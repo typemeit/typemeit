@@ -103,6 +103,18 @@ final class Shortcuts {
         onEvent?(.recordingEnded)
     }
 
+    /// An Option-click on the menu bar puff: starts a recording the way the
+    /// menu does, or stops the one in progress. False when neither applies,
+    /// so the click can open the menu instead.
+    func toggleFromMenuBar() -> Bool {
+        switch phase {
+        case .idle: startFromMenu()
+        case .recording, .pinned: stopFromMenu()
+        case .transcribing, .cleaningUp: return false
+        }
+        return true
+    }
+
     func cancelFromOverlay() {
         guard phase != .idle else { return }
         phase = .idle
