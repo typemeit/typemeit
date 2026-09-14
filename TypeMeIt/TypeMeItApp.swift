@@ -228,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func startRunning() {
         Pipeline.shared.start()
         AppState.shared.ready = true
+        MenuBarClick.install()
         observePipeline()
         previewToastIfAsked()
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
