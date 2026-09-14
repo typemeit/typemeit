@@ -409,8 +409,16 @@ struct MainSettingsTab: View {
                             ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.labelsHidden().fixedSize()
                     }
-                    SettingsRow(label: "debug logs", subtitle: "what each paste did, in the system log", last: true) {
+                    SettingsRow(label: "debug logs", subtitle: "what each dictation and paste did, in a file", last: !settings.debugLogs) {
                         Toggle("", isOn: $settings.debugLogs).toggleStyle(.switch).labelsHidden()
+                    }
+                    if settings.debugLogs {
+                        SettingsRow(label: "log file", subtitle: DebugLog.displayPath, last: true) {
+                            HStack(spacing: 8) {
+                                Button("show") { DebugLog.reveal() }.buttonStyle(InkButtonStyle())
+                                Button("delete") { DebugLog.delete() }.buttonStyle(InkButtonStyle())
+                            }
+                        }
                     }
                 }
                 SettingsGroup(title: "about") {

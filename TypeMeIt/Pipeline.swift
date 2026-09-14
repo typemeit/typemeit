@@ -183,6 +183,7 @@ final class Pipeline {
 
         if duration < Fixed.minimumRecordingSeconds || AudioCapture.peak(pcm) < Fixed.silencePeak {
             Log.app.info("Empty recording discarded (\(duration) s)")
+            DebugLog.write("Dictation discarded: \(durationMs) ms of audio, \(duration < Fixed.minimumRecordingSeconds ? "too short" : "silent")")
             phase = .idle
             shortcuts.setPhase(.idle)
             overlay.hide()
@@ -205,6 +206,7 @@ final class Pipeline {
             } catch {
                 if gen == self.generation {
                     Log.transcriber.error("\(error.localizedDescription)")
+                    DebugLog.write("Dictation discarded: transcription failed (\(error.localizedDescription))")
                     self.finishIdle(discarding: recordingFile)
                 }
                 return
@@ -226,12 +228,15 @@ final class Pipeline {
     }
 
     private static func elapsedMs(since start: ContinuousClock.Instant) -> Int {
-        let d = ContinuousClock.now - start
-        return Int(d.components.seconds * 1000) + Int(d.components.attoseconds / 1_000_000_000_000_000)
+        (ContinuousClock.now - start).milliseconds
     }
 
     private func deliver(raw: Transcriber.Transcript, durationMs: Int, transcribeMs: Int, target: Frontmost.Target?, entryId: UUID, recordingFile: String?, generation gen: Int) async {
-        if ModelText.isBlank(raw.text) { finishIdle(discarding: recordingFile); return }
+        if ModelText.isBlank(raw.text) {
+            DebugLog.write("Dictation discarded: transcript blank after \(durationMs) ms of audio")
+            finishIdle(discarding: recordingFile)
+            return
+        }
         let requested = settings.postProcessingEnabled
         let matched = CustomWordMatcher.apply(raw.matcherWords, terms: store.terms(for: settings.customWords))
         if matched.fixes > 0 { Log.postProcess.info("Custom words replaced \(matched.fixes) run(s)") }
@@ -257,7 +262,11 @@ final class Pipeline {
         finalText = LocalCleanup.run(finalText)
         if requested { finalText = ModelText.stripTrailingFullStop(finalText) }
         // Fillers alone ("um", "uh") clean down to nothing; that is silence, not a dictation.
-        if finalText.isEmpty { finishIdle(discarding: recordingFile); return }
+        if finalText.isEmpty {
+            DebugLog.write("Dictation discarded: clean-up left nothing of \"\(DebugLog.excerpt(raw.text))\"")
+            finishIdle(discarding: recordingFile)
+            return
+        }
 
         if settings.appendTrailingSpace { finalText += " " }
         let focusedIsTextInput = Focus.focusedElementIsTextInput()
@@ -278,7 +287,7 @@ final class Pipeline {
         }
 
         let prompt = settings.copyPromptEnabled && (!pasted || focusedIsTextInput == false)
-        Log.debug("Delivery to \(target?.appName ?? "unknown app"): focus \(focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"), Cmd+V \(pasted ? "posted" : "not posted") → \(prompt ? "copy prompt" : "done")")
+        DebugLog.write("Delivery to \(target?.appName ?? "unknown app"): focus \(focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"), Cmd+V \(pasted ? "posted" : "not posted") → \(prompt ? "copy prompt" : "done")")
         if prompt {
             showCopyPrompt(finalText)
         } else {

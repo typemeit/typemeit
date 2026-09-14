@@ -34,12 +34,13 @@ enum Output {
         await sleep(ms: Fixed.pasteDelayBeforeMs)
 
         let posted = post(keycode: 9, flags: .maskCommand)  // V
+        let postedAt = ContinuousClock.now
         if !posted { Log.output.error("Could not post Cmd+V; Accessibility may be missing") }
-        Log.debug("Paste: Cmd+V \(posted ? "posted" : "not posted") to \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "no frontmost app") with \(text.count) chars \"\(Log.excerpt(text))\" on the clipboard, which held \(savedText.map { "text (\($0.count) chars)" } ?? (savedImage == nil ? "nothing" : "an image")); accessibility \(AXIsProcessTrusted() ? "granted" : "missing"); secure input \(SecureInput.owner.map { "held by \($0.name)" } ?? "off")")
+        DebugLog.write("Paste: Cmd+V \(posted ? "posted" : "not posted") to \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "no frontmost app") with \(text.count) chars \"\(DebugLog.excerpt(text))\" on the clipboard, which held \(savedText.map { "text (\($0.count) chars)" } ?? (savedImage == nil ? "nothing" : "an image")); accessibility \(AXIsProcessTrusted() ? "granted" : "missing"); secure input \(SecureInput.owner.map { "held by \($0.name)" } ?? "off")")
 
         await sleep(ms: Fixed.pasteDelayAfterMs)
         if pb.changeCount != ourChange {
-            Log.debug("Paste: another app rewrote the clipboard before the restore (change \(ourChange) → \(pb.changeCount)); it now holds \(describe(pb))")
+            DebugLog.write("Paste: another app rewrote the clipboard before the restore (change \(ourChange) → \(pb.changeCount)); it now holds \(describe(pb))")
         }
         pb.clearContents()
         if let savedText {
@@ -47,6 +48,7 @@ enum Output {
         } else if let (data, type) = savedImage {
             pb.setData(data, forType: type)
         }
+        DebugLog.write("Paste: clipboard put back \((ContinuousClock.now - postedAt).milliseconds) ms after Cmd+V")
 
         if posted, autoSubmit {
             await sleep(ms: Fixed.autoSubmitDelayMs)
@@ -57,9 +59,9 @@ enum Output {
             }
             _ = post(keycode: 36, flags: flags)  // Return
         }
-        if posted, Settings.shared.debugLogs {
+        if posted, DebugLog.enabled {
             if autoSubmit {
-                Log.debug("Paste check skipped: auto submit is on")
+                DebugLog.write("Paste check skipped: auto submit is on")
             } else {
                 Task { await checkLanded(text, previousClipboard: savedText) }
             }
@@ -89,16 +91,16 @@ enum Output {
     /// its denylist.
     private static func checkLanded(_ text: String, previousClipboard: String?) async {
         if let owner = SecureInput.owner {
-            Log.debug("Paste check skipped: secure input held by \(owner.name)")
+            DebugLog.write("Paste check skipped: secure input held by \(owner.name)")
             return
         }
         try? await Task.sleep(for: ReadBackTiming.settle)
         guard let field = FocusedTextField.captureFrontmost() else {
-            Log.debug("Paste check: no readable text field has focus")
+            DebugLog.write("Paste check: no readable text field has focus")
             return
         }
         if let bundle = field.bundleId, ReadBack.denied(bundle) {
-            Log.debug("Paste check skipped: \(bundle) is never read back")
+            DebugLog.write("Paste check skipped: \(bundle) is never read back")
             return
         }
         var lastCount: Int?
@@ -108,7 +110,7 @@ enum Output {
             guard let value = field.value() else { continue }
             lastCount = value.count
             if ReadBackText.snapshot(value: value, pasted: text, caretUTF16: nil) != nil {
-                Log.debug("Paste check: transcript found in the field on read \(attempt + 1)")
+                DebugLog.write("Paste check: transcript found in the field on read \(attempt + 1)")
                 return
             }
             if let previous = previousClipboard, previous.count >= PasteCheck.minimumClipboardChars,
@@ -117,10 +119,10 @@ enum Output {
             }
         }
         guard let lastCount else {
-            Log.debug("Paste check: the field's value could not be read")
+            DebugLog.write("Paste check: the field's value could not be read")
             return
         }
-        Log.debug("Paste check: transcript not in the field (\(lastCount) chars) after \(PasteCheck.reads) reads\(previousSeen ? "; the clipboard's previous text is" : "")")
+        DebugLog.write("Paste check: transcript not in the field (\(lastCount) chars) after \(PasteCheck.reads) reads\(previousSeen ? "; the clipboard's previous text is" : "")")
     }
 
     private enum PasteCheck {
@@ -131,5 +133,11 @@ enum Output {
         /// Shorter previous clipboard text is too likely to be in the field
         /// already for its presence to mean anything.
         static let minimumClipboardChars = 8
+    }
+}
+
+extension Duration {
+    var milliseconds: Int {
+        Int(components.seconds * 1000) + Int(components.attoseconds / 1_000_000_000_000_000)
     }
 }
