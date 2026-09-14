@@ -1,6 +1,6 @@
 import CoreGraphics
 import Testing
-@testable import TypeMeIt
+@testable import typemeit
 
 struct ScreenSamplerTests {
     private func image(gray: CGFloat) -> CGImage {

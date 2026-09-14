@@ -34,7 +34,7 @@ enum Frontmost {
     }
 
     /// Title of the app's focused window via the accessibility layer. Requires
-    /// the Accessibility permission TypeMeIt already needs for pasting; without
+    /// the Accessibility permission typemeit already needs for pasting; without
     /// it the attribute copy fails with `kAXErrorAPIDisabled` and this
     /// returns `nil`.
     private static func focusedWindowTitle(pid: pid_t) -> String? {

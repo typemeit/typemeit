@@ -22,11 +22,11 @@ certificate in the keychain, drop the `Debug` block under `configs` in
 `project.yml` before generating.
 
 ```sh
-xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug build
-xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt test
+xcodebuild -project typemeit.xcodeproj -scheme typemeit -configuration Debug build
+xcodebuild -project typemeit.xcodeproj -scheme typemeit test
 ```
 
-Dependencies are the transcribe.cpp XCFramework, fetched by SwiftPM from the upstream release (`Packages/TranscribeCpp`), and Sparkle, which handles updates. The speech model (697 MB) is downloaded during onboarding into `~/Library/Application Support/TypeMeIt/models/`.
+Dependencies are the transcribe.cpp XCFramework, fetched by SwiftPM from the upstream release (`Packages/TranscribeCpp`), and Sparkle, which handles updates. The speech model (697 MB) is downloaded during onboarding into `~/Library/Application Support/typemeit/models/`.
 
 ## Permissions
 
@@ -34,8 +34,8 @@ Microphone, Accessibility (pasting and reading corrections) and Input Monitoring
 
 ## Layout
 
-- `TypeMeIt/` app sources, one file per module
-- `TypeMeIt/Learning/`, `TypeMeIt/Insights/` ports of Handy's learning engine and insights, with their tests in `TypeMeItTests/`
+- `typemeit/` app sources, one file per module
+- `typemeit/Learning/`, `typemeit/Insights/` ports of Handy's learning engine and insights, with their tests in `typemeitTests/`
 - `Packages/TranscribeCpp/` the XCFramework wrapper
-- `web/` the puff on a web page, driven by the pointer; `generate.py` transpiles the shader from `TypeMeIt/Overlay/Puff.metal`
+- `web/` the puff on a web page, driven by the pointer; `generate.py` transpiles the shader from `typemeit/Overlay/Puff.metal`
 - `Scripts/`, `.github/workflows/` the release pipeline; `Scripts/generate-dmg-background.sh` draws the disk image's background from frames of the app's own puff shader in `Scripts/puff/`; `Scripts/generate-og.sh` draws the site's link previews, `web/og.png` and `web/og-square.png`, the same way through `Scripts/og/`

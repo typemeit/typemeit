@@ -1,5 +1,5 @@
 import XCTest
-@testable import TypeMeIt
+@testable import typemeit
 
 final class ScreenContextTests: XCTestCase {
     private let dictionary: Set<String> = ["the", "meeting", "with", "on", "monday", "about", "is", "at", "and", "please", "review", "this", "for", "me", "return", "raw", "const", "state", "null", "aubergine"]

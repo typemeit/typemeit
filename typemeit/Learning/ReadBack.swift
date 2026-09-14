@@ -1,6 +1,6 @@
 import Foundation
 
-/// Watches the field TypeMeIt pasted into and learns from the user's corrections
+/// Watches the field typemeit pasted into and learns from the user's corrections
 /// there. One session at a time; a new recording ends the previous session.
 @MainActor
 final class ReadBack {

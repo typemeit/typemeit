@@ -70,7 +70,7 @@ jobs:
           compression-level: 0 # already quantised; zip only wastes runner time
 
       # --latest=false: typeme.it/download resolves /releases/latest/download/
-      # TypeMeIt.dmg, so a model release taking "Latest" breaks every download
+      # typemeit.dmg, so a model release taking "Latest" breaks every download
       # until an app release follows.
       - name: Publish it
         if: inputs.publish

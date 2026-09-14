@@ -8,7 +8,7 @@ a build over `/Applications/type me it.app`, which is the user's release install
 
 ```sh
 DEVELOPMENT_TEAM=Z28DW76Y3W xcodegen generate
-xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug -derivedDataPath build/dd build
+xcodebuild -project typemeit.xcodeproj -scheme typemeit -configuration Debug -derivedDataPath build/dd build
 open "build/dd/Build/Products/Debug/type me it dev.app"
 ```
 

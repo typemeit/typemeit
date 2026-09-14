@@ -1,6 +1,6 @@
 # On-device alternatives to Apple Intelligence for transcript cleanup
 
-Type Me It cleans transcripts with Apple's on-device foundation model through the
+typemeit cleans transcripts with Apple's on-device foundation model through the
 Foundation Models framework (`PostProcessor.swift`). This note records what else
 could run the same job on the user's Mac, what it would cost in time, memory and
 power, and what the current setup gives up. Written September 2026.

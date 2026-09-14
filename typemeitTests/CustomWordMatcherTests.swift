@@ -1,5 +1,5 @@
 import XCTest
-@testable import TypeMeIt
+@testable import typemeit
 
 final class CustomWordMatcherTests: XCTestCase {
     private let terms = ["typeme.it", "Eliza", "lottie.org", "ack", "fucking", "lib"]

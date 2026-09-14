@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import Testing
-@testable import TypeMeIt
+@testable import typemeit
 
 struct KeyComboTests {
     let combo = KeyCombo(keyCode: 8, modifiers: [.command, .shift], keyLabel: "C")

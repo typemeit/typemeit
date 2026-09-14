@@ -1,5 +1,5 @@
 // Generates web/styles/theme.css (Tailwind v4 @theme) and
-// TypeMeIt/DesignTokens.swift from design/tokens.json.
+// typemeit/DesignTokens.swift from design/tokens.json.
 //
 //   node design/build-tokens.mjs        from the repo root
 //   npm run tokens                      from web/
@@ -143,6 +143,6 @@ sw.push(`    }`);
 sw.push(`}`);
 sw.push(``);
 
-const swiftOut = join(root, 'TypeMeIt/DesignTokens.swift');
+const swiftOut = join(root, 'typemeit/DesignTokens.swift');
 writeFileSync(swiftOut, sw.join('\n'));
 console.log(`wrote ${swiftOut}`);

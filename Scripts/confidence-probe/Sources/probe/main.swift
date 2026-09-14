@@ -10,7 +10,7 @@ import Foundation
 struct Entry: Decodable { let id: String; let transcript: String; let recordingFile: String?; let timestamp: String }
 struct Learned: Decodable { let heard: String; let historyId: String; let undone: Bool }
 
-let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TypeMeIt")
+let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("typemeit")
 let limit = CommandLine.arguments.dropFirst().compactMap(Int.init).first ?? 80
 let showAll = CommandLine.arguments.contains("--all")
 

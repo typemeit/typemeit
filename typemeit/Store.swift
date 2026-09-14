@@ -50,8 +50,33 @@ final class Store {
 
     nonisolated static let directory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("TypeMeIt", isDirectory: true)
+        adoptLegacyDirectory(in: base)
+        return base.appendingPathComponent("typemeit", isDirectory: true)
     }()
+
+    /// Everything used to live in "TypeMeIt", and the model alone is 697 MB, so
+    /// the old folder is renamed rather than left behind. A case-insensitive
+    /// volume -- the default on macOS -- already answers to the new name, and
+    /// there a rename has to go through a third name to get past the match.
+    /// The staging name is checked first, in case a crash parked it there.
+    private nonisolated static func adoptLegacyDirectory(in base: URL) {
+        let fm = FileManager.default
+        let names = Set((try? fm.contentsOfDirectory(atPath: base.path)) ?? [])
+        guard !names.contains("typemeit") else { return }
+        let staging = base.appendingPathComponent("typemeit.renaming", isDirectory: true)
+        let target = base.appendingPathComponent("typemeit", isDirectory: true)
+        do {
+            if names.contains("typemeit.renaming") {
+                try fm.moveItem(at: staging, to: target)
+            } else if names.contains("TypeMeIt") {
+                try fm.moveItem(at: base.appendingPathComponent("TypeMeIt", isDirectory: true), to: staging)
+                try fm.moveItem(at: staging, to: target)
+            }
+        } catch {
+            Log.store.error("Could not rename the old TypeMeIt folder: \(error.localizedDescription)")
+        }
+    }
+
     private var historyURL: URL { Store.directory.appendingPathComponent("history.json") }
     private var learnedURL: URL { Store.directory.appendingPathComponent("learned-words.json") }
 

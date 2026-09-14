@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates the site favicons from the menu bar puff,
-# TypeMeIt/Support/Icon/puff.svg. Requires rsvg-convert, magick, python3.
+# typemeit/Support/Icon/puff.svg. Requires rsvg-convert, magick, python3.
 #
 # favicon.svg      source stroke; follows the browser's colour scheme (Chrome, Firefox)
 # favicon.ico      16/32 stroked heavier so the arcs survive, 48 at source stroke; dark ink
@@ -15,7 +15,7 @@ trap 'rm -rf "$TMP"' EXIT
 python3 - "$TMP" <<'PY'
 import re, sys
 tmp = sys.argv[1]
-src = open('../TypeMeIt/Support/Icon/puff.svg').read()
+src = open('../typemeit/Support/Icon/puff.svg').read()
 paths = re.findall(r'<path d="([^"]+)"/>', src)
 # The artwork spans 10.6..54.3 x 8.5..54.4 in the 64 viewBox; a 60-unit
 # square centred on it leaves a margin of about an eighth on every side, so the
@@ -23,7 +23,7 @@ paths = re.findall(r'<path d="([^"]+)"/>', src)
 def svg(width, style=''):
     return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.45 1.45 60 60" fill="none" stroke="#0a0a0a" '
             f'stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round">\n'
-            '  <!-- The menu bar puff from TypeMeIt/Support/Icon/puff.svg. Follows the tab\n'
+            '  <!-- The menu bar puff from typemeit/Support/Icon/puff.svg. Follows the tab\n'
             '       bar\'s colour scheme in browsers that render SVG favicons; the PNG and\n'
             '       ICO cover the rest. -->\n'
             f'  <style>{style}@media (prefers-color-scheme: dark) {{ svg {{ stroke: #fafafa; }} }}</style>\n'

@@ -4,6 +4,6 @@
 # Intelligence on. An optional argument names another PostProcessor.swift.
 set -e
 cd "$(dirname "$0")"
-PP="${1:-../../TypeMeIt/PostProcessor.swift}"
-swiftc -parse-as-library -O -enable-bare-slash-regex eval.swift "$PP" ../../TypeMeIt/Log.swift ../../TypeMeIt/ModelText.swift ../../TypeMeIt/ScreenContext.swift ../../TypeMeIt/CustomWordMatcher.swift ../../TypeMeIt/LocalCleanup.swift -o eval
+PP="${1:-../../typemeit/PostProcessor.swift}"
+swiftc -parse-as-library -O -enable-bare-slash-regex eval.swift "$PP" ../../typemeit/Log.swift ../../typemeit/ModelText.swift ../../typemeit/ScreenContext.swift ../../typemeit/CustomWordMatcher.swift ../../typemeit/LocalCleanup.swift -o eval
 ./eval

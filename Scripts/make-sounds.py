@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the feedback cues in TypeMeIt/Resources. Run after changing anything here.
+"""Generate the feedback cues in typemeit/Resources. Run after changing anything here.
 
 pin    a dust pop: one click with a whisper of crackle behind it
 stop   a valve hum letting go
@@ -73,6 +73,6 @@ def write(path, samples, peak=PEAK):
         w.writeframes(bytes(data))
 
 
-write("TypeMeIt/Resources/pop_pin.wav", dust_pop())
+write("typemeit/Resources/pop_pin.wav", dust_pop())
 # the stop sits under the start and pin
-write("TypeMeIt/Resources/pop_stop.wav", hum_off(), peak=0.28)
+write("typemeit/Resources/pop_stop.wav", hum_off(), peak=0.28)

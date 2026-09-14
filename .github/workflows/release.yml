@@ -67,6 +67,6 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes \
-            build/TypeMeIt.dmg \
+            build/typemeit.dmg \
             build/updates/appcast.xml
 

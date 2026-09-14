@@ -1,5 +1,5 @@
 import XCTest
-@testable import TypeMeIt
+@testable import typemeit
 
 final class PostProcessorTests: XCTestCase {
     func testLostOpeningRejectsADroppedStart() {

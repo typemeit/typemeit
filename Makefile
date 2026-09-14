@@ -24,7 +24,7 @@ TRANSCRIBE := $(shell sed -n 's|.*releases/download/\(v[^/]*\)/.*|\1|p' Packages
 # What the shipped app will accept. It hashes the file after downloading and
 # throws away anything that does not match, so publishing a file that disagrees
 # with these is publishing a download that can only fail.
-STORE := TypeMeIt/ModelStore.swift
+STORE := typemeit/ModelStore.swift
 PINNED_SHA := $(shell sed -n 's/.*let sha256 = "\([0-9a-f]*\)".*/\1/p' $(STORE))
 PINNED_BYTES := $(shell sed -n 's/.*let expectedBytes: Int64 = \([0-9_]*\).*/\1/p' $(STORE) | tr -d _)
 

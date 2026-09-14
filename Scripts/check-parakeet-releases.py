@@ -26,7 +26,7 @@ import urllib.parse
 import urllib.request
 
 HF_API = "https://huggingface.co/api"
-MODEL_STORE = os.path.join(os.path.dirname(__file__), "..", "TypeMeIt", "ModelStore.swift")
+MODEL_STORE = os.path.join(os.path.dirname(__file__), "..", "typemeit", "ModelStore.swift")
 
 # What ModelStore.swift pins: the repo, and the file plus digest the app will
 # accept. The digest is the real baseline -- it is what the app checks after

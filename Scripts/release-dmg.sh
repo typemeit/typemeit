@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 IDENTITY="Developer ID Application: Max Mitchell (Z28DW76Y3W)"
 BUILD="$PWD/build"
 DERIVED="$BUILD/DerivedData"
-ARCHIVE="$BUILD/TypeMeIt.xcarchive"
+ARCHIVE="$BUILD/typemeit.xcarchive"
 APP="$BUILD/export/type me it.app"
 
 # Always moves forward, so it outranks every earlier build with no shared-state
@@ -56,8 +56,8 @@ PLIST
 # -derivedDataPath is not a tidiness flag: Sparkle's tools ship as an SPM binary
 # artifact, and this is what puts them at a known path below.
 xcodebuild archive \
-  -project TypeMeIt.xcodeproj \
-  -scheme TypeMeIt \
+  -project typemeit.xcodeproj \
+  -scheme typemeit \
   -configuration Release \
   -archivePath "$ARCHIVE" \
   -derivedDataPath "$DERIVED" \
@@ -80,11 +80,11 @@ xcodebuild -exportArchive \
 
 VERSION="${MARKETING_VERSION:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")}"
 
-# The asset is named the same every release: /releases/latest/download/TypeMeIt.dmg
+# The asset is named the same every release: /releases/latest/download/typemeit.dmg
 # is what the appcast and the site's download Worker fetch, and that path only
 # resolves for a fixed name. GitHub replaces spaces in asset names with dots, so
 # the name a visitor saves ("type me it.dmg") is set by the Worker, not here.
-DMG="$BUILD/TypeMeIt.dmg"
+DMG="$BUILD/typemeit.dmg"
 
 # Notarization round-trips to Apple and takes minutes, so a binary that can never
 # pass fails here instead -- locally, in a second, naming the reason.
@@ -106,10 +106,10 @@ notarize() { # file
 # Stapling only the DMG is not enough -- once the app is dragged to /Applications
 # it carries no ticket, so an offline Mac that has never seen it has nothing
 # local to verify against.
-ditto -c -k --keepParent "$APP" "$BUILD/TypeMeIt.zip"
-notarize "$BUILD/TypeMeIt.zip"
+ditto -c -k --keepParent "$APP" "$BUILD/typemeit.zip"
+notarize "$BUILD/typemeit.zip"
 xcrun stapler staple "$APP"
-rm -f "$BUILD/TypeMeIt.zip"
+rm -f "$BUILD/typemeit.zip"
 
 STAGE="$BUILD/dmg-stage"
 rm -rf "$STAGE" "$DMG"
@@ -129,7 +129,7 @@ fi
 # UDZO image is read-only, so lay out a UDRW image first, then convert. Laying
 # it out after compression looks like it works and silently produces a default
 # window.
-RW="$BUILD/TypeMeIt-rw.dmg"
+RW="$BUILD/typemeit-rw.dmg"
 MNT="/Volumes/type me it"
 rm -f "$RW"
 hdiutil create -volname "type me it" -srcfolder "$STAGE" -ov -format UDRW "$RW"

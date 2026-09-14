@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import TypeMeIt
+@testable import typemeit
 
 /// Eight rows in the order the history lists them, newest first.
 private let rows = (0..<8).map { _ in UUID() }

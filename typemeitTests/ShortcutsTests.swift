@@ -1,5 +1,5 @@
 import Testing
-@testable import TypeMeIt
+@testable import typemeit
 
 @MainActor
 struct ShortcutsTests {

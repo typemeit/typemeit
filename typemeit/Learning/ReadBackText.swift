@@ -1,4 +1,4 @@
-// The text side of learning from corrections made in the app TypeMeIt pasted
+// The text side of learning from corrections made in the app typemeit pasted
 // into. Right after a paste lands, the focused field's value is captured
 // along with the text before and after the pasted span; later reads compare
 // the span between the same anchors against what was pasted. Text outside
@@ -44,7 +44,7 @@ enum ReadBackText {
     /// Locate `pasted` in `value`. When the caret position is known the
     /// occurrence ending nearest before it wins, since the caret sits at the
     /// end of a fresh paste; otherwise the last occurrence. A trailing-space
-    /// variant of the paste is tried too, because TypeMeIt can append one on
+    /// variant of the paste is tried too, because typemeit can append one on
     /// paste. Nil when the paste is not in the field.
     static func snapshot(value: String, pasted: String, caretUTF16: Int?) -> PasteSnapshot? {
         let scalars = value.unicodeScalars

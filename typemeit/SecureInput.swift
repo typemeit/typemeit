@@ -38,7 +38,7 @@ enum SecureInput {
     }
 
     /// "Press 🌐 key to" in System Settings > Keyboard. 0 means Do Nothing,
-    /// which TypeMeIt needs so the release of Fn does not open the emoji picker.
+    /// which typemeit needs so the release of Fn does not open the emoji picker.
     static var fnKeyDoesNothing: Bool {
         let value = CFPreferencesCopyAppValue("AppleFnUsageType" as CFString, "com.apple.HIToolbox" as CFString)
         guard let value else { return false }

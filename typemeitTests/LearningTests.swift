@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-@testable import TypeMeIt
+@testable import typemeit
 
 /// Answers with a fixed list, recording what it was asked.
 private final class Scripted: VocabularyCheck, @unchecked Sendable {

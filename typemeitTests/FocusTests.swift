@@ -1,5 +1,5 @@
 import Testing
-@testable import TypeMeIt
+@testable import typemeit
 
 struct FocusTests {
     @Test func textRolesAreTextInputs() {

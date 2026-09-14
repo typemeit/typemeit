@@ -4,7 +4,7 @@ import ServiceManagement
 import SwiftUI
 
 @main
-struct TypeMeItApp: App {
+struct MainApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var appState = AppState.shared
 

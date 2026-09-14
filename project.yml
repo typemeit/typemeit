@@ -1,4 +1,4 @@
-name: TypeMeIt
+name: typemeit
 options:
   bundleIdPrefix: it.typeme
   deploymentTarget:
@@ -36,18 +36,18 @@ packages:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
 targets:
-  TypeMeIt:
+  typemeit:
     type: application
     platform: macOS
     sources:
-      - path: TypeMeIt
+      - path: typemeit
         excludes:
           - "Resources/AppIcon.icns"
           - "Resources/AppIcon-Dev.icns"
           - "Support/Icon/**"
-      - path: TypeMeIt/Resources/AppIcon.icns
+      - path: typemeit/Resources/AppIcon.icns
         buildPhase: resources
-      - path: TypeMeIt/Resources/AppIcon-Dev.icns
+      - path: typemeit/Resources/AppIcon-Dev.icns
         buildPhase: resources
     dependencies:
       - package: TranscribeCpp
@@ -55,7 +55,7 @@ targets:
       - package: Sparkle
         product: Sparkle
     info:
-      path: TypeMeIt/Support/Info.plist
+      path: typemeit/Support/Info.plist
       properties:
         CFBundleDisplayName: "$(PRODUCT_NAME)"
         CFBundleName: "$(PRODUCT_NAME)"
@@ -72,7 +72,7 @@ targets:
         SUAutomaticallyUpdate: true
         SUPublicEDKey: WGBC31wJMt0uMIwvfVDsWaqVJL8ki+jRfdKACFhPEDw=
     entitlements:
-      path: TypeMeIt/Support/TypeMeIt.entitlements
+      path: typemeit/Support/typemeit.entitlements
       properties:
         com.apple.security.device.audio-input: true
         com.apple.security.cs.allow-unsigned-executable-memory: false
@@ -80,7 +80,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
         PRODUCT_NAME: type me it
-        PRODUCT_MODULE_NAME: TypeMeIt
+        PRODUCT_MODULE_NAME: typemeit
         GENERATE_INFOPLIST_FILE: NO
         SWIFT_OBJC_BRIDGING_HEADER: ""
         OTHER_LDFLAGS: "-lc++ -lz"
@@ -93,12 +93,12 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.dev
           PRODUCT_NAME: type me it dev
           APP_ICON_FILE: AppIcon-Dev
-  TypeMeItTests:
+  typemeitTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [TypeMeItTests]
+    sources: [typemeitTests]
     dependencies:
-      - target: TypeMeIt
+      - target: typemeit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.tests
@@ -109,13 +109,13 @@ targets:
           TEST_HOST: "$(BUILT_PRODUCTS_DIR)/type me it dev.app/Contents/MacOS/type me it dev"
           BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
-  TypeMeIt:
+  typemeit:
     build:
       targets:
-        TypeMeIt: all
-        TypeMeItTests: [test]
+        typemeit: all
+        typemeitTests: [test]
     run:
       config: Debug
     test:
       config: Debug
-      targets: [TypeMeItTests]
+      targets: [typemeitTests]

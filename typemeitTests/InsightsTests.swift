@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import TypeMeIt
+@testable import typemeit
 
 /// Gregorian calendar in UTC, so every date in these tests is a fixed
 /// instant regardless of the machine's zone.
