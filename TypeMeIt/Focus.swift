@@ -84,6 +84,7 @@ enum Focus {
 
         guard let focused else {
             Log.output.notice("Focus check: no focused element from system or app")
+            DebugLog.write("Focus check: no focused element from system or app")
             return nil
         }
         focused.applyMessagingTimeout()
@@ -98,7 +99,9 @@ enum Focus {
         AXUIElementGetPid(focused, &pid)
         let owner = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "pid \(pid)"
         let isText = classifyRole(role, valueSettable: valueSettable)
-        Log.output.notice("Focus check (\(source, privacy: .public)): \(owner, privacy: .public) role \(role, privacy: .public) subrole \(subrole, privacy: .public) valueSettable \(valueSettable) -> \(isText ? "text input" : "not text input", privacy: .public)")
+        let line = "Focus check (\(source)): \(owner) role \(role) subrole \(subrole) valueSettable \(valueSettable) -> \(isText ? "text input" : "not text input")"
+        Log.output.notice("\(line, privacy: .public)")
+        DebugLog.write(line)
         return isText
     }
 }
@@ -133,6 +136,15 @@ final class FocusedTextField: @unchecked Sendable {
         let app = AXUIElementCreateApplication(pid)
         app.applyMessagingTimeout()
         return fromFocusedElement(of: app)
+    }
+
+    /// `capture()`, then the frontmost app's own focused element when the
+    /// system-wide one gave nothing: the same route as the focus check, for
+    /// the Macs where only the app answers.
+    static func captureFrontmost() -> FocusedTextField? {
+        if let field = capture() { return field }
+        guard let front = NSWorkspace.shared.frontmostApplication else { return nil }
+        return capture(inApplication: front.processIdentifier)
     }
 
     /// Reads `AXFocusedUIElement` of `parent` and wraps it if it is a

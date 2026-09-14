@@ -404,10 +404,21 @@ struct MainSettingsTab: View {
                     SettingsRow(label: "dock icon") {
                         Toggle("", isOn: Binding(get: { settings.showDockIcon }, set: { settings.showDockIcon = $0; AppDelegate.shared?.applyDockIcon() })).toggleStyle(.switch).labelsHidden()
                     }
-                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud", last: true) {
+                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud") {
                         Picker("", selection: Binding(get: { settings.appearance }, set: { settings.appearance = $0; AppDelegate.shared?.applyAppearance() })) {
                             ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.labelsHidden().fixedSize()
+                    }
+                    SettingsRow(label: "debug logs", subtitle: "what each dictation and paste did, in a file", last: !settings.debugLogs) {
+                        Toggle("", isOn: $settings.debugLogs).toggleStyle(.switch).labelsHidden()
+                    }
+                    if settings.debugLogs {
+                        SettingsRow(label: "log file", subtitle: DebugLog.displayPath, last: true) {
+                            HStack(spacing: 8) {
+                                Button("show") { DebugLog.reveal() }.buttonStyle(InkButtonStyle())
+                                Button("delete") { DebugLog.delete() }.buttonStyle(InkButtonStyle())
+                            }
+                        }
                     }
                 }
                 SettingsGroup(title: "about") {

@@ -121,6 +121,16 @@ final class Settings {
     }
     /// Words removed by the learned-words toast's Undo. Never learned again.
     var undoneWords: [String] { didSet { defaults.set(undoneWords, forKey: "undoneWords") } }
+    /// Writes what each dictation and paste did to `DebugLog.url`, naming
+    /// the app, the clipboard's contents and the start of the transcript.
+    /// For bug reports.
+    var debugLogs: Bool {
+        didSet {
+            defaults.set(debugLogs, forKey: "debugLogs")
+            DebugLog.enabled = debugLogs
+            if debugLogs { DebugLog.writeHeader() }
+        }
+    }
 
     private init() {
         let d = UserDefaults.standard
@@ -150,6 +160,9 @@ final class Settings {
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
+        debugLogs = bool("debugLogs", false)
+        DebugLog.enabled = debugLogs
+        if debugLogs { DebugLog.writeHeader() }
     }
 
     func addCustomWord(_ word: String) {

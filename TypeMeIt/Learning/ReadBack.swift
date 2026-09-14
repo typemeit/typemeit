@@ -24,7 +24,7 @@ final class ReadBack {
         current = nil
     }
 
-    private static func denied(_ bundle: String) -> Bool {
+    static func denied(_ bundle: String) -> Bool {
         Fixed.learningAppDenylist.contains { $0.caseInsensitiveCompare(bundle) == .orderedSame }
     }
 
