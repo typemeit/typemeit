@@ -438,10 +438,12 @@ Problem 1, a paste that lands nothing.
   six post or hold a real Command key. A stale Accessibility grant after an
   update, which `AXIsProcessTrusted` cannot distinguish ([ADR-0040][wh-adr40],
   [#150][wh-150]); Type Me It's `posted` flag cannot see it either
-  (`Output.swift` 9–10). Secure event input, which drops synthetic keystrokes
-  ([tn2150], [Yap][yap-inj] 69–72); Type Me It already knows the holder
-  (`SecureInput.owner`) and could show the copy prompt instead of pasting.
-  The V key code not being V on the active layout (VoiceInk
+  (`Output.swift` 9–10). Not secure event input: TN2150 defines its effect on
+  processes that intercept keyboard events (HID seize, event taps, `GetKeys`)
+  and says nothing about posted events [tn2150]; loginwindow holds it after
+  every unlock (`TypeMeIt/SecureInput.swift` 7–9) and pastes land then, so
+  Yap's refusal to paste under it ([Yap][yap-inj] 69–72) is a choice, not a
+  finding. The V key code not being V on the active layout (VoiceInk
   [cbf7f60][vi-c-layout], OpenSuperWhisper [#90][osw-90], Handy
   [input.rs][handy-input] 77–133). An early restore, which for Chromium's
   asynchronous read turns into an empty paste rather than an old one
