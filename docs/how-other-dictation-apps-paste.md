@@ -11,25 +11,39 @@ and its GitHub issues. Written September 2026.
 
 ## Where Type Me It stands
 
-- `Output.paste` (`TypeMeIt/Output.swift` 23–70): saves the clipboard's text,
-  or an image when there is no text (25–28); writes the transcript and records
-  `changeCount` (30–33); sleeps `Fixed.pasteDelayBeforeMs` = 60 ms
-  (`TypeMeIt/Settings.swift` 191); posts V key-down and key-up with
-  `.maskCommand` to `.cghidEventTap` from a `nil` event source, with no
-  Command key events of their own (8–16, 36); sleeps `Fixed.pasteDelayAfterMs`
-  = 60 ms (192); logs, but does not act on, a changed `changeCount` (42–44);
-  clears and restores unconditionally (45–50). Auto-submit posts Return
-  `Fixed.autoSubmitDelayMs` = 50 ms later (53–61).
+Until 2026-09-14 `Output.paste` wrote the transcript, slept 60 ms, posted a
+V key-down and key-up carrying `.maskCommand`, slept 60 ms and restored the
+clipboard unconditionally; the focus check answered `false` for any role
+outside its text list whose `AXValue` was not settable. The survey below was
+written against that version. It now works as follows.
+
+- `Output.paste` (`TypeMeIt/Output.swift`): saves the clipboard's text, or
+  an image when there is no text; promises the transcript with
+  `declareTypes(_:owner:)` plus the three `org.nspasteboard` marker types;
+  sleeps `Fixed.pasteDelayBeforeMs` = 60 ms; posts Command down, V down,
+  V up, Command up to `.cghidEventTap` from a `nil` event source, and
+  returns. `PasteTransaction` receives `pasteboard(_:provideDataForType:)`
+  when the first reader asks for the string, then restores
+  `Fixed.pasteQuietMs` = 200 ms after that read, `Fixed.pasteUnreadCapMs` =
+  8 s after Cmd+V when nothing reads, or `Fixed.pasteReadEarlyMs` = 1.5 s
+  after Cmd+V when a reader took the receipt before the chord. It does not
+  restore when `changeCount` has moved. Auto-submit posts Return
+  `Fixed.autoSubmitDelayMs` = 50 ms after the read, and not at all when
+  nothing read the clipboard. `PasteTiming.plan` is the pure form.
 - The return value is whether `CGEvent(keyboardEventSource:...)` returned an
-  event (9–10, 69). It does not report whether the system delivered it.
-- `Focus.focusedElementIsTextInput` (`TypeMeIt/Focus.swift` 54–106) reads
+  event. It does not report whether the system delivered it.
+- `Focus.focusedElementIsTextInput` (`TypeMeIt/Focus.swift`) reads
   `kAXFocusedUIElement` from the system-wide element, then from the frontmost
-  app (60–83), and classifies the role as text input when it is
-  AXTextField/AXTextArea/AXComboBox/AXSearchField or `AXValue` is settable
-  (18, 26–28, 97–101). `nil` when nothing answers (85–89).
-- `Pipeline` (`TypeMeIt/Pipeline.swift` 272–296) runs the focus check, pastes
-  regardless of its answer, and shows the copy prompt when the focus check
-  returned `false` or no event could be created (289–292).
+  app, and classifies the role: `true` for
+  AXTextField/AXTextArea/AXComboBox/AXSearchField or a settable `AXValue`,
+  `false` for a listed role that never takes text (`Focus.nonTextRoles`),
+  `nil` for any other role and when nothing answers.
+- `Pipeline` (`TypeMeIt/Pipeline.swift`) runs the focus check, pastes
+  regardless of its answer, and shows the copy prompt at once when the focus
+  check returned `false` or no event could be created. Otherwise it waits
+  `Fixed.pasteLandedWaitMs` = 1 s for the read receipt and shows the prompt
+  only if nothing read the clipboard: Finder beeps at Cmd+V without reading
+  it; Zed reads at ~30 ms while reporting its window as the focused element.
 - Secure input is polled once a second for the menu (`TypeMeIt/TypeMeItApp.swift`
   233–236) and logged at paste time (`Output.swift` 39), but the paste is not
   gated on it.
@@ -204,8 +218,9 @@ Source at commit `db1aaac`, 2026-09. [clipboard.rs][handy-clip],
   receipt (Chromium reads more than once), or after 8 s with no receipt, or
   500 ms if the chord could not be sent; it is skipped when `changeCount`
   moved or `pasteboardChangedOwner:` fired ([paste_tx/mod.rs][handy-tx] 18–32,
-  50–63, 139–157; [macos.rs][handy-tx-mac] 157–177). Auto-submit Enter is sent
-  only after a receipt (141–155). The write carries the three
+  50–63, 139–157; [macos.rs][handy-tx-mac] 157–177). Auto-submit Enter goes
+  out when the transaction settles, after a receipt or at the timeout
+  (141–155). The write carries the three
   `org.nspasteboard` marker types so clipboard managers do not read it (36–40).
 - Focus: none (no AX focused-element query in `src-tauri/src`). Secure input
   is detected for shortcuts, not for the paste
@@ -383,7 +398,7 @@ Source at commit `ac5ddb4`, 2026-08.
 
 | Project | Cmd+V mechanism | Wait before / after | Restore guard | Focus check | When it cannot paste |
 |---|---|---|---|---|---|
-| Type Me It | V with flag, nil source, HID tap | 60 / 60 ms | none (logged only) | AX role or settable `AXValue`; `nil` pastes anyway | copy prompt |
+| Type Me It | 4 events, nil source, HID tap; promised pasteboard type | 60 / 200 ms after the read receipt, 8 s cap | `changeCount` equal | AX role or settable `AXValue`; generic roles and `nil` paste with no prompt | copy prompt |
 | VoiceInk | 4 events, `.privateState`; or AppleScript (setting) | 100 / 2 s default, 250 ms floor | text equal + UUID session type | none (tried 2025-07, removed) | none |
 | Hex | 4 events, `.combinedSessionState`, Sauce keycode; or AppleScript typing | poll `changeCount` ≤150 ms / 500 ms | none | none (AX insert code unreachable) | text stays on clipboard |
 | OpenSuperWhisper | V with flag, `.combinedSessionState`, layout-resolved keycode | 0 / 1.5 s | `changeCount` equal | none | none |
@@ -403,7 +418,7 @@ Problem 2, the previous clipboard being pasted.
   was outrun somewhere: 60–190 ms in Handy [#502][handy-502], 250 and 500 ms
   in VoiceInk [#722][vi-722], 1 s in VoiceInk [#415][vi-415], 100 ms in
   OpenSuperWhisper [#153][osw-153], 250 ms in Yap for Chromium
-  ([afa8872][yap-c-cross]). Type Me It's 60 ms after the keystroke is the
+  ([afa8872][yap-c-cross]). Type Me It's 60 ms after the keystroke was the
   shortest of the set, equal to Handy's legacy default.
 - Verified in source: Handy's promise-based restore is the only approach that
   waits for the read itself ([paste_tx/macos.rs][handy-tx-mac]). The Swift
@@ -418,10 +433,9 @@ Problem 2, the previous clipboard being pasted.
 - The cheaper change is the one VoiceInk, OpenSuperWhisper, Yap and Talkify
   converged on: a long delay (500 ms to 2 s) plus restore only when
   `changeCount` still equals the value read after our write, ideally with a
-  private session type. Type Me It already reads `ourChange`
-  (`Output.swift` 33, 42); it needs to skip the restore on a mismatch rather
-  than log it. The delay trades against the double-paste window Yap hit at
-  1.5 s ([f577427][yap-c-01]).
+  private session type. Type Me It skips the restore on a mismatch. The
+  delay trades against the double-paste window Yap hit at 1.5 s
+  ([f577427][yap-c-01]).
 - Hex's pre-paste wait for `changeCount` to reach the written value
   ([hex-pb] 236–266) addresses a different race, the keystroke arriving before
   the write; it does not touch the restore.
@@ -434,8 +448,11 @@ Problem 1, a paste that lands nothing.
 - Causes found in the other trackers, each with a fix in source: only a V
   event with the Command flag, which Chromium/Electron, Java, Parallels and
   VMware ignore ([3db77ae][yap-c-electron], [#141][osw-141], [#12][handy-12]);
-  Type Me It, OpenSuperWhisper and Talkify post only the V event, the other
-  six post or hold a real Command key. A stale Accessibility grant after an
+  OpenSuperWhisper and Talkify post only the V event, the others post or
+  hold a real Command key. Yap's commit cites no test and moved the tap
+  from `.cgAnnotatedSessionEventTap` to `.cghidEventTap` in the same change,
+  so the Chromium claim is not established; the VM reports are. A stale
+  Accessibility grant after an
   update, which `AXIsProcessTrusted` cannot distinguish ([ADR-0040][wh-adr40],
   [#150][wh-150]); Type Me It's `posted` flag cannot see it either
   (`Output.swift` 9–10). Not secure event input: TN2150 defines its effect on
@@ -468,10 +485,11 @@ Problem 3, whether a text field is focused.
   focused element ([afa8872][yap-c-cross]) and web content as reporting a
   generic role without a settable `AXValue` while the caret is in a text box
   ([792ae9a][yap-c-slack]); Talkify measured the same on macOS 26.
-- Type Me It's `nil` answer already falls through to the paste. The `false`
-  answer (`Focus.swift` 101–105), which triggers the copy prompt, is the case
-  Yap's [792ae9a][yap-c-slack] describes for web content, so a copy prompt
-  after a paste that in fact landed is expected in browsers and Electron.
+- Type Me It's `nil` answer falls through to the paste with no prompt. A
+  generic role with no settable `AXValue`, the case Yap's
+  [792ae9a][yap-c-slack] describes for web content, used to answer `false`
+  and show the copy prompt after a paste that had landed; it now answers
+  `nil`, and `false` is reserved for roles that never take text.
 - Talkify's alternative answers a narrower question that AX can answer:
   capture the focused element (or the frontmost pid) when recording starts,
   and before pasting check that focus is still the same element
