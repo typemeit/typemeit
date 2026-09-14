@@ -189,7 +189,21 @@ enum Fixed {
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
     static let holdThresholdMs = 300
     static let pasteDelayBeforeMs = 60
-    static let pasteDelayAfterMs = 60
+    /// Restore this long after the target read the clipboard. Chromium's
+    /// browser process reads, then the renderer reads the pasteboard's copy.
+    static let pasteQuietMs = 200
+    /// Restore, and Return, this long after Cmd+V when something read the
+    /// clipboard before the chord and the target's read cannot be seen.
+    static let pasteReadEarlyMs = 1500
+    /// Restore this long after Cmd+V when nothing has read the clipboard.
+    static let pasteUnreadCapMs = 8000
+    /// Nothing has read the clipboard this long after Cmd+V: the paste
+    /// landed nowhere, and the copy prompt shows. Slack under load read at
+    /// 273 ms.
+    static let pasteLandedWaitMs = 1000
+    /// Restore this long after a Cmd+V that could not be posted.
+    static let pasteNotPostedMs = 500
+    static let pasteTickMs = 20
     static let autoSubmitDelayMs = 50
     static let modelUnloadIdle: Duration = .seconds(5 * 60)
     static let copyPromptTimeout: Duration = .seconds(8)
