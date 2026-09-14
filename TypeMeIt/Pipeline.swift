@@ -277,7 +277,9 @@ final class Pipeline {
             ReadBack.shared.start(pasted: finalText, historyId: entry.id, appId: target?.appId)
         }
 
-        if settings.copyPromptEnabled, !pasted || focusedIsTextInput == false {
+        let prompt = settings.copyPromptEnabled && (!pasted || focusedIsTextInput == false)
+        Log.debug("Delivery to \(target?.appName ?? "unknown app"): focus \(focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"), Cmd+V \(pasted ? "posted" : "not posted") → \(prompt ? "copy prompt" : "done")")
+        if prompt {
             showCopyPrompt(finalText)
         } else {
             overlay.hide()

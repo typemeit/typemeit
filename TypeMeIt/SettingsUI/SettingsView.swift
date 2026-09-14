@@ -404,10 +404,13 @@ struct MainSettingsTab: View {
                     SettingsRow(label: "dock icon") {
                         Toggle("", isOn: Binding(get: { settings.showDockIcon }, set: { settings.showDockIcon = $0; AppDelegate.shared?.applyDockIcon() })).toggleStyle(.switch).labelsHidden()
                     }
-                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud", last: true) {
+                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud") {
                         Picker("", selection: Binding(get: { settings.appearance }, set: { settings.appearance = $0; AppDelegate.shared?.applyAppearance() })) {
                             ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.labelsHidden().fixedSize()
+                    }
+                    SettingsRow(label: "debug logs", subtitle: "what each paste did, in the system log", last: true) {
+                        Toggle("", isOn: $settings.debugLogs).toggleStyle(.switch).labelsHidden()
                     }
                 }
                 SettingsGroup(title: "about") {

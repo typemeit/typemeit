@@ -135,6 +135,15 @@ final class FocusedTextField: @unchecked Sendable {
         return fromFocusedElement(of: app)
     }
 
+    /// `capture()`, then the frontmost app's own focused element when the
+    /// system-wide one gave nothing: the same route as the focus check, for
+    /// the Macs where only the app answers.
+    static func captureFrontmost() -> FocusedTextField? {
+        if let field = capture() { return field }
+        guard let front = NSWorkspace.shared.frontmostApplication else { return nil }
+        return capture(inApplication: front.processIdentifier)
+    }
+
     /// Reads `AXFocusedUIElement` of `parent` and wraps it if it is a
     /// readable text field.
     private static func fromFocusedElement(of parent: AXUIElement) -> FocusedTextField? {
