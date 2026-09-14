@@ -4,18 +4,42 @@ import Testing
 struct FocusTests {
     @Test func textRolesAreTextInputs() {
         for role in Focus.textRoles {
-            #expect(Focus.classifyRole(role, valueSettable: false), "\(role)")
+            #expect(Focus.classifyRole(role, valueSettable: false) == true, "\(role)")
         }
     }
 
     @Test func genericRoleWithSettableValueIsTextInput() {
-        #expect(Focus.classifyRole("AXWebArea", valueSettable: true))
+        #expect(Focus.classifyRole("AXWebArea", valueSettable: true) == true)
+        #expect(Focus.classifyRole("AXGroup", valueSettable: true) == true)
     }
 
     @Test func staticContentIsNotTextInput() {
-        #expect(!Focus.classifyRole("AXStaticText", valueSettable: false))
-        #expect(!Focus.classifyRole("AXButton", valueSettable: false))
-        #expect(!Focus.classifyRole("", valueSettable: false))
+        for role in Focus.nonTextRoles {
+            #expect(Focus.classifyRole(role, valueSettable: false) == false, "\(role)")
+        }
+    }
+
+    @Test func controlWithSettableValueIsStillNotTextInput() {
+        #expect(Focus.classifyRole("AXSlider", valueSettable: true) == false)
+        #expect(Focus.classifyRole("AXCheckBox", valueSettable: true) == false)
+    }
+
+    @Test func genericRoleWithoutSettableValueIsUnknown() {
+        #expect(Focus.classifyRole("AXWebArea", valueSettable: false) == nil)
+        #expect(Focus.classifyRole("AXGroup", valueSettable: false) == nil)
+        #expect(Focus.classifyRole("AXUnknown", valueSettable: false) == nil)
+        #expect(Focus.classifyRole("", valueSettable: false) == nil)
+    }
+
+    @Test func containerAsFocusedElementIsUnknown() {
+        // Zed reports its window; Java apps report the window or application.
+        #expect(Focus.classifyRole("AXWindow", valueSettable: false) == nil)
+        #expect(Focus.classifyRole("AXApplication", valueSettable: false) == nil)
+        #expect(Focus.classifyRole("AXSheet", valueSettable: false) == nil)
+    }
+
+    @Test func roleListsDoNotOverlap() {
+        #expect(Focus.nonTextRoles.isDisjoint(with: Focus.textRoles))
     }
 
     @Test func secureRoleOrSubroleIsSecure() {

@@ -270,7 +270,8 @@ final class Pipeline {
 
         if settings.appendTrailingSpace { finalText += " " }
         let focusedIsTextInput = Focus.focusedElementIsTextInput()
-        let pasted = await Output.paste(finalText, autoSubmit: settings.autoSubmit, autoSubmitKey: settings.autoSubmitKey)
+        let paste = await Output.paste(finalText, autoSubmit: settings.autoSubmit, autoSubmitKey: settings.autoSubmitKey)
+        let pasted = paste.posted
         guard gen == generation else { return }
 
         let entry = HistoryEntry(
@@ -286,13 +287,26 @@ final class Pipeline {
             ReadBack.shared.start(pasted: finalText, historyId: entry.id, appId: target?.appId)
         }
 
-        let prompt = settings.copyPromptEnabled && (!pasted || focusedIsTextInput == false)
-        DebugLog.write("Delivery to \(target?.appName ?? "unknown app"): focus \(focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"), Cmd+V \(pasted ? "posted" : "not posted") → \(prompt ? "copy prompt" : "done")")
-        if prompt {
-            showCopyPrompt(finalText)
-        } else {
+        let appName = target?.appName ?? "unknown app"
+        let focus = focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"
+        guard settings.copyPromptEnabled else {
+            DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V \(pasted ? "posted" : "not posted") → done")
             overlay.hide()
+            return
         }
+        if !pasted || focusedIsTextInput == false {
+            DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V \(pasted ? "posted" : "not posted") → copy prompt")
+            showCopyPrompt(finalText)
+            return
+        }
+        // The role could not rule the paste out; whether anything reads the
+        // clipboard can. A focused container (Zed's window, Finder's list)
+        // looks the same either way.
+        overlay.hide()
+        let landed = await paste.landed(within: Fixed.pasteLandedWaitMs)
+        guard gen == generation else { return }
+        DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V posted, clipboard \(landed ? "read → done" : "not read within \(Fixed.pasteLandedWaitMs) ms → copy prompt")")
+        if !landed { showCopyPrompt(finalText) }
     }
 
     private func skipPostProcessing() {
