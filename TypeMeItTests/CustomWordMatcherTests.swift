@@ -72,7 +72,7 @@ final class CustomWordMatcherTests: XCTestCase {
 
     func testAnAliasIsReplacedWhenUncertainAndHintedWhenConfident() {
         let terms = [CustomWordMatcher.Term("typeme.it", aliases: ["Titemere"])]
-        let uncertain = "changed to Titemere".split(separator: " ").map { CustomWordMatcher.Word(text: String($0), confidence: $0 == "Titemere" ? 0.74 : 1) }
+        let uncertain = "changed to Titemere".split(separator: " ").map { CustomWordMatcher.Word(text: String($0), confidence: $0 == "Titemere" ? Float(0.74) : 1) }
         XCTAssertEqual(CustomWordMatcher.apply(uncertain, terms: terms), .init(text: "changed to typeme.it", fixes: 1))
         let confident = "changed to Titemere".split(separator: " ").map { CustomWordMatcher.Word(text: String($0), confidence: 1) }
         XCTAssertEqual(CustomWordMatcher.apply(confident, terms: terms), .init(text: "changed to Titemere", fixes: 0, hints: [.init(heard: "Titemere", term: "typeme.it")]))
