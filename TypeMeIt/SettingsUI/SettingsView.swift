@@ -5,6 +5,12 @@ enum SettingsTab: String, CaseIterable {
     // The order the sidebar lists them in.
     case insights, intelligence, history, settings
 
+    /// The tabs this build shows. Insights are built on window titles, which
+    /// the sandbox cannot read, so a sandboxed build has no insights page.
+    static var available: [SettingsTab] {
+        allCases.filter { $0 != .insights || Sandbox.readsOtherApps }
+    }
+
     var icon: String {
         switch self {
         case .insights: "akar-statistic-up"
@@ -16,8 +22,9 @@ enum SettingsTab: String, CaseIterable {
 }
 
 struct SettingsView: View {
-    @State private var tab: SettingsTab? = .insights
+    @State private var tab: SettingsTab? = SettingsTab.available[0]
     @State private var appState = AppState.shared
+    private var current: SettingsTab { tab ?? SettingsTab.available[0] }
     /// `.key` while this window is in front.
     @Environment(\.controlActiveState) private var activeState
 
@@ -33,7 +40,7 @@ struct SettingsView: View {
                     .frame(width: 40, height: 40)
                     .padding(.leading, 12)
                     .padding(.bottom, 14)
-                ForEach(SettingsTab.allCases, id: \.self) { t in
+                ForEach(SettingsTab.available, id: \.self) { t in
                     SidebarItem(tab: t, selected: t == tab) { tab = t }
                 }
                 Spacer()
@@ -45,9 +52,9 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 196, max: 240)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
-                PageHeader(title: (tab ?? .insights).rawValue)
+                PageHeader(title: current.rawValue)
                 Group {
-                    switch tab ?? .insights {
+                    switch current {
                     case .settings: MainSettingsTab()
                     case .intelligence: IntelligenceTab()
                     case .history: HistoryTab()
@@ -525,9 +532,11 @@ struct IntelligenceTab: View {
                 }
                 SettingsGroup(title: "custom words") {
                     VStack(alignment: .leading, spacing: 0) {
-                        SettingsRow(label: "learn from corrections", subtitle: modelAvailable ? nil : "needs apple intelligence") {
-                            Toggle("", isOn: $settings.learnFromCorrections).toggleStyle(.switch).labelsHidden()
-                                .disabled(!modelAvailable)
+                        if Sandbox.readsOtherApps {
+                            SettingsRow(label: "learn from corrections", subtitle: modelAvailable ? nil : "needs apple intelligence") {
+                                Toggle("", isOn: $settings.learnFromCorrections).toggleStyle(.switch).labelsHidden()
+                                    .disabled(!modelAvailable)
+                            }
                         }
                         if !settings.customWords.isEmpty {
                             FlowLayout(spacing: 6) {

@@ -69,6 +69,7 @@ enum Focus {
     /// no element from either, the answer is unknown rather than "no text
     /// box": the paste has already landed somewhere.
     static func focusedElementIsTextInput() -> Bool? {
+        guard Sandbox.readsOtherApps else { return nil }
         let systemWide = AXUIElementCreateSystemWide()
         systemWide.applyMessagingTimeout()
 
@@ -141,6 +142,7 @@ final class FocusedTextField: @unchecked Sendable {
     /// may be read back. `nil` when nothing is focused, when the element is
     /// not a text input, or when it is a secure (password) field.
     static func capture() -> FocusedTextField? {
+        guard Sandbox.readsOtherApps else { return nil }
         let systemWide = AXUIElementCreateSystemWide()
         systemWide.applyMessagingTimeout()
         return fromFocusedElement(of: systemWide)
@@ -151,6 +153,7 @@ final class FocusedTextField: @unchecked Sendable {
     /// one. The system-wide lookup fails with `kAXErrorCannotComplete` from a
     /// plain shell process, so tools that read a known application use this.
     static func capture(inApplication pid: pid_t) -> FocusedTextField? {
+        guard Sandbox.readsOtherApps else { return nil }
         let app = AXUIElementCreateApplication(pid)
         app.applyMessagingTimeout()
         return fromFocusedElement(of: app)
