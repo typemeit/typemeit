@@ -92,6 +92,19 @@ info="$(codesign -dvv "$APP" 2>&1)"
 grep -q "Developer ID Application" <<<"$info" || { echo "not signed with a Developer ID certificate:"; echo "$info"; exit 1; }
 grep -q "Timestamp=" <<<"$info" || { echo "no secure timestamp; notarization rejects that"; exit 1; }
 grep -q "flags=0x10000(runtime)" <<<"$info" || { echo "hardened runtime is not enabled"; exit 1; }
+
+# The signed entitlements can grow without a change to TypeMeIt.entitlements:
+# a capability toggled in Xcode, a build setting, a dependency's advice. The
+# microphone is the only one the app needs, so a set with anything else in it
+# fails here, before notarization.
+EXPECTED_ENTITLEMENTS="com.apple.security.device.audio-input"
+entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null | plutil -convert xml1 -o - - 2>/dev/null | sed -n 's|.*<key>\(.*\)</key>.*|\1|p' | sort || true)"
+if [ "$entitlements" != "$EXPECTED_ENTITLEMENTS" ]; then
+  echo "the app's entitlements are not the expected set"
+  echo "expected: $EXPECTED_ENTITLEMENTS"
+  echo "found:    $(tr '\n' ' ' <<<"${entitlements:-(none)}")"
+  exit 1
+fi
 # --deep here is *verification*, which is fine; what Quinn warns against is
 # `codesign --deep` to *sign*, which this script never does.
 codesign --verify --deep --strict --verbose=2 "$APP"
