@@ -61,6 +61,15 @@
   #download:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
   #download:focus:not(:focus-visible) { outline: none; }
 
+  /* The page's only standing words: what the app is, above the puff, mirroring
+     the note's offset below it. A touch larger than the note so it reads as
+     the page's line rather than a second aside. */
+  #tagline {
+    position: fixed; left: 50%; top: calc(50% - 120px); transform: translateX(-50%);
+    margin: 0; font: 12px/1.4 "DM Mono", ui-monospace, Menlo, monospace;
+    color: #8a8a8a; text-align: center; white-space: nowrap;
+  }
+
   /* Design-system note text: DM Mono, lowercase, ink-3 on paper, no surface. */
   #hint {
     position: fixed; left: 50%; top: calc(50% + 120px); transform: translateX(-50%);
@@ -94,6 +103,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<p id="tagline">minimal transcription app</p>
 <button id="download" type="button">download type me it for macos</button>
 <p id="hint" role="status" aria-live="polite"></p>
 <pre id="err"></pre>
