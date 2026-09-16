@@ -61,21 +61,18 @@
   #download:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
   #download:focus:not(:focus-visible) { outline: none; }
 
-  /* The page's only standing words: what the app is, above the puff, mirroring
-     the note's offset below it. A touch larger than the note so it reads as
-     the page's line rather than a second aside. */
-  #tagline {
-    position: fixed; left: 50%; top: calc(50% - 120px); transform: translateX(-50%);
-    margin: 0; font: 12px/1.4 "DM Mono", ui-monospace, Menlo, monospace;
-    color: #8a8a8a; text-align: center; white-space: nowrap;
-  }
-
-  /* Design-system note text: DM Mono, lowercase, ink-3 on paper, no surface. */
+  /* One line under the puff, and the page's only standing words. It starts as
+     what the app is and a click replaces it with what the next click does, so
+     the page never carries two notes at once. Design-system note text: DM
+     Mono, lowercase, ink-3 on paper, no surface. */
   #hint {
     position: fixed; left: 50%; top: calc(50% + 120px); transform: translateX(-50%);
     margin: 0; font: 10px/1.4 "DM Mono", ui-monospace, Menlo, monospace;
     color: #8a8a8a; text-align: center; white-space: nowrap;
   }
+  /* Standing copy is a touch larger than the note that replaces it: it is the
+     page's line rather than an aside about a click. */
+  #hint.standing { font-size: 12px; }
   #hint:empty { display: none; }
   /* The app's name inside the note is emphasis, and DM Mono is loaded in one
      weight, so it is brightened to ink rather than set bold. */
@@ -103,9 +100,8 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<p id="tagline">minimal transcription app</p>
 <button id="download" type="button">download type me it for macos</button>
-<p id="hint" role="status" aria-live="polite"></p>
+<p id="hint" class="standing" role="status" aria-live="polite">minimal transcription app</p>
 <pre id="err"></pre>
 <ul id="more">
   <li><a href="/terms">terms</a></li>
@@ -154,6 +150,7 @@ let downloaded = false;
   document.getElementById("download").addEventListener("click", () => {
     if (downloaded) return;
     if (!isMac()) {
+      hint.classList.remove("standing");
       hint.textContent = "type me it is for macos only";
       return;
     }
@@ -161,16 +158,20 @@ let downloaded = false;
       armed = true;
       const name = document.createElement("strong");
       name.textContent = "type me it";
+      hint.classList.remove("standing");
       hint.replaceChildren("click again to download ", name);
       return;
     }
     downloaded = true;
-    // Nothing is waiting on a click any more, so the green fades out with the
+    // Nothing is waiting on a click any more, so the green goes out with the
     // note and the puff flushes red instead: the browser's own download shows
     // itself, and the puff is left alone again.
     armed = false;
     blush = performance.now();
-    hint.textContent = "";
+    // Back to the standing line: the browser's own download takes over from
+    // here, and the page reads as it did before the first click.
+    hint.classList.add("standing");
+    hint.textContent = "minimal transcription app";
     location.href = DMG;
   });
 }
