@@ -1,0 +1,15 @@
+nodes:
+  - key: external.github
+    kind: external
+    icon: github
+    name: GitHub
+    summary: Releases, and the speech model.
+    description: |-
+      The only place the app talks to over the network, and it only ever downloads.
+      - the speech model, once, when the app is first set up
+      - the list of released versions, and the new build itself
+      Nothing is uploaded: no transcript, no audio, no usage data, and nothing about the Mac.
+    provenance:
+      state: asserted
+      source: human
+      author: max
