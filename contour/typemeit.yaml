@@ -433,7 +433,8 @@ nodes:
         blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
 edges:
-  - from: device.macos
+  - id: tiw03m3n
+    from: device.macos
     to: typemeit.audio-capture
     payload: mic audio
     direction: one-way
@@ -455,7 +456,8 @@ edges:
         lines: [66, 80]
         blob: 3c552c86647bcecf324223be8dc6102ee4c208a8
 
-  - from: device.macos
+  - id: xxaamsvh
+    from: device.macos
     to: typemeit.read-back
     payload: field contents
     direction: one-way
@@ -476,7 +478,8 @@ edges:
         lines: [32, 79]
         blob: bc4663e4b32ebd5eb65aed2c7535862682ccfbdf
 
-  - from: external.github
+  - id: 111n35vn
+    from: external.github
     to: typemeit.transcriber.parakeet-gguf
     payload: speech model
     direction: one-way
@@ -499,7 +502,8 @@ edges:
         lines: [11, 99]
         blob: 957be3ad0c9363246b56ecf91b98d1737fe66589
 
-  - from: external.github
+  - id: 9xmowek3
+    from: external.github
     to: typemeit.updater
     payload: appcast.xml
     direction: one-way
@@ -520,7 +524,8 @@ edges:
         lines: [37, 42]
         blob: a1d62deedde918bb3f9a7d0be3da93bf7d49e913
 
-  - from: external.github
+  - id: krlsy187
+    from: external.github
     to: typemeit.updater
     payload: signed DMG
     direction: one-way
@@ -538,7 +543,8 @@ edges:
         lines: [141, 164]
         blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
-  - from: typemeit.audio-capture
+  - id: bpe1v6fm
+    from: typemeit.audio-capture
     to: typemeit.recordings
     payload: raw recording
     direction: one-way
@@ -558,7 +564,8 @@ edges:
         lines: [15, 58]
         blob: 9e33c108d1b9ba896ffe89882da58741673069a1
 
-  - from: typemeit.audio-capture
+  - id: ug0pcnwe
+    from: typemeit.audio-capture
     to: typemeit.transcriber
     payload: 16 kHz audio
     direction: one-way
@@ -579,7 +586,8 @@ edges:
         lines: [170, 219]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.custom-word-matcher
+  - id: tph1wef8
+    from: typemeit.custom-word-matcher
     to: typemeit.post-processor
     payload: matched transcript
     direction: one-way
@@ -599,7 +607,8 @@ edges:
         lines: [240, 255]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.learned-words-json
+  - id: yfji7pm9
+    from: typemeit.learned-words-json
     to: typemeit.custom-word-matcher
     payload: learned terms
     direction: one-way
@@ -618,7 +627,8 @@ edges:
         lines: [175, 188]
         blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
-  - from: typemeit.local-cleanup
+  - id: 9091zln8
+    from: typemeit.local-cleanup
     to: device.macos
     payload: final text
     direction: one-way
@@ -647,7 +657,8 @@ edges:
         lines: [92, 129]
         blob: e25d6ae1897f2af960230c543b4dfccee49b8727
 
-  - from: typemeit.local-cleanup
+  - id: 04zxaeu9
+    from: typemeit.local-cleanup
     to: typemeit.history-json
     payload: history entry
     direction: one-way
@@ -670,7 +681,8 @@ edges:
         lines: [277, 281]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.post-processor
+  - id: 7cdutemq
+    from: typemeit.post-processor
     to: typemeit.local-cleanup
     payload: cleaned draft
     direction: one-way
@@ -689,7 +701,8 @@ edges:
         lines: [255, 262]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.read-back
+  - id: pxi60tuu
+    from: typemeit.read-back
     to: typemeit.learned-words-json
     payload: corrected words
     direction: one-way
@@ -708,7 +721,8 @@ edges:
         lines: [24, 33]
         blob: b47ce5563d6e3d93b57c01d77fc56074af8bba46
 
-  - from: typemeit.read-back
+  - id: hyw0x2pr
+    from: typemeit.read-back
     to: typemeit.settings
     payload: learned word
     direction: one-way
@@ -726,7 +740,8 @@ edges:
         lines: [29, 47]
         blob: b47ce5563d6e3d93b57c01d77fc56074af8bba46
 
-  - from: typemeit.settings
+  - id: h84zlwc0
+    from: typemeit.settings
     to: typemeit.audio-capture
     payload: microphone choice
     direction: one-way
@@ -744,7 +759,8 @@ edges:
         lines: [120, 122]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.settings
+  - id: 2ir5dzzg
+    from: typemeit.settings
     to: typemeit.custom-word-matcher
     payload: custom terms
     direction: one-way
@@ -763,7 +779,8 @@ edges:
         lines: [240, 241]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.settings
+  - id: wzyexq27
+    from: typemeit.settings
     to: typemeit.post-processor
     payload: terms to keep
     direction: one-way
@@ -781,7 +798,8 @@ edges:
         lines: [255, 255]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.settings
+  - id: 31yo6va1
+    from: typemeit.settings
     to: typemeit.updater
     payload: update preferences
     direction: one-way
@@ -805,7 +823,8 @@ edges:
         lines: [62, 77]
         blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
-  - from: typemeit.transcriber
+  - id: 68panlpm
+    from: typemeit.transcriber
     to: typemeit.custom-word-matcher
     payload: raw transcript
     direction: one-way
@@ -824,7 +843,8 @@ edges:
         lines: [235, 241]
         blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
-  - from: typemeit.transcriber.parakeet-gguf
+  - id: ogm9znk9
+    from: typemeit.transcriber.parakeet-gguf
     to: typemeit.transcriber.transcribe
     payload: model weights
     direction: one-way
@@ -843,7 +863,8 @@ edges:
         lines: [42, 83]
         blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
 
-  - from: typemeit.transcriber.transcribe
+  - id: oy497no8
+    from: typemeit.transcriber.transcribe
     to: typemeit.transcriber.word-scoring
     payload: token probabilities
     direction: one-way
