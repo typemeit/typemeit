@@ -98,7 +98,7 @@
 <body>
 <canvas id="c"></canvas>
 <button id="download" type="button">download type me it for macos</button>
-<p id="hint" role="status" aria-live="polite">minimal transcription app</p>
+<p id="hint" role="status" aria-live="polite">transcription app for macos</p>
 <pre id="err"></pre>
 <ul id="more">
   <li><a href="/terms">terms</a></li>
@@ -165,7 +165,7 @@ let downloaded = false;
     blush = performance.now();
     // Back to the standing line: the browser's own download takes over from
     // here, and the page reads as it did before the first click.
-    hint.textContent = "minimal transcription app";
+    hint.textContent = "transcription app for macos";
     location.href = DMG;
   });
 }
