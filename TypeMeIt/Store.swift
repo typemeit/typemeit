@@ -194,6 +194,19 @@ final class Store {
         appendLearned([LearnedWord(batchId: UUID(), heard: h, meant: word, source: "typed", historyId: nil, learnedAt: Date())])
     }
 
+    /// Marks the records that say `heard` is how the speech model writes
+    /// `word` undone, leaving the word and its other spellings alone.
+    func forgetAlias(heard: String, for word: String) {
+        var changed = false
+        for i in learned.indices where !learned[i].undone
+            && learned[i].meant.caseInsensitiveCompare(word) == .orderedSame
+            && learned[i].heard.trimmingCharacters(in: .whitespaces).caseInsensitiveCompare(heard) == .orderedSame {
+            learned[i].undone = true
+            changed = true
+        }
+        if changed { save(learned, to: learnedURL) }
+    }
+
     func learnedRecord(for word: String) -> LearnedWord? {
         learned.last { !$0.undone && $0.meant.caseInsensitiveCompare(word) == .orderedSame }
     }
