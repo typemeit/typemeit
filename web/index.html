@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>type me it</title>
+<meta name="description" content="transcription app for macOS">
 <meta property="og:site_name" content="type me it">
 <meta property="og:title" content="type me it">
 <meta property="og:description" content="type me it">
@@ -61,7 +62,10 @@
   #download:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
   #download:focus:not(:focus-visible) { outline: none; }
 
-  /* Design-system note text: DM Mono, lowercase, ink-3 on paper, no surface. */
+  /* One line under the puff, and the page's only standing words. It starts as
+     what the app is and a click replaces it with what the next click does, so
+     the page never carries two notes at once. Design-system note text: DM
+     Mono, lowercase, ink-3 on paper, no surface. */
   #hint {
     position: fixed; left: 50%; top: calc(50% + 120px); transform: translateX(-50%);
     margin: 0; font: 10px/1.4 "DM Mono", ui-monospace, Menlo, monospace;
@@ -95,7 +99,7 @@
 <body>
 <canvas id="c"></canvas>
 <button id="download" type="button">download type me it for macos</button>
-<p id="hint" role="status" aria-live="polite"></p>
+<p id="hint" role="status" aria-live="polite">transcription app for macos</p>
 <pre id="err"></pre>
 <ul id="more">
   <li><a href="/terms">terms</a></li>
@@ -155,12 +159,14 @@ let downloaded = false;
       return;
     }
     downloaded = true;
-    // Nothing is waiting on a click any more, so the green fades out with the
+    // Nothing is waiting on a click any more, so the green goes out with the
     // note and the puff flushes red instead: the browser's own download shows
     // itself, and the puff is left alone again.
     armed = false;
     blush = performance.now();
-    hint.textContent = "";
+    // Back to the standing line: the browser's own download takes over from
+    // here, and the page reads as it did before the first click.
+    hint.textContent = "transcription app for macos";
     location.href = DMG;
   });
 }

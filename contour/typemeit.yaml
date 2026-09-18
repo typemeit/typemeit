@@ -2,15 +2,13 @@ nodes:
   - key: typemeit
     kind: app
     name: type me it
-    summary: Hold the hotkey, speak, release; the text is pasted where you were typing.
+    summary: Hold a hotkey, speak, and the text is pasted at the cursor, all on the Mac.
     description: |-
-      A macOS menu-bar dictation app. Everything that turns your voice into text happens
-      on your own Mac — the speech model, the grammar clean-up, the vocabulary it learns
-      from your corrections.
-      The only network traffic is three downloads from GitHub: the speech model once, and
-      the update feed and new builds afterwards. Nothing is ever uploaded.
+      A macOS menu-bar dictation app. The speech model, the grammar clean-up and the
+      vocabulary learned from corrections all run on the user's Mac.
+      The app's only network traffic is three downloads from GitHub: the speech model
+      once, then the update feed and new builds. It never uploads anything.
     provenance:
-      state: asserted
       source: human
       author: max
 
@@ -20,46 +18,36 @@ nodes:
     summary: Captures the mic while the hotkey is held.
     description: |-
       Owns the microphone connection.
-      - opens the microphone you chose, or the system default
+      - opens the microphone chosen in settings, or the system default
       - converts every buffer to 16 kHz mono, the format the speech model expects
-      - holds the take in memory; releasing the hotkey ends the stream and hands it on
+      - holds the take in memory until the hotkey is released, then ends the stream and
+        hands the take to the Transcriber
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/AudioCapture.swift
-        lines: [5, 80]
-        blob: 3c552c86647bcecf324223be8dc6102ee4c208a8
 
   - key: typemeit.custom-word-matcher
     kind: function
     name: CustomWordMatcher
-    summary: Swaps in the words the speech model keeps getting wrong.
+    summary: Restores the user's custom words where the speech model misheard them.
     description: |-
-      One pure function, run on every dictation, before any model sees the text.
-      - a run of words is replaced when its letters spell one of your terms exactly
-      - or when it sounds close, is about the right length, and the speech model was unsure of it
-      - a word the model was confident in is never replaced on sound alone, because "cat" and
-        "cut" sound alike; it is passed on as a hint for the clean-up model to settle instead
-      No state, no memory, one call.
+      A pure function that runs on every dictation, before the AI clean-up sees the text.
+      It replaces a run of words with one of the user's custom terms when:
+      - the letters spell the term exactly, or
+      - the run sounds close, is about the right length, and the speech model was unsure
+        of it
+      A word the speech model was confident in is never replaced on sound alone, because
+      "cat" and "cut" sound alike. Instead it is passed to the AI clean-up as a hint. The
+      matcher keeps no state between calls.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/CustomWordMatcher.swift
-        lines: [3, 92]
-        blob: 29375ba335cf787d54a24f16737320b50ac5553a
 
   - key: typemeit.history-json
-    kind: collection
-    subtype: file
+    kind: store
     name: history.json
-    summary: Every dictation, with what was heard and what was written.
-    pii: true
+    summary: The record of every dictation, as heard and as tidied.
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/history.json
       format: JSON, ISO-8601 dates, rewritten atomically after every change
@@ -71,6 +59,7 @@ nodes:
           "timestamp": "2026-09-14T09:12:41Z",
           "transcript": "send the deck to Priya by Friday",
           "postProcessed": "Send the deck to Priya by Friday.",
+          "postProcessRequested": true,
           "appName": "Mail",
           "windowTitle": "Re: Q3 handover",
           "durationMs": 4210,
@@ -78,88 +67,88 @@ nodes:
           "dictionaryFixes": 1
         }
       ]
+    schema:
+      lang: swift
+      file: TypeMeIt/Store.swift
+      lines: [4, 28]
+      code: |-
+        struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
+            var id: UUID = UUID()
+            var timestamp: Date
+            var starred: Bool = false
+            /// Engine output after local cleanup (custom words, fillers, normalisation).
+            var transcript: String
+            /// Apple Intelligence output; nil when off, skipped, rejected or failed.
+            var postProcessed: String?
+            var postProcessRequested: Bool
+            var edited: String?
+            var editedAt: Date?
+            var durationMs: Int?
+            /// Wall-clock time the speech engine took, in milliseconds.
+            var transcribeMs: Int?
+            /// Wall-clock time Apple Intelligence took, in milliseconds; nil when it was not requested.
+            var postProcessMs: Int?
+            var appId: String?
+            var appName: String?
+            var windowTitle: String?
+            var dictionaryFixes: Int
+            /// File name in `RecordingArchive.directory`; nil when audio was not kept.
+            var recordingFile: String?
+
+            var displayText: String { edited ?? postProcessed ?? transcript }
+        }
     description: |-
-      The app's own record of every dictation, kept on this Mac and nowhere else.
+      The app's record of every dictation, kept on this Mac only. Each entry holds:
       - what the speech model heard, and the tidied version of it
-      - which app and which window you dictated into
+      - which app and window the dictation went to
       - how long each stage took
-      Personal data at rest: this is the file that holds what you said.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [4, 28]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - key: typemeit.history-json.edited
     kind: field
     name: edited
-    summary: Your hand-edit of a dictation — which nothing in the shipped app writes.
-    pii: true
+    summary: A hand-corrected version of a dictation; nothing in the shipped app writes it.
     description: |-
-      Meant to hold the version you corrected by hand, and it wins over everything else when a
-      dictation is displayed. In the shipped app it is always empty: the three functions that
-      would set it — `update`, `toggleStar` and `setEdited` — have no callers anywhere in the
-      app, so nothing can ever fill it in.
+      Holds a version of the dictation the user corrected by hand, and wins over every
+      other version when a dictation is displayed. In the shipped app it is always empty:
+      the three functions that would set it, `update`, `toggleStar` and `setEdited`, have
+      no callers, so nothing can fill it in.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [13, 27]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - key: typemeit.history-json.transcript
     kind: field
     name: transcript
-    summary: What the speech model heard, exactly as it came out.
-    pii: true
+    summary: The speech model's output, before any clean-up.
     description: |-
-      The speech model's own output for a dictation, stored as it was produced — before the
-      custom-word swap, the grammar clean-up and the filler stripping. It is therefore not the
-      text that was pasted: no field holds that verbatim.
+      The speech model's output for a dictation, stored as produced: before the
+      custom-word swap, the AI clean-up and the filler stripping. It is not the text that
+      was pasted; no field holds that verbatim.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [8, 9]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - key: typemeit.history-json.window-title
     kind: field
     name: windowTitle
-    summary: The title of the window you dictated into.
-    pii: true
+    summary: The title of the window the dictation went into.
     description: |-
-      The name of the window that had focus when you spoke — document names, chat participants,
-      browser tab titles — stored exactly as the system reported it, never redacted. The sharpest
-      personal data in the app: it records where you were, not just what you said.
+      The title of the window that had focus when the user spoke, stored exactly as macOS
+      reported it and never redacted. Window titles include document names, chat
+      participants and browser tab titles, so this field can reveal what the user was
+      working on.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [22, 22]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - key: typemeit.learned-words-json
-    kind: collection
-    subtype: file
+    kind: store
     name: learned-words.json
-    summary: The words you corrected, remembered.
-    pii: true
-    tags:
-      - retention-gap
+    summary: Corrections the app has learned, as pairs of what was heard and what was meant.
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/learned-words.json
       format: JSON, ISO-8601 dates, rewritten atomically after every change
@@ -176,100 +165,90 @@ nodes:
           "undone": false
         }
       ]
+    schema:
+      lang: swift
+      file: TypeMeIt/Store.swift
+      lines: [30, 39]
+      code: |-
+        struct LearnedWord: Codable, Identifiable, Sendable, Equatable {
+            var id: UUID = UUID()
+            var batchId: UUID
+            var heard: String
+            var meant: String
+            var source: String
+            var historyId: UUID?
+            var learnedAt: Date
+            var undone: Bool = false
+        }
     description: |-
-      Pairs of what the speech model wrote and what you meant, kept on this Mac.
-      - most come from a correction you made right after a paste
-      - some you typed yourself in settings, by naming the spelling the model keeps producing
-      - undoing one marks it rather than deleting it, so it is never learned again
-      Clearing your history does not clear this file, and nothing ever expires from it.
+      Pairs of what the speech model wrote and what the user meant, kept on this Mac only.
+      - most are added from a correction the user made right after a paste
+      - some are typed into settings, by naming the spelling the speech model keeps
+        producing
+      - undoing one marks it instead of deleting it, so it is never learned again
+      Clearing the history does not clear this file, and nothing in it expires.
+    tags:
+      - retention-gap
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [30, 39]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - key: typemeit.local-cleanup
     kind: function
     name: LocalCleanup
-    summary: Tidies fillers and stutters, always.
+    summary: Strips fillers and stutters from every dictation.
     description: |-
-      The mechanical half of clean-up, run on whatever is about to be typed.
+      The mechanical half of clean-up. It runs on whatever is about to be typed, whether
+      that is the AI clean-up's answer or the raw transcript, because the AI clean-up
+      often leaves fillers in.
       - drops filler sounds: "uh", "ummm", "erm"
       - collapses stutters, so "the the uh the" becomes one "the"
-      - runs on the clean-up model's answer and on the raw transcript alike, because the model
-        often leaves them in
-      Same text in, same text out; nothing is stored.
+      It stores nothing and gives the same output for the same input.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/LocalCleanup.swift
-        lines: [3, 26]
-        blob: e352583ec4b8eb6da97a7ed3da27a38c79ea30d9
 
   - key: typemeit.post-processor
     kind: component
     name: AI clean-up
-    summary: Apple Intelligence tidies grammar and punctuation, on device.
-    tags:
-      - on-device
+    summary: Fixes grammar and punctuation with Apple Intelligence, on device.
     meta:
-      framework: Apple FoundationModels, the device's own language model
       guards: an answer that rewrites the text, or drops its opening words, is thrown away
     description: |-
-      Hands the transcript to Apple Intelligence to fix grammar and punctuation, then checks the
-      answer before trusting it.
-      - the rules are given up front and the transcript alone is sent as the message, so the model
-        edits rather than answers
-      - an answer that reads like a rewrite, or that has lost the opening words, is discarded and
-        the locally cleaned text is used instead
-      - skipped entirely when the setting is off, when you press Escape, or when Apple
-        Intelligence is unavailable
-      The model runs on the Mac itself: nothing is sent anywhere.
+      Sends the transcript to Apple Intelligence to fix grammar and punctuation, then
+      checks the answer before using it.
+      - an answer that reads like a rewrite, or that has lost the opening words, is
+        discarded and the locally cleaned text is used instead
+      - the step is skipped when the setting is off, when the user presses Escape, or when
+        Apple Intelligence is unavailable
+      The model runs on the Mac; nothing is sent over the network.
+    tags:
+      - on-device
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/PostProcessor.swift
-        lines: [4, 118]
-        blob: 416880acab226e7a49a186950706127441579453
 
   - key: typemeit.read-back
     kind: component
     name: Read-back learner
-    summary: Watches the field you pasted into and learns your corrections.
+    summary: Watches the field the text was pasted into and learns the user's corrections.
     description: |-
-      After a paste, it reads the text field back and compares what is there with what was put
-      there, so a fix you make by hand can be turned into a word the app remembers.
-      - it watches for up to 90 seconds, or until you move on
-      - an on-device model decides whether a fix is a name, product, project, acronym or
-        technical term — anything else is ignored as an ordinary edit
-      - it never reads back from password managers or terminals, and never while the system is
-        hiding what you type
+      After a paste, reads the text field back and compares it with what was pasted, so a
+      correction the user makes by hand can become a word the app remembers.
+      - watches for up to 90 seconds, or until the user moves on
+      - an on-device model decides whether a change is a name, product, project, acronym
+        or technical term; any other change is ignored as an ordinary edit
+      - never reads back from password managers or terminals, and never while the system
+        is hiding what the user types
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Learning/ReadBack.swift
-        lines: [12, 93]
-        blob: bc4663e4b32ebd5eb65aed2c7535862682ccfbdf
 
   - key: typemeit.recordings
     kind: store
-    subtype: file
     name: Recordings
-    summary: Raw takes, kept only if you ask for them.
-    pii: true
+    summary: Audio takes, kept only when the user opts in.
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/Recordings/
       format: AAC in .m4a, mono, 16 kbps — roughly 120 KB a minute
@@ -278,31 +257,23 @@ nodes:
       6F1C2A84-0B3D-4E55-9A71-2C8D5E7F0A19.m4a · 4.2 s
       B2E90D17-5A6C-4F38-8D02-1E4A7B9C3F65.m4a · 11.8 s
     description: |-
-      A folder of audio takes, one per dictation, written only when "keep audio" is on. It is off
-      by default.
-      - each file is named after the history entry it belongs to, and goes when that entry goes
+      A folder of audio takes, one per dictation, written only when "keep audio" is on. It
+      is off by default.
+      - each file is named after the history entry it belongs to, and is deleted with that
+        entry
       - a take can be played back beside its transcript in the history tab
-      Your recorded voice at rest: the most sensitive thing the app stores.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/RecordingArchive.swift
-        lines: [4, 65]
-        blob: 9e33c108d1b9ba896ffe89882da58741673069a1
 
   - key: typemeit.settings
     kind: store
-    subtype: key-value
     name: Settings
-    summary: Your preferences.
-    pii: true
+    summary: The user's preferences, stored in UserDefaults.
+    subtype: key-value
     meta:
       engine: UserDefaults, macOS's own preference store
-      keys: microphoneUID, customWords, postProcessingEnabled, learnFromCorrections, keepRecordings,
-        historyLimit, autoUpdate, askBeforeUpdating, undoneWords, screenContextEnabled, and 16 more
+      keys: microphoneUID, customWords, postProcessingEnabled, learnFromCorrections, keepRecordings, historyLimit, autoUpdate, askBeforeUpdating, undoneWords, screenContextEnabled, and 16 more
     sample: |-
       {
         "customWords": ["Parakey", "Zentryx", "Priya"],
@@ -313,42 +284,87 @@ nodes:
         "autoUpdate": true,
         "askBeforeUpdating": true
       }
+    schema:
+      lang: swift
+      file: TypeMeIt/Settings.swift
+      lines: [83, 133]
+      code: |-
+        var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: "microphoneUID") } }
+        var muteWhileRecording: Bool { didSet { defaults.set(muteWhileRecording, forKey: "muteWhileRecording") } }
+        var audioFeedback: Bool { didSet { defaults.set(audioFeedback, forKey: "audioFeedback") } }
+        var copyPromptEnabled: Bool { didSet { defaults.set(copyPromptEnabled, forKey: "copyPromptEnabled") } }
+        var postProcessingEnabled: Bool { didSet { defaults.set(postProcessingEnabled, forKey: "postProcessingEnabled") } }
+        var customWords: [String] { didSet { defaults.set(customWords, forKey: "customWords") } }
+        var learnFromCorrections: Bool { didSet { defaults.set(learnFromCorrections, forKey: "learnFromCorrections") } }
+        var appendTrailingSpace: Bool { didSet { defaults.set(appendTrailingSpace, forKey: "appendTrailingSpace") } }
+        var autoSubmit: Bool { didSet { defaults.set(autoSubmit, forKey: "autoSubmit") } }
+        var autoSubmitKey: AutoSubmitKey { didSet { defaults.set(autoSubmitKey.rawValue, forKey: "autoSubmitKey") } }
+        var historyLimit: Int { didSet { defaults.set(historyLimit, forKey: "historyLimit") } }
+        /// Keeps each dictation's audio next to its history entry.
+        var keepRecordings: Bool { didSet { defaults.set(keepRecordings, forKey: "keepRecordings") } }
+        /// Checks for, downloads and installs updates on its own. Off, the app
+        /// looks for an update only when Settings comes to the front, and installs
+        /// one only from the version row's button.
+        var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: "autoUpdate") } }
+        /// With `autoUpdate` on: a ready update is announced with the pill and
+        /// waits for a click. Off, the app installs it and restarts itself once no
+        /// dictation is in flight.
+        var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
+        var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
+        var showDockIcon: Bool { didSet { defaults.set(showDockIcon, forKey: "showDockIcon") } }
+        var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: "appearance") } }
+        /// Off, the cloud is white or dark grey with the appearance.
+        var cloudColorEnabled: Bool { didSet { defaults.set(cloudColorEnabled, forKey: "cloudColorEnabled") } }
+        var cloudColor: CloudColor { didSet { defaults.set(cloudColor.rawValue, forKey: "cloudColor") } }
+        var cloudPosition: CloudPosition { didSet { defaults.set(cloudPosition.rawValue, forKey: "cloudPosition") } }
+        /// The cloud samples the screen under it and goes white or dark against
+        /// it. Needs Screen Recording; without the grant the appearance decides.
+        var cloudMatchesBackdrop: Bool { didSet { defaults.set(cloudMatchesBackdrop, forKey: "cloudMatchesBackdrop") } }
+        /// The clean-up model is told the names and terms visible in the window
+        /// being dictated into. Needs Screen Recording.
+        var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
+        var onboardingComplete: Bool { didSet { defaults.set(onboardingComplete, forKey: "onboardingComplete") } }
+        /// Copies the newest transcript to the clipboard. Nil means no shortcut.
+        var copyLastShortcut: KeyCombo? {
+            didSet { defaults.set(copyLastShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "copyLastShortcut") }
+        }
+        /// Words removed by the learned-words toast's Undo. Never learned again.
+        var undoneWords: [String] { didSet { defaults.set(undoneWords, forKey: "undoneWords") } }
+        /// Writes what each dictation and paste did to `DebugLog.url`, naming
+        /// the app, the clipboard's contents and the start of the transcript.
+        /// For bug reports.
+        var debugLogs: Bool {
+            didSet {
+                defaults.set(debugLogs, forKey: "debugLogs")
+                DebugLog.enabled = debugLogs
+                if debugLogs { DebugLog.writeHeader() }
+            }
+        }
     description: |-
-      Everything you choose in the settings window, stored by macOS itself and written the moment
-      you change it.
-      - the words you want spelled your way, and which microphone to listen to
-      - whether Apple Intelligence tidies your text, and whether corrections are learned
+      Everything chosen in the settings window, stored by macOS in UserDefaults and
+      written the moment it changes.
+      - the custom words to spell a particular way, and which microphone to use
+      - whether Apple Intelligence tidies the text, and whether corrections are learned
       - whether audio is kept, how much history to keep, and how updates install
-      Your custom words are personal data: they are the names and jargon you use.
+      The custom words are personal data, because they are the names and jargon the user
+      works with.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Settings.swift
-        lines: [83, 133]
-        blob: af3e5b9a526a7d97dd1c8c27e5af4902326fb318
 
   - key: typemeit.transcriber
     kind: component
     name: Transcriber
-    summary: Audio to raw text, on device.
+    summary: Turns the audio into raw text, on device.
     description: |-
-      The heart of the app: the speech model, held in memory and run over the recording.
-      - loads the 697 MB model on first use and frees it again after five idle minutes
-      - runs on the Mac's GPU, falling back to the processor where that is not available
-      - returns the text with a score for each word, saying how sure it was
-      One dictation at a time, and nothing leaves the machine.
+      Holds the speech model in memory and runs it over the recording.
+      - loads the 697 MB model on first use and frees it after five idle minutes
+      - runs on the Mac's GPU, or on the CPU where no GPU is available
+      - returns the text with a score for each word saying how sure the model was
+      It handles one dictation at a time, and the audio never leaves the machine.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Transcriber.swift
-        lines: [4, 83]
-        blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
 
   - key: typemeit.transcriber.parakeet-gguf
     kind: artifact
@@ -360,77 +376,55 @@ nodes:
       size: 697 MB (731,357,568 bytes)
       sha256: 4b50b6dd862bf6e346929aaf4f5eaacec003bfa3f56462d6c874b41ef2f38795
     description: |-
-      The speech model as one quantised file. It is downloaded once while the app is being set
-      up and checked against a size and a fingerprint the app ships with before it is put in
-      place; a file that does not match is deleted rather than used. The app pins one exact
-      model, so a newer one arrives only as a new version of the app.
+      The speech model as one quantised file. The app downloads it once during setup and
+      checks it against a size and fingerprint shipped with the app before putting it in
+      place; a file that does not match is deleted. The app pins one exact model, so a
+      newer model only arrives with a new version of the app.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/ModelStore.swift
-        lines: [11, 17]
-        blob: 957be3ad0c9363246b56ecf91b98d1737fe66589
 
   - key: typemeit.transcriber.transcribe
     kind: function
     name: transcribe
     summary: Runs the speech model over the recording.
     description: |-
-      Feeds the 16 kHz audio through the model in a single pass and returns what it heard, word
-      by word. One session at a time: a second dictation waits for the first, and pressing Escape
-      aborts the run in progress.
+      Feeds the 16 kHz audio through the speech model in a single pass and returns what it
+      heard, word by word. One session runs at a time: a second dictation waits for the
+      first, and pressing Escape aborts the run in progress.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Transcriber.swift
-        lines: [120, 137]
-        blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
 
   - key: typemeit.transcriber.word-scoring
     kind: function
     name: word scoring
-    summary: Gives every word a score for how sure the model was.
+    summary: Gives every word a score for how sure the speech model was.
     description: |-
-      The model scores each piece of a word separately. This folds those into one number per
-      word — the lowest of them, so a word is only ever as sure as its least certain part. The
-      score is a hint rather than a calibrated probability, and it is what stops a word the model
-      was confident in being swapped for one of your custom terms.
+      The speech model scores each piece of a word separately. This step folds those into
+      one number per word by taking the lowest, so a word is only as sure as its least
+      certain piece. The score is a hint, not a calibrated probability. The
+      CustomWordMatcher uses it to avoid swapping a word the speech model was confident in
+      for one of the user's custom terms.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Transcriber.swift
-        lines: [139, 162]
-        blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
 
   - key: typemeit.updater
     kind: component
     name: Sparkle updater
     summary: Checks GitHub for new versions and installs them.
     description: |-
-      Keeps the app up to date, using the Sparkle framework, and runs entirely apart from
-      dictation.
+      Keeps the app up to date using the Sparkle framework, independently of dictation.
       - checks for a new release hourly and when the app launches
-      - downloads and installs on its own, or waits for your click, according to your preferences
-      - waits for a dictation to finish before relaunching, so an update never cuts one off
-      Nothing about your Mac is sent with the request, and development builds never check at all.
+      - downloads and installs on its own, or waits for the user's click, according to the
+        update preferences
+      - waits for a dictation to finish before relaunching, so an update never cuts one
+        off
+      The request carries nothing about the Mac, and development builds never check.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Updates.swift
-        lines: [58, 77]
-        blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
 edges:
   - from: device.macos
@@ -440,20 +434,13 @@ edges:
     transport: custom
     customTransport: audio input
     delivery: pull
-    description: Captured only while the dictation hotkey is held. Release the key and the stream stops.
-    pii: true
+    description: Raw audio from the chosen microphone, streamed into the app while the hotkey is held.
     condition: the dictation hotkey is held
     meta:
       format: raw PCM, converted to 16 kHz mono as it arrives
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/AudioCapture.swift
-        lines: [66, 80]
-        blob: 3c552c86647bcecf324223be8dc6102ee4c208a8
 
   - from: device.macos
     to: typemeit.read-back
@@ -462,19 +449,26 @@ edges:
     transport: custom
     customTransport: accessibility api
     delivery: pull
-    description: Reads back the field the text landed in, so a fix you make by hand can be compared with what was pasted.
-    pii: true
+    description: |-
+      The text field the paste landed in, read back so a hand-made correction can be
+      compared with what was pasted.
     condition: learning from corrections is on, and the paste landed in a text field
     frequency: four times a second, for up to 90 seconds after a paste
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Learning/ReadBack.swift
-        lines: [32, 79]
-        blob: bc4663e4b32ebd5eb65aed2c7535862682ccfbdf
+
+  - from: device.macos.apple-intelligence
+    to: typemeit.post-processor
+    payload: tidied text
+    direction: one-way
+    transport: custom
+    customTransport: in process
+    delivery: push
+    description: Apple Intelligence's answer as it comes back. A run that fails or is cancelled returns nothing, and the text carries on without it.
+    provenance:
+      source: human
+      author: max
 
   - from: external.github
     to: typemeit.transcriber.parakeet-gguf
@@ -482,7 +476,9 @@ edges:
     direction: one-way
     transport: http
     delivery: pull
-    description: Downloaded once while the app is being set up, then used from disk. The app never talks to GitHub during a dictation.
+    description: |-
+      Downloaded once during setup, then used from disk. The app never contacts GitHub
+      during a dictation.
     frequency: once, during onboarding
     transform: checked against a size and a SHA-256 fingerprint before it is put in place
     meta:
@@ -490,14 +486,8 @@ edges:
       format: GGUF, Q8_0 quantised
       source: github.com/typemeit/typemeit/releases ↗
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/ModelStore.swift
-        lines: [11, 99]
-        blob: 957be3ad0c9363246b56ecf91b98d1737fe66589
 
   - from: external.github
     to: typemeit.updater
@@ -505,20 +495,14 @@ edges:
     direction: one-way
     transport: http
     delivery: pull
-    description: The list of released versions. The app asks; nothing about the Mac is sent with the request.
+    description: The list of released versions. The request carries nothing about the Mac.
     frequency: hourly, and at launch
     meta:
       feed: github.com/typemeit/typemeit/releases/latest/download/appcast.xml ↗
       signature: EdDSA, checked against a public key shipped in the app
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Support/Info.plist
-        lines: [37, 42]
-        blob: a1d62deedde918bb3f9a7d0be3da93bf7d49e913
 
   - from: external.github
     to: typemeit.updater
@@ -526,17 +510,13 @@ edges:
     direction: one-way
     transport: http
     delivery: pull
-    description: The new build itself, fetched when the feed advertises a newer version than the one running. It is put in place on the next relaunch.
+    description: |-
+      The new build, fetched when the feed advertises a version newer than the one
+      running. It is installed on the next relaunch.
     condition: a newer version exists, and a dictation is not in flight
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Updates.swift
-        lines: [141, 164]
-        blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
   - from: typemeit.audio-capture
     to: typemeit.recordings
@@ -544,19 +524,14 @@ edges:
     direction: one-way
     transport: file
     delivery: push
-    description: The take is archived so the dictation can be played back beside its transcript later. Off by default.
-    pii: true
+    description: |-
+      The take, archived so the dictation can be played back beside its transcript. Off by
+      default.
     condition: keeping the audio is switched on
     transform: encoded to AAC, mono, 16 kbps
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/RecordingArchive.swift
-        lines: [15, 58]
-        blob: 9e33c108d1b9ba896ffe89882da58741673069a1
 
   - from: typemeit.audio-capture
     to: typemeit.transcriber
@@ -565,19 +540,14 @@ edges:
     transport: custom
     customTransport: in process
     delivery: push
-    description: The whole take, already in the format the model expects, handed over when the hotkey is released.
-    pii: true
+    description: |-
+      The whole take, already in the format the speech model expects, handed over when the
+      hotkey is released.
     condition: the take is longer than 0.3 s and not silent
     transform: downsampled to 16 kHz mono
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [170, 219]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.custom-word-matcher
     to: typemeit.post-processor
@@ -586,18 +556,11 @@ edges:
     transport: custom
     customTransport: in process
     delivery: push
-    description: The transcript with your vocabulary already restored, on its way into grammar clean-up.
-    pii: true
+    description: The transcript with the user's custom words restored, on its way to the AI clean-up.
     condition: Apple Intelligence clean-up is switched on
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [240, 255]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.learned-words-json
     to: typemeit.custom-word-matcher
@@ -605,18 +568,13 @@ edges:
     direction: one-way
     transport: file
     delivery: pull
-    description: What the model misheard last time is loaded back as a spelling it should recognise this time. This is the loop that makes a correction stick.
-    pii: true
+    description: |-
+      Spellings the speech model misheard on earlier dictations, loaded so the matcher can
+      restore them on this one.
     frequency: every dictation
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Store.swift
-        lines: [175, 188]
-        blob: d3d49df59b033776a2c007ddd5d084217f31f7db
 
   - from: typemeit.local-cleanup
     to: device.macos
@@ -626,26 +584,20 @@ edges:
     customTransport: system clipboard
     delivery: push
     description: |-
-      The finished dictation leaves the app and lands where you were typing.
-      - it is put on the system clipboard and a Cmd+V keystroke is posted for you
-      - whatever the clipboard held before is put back once the app you pasted into has read it
-      - if nothing readable had focus, or nothing ever read the clipboard, the text is offered as
-        a copy button instead
-      For that moment the transcript sits on the system clipboard, where any clipboard manager on
-      the Mac can see it.
-    pii: true
+      The finished dictation leaves the app and lands where the user was typing.
+      - the text is put on the system clipboard and a Cmd+V keystroke is posted
+      - whatever the clipboard held before is restored once the target app has read the
+        text
+      - if nothing readable had focus, or nothing read the clipboard, the text is offered
+        as a copy button instead
+      While it is on the clipboard, any clipboard manager on the Mac can read the
+      transcript.
     meta:
       via: system clipboard
       mechanism: Cmd+V posted as a synthetic keystroke, which needs Accessibility permission
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Output.swift
-        lines: [92, 129]
-        blob: e25d6ae1897f2af960230c543b4dfccee49b8727
 
   - from: typemeit.local-cleanup
     to: typemeit.history-json
@@ -654,21 +606,27 @@ edges:
     transport: file
     delivery: push
     description: |-
-      The dictation is written to the local history file: what the model heard, the tidied
-      version, which app and window it went to, and how long each stage took. This is where
-      personal data comes to rest. Note that the exact characters pasted are not kept — the
-      record is written from the text before the last clean-up pass.
-    pii: true
+      The dictation as written to the local history file: what the speech model heard, the
+      tidied version, which app and window it went to, and how long each stage took. The
+      exact characters pasted are not kept; the entry is written from the text before the
+      last clean-up pass.
     frequency: every dictation
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [277, 281]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
+
+  - from: typemeit.post-processor
+    to: device.macos.apple-intelligence
+    payload: transcript to tidy
+    direction: one-way
+    transport: custom
+    customTransport: in process
+    delivery: push
+    description: The rules are given to the model up front and the transcript alone is sent as the message, so it edits rather than answers.
+    condition: Apple Intelligence clean-up is switched on
+    provenance:
+      source: human
+      author: max
 
   - from: typemeit.post-processor
     to: typemeit.local-cleanup
@@ -677,17 +635,13 @@ edges:
     transport: custom
     customTransport: in process
     delivery: push
-    description: The tidied text still goes through the mechanical pass, because the model often leaves fillers alone. When its answer was rejected, or it never ran, the matched transcript takes this path instead.
-    pii: true
+    description: |-
+      The tidied text, which still goes through the mechanical pass because the AI
+      clean-up often leaves fillers in. When the AI clean-up's answer was rejected, or it
+      never ran, the matched transcript takes this path instead.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [255, 262]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.read-back
     to: typemeit.learned-words-json
@@ -695,18 +649,13 @@ edges:
     direction: one-way
     transport: file
     delivery: push
-    description: A fix you made by hand is saved as a pair — what was heard, what you meant — so the same mistake stops happening.
-    pii: true
+    description: |-
+      A correction the user made by hand, saved as a pair of what was heard and what was
+      meant, so the same mistake is not repeated.
     condition: the fix is a name, product, project, acronym or technical term
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Learning/LearningCoordinator.swift
-        lines: [24, 33]
-        blob: b47ce5563d6e3d93b57c01d77fc56074af8bba46
 
   - from: typemeit.read-back
     to: typemeit.settings
@@ -714,17 +663,13 @@ edges:
     direction: one-way
     transport: db-write
     delivery: push
-    description: The learned spelling is also added to your custom words, which is the list the matcher and the clean-up model actually read. Undoing it removes it again and blocks it from ever being learned a second time.
-    pii: true
+    description: |-
+      The learned spelling is also added to the custom words in settings, which is the
+      list the matcher and the AI clean-up read. Undoing it removes it and blocks it from
+      being learned again.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Learning/LearningCoordinator.swift
-        lines: [29, 47]
-        blob: b47ce5563d6e3d93b57c01d77fc56074af8bba46
 
   - from: typemeit.settings
     to: typemeit.audio-capture
@@ -732,17 +677,11 @@ edges:
     direction: one-way
     transport: db-read
     delivery: pull
-    description: Which microphone to open. Empty means whatever the Mac is using by default.
+    description: Which microphone to open. Empty means the Mac's default.
     frequency: every dictation
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [120, 122]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.settings
     to: typemeit.custom-word-matcher
@@ -750,18 +689,13 @@ edges:
     direction: one-way
     transport: db-read
     delivery: pull
-    description: Your hand-entered vocabulary — names, jargon, product spellings — read fresh on every dictation so the matcher can protect it.
-    pii: true
+    description: |-
+      The user's hand-entered vocabulary (names, jargon, product spellings), read on every
+      dictation so the matcher can protect it.
     frequency: every dictation
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [240, 241]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.settings
     to: typemeit.post-processor
@@ -769,17 +703,13 @@ edges:
     direction: one-way
     transport: db-read
     delivery: pull
-    description: Only the custom terms the transcript already contains are named to the clean-up model, so it leaves them alone. It is never shown the whole list — given that, it swapped one listed word for another.
-    pii: true
+    description: |-
+      Only the custom terms the transcript already contains are named to the AI clean-up,
+      so it leaves them alone. It is never shown the whole list, because when it was, it
+      swapped one listed word for another.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [255, 255]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.settings
     to: typemeit.updater
@@ -790,20 +720,15 @@ edges:
     description: |-
       Two preferences decide how an update arrives.
       - auto update: whether the app checks and downloads on its own at all
-      - ask before updating: whether it waits for your click before putting the new build in place
-      Both are on by default. With auto update off, the updater neither checks on a schedule nor
-      downloads in the background.
+      - ask before updating: whether it waits for the user's click before installing the
+        new build
+      Both are on by default. With auto update off, the updater neither checks on a
+      schedule nor downloads in the background.
     meta:
       read at: Updates.swift · 65, 169, 174, 222, 269, 279
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Updates.swift
-        lines: [62, 77]
-        blob: 1d78d38f813a63c1208e2c111ae054066159aea6
 
   - from: typemeit.transcriber
     to: typemeit.custom-word-matcher
@@ -812,17 +737,12 @@ edges:
     transport: custom
     customTransport: in process
     delivery: push
-    description: What the model heard, one word at a time with a score attached to each, before any correction is applied.
-    pii: true
+    description: |-
+      What the speech model heard, one word at a time with a score on each, before any
+      correction.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Pipeline.swift
-        lines: [235, 241]
-        blob: 333236b9e200b43a2cd2d1b28066f61a282c9590
 
   - from: typemeit.transcriber.parakeet-gguf
     to: typemeit.transcriber.transcribe
@@ -830,18 +750,14 @@ edges:
     direction: one-way
     transport: file
     delivery: pull
-    description: The model file is loaded into the running app on first use and freed again after five idle minutes, so an app left open does not hold 697 MB forever.
+    description: |-
+      The model file, loaded into the running app on first use and freed after five idle
+      minutes, so an idle app does not hold 697 MB.
     meta:
       size: 697 MB
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Transcriber.swift
-        lines: [42, 83]
-        blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
 
   - from: typemeit.transcriber.transcribe
     to: typemeit.transcriber.word-scoring
@@ -850,13 +766,7 @@ edges:
     transport: custom
     customTransport: in process
     delivery: push
-    description: The model emits a score for every piece of every word; those are what the per-word number is folded from.
+    description: A score for every piece of every word; word scoring folds these into one number per word.
     provenance:
-      state: asserted
       source: human
       author: max
-      evidence:
-        repo: typemeit
-        file: TypeMeIt/Transcriber.swift
-        lines: [142, 162]
-        blob: 1dac203e083d28e4e442de01bfb4dea609ac6acf
