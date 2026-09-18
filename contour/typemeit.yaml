@@ -43,13 +43,28 @@ nodes:
 
   - key: typemeit.history-json
     kind: collection
-    subtype: file
     name: history.json
     summary: Every dictation, with what was heard and what was written.
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/history.json
       format: JSON, ISO-8601 dates, rewritten atomically after every change
       retention: capped by the history limit, 500 entries by default
+    sample: |-
+      [
+        {
+          "id": "6F1C2A84-0B3D-4E55-9A71-2C8D5E7F0A19",
+          "timestamp": "2026-09-14T09:12:41Z",
+          "transcript": "send the deck to Priya by Friday",
+          "postProcessed": "Send the deck to Priya by Friday.",
+          "postProcessRequested": true,
+          "appName": "Mail",
+          "windowTitle": "Re: Q3 handover",
+          "durationMs": 4210,
+          "transcribeMs": 380,
+          "dictionaryFixes": 1
+        }
+      ]
     schema:
       lang: swift
       file: TypeMeIt/Store.swift
@@ -80,21 +95,6 @@ nodes:
 
             var displayText: String { edited ?? postProcessed ?? transcript }
         }
-    sample: |-
-      [
-        {
-          "id": "6F1C2A84-0B3D-4E55-9A71-2C8D5E7F0A19",
-          "timestamp": "2026-09-14T09:12:41Z",
-          "transcript": "send the deck to Priya by Friday",
-          "postProcessed": "Send the deck to Priya by Friday.",
-          "postProcessRequested": true,
-          "appName": "Mail",
-          "windowTitle": "Re: Q3 handover",
-          "durationMs": 4210,
-          "transcribeMs": 380,
-          "dictionaryFixes": 1
-        }
-      ]
     description: |-
       The app's own record of every dictation, kept on this Mac and nowhere else.
       - what the speech model heard, and the tidied version of it
@@ -144,15 +144,25 @@ nodes:
 
   - key: typemeit.learned-words-json
     kind: collection
-    subtype: file
     name: learned-words.json
     summary: The words you corrected, remembered.
-    tags:
-      - retention-gap
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/learned-words.json
       format: JSON, ISO-8601 dates, rewritten atomically after every change
       retention: no cap and no expiry; "Delete All" clears history and audio but not this file
+    sample: |-
+      [
+        {
+          "id": "1D77B0E4-9C2A-4B16-A3F8-0E5D6C817B24",
+          "batchId": "8A4E1F62-33D9-4C07-B5EA-77C1029D4E8B",
+          "heard": "para keet",
+          "meant": "Parakey",
+          "source": "readback",
+          "learnedAt": "2026-09-14T09:13:02Z",
+          "undone": false
+        }
+      ]
     schema:
       lang: swift
       file: TypeMeIt/Store.swift
@@ -168,24 +178,14 @@ nodes:
             var learnedAt: Date
             var undone: Bool = false
         }
-    sample: |-
-      [
-        {
-          "id": "1D77B0E4-9C2A-4B16-A3F8-0E5D6C817B24",
-          "batchId": "8A4E1F62-33D9-4C07-B5EA-77C1029D4E8B",
-          "heard": "para keet",
-          "meant": "Parakey",
-          "source": "readback",
-          "learnedAt": "2026-09-14T09:13:02Z",
-          "undone": false
-        }
-      ]
     description: |-
       Pairs of what the speech model wrote and what you meant, kept on this Mac.
       - most come from a correction you made right after a paste
       - some you typed yourself in settings, by naming the spelling the model keeps producing
       - undoing one marks it rather than deleting it, so it is never learned again
       Clearing your history does not clear this file, and nothing ever expires from it.
+    tags:
+      - retention-gap
     provenance:
       source: human
       author: max
@@ -209,8 +209,6 @@ nodes:
     kind: component
     name: AI clean-up
     summary: Checks what the model sends back before trusting it.
-    tags:
-      - on-device
     meta:
       guards: an answer that rewrites the text, or drops its opening words, is thrown away
     description: |-
@@ -219,6 +217,8 @@ nodes:
         the locally cleaned text is used instead
       - skipped entirely when the setting is off, when you press Escape, or when Apple
         Intelligence is unavailable
+    tags:
+      - on-device
     provenance:
       source: human
       author: max
@@ -241,9 +241,9 @@ nodes:
 
   - key: typemeit.recordings
     kind: store
-    subtype: file
     name: Recordings
     summary: Raw takes, kept only if you ask for them.
+    subtype: file
     meta:
       path: ~/Library/Application Support/TypeMeIt/Recordings/
       format: AAC in .m4a, mono, 16 kbps — roughly 120 KB a minute
@@ -263,13 +263,22 @@ nodes:
 
   - key: typemeit.settings
     kind: store
-    subtype: key-value
     name: Settings
     summary: Your preferences.
+    subtype: key-value
     meta:
       engine: UserDefaults, macOS's own preference store
-      keys: microphoneUID, customWords, postProcessingEnabled, learnFromCorrections, keepRecordings,
-        historyLimit, autoUpdate, askBeforeUpdating, undoneWords, screenContextEnabled, and 16 more
+      keys: microphoneUID, customWords, postProcessingEnabled, learnFromCorrections, keepRecordings, historyLimit, autoUpdate, askBeforeUpdating, undoneWords, screenContextEnabled, and 16 more
+    sample: |-
+      {
+        "customWords": ["Parakey", "Zentryx", "Priya"],
+        "postProcessingEnabled": true,
+        "learnFromCorrections": true,
+        "keepRecordings": false,
+        "historyLimit": 500,
+        "autoUpdate": true,
+        "askBeforeUpdating": true
+      }
     schema:
       lang: swift
       file: TypeMeIt/Settings.swift
@@ -326,16 +335,6 @@ nodes:
                 if debugLogs { DebugLog.writeHeader() }
             }
         }
-    sample: |-
-      {
-        "customWords": ["Parakey", "Zentryx", "Priya"],
-        "postProcessingEnabled": true,
-        "learnFromCorrections": true,
-        "keepRecordings": false,
-        "historyLimit": 500,
-        "autoUpdate": true,
-        "askBeforeUpdating": true
-      }
     description: |-
       Everything you choose in the settings window, stored by macOS itself and written the moment
       you change it.
