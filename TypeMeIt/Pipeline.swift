@@ -22,6 +22,9 @@ final class Pipeline {
     private var copyPromptTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
     private var lastRecordingFirstBuffer = false
+    /// The stream for the dictation in progress, when it is being
+    /// transcribed as it is spoken. Nil for the ordinary run-at-the-end path.
+    private var live: LiveDictation?
     /// Screen terms for the dictation in progress: nil until the read
     /// finishes. The read starts with the recording and is never waited
     /// for; a dictation shorter than the read goes without.
@@ -118,9 +121,16 @@ final class Pipeline {
         ReadBack.shared.finishNow()
         shortcuts.setPhase(.recording)
         if settings.muteWhileRecording { OutputMute.mute() }
+        if let meeting = MeetingMic.holder() {
+            let live = LiveDictation()
+            self.live = live
+            capture.setOnSamples { [weak live] pcm in live?.append(pcm) }
+            Log.transcriber.info("Streaming this dictation: \(meeting) has the mic")
+        }
         do {
             try capture.start(uid: settings.microphoneUID)
         } catch {
+            endLive()?.cancel()
             Log.audio.error("Could not start capture: \(error.localizedDescription)")
             phase = .idle
             shortcuts.setPhase(.idle)
@@ -133,7 +143,18 @@ final class Pipeline {
             Task { await PostProcessor.shared.prewarm() }
             if settings.screenContextEnabled { readScreen(generation: generation) }
         }
-        Task { await Transcriber.shared.preload() }
+        if live == nil { Task { await Transcriber.shared.preload() } }
+    }
+
+    /// Drops the stream for the dictation that just ended, and with it the
+    /// tap's route into it. Returns the stream so the caller can read the
+    /// transcript out of it.
+    @discardableResult
+    private func endLive() -> LiveDictation? {
+        capture.setOnSamples(nil)
+        let live = self.live
+        self.live = nil
+        return live
     }
 
     /// Reads the frontmost window in the background and stores the terms
@@ -161,6 +182,7 @@ final class Pipeline {
         phase = .idle
         shortcuts.setPhase(.idle)
         if wasRecording { capture.cancel() }
+        endLive()?.cancel()
         OutputMute.restore()
         Task { Transcriber.shared.cancel() }
         PostProcessor.shared.cancel()
@@ -171,6 +193,7 @@ final class Pipeline {
         guard phase == .recording else { return }
         let gen = generation
         let pcm = capture.stop()
+        let live = endLive()
         let duration = Double(pcm.count) / 16000
         let durationMs = Int(duration * 1000)
         let wasMuted = OutputMute.restore()
@@ -182,6 +205,7 @@ final class Pipeline {
         }
 
         if duration < Fixed.minimumRecordingSeconds || AudioCapture.peak(pcm) < Fixed.silencePeak {
+            live?.cancel()
             Log.app.info("Empty recording discarded (\(duration) s)")
             DebugLog.write("Dictation discarded: \(durationMs) ms of audio, \(duration < Fixed.minimumRecordingSeconds ? "too short" : "silent")")
             phase = .idle
@@ -202,7 +226,7 @@ final class Pipeline {
             let raw: Transcriber.Transcript
             let transcribeStart = ContinuousClock.now
             do {
-                raw = try await Transcriber.shared.transcribeScored(pcm)
+                raw = try await Pipeline.transcribe(pcm, live: live)
             } catch {
                 if gen == self.generation {
                     Log.transcriber.error("\(error.localizedDescription)")
@@ -215,6 +239,19 @@ final class Pipeline {
             let transcribeMs = Pipeline.elapsedMs(since: transcribeStart)
             Log.transcriber.info("Transcribed \(durationMs) ms of audio in \(transcribeMs) ms")
             await self.deliver(raw: raw, durationMs: durationMs, transcribeMs: transcribeMs, target: target, entryId: entryId, recordingFile: recordingFile, generation: gen)
+        }
+    }
+
+    /// The transcript a stream produced, or a run over the recording when
+    /// there was no stream. A stream that failed falls back to the run: the
+    /// whole recording is still here, and the cost is a wait, not a dictation.
+    private static func transcribe(_ pcm: [Float], live: LiveDictation?) async throws -> Transcriber.Transcript {
+        guard let live else { return try await Transcriber.shared.transcribeScored(pcm) }
+        do {
+            return try await live.transcript()
+        } catch {
+            Log.transcriber.warning("Stream failed (\(error.localizedDescription)); transcribing the recording")
+            return try await Transcriber.shared.transcribeScored(pcm)
         }
     }
 

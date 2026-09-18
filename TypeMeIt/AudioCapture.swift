@@ -18,6 +18,10 @@ final class AudioCapture: @unchecked Sendable {
     /// Level in 0...1 for the pill, published at most 30 times a second.
     var onLevel: (@Sendable (Float) -> Void)?
     var onFirstBuffer: (@Sendable () -> Void)?
+    /// Every converted buffer, in order, for a dictation being transcribed
+    /// while it is spoken. Called on the audio thread, so it must not block,
+    /// and read under the lock, so it can be swapped between dictations.
+    private var onSamples: (@Sendable ([Float]) -> Void)?
     private var lastLevelAt: TimeInterval = 0
     /// Loudest sample since the last level report, so a consonant that lands
     /// between reports still reaches the puff.
@@ -95,6 +99,12 @@ final class AudioCapture: @unchecked Sendable {
         try? ensureEngine(uid: lastUID)
     }
 
+    func setOnSamples(_ sink: (@Sendable ([Float]) -> Void)?) {
+        lock.lock()
+        onSamples = sink
+        lock.unlock()
+    }
+
     func start(uid: String?) throws {
         lastUID = uid
         lock.lock()
@@ -151,8 +161,10 @@ final class AudioCapture: @unchecked Sendable {
         samples.append(contentsOf: UnsafeBufferPointer(start: data, count: n))
         let report = !firstBufferReported
         firstBufferReported = true
+        let sink = onSamples
         lock.unlock()
         if report { onFirstBuffer?() }
+        if let sink { sink([Float](UnsafeBufferPointer(start: data, count: n))) }
 
         let now = Date().timeIntervalSinceReferenceDate
         peakSinceReport = max(peakSinceReport, peak)
