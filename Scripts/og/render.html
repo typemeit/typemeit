@@ -30,10 +30,13 @@ uniform vec2 uCentre; uniform float uSize; uniform float uTime;
 uniform float uExpansion; uniform float uTrail; uniform float uFlow; uniform float uDensity;
 out vec4 fragColor;
 void main(){ vec2 p = gl_FragCoord.xy - uCentre; p.y = -p.y;
-  // No dispersal and no lightning (a negative strike is none); the stills are
-  // plain white smoke, so the tint is opaque white.
+  // No dispersal and no lightning (a negative strike is none). The frame's
+  // 'dens' scales the opacity after Beer-Lambert through the tint's alpha,
+  // which saturates the dense cores the stills were tuned around; the
+  // shader's density argument thickens the smoke inside the exponent and
+  // reads softer, so it stays at 1.
   fragColor = render(p + 0.5*vec2(uSize), vec2(uSize), uTime, uExpansion, uTrail, uFlow,
-                     0.0, -1.0, uDensity, vec4(1.0, 1.0, 1.0, 1.0)); }`;
+                     0.0, -1.0, 1.0, vec4(1.0, 1.0, 1.0, uDensity)); }`;
 const VERT = `#version 300 es
 in vec2 aPos; void main(){ gl_Position = vec4(aPos,0.0,1.0); }`;
 function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
