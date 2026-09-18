@@ -1,9 +1,9 @@
 key: flow.dictation
 name: How a dictation happens
 description: |-
-  From holding the hotkey to text at the cursor — and the correction you make afterwards, which
-  teaches the app a word and comes back round on the next dictation. Every step happens on your
-  own Mac.
+  From holding the hotkey to text at the cursor, then the correction the user makes
+  afterwards, which teaches the app a word and feeds the next dictation. Every step runs on
+  the user's Mac.
 steps:
   - edge:
       from: device.macos
@@ -19,7 +19,7 @@ steps:
       from: typemeit.transcriber
       to: typemeit.custom-word-matcher
       payload: raw transcript
-    note: The model's own words, each with a score for how sure it was.
+    note: The speech model's own words, each with a score for how sure it was.
   - edge:
       from: typemeit.custom-word-matcher
       to: typemeit.post-processor
@@ -39,7 +39,7 @@ steps:
       from: typemeit.post-processor
       to: typemeit.local-cleanup
       payload: cleaned draft
-    note: Whatever survived — the tidied text, or the matched transcript when there was none — gets the mechanical pass.
+    note: Whatever survived (the tidied text, or the matched transcript when there was none) gets the mechanical pass.
   - edge:
       from: typemeit.local-cleanup
       to: device.macos
@@ -49,7 +49,7 @@ steps:
       from: device.macos
       to: typemeit.read-back
       payload: field contents
-    note: The field is watched for up to 90 seconds in case you fix something.
+    note: The field is watched for up to 90 seconds in case the user corrects something.
   - edge:
       from: typemeit.read-back
       to: typemeit.learned-words-json
@@ -59,7 +59,7 @@ steps:
       from: typemeit.learned-words-json
       to: typemeit.custom-word-matcher
       payload: learned terms
-    note: Returns to step 4. What the model misheard once is a spelling it recognises next time.
+    note: Returns to step 4. A spelling the speech model misheard once is restored on the next dictation.
 provenance:
   source: human
   author: max

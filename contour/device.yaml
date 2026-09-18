@@ -2,12 +2,13 @@ nodes:
   - key: device.macos
     kind: device
     name: macOS
-    summary: Mic audio in; pasted text out.
+    summary: The Mac, where microphone audio comes in and pasted text goes out.
     description: |-
-      The Mac itself — the boundary where your data enters and leaves the app.
-      - microphone audio comes in, while the dictation hotkey is held
-      - the finished text goes back out, pasted where you were typing
-      - the field you pasted into is read back afterwards, so your hand-fixes can be learned
+      The Mac itself, where data enters and leaves the app.
+      - microphone audio comes in while the dictation hotkey is held
+      - the finished text goes out, pasted where the user was typing
+      - the field the text was pasted into is read back afterwards, so hand corrections
+        can be learned
     provenance:
       source: human
       author: max
@@ -15,12 +16,12 @@ nodes:
   - key: device.macos.apple-intelligence
     kind: service
     name: Apple Intelligence
-    summary: The Mac's own language model; it fixes a transcript's grammar and punctuation and hands it back.
+    summary: The language model built into macOS, which fixes grammar and punctuation on device.
     meta:
       framework: Apple FoundationModels
     description: |-
       The language model that ships with macOS, running as part of the operating system.
-      - it runs on this Mac: the transcript goes to it and comes back without leaving the machine
+      - runs on this Mac, so the transcript goes to it and comes back without leaving the machine
       - nothing is sent over the network, and no account is involved
       - a Mac without Apple Intelligence does not have it, and the app carries on without it
     provenance:
