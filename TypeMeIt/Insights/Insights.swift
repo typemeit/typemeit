@@ -42,6 +42,42 @@ struct DayActivity: Sendable, Equatable {
     var words: Int
 }
 
+/// The value a given share of a sample falls under. Percentiles rather than
+/// an average, so one slow dictation does not carry the figure.
+struct Percentiles: Sendable, Equatable {
+    var p50: Int
+    var p75: Int
+    var p90: Int
+    var p95: Int
+
+    init(p50: Int, p75: Int, p90: Int, p95: Int) {
+        self.p50 = p50
+        self.p75 = p75
+        self.p90 = p90
+        self.p95 = p95
+    }
+
+    /// `nil` for an empty sample.
+    init?(_ values: [Int]) {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        p50 = Self.percentile(sorted, 0.50)
+        p75 = Self.percentile(sorted, 0.75)
+        p90 = Self.percentile(sorted, 0.90)
+        p95 = Self.percentile(sorted, 0.95)
+    }
+
+    /// Linear interpolation between the two order statistics the rank falls
+    /// between, so the 50th is the usual median.
+    private static func percentile(_ sorted: [Int], _ p: Double) -> Int {
+        let rank = p * Double(sorted.count - 1)
+        let lower = Int(rank.rounded(.down))
+        let upper = min(lower + 1, sorted.count - 1)
+        let fraction = rank - Double(lower)
+        return Int((Double(sorted[lower]) + fraction * Double(sorted[upper] - sorted[lower])).rounded())
+    }
+}
+
 struct InsightsStats: Sendable, Equatable {
     var totalWords: Int
     var totalDictations: Int
@@ -50,17 +86,25 @@ struct InsightsStats: Sendable, Equatable {
     /// Spoken words per minute over the dictations that recorded a duration.
     var wordsPerMinute: Double?
     var timedDictations: Int
+    /// How much longer typing the timed dictations at `Insights.typingWPM`
+    /// would have taken than speaking them, in milliseconds. Negative when
+    /// speaking was the slower of the two.
+    var timeSavedMs: Int?
+    /// Length of one dictation's audio, in milliseconds.
+    var audioMs: Percentiles?
+    /// Words in one dictation.
+    var wordsPerDictation: Percentiles?
     /// Custom-word corrections applied by the fuzzy matcher.
     var dictionaryFixes: Int
     /// Words changed by post-processing where it ran.
     var postProcessFixes: Int
-    /// Typical time the engine took over one dictation, in milliseconds.
-    var transcribeMedianMs: Int?
+    /// Time the engine took over one dictation, in milliseconds.
+    var transcribeMs: Percentiles?
     /// Time spent transcribing as a fraction of the audio's own length, over
     /// the dictations that recorded both.
     var transcribeRealtime: Double?
-    /// Typical time the clean-up took over one dictation, in milliseconds.
-    var cleanUpMedianMs: Int?
+    /// Time the clean-up took over one dictation, in milliseconds.
+    var cleanUpMs: Percentiles?
     var categories: [CategoryUsage]
     /// Dictations with no app recorded, which the categories exclude. Every
     /// entry saved before app attribution shipped counts here.
@@ -120,6 +164,8 @@ struct LocalDay: Hashable, Comparable, Sendable {
 
 enum Insights {
     static let topApps = 8
+    /// Typing speed the spoken rate and the time saved are measured against.
+    static let typingWPM = 40.0
 
     /// Whitespace-separated tokens, as Rust's `str::split_whitespace`: split
     /// on Unicode `White_Space` scalars, empty pieces dropped.
@@ -180,6 +226,8 @@ enum Insights {
         var postProcessFixes = 0
         var transcribeTimes: [Int] = []
         var cleanUpTimes: [Int] = []
+        var audioLengths: [Int] = []
+        var dictationWords: [Int] = []
         var transcribingMs = 0
         var transcribedAudioMs = 0
         var unattributed = 0
@@ -193,6 +241,7 @@ enum Insights {
         for row in rows {
             let words = wordCount(row.transcript)
             totalWords += words
+            dictationWords.append(words)
 
             let day = LocalDay(row.timestamp, calendar: calendar)
             let month = (day.year, day.month)
@@ -208,6 +257,7 @@ enum Insights {
                 timedWords += words
                 timedMs += ms
                 timedDictations += 1
+                audioLengths.append(ms)
             }
 
             if let ms = row.transcribeMs, ms > 0 {
@@ -255,11 +305,14 @@ enum Insights {
         }
 
         var wordsPerMinute: Double? = nil
+        var timeSavedMs: Int? = nil
         if timedMs > 0 {
             let wpm = Double(timedWords) / (Double(timedMs) / 60_000.0)
             if wpm.isFinite {
                 wordsPerMinute = wpm
             }
+            let typingMs = Double(timedWords) / typingWPM * 60_000.0
+            timeSavedMs = Int((typingMs - Double(timedMs)).rounded())
         }
 
         var transcribeRealtime: Double? = nil
@@ -302,11 +355,14 @@ enum Insights {
             wordsPreviousMonth: wordsPreviousMonth,
             wordsPerMinute: wordsPerMinute,
             timedDictations: timedDictations,
+            timeSavedMs: timeSavedMs,
+            audioMs: Percentiles(audioLengths),
+            wordsPerDictation: Percentiles(dictationWords),
             dictionaryFixes: dictionaryFixes,
             postProcessFixes: postProcessFixes,
-            transcribeMedianMs: median(transcribeTimes),
+            transcribeMs: Percentiles(transcribeTimes),
             transcribeRealtime: transcribeRealtime,
-            cleanUpMedianMs: median(cleanUpTimes),
+            cleanUpMs: Percentiles(cleanUpTimes),
             categories: categories,
             unattributed: unattributed,
             totalApps: totalApps,
@@ -318,14 +374,6 @@ enum Insights {
         )
     }
 
-    /// The middle value, or the mean of the two middle ones. A median rather
-    /// than an average, so one slow dictation does not carry the figure.
-    static func median(_ values: [Int]) -> Int? {
-        guard !values.isEmpty else { return nil }
-        let sorted = values.sorted()
-        let middle = sorted.count / 2
-        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
-    }
 
     /// `(current, longest)` runs of consecutive active days. The current streak
     /// is still alive on a day with no dictation yet, so it is counted back from
