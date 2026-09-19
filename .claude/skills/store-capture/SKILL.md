@@ -32,3 +32,21 @@ slack → Slack, claude → Claude, notes → Notes.
 
 If the window geometry changes on purpose, re-measure the constants at the top of
 the scene's `generate.py` and its window box in `frame.py`.
+
+## insights
+
+The insights scene is the app's own settings window over made-up history, so
+there is nothing to repaint and no need for the user to screenshot. Build the
+dev app, then:
+
+```sh
+python3 Scripts/store/insights/seed.py
+TYPEMEIT_SUPPORT_DIR="$PWD/Scripts/store/insights/store" "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev" &
+```
+
+Wait for the settings window, find its window number with
+`CGWindowListCopyWindowInfo` filtered to that pid and the name `settings`, then
+`screencapture -l <number> -x Scripts/store/insights/base.png` and
+`python3 Scripts/store/frame.py insights`. Quit the app afterwards. Launch the
+binary directly, not with `open`: the env var has to reach the process, and
+`open` may start another worktree's copy.

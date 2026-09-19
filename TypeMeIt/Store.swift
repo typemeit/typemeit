@@ -48,7 +48,12 @@ final class Store {
     private(set) var history: [HistoryEntry] = []
     private(set) var learned: [LearnedWord] = []
 
+    /// TYPEMEIT_SUPPORT_DIR points a build at another store, so a screenshot
+    /// run can show made-up history without touching the real one.
     nonisolated static let directory: URL = {
+        if let dir = ProcessInfo.processInfo.environment["TYPEMEIT_SUPPORT_DIR"] {
+            return URL(fileURLWithPath: dir, isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("TypeMeIt", isDirectory: true)
     }()

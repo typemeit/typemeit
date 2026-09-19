@@ -11,20 +11,17 @@ import os
 import subprocess
 import sys
 
+import numpy as np
+from PIL import Image
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 W, H = 2560, 1600
 
-# The macOS screenshot includes a transparent margin holding the window shadow;
-# this is the opaque window inside a base.png taken with window.sh, used to
-# size the window rather than its shadow.
-WINDOW = (112, 76, 3136, 1974)
-
 SCENES = {
     "slack": dict(
         image="slack/out/slack.png",
-        window=WINDOW,
         lead="Talk instead of typing.",
         rest="Say it, and it's typed wherever your cursor is.",
         layout="top",          # headline centred above the window
@@ -32,9 +29,15 @@ SCENES = {
     ),
     "claude": dict(
         image="claude/out/claude.png",
-        window=WINDOW,
         lead="Speak the prompt.",
         rest="Hold a key, say it, let go. It lands in the box.",
+        layout="top",
+        cloud="dark",
+    ),
+    "insights": dict(
+        image="insights/base.png",
+        lead="Kept count.",
+        rest="Words, speed and streaks, worked out on your Mac.",
         layout="top",
         cloud="dark",
     ),
@@ -55,15 +58,24 @@ body{font-family:M,monospace;color:#0a0a0a;-webkit-font-smoothing:antialiased;po
 """
 
 
+def window_box(path):
+    """The opaque window inside a capture, ignoring the transparent margin
+    that holds its shadow."""
+    alpha = np.array(Image.open(path).getchannel("A"))
+    ys, xs = np.where(alpha == 255)
+    return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
+
+
 def render(name, s):
     os.makedirs(OUT, exist_ok=True)
-    x0, y0, x1, y1 = s["window"]
-    win_w, win_h = x1 - x0, y1 - y0
+    image = os.path.join(HERE, s["image"])
+    x0, y0, x1, y1 = window_box(image)
+    win_w = x1 - x0
     # Window spans the frame width minus margins; it runs off the bottom edge
     # the way Things' screenshots do, so the headline keeps its room.
     margin = 180
     scale = (W - 2 * margin) / win_w
-    img_w = round(3248 * scale)
+    img_w = round(Image.open(image).width * scale)
     left = margin - round(x0 * scale)
     top = 262 - round(y0 * scale)
     cloud = ""
