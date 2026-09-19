@@ -54,7 +54,7 @@ Also different in a store build:
 ## Order of work
 
 1. Merge PR #127 (and #126 with the store set allowed).
-2. Add a `TypeMeIt Store` target in `project.yml`: same sources, sandbox
+2. Add a `typemeit` target in `project.yml`: same sources, sandbox
    entitlements, Apple Distribution signing, Sparkle excluded behind a
    build flag.
 3. Create the app record and register the bundle id; sign the Paid Apps
