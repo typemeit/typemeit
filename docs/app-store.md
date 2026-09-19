@@ -18,7 +18,9 @@ key.
 
 - The app record exists since 19 September 2026: `type me it:
   Transcription`, SKU `typemeit`, Apple ID 6813950813, primary language
-  English (U.S.), priced £2.99 in the UK with Apple's equivalents elsewhere.
+  English (U.S.), priced £2.99 in the UK with Apple's equivalents elsewhere,
+  on sale in six storefronts only: United Kingdom, Ireland, United States,
+  Canada, Australia and New Zealand. The speech model is English.
   Pricing takes effect only once the Paid Apps agreement is signed, and the
   updated Developer Program License Agreement has to be accepted by the
   Account Holder before a new app can be submitted.
