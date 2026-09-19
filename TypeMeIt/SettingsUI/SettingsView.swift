@@ -335,7 +335,7 @@ struct MainSettingsTab: View {
                         .labelsHidden().fixedSize()
                         .onAppear { devices = AudioCapture.inputDevices() }
                     }
-                    SettingsRow(label: "mute other audio") {
+                    SettingsRow(label: "mute audio") {
                         Toggle("", isOn: $settings.muteWhileRecording).toggleStyle(.switch).labelsHidden()
                     }
                     SettingsRow(label: "pause audio", last: true) {
