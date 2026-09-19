@@ -69,7 +69,7 @@ def render(name, s):
     cloud = ""
     if s.get("cloud"):
         # Straddles the composer, as the app draws it at the bottom of the screen.
-        size = 240
+        size = 160
         cloud = (f'<img class=cloud src="clouds/{s["cloud"]}.png" style="width:{size}px;height:{size}px;'
                  f'left:{W / 2 - size / 2}px;top:{H - size * 0.55}px">')
     html = (f'<!doctype html><meta charset=utf-8><base href="file://{HERE}/"><style>'
