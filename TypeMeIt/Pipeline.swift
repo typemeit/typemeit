@@ -49,8 +49,8 @@ final class Pipeline {
             if case .learned = self.overlay.model.state { self.keepLearned(); return }
             self.shortcuts.cancelFromOverlay()
         }
-        overlay.model.onSkip = { [weak self] in self?.skipPostProcessing() }
         overlay.model.onCopy = { [weak self] in self?.copyFromPrompt() }
+        overlay.model.onOpenAccessibility = { NSWorkspace.shared.open(SecureInput.accessibilitySettingsURL) }
         overlay.model.onKeep = { [weak self] in self?.keepLearned() }
         overlay.model.onUndo = { [weak self] in self?.undoLearned() }
         overlay.model.onOpenIntelligence = { [weak self] in
@@ -84,7 +84,6 @@ final class Pipeline {
             if overlay.model.isRecording { overlay.show(.pinned) }
         case .recordingEnded: endRecording()
         case .cancelled: cancel()
-        case .skipRequested: skipPostProcessing()
         case .copyLastRequested: copyLast()
         }
     }
@@ -243,6 +242,7 @@ final class Pipeline {
             finishIdle(discarding: recordingFile)
             return
         }
+        let styles = settings.writingStyles
         let requested = settings.postProcessingEnabled
         let matched = CustomWordMatcher.apply(raw.matcherWords, terms: store.terms(for: settings.customWords))
         if matched.fixes > 0 { Log.postProcess.info("Custom words replaced \(matched.fixes) run(s)") }
@@ -258,15 +258,16 @@ final class Pipeline {
             if self.screenTerms == nil, settings.screenContextEnabled { Log.screenContext.info("Screen read not finished; cleaning up without it") }
             if !screenTerms.isEmpty { Log.screenContext.info("Screen terms: \(screenTerms.joined(separator: ", "), privacy: .private)") }
             let start = ContinuousClock.now
-            postProcessed = await PostProcessor.shared.run(matched.text, keep: CustomWordMatcher.present(in: matched.text, terms: settings.customWords), hints: matched.hints, screenTerms: screenTerms)
+            let cleaned = await PostProcessor.shared.clean(matched, customWords: settings.customWords, screenTerms: screenTerms, styles: styles)
             let ms = Pipeline.elapsedMs(since: start)
             postProcessMs = ms
-            Log.postProcess.info("Post-processing took \(ms) ms (\(postProcessed == nil ? "no result, local clean-up only" : "applied"))")
+            Log.postProcess.info("Post-processing took \(ms) ms (\(cleaned.applied ? "applied" : "no result, local clean-up only"))")
             guard gen == generation else { return }
-            if let postProcessed { finalText = postProcessed }
+            if cleaned.applied { postProcessed = cleaned.text }
+            finalText = cleaned.text
+        } else {
+            finalText = LocalCleanup.run(finalText)
         }
-        finalText = LocalCleanup.run(finalText)
-        if requested { finalText = ModelText.stripTrailingFullStop(finalText) }
         // Fillers alone ("um", "uh") clean down to nothing; that is silence, not a dictation.
         if finalText.isEmpty {
             DebugLog.write("Dictation discarded: clean-up left nothing of \"\(DebugLog.excerpt(raw.text))\"")
@@ -302,7 +303,7 @@ final class Pipeline {
         }
         if !pasted || focusedIsTextInput == false {
             DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V \(pasted ? "posted" : "not posted") → copy prompt")
-            showCopyPrompt(finalText)
+            showCopyPrompt(finalText, cantType: !pasted)
             return
         }
         // The role could not rule the paste out; whether anything reads the
@@ -312,21 +313,16 @@ final class Pipeline {
         let landed = await paste.landed(within: Fixed.pasteLandedWaitMs)
         guard gen == generation else { return }
         DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V posted, clipboard \(landed ? "read → done" : "not read within \(Fixed.pasteLandedWaitMs) ms → copy prompt")")
-        if !landed { showCopyPrompt(finalText) }
-    }
-
-    private func skipPostProcessing() {
-        guard phase == .cleaningUp else { return }
-        PostProcessor.shared.cancel()
+        if !landed { showCopyPrompt(finalText, cantType: false) }
     }
 
     // MARK: Copy prompt
 
     private var copyPromptText = ""
 
-    private func showCopyPrompt(_ text: String) {
+    private func showCopyPrompt(_ text: String, cantType: Bool) {
         copyPromptText = text
-        overlay.show(.copyPrompt)
+        overlay.show(.copyPrompt(cantType: cantType))
         copyPromptTask?.cancel()
         copyPromptTask = Task { [weak self] in
             try? await Task.sleep(for: Fixed.copyPromptTimeout)
