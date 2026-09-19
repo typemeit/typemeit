@@ -41,7 +41,7 @@ SCENES = {
     "history": dict(
         image="app/history.png",
         head="everything on your mac.",
-        text="transcribed, formatted and tidied on device, then kept here to review and copy again.",
+        text="transcribed, formatted and tidied on device, then kept in history to review and copy again.",
     ),
     "settings": dict(
         image="app/settings.png",
