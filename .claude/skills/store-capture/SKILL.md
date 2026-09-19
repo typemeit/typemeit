@@ -1,12 +1,12 @@
 ---
 name: store-capture
-description: Retake the base window capture for an App Store screenshot scene (slack, notes) and regenerate the framed scene
+description: Retake the base window capture for an App Store screenshot scene (slack, claude, notes) and regenerate the framed scene
 ---
 
 Each scene in `Scripts/store/<scene>/` is painted over a real window capture, and
 its `generate.py` measures everything against a 1512x949 point window, so the
 capture must be taken at exactly that size. Scenes and the app they capture:
-slack → Slack, notes → Notes.
+slack → Slack, claude → Claude, notes → Notes.
 
 1. Size the window (the app must be running with the right view open):
 
