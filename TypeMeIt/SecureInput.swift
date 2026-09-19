@@ -45,10 +45,23 @@ enum SecureInput {
         return (value as? NSNumber)?.intValue == 0
     }
 
+    /// Sets "Press 🌐 key to" to Do Nothing through the Carbon call System
+    /// Settings itself makes. It persists the preference and broadcasts the
+    /// change, so it applies at once; writing the preference directly only
+    /// takes effect at the next login. The symbol is private, so this can
+    /// fail, in which case the caller sends the user to Keyboard settings.
+    @discardableResult
+    static func setFnKeyToDoNothing() -> Bool {
+        typealias Update = @convention(c) (Int32) -> Void
+        guard let carbon = dlopen("/System/Library/Frameworks/Carbon.framework/Carbon", RTLD_LAZY),
+              let symbol = dlsym(carbon, "TISUpdateFnUsageType") else { return false }
+        unsafeBitCast(symbol, to: Update.self)(0)
+        return fnKeyDoesNothing
+    }
+
     static let keyboardSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!
     static let appleIntelligenceSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!
     static let accessibilitySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-    static let inputMonitoringSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
     static let microphoneSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
     static let screenRecordingSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
 }

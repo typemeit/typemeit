@@ -34,7 +34,7 @@ final class Shortcuts {
     private static let spaceKeycode: Int64 = 49
     private static let escKeycode: Int64 = 53
 
-    /// Returns false when Input Monitoring has not been granted.
+    /// Returns false when Accessibility has not been granted.
     @discardableResult
     func install() -> Bool {
         guard tap == nil else { return true }
@@ -45,7 +45,7 @@ final class Shortcuts {
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
             eventsOfInterest: mask, callback: Shortcuts.callback, userInfo: userInfo)
         else {
-            Log.shortcuts.error("Event tap could not be created; Input Monitoring is missing")
+            Log.shortcuts.error("Event tap could not be created; Accessibility is missing")
             tapInstalled = false
             return false
         }
