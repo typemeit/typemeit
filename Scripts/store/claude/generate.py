@@ -118,5 +118,5 @@ if __name__ == "__main__":
         "Where to stay in Porto",
         "Weekend plan with the kids",
     ]
-    print(generate(chats, "Write a short reply to Sam saying the follow-up lands this afternoon",
+    print(generate(chats, "Build me a minimal transcription app for the Mac, and make no mistakes",
                    os.path.join(OUT, "claude.png")))
