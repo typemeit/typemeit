@@ -26,22 +26,22 @@ SCENES = {
     "slack": dict(
         image="slack/out/slack.png", cloud="dark",
         head="hold fn, speak, let go.",
-        text="typed wherever the cursor is - be it slack, claude or anything with a text box.",
+        text="typed where the cursor is, be it slack, claude or anything with a text box.",
     ),
     "claude": dict(
         image="claude/out/claude.png", cloud="white",
         head="tidied by apple intelligence.",
-        text="fillers dropped, punctuation put in, on this mac. nothing leaves the computer.",
+        text="fillers dropped, punctuation put in. nothing leaves your mac.",
     ),
     "insights": dict(
         image="app/insights.png",
         head="three times faster than typing.",
-        text="every dictation counted: words, speed, streaks, and the apps you spoke into.",
+        text="every dictation counted: words, speed, streaks and the apps you spoke into.",
     ),
     "history": dict(
         image="app/history.png",
         head="everything on your mac.",
-        text="transcribed, formatted and tidied on device, and kept here with what was heard. nothing is sent anywhere.",
+        text="transcribed, formatted and tidied on device, then kept here to review and copy again.",
     ),
     "settings": dict(
         image="app/settings.png",
