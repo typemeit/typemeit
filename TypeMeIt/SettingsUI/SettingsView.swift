@@ -259,22 +259,19 @@ struct RowRule: View {
     var body: some View { Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: DesignTokens.hairline) }
 }
 
-/// A question mark after a row's label. Its explanation pops up at once on
-/// hover, and a click holds it open.
+/// A question mark after a row's label. A click pops its explanation up.
 struct HelpMark: View {
     let text: String
-    @State private var hovering = false
-    @State private var pinned = false
+    @State private var open = false
 
     var body: some View {
         Image(systemName: "questionmark.circle")
             .font(.system(size: 11))
-            .foregroundStyle(hovering || pinned ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+            .foregroundStyle(open ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
             .frame(width: 18, height: 18)
             .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .onTapGesture { pinned.toggle() }
-            .popover(isPresented: Binding(get: { hovering || pinned }, set: { if !$0 { pinned = false } }), arrowEdge: .bottom) {
+            .onTapGesture { open.toggle() }
+            .popover(isPresented: $open, arrowEdge: .bottom) {
                 Text(text)
                     .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
                     .fixedSize(horizontal: false, vertical: true)
