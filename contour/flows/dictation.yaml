@@ -24,7 +24,8 @@ steps:
       from: typemeit.custom-word-matcher
       to: typemeit.post-processor
       payload: matched transcript
-    note: Skipped when Apple Intelligence clean-up is off; the text goes straight to step 7.
+    note: Skipped when Apple Intelligence clean-up is off; the text goes straight to step 8.
+    otherwise: 8
   - edge:
       from: typemeit.post-processor
       to: device.macos.apple-intelligence
@@ -39,7 +40,7 @@ steps:
       from: typemeit.post-processor
       to: typemeit.local-cleanup
       payload: cleaned draft
-    note: Whatever survived (the tidied text, or the matched transcript when there was none) gets the mechanical pass.
+    note: The tidied text gets the mechanical pass.
   - edge:
       from: typemeit.local-cleanup
       to: device.macos
