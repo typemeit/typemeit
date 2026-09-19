@@ -280,13 +280,13 @@ struct HistoryTab: View {
 }
 
 /// How many characters the clean-up put in and took out, `+12 −3`, in the
-/// diff colours. Nothing when the text was left as heard.
+/// diff colours, not counting spaces. Nothing when the text was left as heard.
 private struct CharDelta: View {
     let heard: String
     let typed: String
 
     var body: some View {
-        let diff = Array(typed).difference(from: Array(heard))
+        let diff = typed.filter { !$0.isWhitespace }.difference(from: heard.filter { !$0.isWhitespace })
         let (added, removed) = (diff.insertions.count, diff.removals.count)
         if added > 0 { Text("+\(added.formatted())").foregroundStyle(DesignTokens.Colors.diffAdd) }
         if removed > 0 { Text("−\(removed.formatted())").foregroundStyle(DesignTokens.Colors.diffRemove) }
