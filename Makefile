@@ -8,6 +8,7 @@
 #   make model-verify-url   re-download the published asset and hash it
 #   make eval               score the clean-up prompt on Apple Intelligence
 #   make bench MODELS=...   score the same cases on local GGUF models
+#   make globe-key-image    rebuild the onboarding 🌐 key image from design/onboarding
 
 MODEL ?= nvidia/parakeet-unified-en-0.6b
 QUANT ?= Q8_0
@@ -88,3 +89,9 @@ eval:
 # The same cases on local GGUF models, e.g. make bench MODELS="a.gguf b.gguf".
 bench:
 	Scripts/llm-bench/run.sh $(MODELS)
+
+# The onboarding image for the 🌐 key step, light and dark, from the
+# screenshots in design/onboarding.
+.PHONY: globe-key-image
+globe-key-image:
+	swift Scripts/globe-key-image.swift

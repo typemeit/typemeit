@@ -76,7 +76,7 @@ struct PillView: View {
                 // that spelling is what was added.
                 label(Text("added ") + Text(words[0]).bold() + Text(" to dictionary"))
             } else {
-                label("learned \(words.count) words")
+                label("learned \(counted(words.count, "word"))")
             }
         case .undone:
             label("undone")

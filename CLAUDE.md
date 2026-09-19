@@ -20,8 +20,8 @@ pgrep -fil "type me it dev.app/Contents/MacOS"
 pkill -fi "type me it dev.app/Contents/MacOS"
 ```
 
-Because the signature is stable, macOS keeps the dev app's Input Monitoring, Microphone
-and Accessibility grants across rebuilds. They are granted once through the dev app's
+Because the signature is stable, macOS keeps the dev app's Microphone and Accessibility
+grants across rebuilds. They are granted once through the dev app's
 own onboarding. The dev app has its own UserDefaults, so settings and onboarding state
 do not carry over from the release app.
 
@@ -48,3 +48,9 @@ because the model might plausibly do something; run `make eval`, read the
 output, then add it with a `why` that says what was seen. Behaviour that is
 pure code (digits, lists, quotes, the safe contractions) is tested in
 `TypeMeItTests`, not with eval cases.
+
+## Counts agree with their noun
+
+A string that shows a count next to a noun goes through `counted(n, "word")`
+(TypeMeIt/Plural.swift), so it reads "1 word" and "2 words". Never write
+"\(n) words" or "word(s)" in anything the user sees.

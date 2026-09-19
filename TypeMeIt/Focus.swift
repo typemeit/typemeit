@@ -20,11 +20,28 @@ enum Focus {
     /// The role (and, in web content, subrole) of a password field.
     static let secureTextRole = "AXSecureTextField"
 
-    /// Pure classification: a known text role, or any element whose `AXValue`
-    /// the accessibility layer lets us set (editable web content, code editors
-    /// and terminals that report a generic role but writable text).
-    static func classifyRole(_ role: String, valueSettable: Bool) -> Bool {
-        textRoles.contains(role) || valueSettable
+    /// Accessibility roles that never take typed text: controls and static
+    /// content. No containers: an app that draws its own UI (Zed, Java
+    /// toolkits) reports the window as the focused element while the caret
+    /// is in its editor.
+    static let nonTextRoles: Set<String> = [
+        "AXMenuBar", "AXMenuBarItem", "AXMenu", "AXMenuItem", "AXMenuButton",
+        "AXButton", "AXPopUpButton", "AXCheckBox", "AXRadioButton", "AXRadioGroup", "AXDisclosureTriangle",
+        "AXSlider", "AXIncrementor", "AXProgressIndicator", "AXValueIndicator", "AXBusyIndicator", "AXLevelIndicator",
+        "AXScrollBar", "AXSplitter", "AXStaticText", "AXHeading", "AXImage", "AXLink", "AXColorWell", "AXDockItem",
+    ]
+
+    /// Pure classification. `true` for a text role, or any other element
+    /// whose `AXValue` the accessibility layer lets us set (editable web
+    /// content, code editors and terminals that report a generic role but
+    /// writable text). `false` for a role that never takes text, whatever its
+    /// value says: a slider's value is settable. `nil` for the rest: web
+    /// content reports a generic role with no settable value while the caret
+    /// is in a real text box.
+    static func classifyRole(_ role: String, valueSettable: Bool) -> Bool? {
+        if textRoles.contains(role) { return true }
+        if nonTextRoles.contains(role) { return false }
+        return valueSettable ? true : nil
     }
 
     /// Pure check: a field whose contents must never be read back. Native
@@ -43,8 +60,8 @@ enum Focus {
     }
 
     /// `true` when the focused element takes text input, `false` when it
-    /// definitely does not, `nil` when Accessibility is not granted or no
-    /// focused element can be read.
+    /// definitely does not, `nil` when Accessibility is not granted, no
+    /// focused element can be read, or its role says nothing either way.
     ///
     /// The system-wide element is asked first. On some Macs it answers that
     /// nothing is focused while the frontmost app, asked directly, names the
@@ -84,6 +101,7 @@ enum Focus {
 
         guard let focused else {
             Log.output.notice("Focus check: no focused element from system or app")
+            DebugLog.write("Focus check: no focused element from system or app")
             return nil
         }
         focused.applyMessagingTimeout()
@@ -98,7 +116,10 @@ enum Focus {
         AXUIElementGetPid(focused, &pid)
         let owner = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "pid \(pid)"
         let isText = classifyRole(role, valueSettable: valueSettable)
-        Log.output.notice("Focus check (\(source, privacy: .public)): \(owner, privacy: .public) role \(role, privacy: .public) subrole \(subrole, privacy: .public) valueSettable \(valueSettable) -> \(isText ? "text input" : "not text input", privacy: .public)")
+        let verdict = isText.map { $0 ? "text input" : "not text input" } ?? "unknown"
+        let line = "Focus check (\(source)): \(owner) role \(role) subrole \(subrole) valueSettable \(valueSettable) -> \(verdict)"
+        Log.output.notice("\(line, privacy: .public)")
+        DebugLog.write(line)
         return isText
     }
 }
@@ -135,6 +156,15 @@ final class FocusedTextField: @unchecked Sendable {
         return fromFocusedElement(of: app)
     }
 
+    /// `capture()`, then the frontmost app's own focused element when the
+    /// system-wide one gave nothing: the same route as the focus check, for
+    /// the Macs where only the app answers.
+    static func captureFrontmost() -> FocusedTextField? {
+        if let field = capture() { return field }
+        guard let front = NSWorkspace.shared.frontmostApplication else { return nil }
+        return capture(inApplication: front.processIdentifier)
+    }
+
     /// Reads `AXFocusedUIElement` of `parent` and wraps it if it is a
     /// readable text field.
     private static func fromFocusedElement(of parent: AXUIElement) -> FocusedTextField? {
@@ -158,7 +188,7 @@ final class FocusedTextField: @unchecked Sendable {
             return nil
         }
         let valueSettable = element.isAttributeSettable(kAXValueAttribute)
-        guard Focus.classifyRole(role, valueSettable: valueSettable) else {
+        guard Focus.classifyRole(role, valueSettable: valueSettable) == true else {
             return nil
         }
 

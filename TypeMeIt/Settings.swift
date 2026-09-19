@@ -81,7 +81,19 @@ final class Settings {
     private let defaults = UserDefaults.standard
 
     var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: "microphoneUID") } }
-    var muteWhileRecording: Bool { didSet { defaults.set(muteWhileRecording, forKey: "muteWhileRecording") } }
+    // Mute and pause are alternatives: switching one on switches the other off.
+    var muteWhileRecording: Bool {
+        didSet {
+            defaults.set(muteWhileRecording, forKey: "muteWhileRecording")
+            if muteWhileRecording, pauseWhileRecording { pauseWhileRecording = false }
+        }
+    }
+    var pauseWhileRecording: Bool {
+        didSet {
+            defaults.set(pauseWhileRecording, forKey: "pauseWhileRecording")
+            if pauseWhileRecording, muteWhileRecording { muteWhileRecording = false }
+        }
+    }
     var audioFeedback: Bool { didSet { defaults.set(audioFeedback, forKey: "audioFeedback") } }
     var copyPromptEnabled: Bool { didSet { defaults.set(copyPromptEnabled, forKey: "copyPromptEnabled") } }
     var postProcessingEnabled: Bool { didSet { defaults.set(postProcessingEnabled, forKey: "postProcessingEnabled") } }
@@ -95,8 +107,13 @@ final class Settings {
     var historyLimit: Int { didSet { defaults.set(historyLimit, forKey: "historyLimit") } }
     /// Keeps each dictation's audio next to its history entry.
     var keepRecordings: Bool { didSet { defaults.set(keepRecordings, forKey: "keepRecordings") } }
-    /// A ready update is announced with the pill and waits for a click. Off,
-    /// the app installs it and restarts itself once no dictation is in flight.
+    /// Checks for, downloads and installs updates on its own. Off, the app
+    /// looks for an update only when Settings comes to the front, and installs
+    /// one only from the version row's button.
+    var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: "autoUpdate") } }
+    /// With `autoUpdate` on: a ready update is announced with the pill and
+    /// waits for a click. Off, the app installs it and restarts itself once no
+    /// dictation is in flight.
     var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
     var showDockIcon: Bool { didSet { defaults.set(showDockIcon, forKey: "showDockIcon") } }
@@ -118,12 +135,23 @@ final class Settings {
     }
     /// Words removed by the learned-words toast's Undo. Never learned again.
     var undoneWords: [String] { didSet { defaults.set(undoneWords, forKey: "undoneWords") } }
+    /// Writes what each dictation and paste did to `DebugLog.url`, naming
+    /// the app, the clipboard's contents and the start of the transcript.
+    /// For bug reports.
+    var debugLogs: Bool {
+        didSet {
+            defaults.set(debugLogs, forKey: "debugLogs")
+            DebugLog.enabled = debugLogs
+            if debugLogs { DebugLog.writeHeader() }
+        }
+    }
 
     private init() {
         let d = UserDefaults.standard
         func bool(_ key: String, _ fallback: Bool) -> Bool { d.object(forKey: key) == nil ? fallback : d.bool(forKey: key) }
         microphoneUID = d.string(forKey: "microphoneUID")
         muteWhileRecording = bool("muteWhileRecording", true)
+        pauseWhileRecording = bool("pauseWhileRecording", false)
         audioFeedback = bool("audioFeedback", true)
         copyPromptEnabled = bool("copyPromptEnabled", true)
         postProcessingEnabled = bool("postProcessingEnabled", true)
@@ -135,6 +163,7 @@ final class Settings {
         autoSubmitKey = AutoSubmitKey(rawValue: d.string(forKey: "autoSubmitKey") ?? "") ?? .enter
         historyLimit = d.object(forKey: "historyLimit") == nil ? 500 : d.integer(forKey: "historyLimit")
         keepRecordings = bool("keepRecordings", Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
+        autoUpdate = bool("autoUpdate", true)
         askBeforeUpdating = bool("askBeforeUpdating", true)
         launchAtLogin = bool("launchAtLogin", true)
         showDockIcon = bool("showDockIcon", true)
@@ -147,6 +176,9 @@ final class Settings {
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
+        debugLogs = bool("debugLogs", false)
+        DebugLog.enabled = debugLogs
+        if debugLogs { DebugLog.writeHeader() }
     }
 
     func addCustomWord(_ word: String) {
@@ -173,7 +205,21 @@ enum Fixed {
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
     static let holdThresholdMs = 300
     static let pasteDelayBeforeMs = 60
-    static let pasteDelayAfterMs = 60
+    /// Restore this long after the target read the clipboard. Chromium's
+    /// browser process reads, then the renderer reads the pasteboard's copy.
+    static let pasteQuietMs = 200
+    /// Restore, and Return, this long after Cmd+V when something read the
+    /// clipboard before the chord and the target's read cannot be seen.
+    static let pasteReadEarlyMs = 1500
+    /// Restore this long after Cmd+V when nothing has read the clipboard.
+    static let pasteUnreadCapMs = 8000
+    /// Nothing has read the clipboard this long after Cmd+V: the paste
+    /// landed nowhere, and the copy prompt shows. Slack under load read at
+    /// 273 ms.
+    static let pasteLandedWaitMs = 1000
+    /// Restore this long after a Cmd+V that could not be posted.
+    static let pasteNotPostedMs = 500
+    static let pasteTickMs = 20
     static let autoSubmitDelayMs = 50
     static let modelUnloadIdle: Duration = .seconds(5 * 60)
     static let copyPromptTimeout: Duration = .seconds(8)

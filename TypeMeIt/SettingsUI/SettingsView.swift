@@ -259,18 +259,52 @@ struct RowRule: View {
     var body: some View { Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: DesignTokens.hairline) }
 }
 
+/// A question mark after a row's label. A click pops its explanation up.
+struct HelpMark: View {
+    let text: String
+    @State private var open = false
+
+    var body: some View {
+        Image(systemName: "questionmark.circle")
+            .font(.system(size: 11))
+            .foregroundStyle(open ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+            .frame(width: 18, height: 18)
+            .contentShape(Rectangle())
+            .onTapGesture { open.toggle() }
+            .popover(isPresented: $open, arrowEdge: .bottom) {
+                Text(text)
+                    .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 280, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+            }
+    }
+}
+
+/// A link in the settings: the web's `.link`, underlined in ink-a32 at rest,
+/// and the underline lifts under the pointer.
+struct InkLink: View {
+    let title: String
+    let url: URL
+    @State private var hovering = false
+
+    var body: some View {
+        Text(title)
+            .underline(!hovering, color: DesignTokens.Colors.inkA32)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture { NSWorkspace.shared.open(url) }
+    }
+}
+
 extension SettingsRow {
-    /// Parses a subtitle as markdown and underlines link runs, so any link in
-    /// a subtitle carries the same underline the standalone `Link` rows do.
-    /// Plain strings render unchanged; a malformed markdown string falls back
+    /// Parses a label or subtitle as markdown; a malformed string falls back
     /// to a plain AttributedString.
-    /// Labels and subtitles are markdown, so either can carry a link.
     static func attributed(_ s: String) -> AttributedString {
-        var attr = (try? AttributedString(markdown: s)) ?? AttributedString(s)
-        for run in attr.runs where run.link != nil {
-            attr[run.range].underlineStyle = .single
-        }
-        return attr
+        (try? AttributedString(markdown: s)) ?? AttributedString(s)
     }
 }
 
@@ -278,15 +312,26 @@ struct SettingsRow<Control: View>: View {
     var label: String
     var subtitle: String?
     var last = false
+    /// A label that holds a link, in place of the plain string.
+    var labelView: AnyView?
+    /// Links under the label; the plain `subtitle` is a tooltip instead.
+    var subtitleView: AnyView?
     @ViewBuilder var control: Control
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(SettingsRow.attributed(label)).font(DesignTokens.Fonts.ui.monospaced()).tint(DesignTokens.Colors.ink)
-                    if let subtitle {
-                        Text(SettingsRow.attributed(subtitle)).font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2).tint(DesignTokens.Colors.ink).frame(maxWidth: 400, alignment: .leading)
+                    HStack(spacing: 6) {
+                        Group {
+                            if let labelView { labelView } else { Text(SettingsRow.attributed(label)) }
+                        }
+                        .font(DesignTokens.Fonts.ui.monospaced())
+                        if let subtitle { HelpMark(text: subtitle) }
+                    }
+                    if let subtitleView {
+                        subtitleView
+                            .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: 400, alignment: .leading)
                     }
                 }
                 Spacer()
@@ -335,12 +380,15 @@ struct MainSettingsTab: View {
                         .labelsHidden().fixedSize()
                         .onAppear { devices = AudioCapture.inputDevices() }
                     }
-                    SettingsRow(label: "mute other audio", last: true) {
+                    SettingsRow(label: "mute audio") {
                         Toggle("", isOn: $settings.muteWhileRecording).toggleStyle(.switch).labelsHidden()
+                    }
+                    SettingsRow(label: "pause audio", last: true) {
+                        Toggle("", isOn: $settings.pauseWhileRecording).toggleStyle(.switch).labelsHidden()
                     }
                 }
                 SettingsGroup(title: "cloud") {
-                    SettingsRow(label: "cloud colour") {
+                    SettingsRow(label: "custom colour") {
                         Toggle("", isOn: $settings.cloudColorEnabled).toggleStyle(.switch).labelsHidden()
                     }
                     if settings.cloudColorEnabled {
@@ -348,19 +396,21 @@ struct MainSettingsTab: View {
                             .padding(.horizontal, 12).padding(.vertical, 6)
                         RowRule()
                     }
-                    SettingsRow(label: "match what is behind it", subtitle: backdropSubtitle) {
-                        HStack(spacing: 8) {
-                            if settings.cloudMatchesBackdrop, !screenGranted {
-                                Button("system settings") { NSWorkspace.shared.open(SecureInput.screenRecordingSettingsURL) }.buttonStyle(InkButtonStyle())
+                    if !settings.cloudColorEnabled {
+                        SettingsRow(label: "match what is behind it", subtitle: backdropSubtitle) {
+                            HStack(spacing: 8) {
+                                if settings.cloudMatchesBackdrop, !screenGranted {
+                                    Button("system settings") { NSWorkspace.shared.open(SecureInput.screenRecordingSettingsURL) }.buttonStyle(InkButtonStyle())
+                                }
+                                Toggle("", isOn: Binding(get: { settings.cloudMatchesBackdrop }, set: { on in
+                                    settings.cloudMatchesBackdrop = on
+                                    if on, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
+                                    screenGranted = CGPreflightScreenCaptureAccess()
+                                })).toggleStyle(.switch).labelsHidden()
                             }
-                            Toggle("", isOn: Binding(get: { settings.cloudMatchesBackdrop }, set: { on in
-                                settings.cloudMatchesBackdrop = on
-                                if on, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
-                                screenGranted = CGPreflightScreenCaptureAccess()
-                            })).toggleStyle(.switch).labelsHidden()
                         }
                     }
-                    SettingsRow(label: "cloud position") {
+                    SettingsRow(label: "position") {
                         Picker("", selection: $settings.cloudPosition) {
                             ForEach(CloudPosition.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.pickerStyle(.segmented).labelsHidden().fixedSize()
@@ -391,26 +441,51 @@ struct MainSettingsTab: View {
                     SettingsRow(label: "open at login") {
                         Toggle("", isOn: Binding(get: { settings.launchAtLogin }, set: { settings.launchAtLogin = $0; AppDelegate.shared?.reconcileLaunchAtLogin() })).toggleStyle(.switch).labelsHidden()
                     }
-                    SettingsRow(label: "ask before updating", subtitle: "restarts itself when idle when turned off") {
-                        Toggle("", isOn: Binding(get: { settings.askBeforeUpdating }, set: { settings.askBeforeUpdating = $0; Updates.shared.askPreferenceChanged() })).toggleStyle(.switch).labelsHidden()
+                    SettingsRow(label: "auto update", subtitle: "off, the version row still offers updates") {
+                        Toggle("", isOn: Binding(get: { settings.autoUpdate }, set: { settings.autoUpdate = $0; Updates.shared.preferencesChanged() })).toggleStyle(.switch).labelsHidden()
                             .disabled(Updates.isDevBuild)
+                    }
+                    if settings.autoUpdate {
+                        SettingsRow(label: "ask before updating", subtitle: "restarts itself when idle when turned off") {
+                            Toggle("", isOn: Binding(get: { settings.askBeforeUpdating }, set: { settings.askBeforeUpdating = $0; Updates.shared.preferencesChanged() })).toggleStyle(.switch).labelsHidden()
+                                .disabled(Updates.isDevBuild)
+                        }
                     }
                     SettingsRow(label: "dock icon") {
                         Toggle("", isOn: Binding(get: { settings.showDockIcon }, set: { settings.showDockIcon = $0; AppDelegate.shared?.applyDockIcon() })).toggleStyle(.switch).labelsHidden()
                     }
-                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud", last: true) {
+                    SettingsRow(label: "appearance", subtitle: "both the app window and the cloud") {
                         Picker("", selection: Binding(get: { settings.appearance }, set: { settings.appearance = $0; AppDelegate.shared?.applyAppearance() })) {
                             ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.labelsHidden().fixedSize()
                     }
+                    SettingsRow(label: "debug logs", subtitle: "what each dictation and paste did, in a file", last: !settings.debugLogs) {
+                        Toggle("", isOn: $settings.debugLogs).toggleStyle(.switch).labelsHidden()
+                    }
+                    if settings.debugLogs {
+                        SettingsRow(label: "log file", subtitle: DebugLog.displayPath, last: true) {
+                            HStack(spacing: 8) {
+                                Button("show") { DebugLog.reveal() }.buttonStyle(InkButtonStyle())
+                                Button("delete") { DebugLog.delete() }.buttonStyle(InkButtonStyle())
+                            }
+                        }
+                    }
                 }
                 SettingsGroup(title: "about") {
-                    SettingsRow(label: "[version \(AppVersion.current)](\(Fixed.releaseURL(AppVersion.current)))", subtitle: "[parakeet 0.6b](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) · [apple intelligence](https://www.apple.com/apple-intelligence/)") {
+                    SettingsRow(
+                        label: "version",
+                        labelView: AnyView(InkLink(title: "version \(AppVersion.current)", url: URL(string: Fixed.releaseURL(AppVersion.current))!)),
+                        subtitleView: AnyView(HStack(spacing: 4) {
+                            InkLink(title: "parakeet 0.6b", url: URL(string: "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2")!)
+                            Text("·")
+                            InkLink(title: "apple intelligence", url: URL(string: "https://www.apple.com/apple-intelligence/")!)
+                        })
+                    ) {
                         updateStatus
                     }
                     SettingsRow(label: "website", last: true) {
-                        Link("typeme.it", destination: Fixed.websiteURL)
-                            .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink).underline()
+                        InkLink(title: "typeme.it", url: Fixed.websiteURL)
+                            .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
                     }
                 }
             }
@@ -420,8 +495,8 @@ struct MainSettingsTab: View {
     }
 
     /// Where the update check got to. It runs again each time the window
-    /// comes to the front; the only action is installing a version that is
-    /// already downloaded.
+    /// comes to the front; the only action is installing a version, which
+    /// downloads it first when auto update is off.
     @ViewBuilder
     private var updateStatus: some View {
         if Updates.isDevBuild {
@@ -431,7 +506,7 @@ struct MainSettingsTab: View {
             case .checking: statusText("checking…")
             case .upToDate: statusText("the latest version")
             case .downloading(let v): statusText("downloading \(v)…")
-            case .readyToInstall(let v):
+            case .available(let v), .readyToInstall(let v):
                 Button("install \(v)") { updates.install() }.buttonStyle(InkButtonStyle())
             case .installing: statusText("installing…")
             case .unreachable: statusText("can't reach the update server")
@@ -619,8 +694,8 @@ struct IntelligenceTab: View {
     }
 
     private func headline(for word: String, matches: [VerifyCustomWord.Match], scanned: Int) -> String {
-        if matches.isEmpty { return "'\(word)' would not have changed the last \(scanned) dictations" }
-        return "'\(word)' would have caught \(matches.count) of the last \(scanned) dictations"
+        if matches.isEmpty { return "'\(word)' would not have changed the last \(counted(scanned, "dictation"))" }
+        return "'\(word)' would have caught \(matches.count) of the last \(counted(scanned, "dictation"))"
     }
 
     @ViewBuilder
