@@ -26,10 +26,10 @@ SCENES = {
     "slack": dict(
         image="slack/out/slack.png", cloud="dark",
         head="hold fn, speak, let go.",
-        text="typed wherever the cursor is. slack, mail, anything with a text box.",
+        text="typed wherever the cursor is. slack, claude, anything with a text box.",
     ),
     "claude": dict(
-        image="claude/out/claude.png", cloud="dark",
+        image="claude/out/claude.png", cloud="white",
         head="tidied by apple intelligence.",
         text="fillers dropped, punctuation put in, on this mac. nothing leaves the computer.",
     ),
@@ -40,7 +40,7 @@ SCENES = {
     ),
     "history": dict(
         image="app/history.png",
-        head="all of it on your mac.",
+        head="everything on your mac.",
         text="transcribed, formatted and tidied on device, and kept here with what was heard. nothing is sent anywhere.",
     ),
     "settings": dict(

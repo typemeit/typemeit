@@ -55,6 +55,9 @@ python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py insights 
 `open`, which may start another worktree's copy), brings it to the front so
 the capture has the key window's shadow and traffic lights, clicks each tab,
 and for history opens the first row's "heard" panel. Pass tab names to do one.
+Keep the mouse and keyboard off while it runs: a click elsewhere takes the
+key window away and the capture comes out without the shadow, which the
+script rejects.
 
 ## Retake a painted scene's base
 
@@ -68,7 +71,12 @@ against it.
    them to say it's done. macOS saves it to the Desktop with the shadow.
 3. `python3 Scripts/store/capture.py <scene>` adopts the newest Desktop
    screenshot as the base (it refuses anything not 3248x2122 RGBA), then run
-   the scene's `generate.py` and `frame.py`.
+   the scene's `generate.py` and `frame.py`. For claude use
+   `python3 Scripts/store/claude/prepare.py "<the screenshot>"` instead of
+   `capture.py`: it cuts out the usage banner Claude sometimes shows above
+   the composer and swaps the shortcut numbers on the first chats for
+   bullets. Claude is captured in dark mode; the ink colours in its
+   `generate.py` are dark-mode values.
 
 If the layout moved, re-measure the pixel constants at the top of
 `generate.py` on the new base.

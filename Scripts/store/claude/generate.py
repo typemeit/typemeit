@@ -3,7 +3,7 @@
 
     python3 Scripts/store/claude/generate.py
 
-base.png is a 1512x949 window capture (see the store-capture skill). Text is
+base.png is a 1512x949 dark-mode window capture, prepared by prepare.py (see the store-screenshots skill). Text is
 set in the Anthropic Sans that ships inside Claude.app, rendered by headless
 Chrome at device scale 2, which reproduces the app's rasterisation: the
 sidebar rows and the composer placeholder match the capture to the pixel in
@@ -25,17 +25,17 @@ FONT_URL = f"file://{HERE}/fonts/sans.ttf"
 # rows repeat every 55 px; the list is clipped by the footer's rule.
 LIST_X, LIST_CAP, LIST_PITCH = 190, 1003, 55
 LIST_BOX = (185, 990, 683, 1885)
-LIST_SIZE, LIST_COLOR = 13, "#525150"
+LIST_SIZE, LIST_COLOR = 13, "#c3c2b8"
 
 # Composer: the placeholder's ink box, and the field's white inside.
 COMPOSER_X, COMPOSER_CAP = 1307, 874
 COMPOSER_BOX = (1280, 850, 2545, 940)
-COMPOSER_SIZE, COMPOSER_COLOR = 16, "#0b0b0b"
+COMPOSER_SIZE, COMPOSER_COLOR = 16, "#e8e6e3"
 CARET_H, CARET_GAP = 40, 4
 
 # The "Active" list of scheduled runs under the composer, cleared to the
 # main pane's background.
-ACTIVE_BOX = (1290, 1190, 2540, 1915)
+ACTIVE_BOX = (1290, 1190, 2540, 2000)
 
 
 def chrome(html, out, w, h):
@@ -84,8 +84,9 @@ def generate(chats, prompt, out_path):
         paste_text(src, title, LIST_SIZE, LIST_COLOR, sidebar, LIST_X, LIST_CAP + i * LIST_PITCH,
                    clip=(LIST_BOX[2], LIST_BOX[3]))
 
-    draw.rectangle((COMPOSER_BOX[0], COMPOSER_BOX[1], COMPOSER_BOX[2] - 1, COMPOSER_BOX[3] - 1), fill="#ffffff")
-    end = paste_text(src, prompt, COMPOSER_SIZE, COMPOSER_COLOR, "#ffffff", COMPOSER_X, COMPOSER_CAP)
+    field = hexstr(src.getpixel((COMPOSER_BOX[0], COMPOSER_BOX[1])))
+    draw.rectangle((COMPOSER_BOX[0], COMPOSER_BOX[1], COMPOSER_BOX[2] - 1, COMPOSER_BOX[3] - 1), fill=field)
+    end = paste_text(src, prompt, COMPOSER_SIZE, COMPOSER_COLOR, field, COMPOSER_X, COMPOSER_CAP)
     top = COMPOSER_CAP - (CARET_H - 31) // 2
     draw.rectangle((end + CARET_GAP, top, end + CARET_GAP + 1, top + CARET_H), fill=COMPOSER_COLOR)
 

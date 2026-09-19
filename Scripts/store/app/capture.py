@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 
+from PIL import Image
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 APP = os.path.join(ROOT, "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev")
@@ -73,6 +75,8 @@ def main(tabs):
             # traffic lights.
             osascript(app.pid, "set frontmost to true")
             time.sleep(1.5)
+            osascript(app.pid, "set frontmost to true")  # again, in case a click elsewhere took it back
+            time.sleep(0.3)
             if tab == "history":
                 # Open the first row's "heard" panel so the capture shows what
                 # was heard against what was typed. Screen points: the chip
@@ -81,6 +85,8 @@ def main(tabs):
                 time.sleep(1)
             out = os.path.join(HERE, f"{tab}.png")
             subprocess.run(["screencapture", "-l", wid, "-x", out], check=True)
+            if Image.open(out).size != (3248, 2122):
+                sys.exit(f"{out} is not the key window's capture; keep the mouse and keyboard off while this runs and retry")
             print(out)
     finally:
         app.terminate()
