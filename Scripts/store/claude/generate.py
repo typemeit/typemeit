@@ -33,6 +33,10 @@ COMPOSER_BOX = (1280, 850, 2545, 940)
 COMPOSER_SIZE, COMPOSER_COLOR = 16, "#0b0b0b"
 CARET_H, CARET_GAP = 40, 4
 
+# The "Active" list of scheduled runs under the composer, cleared to the
+# main pane's background.
+ACTIVE_BOX = (1290, 1190, 2540, 1915)
+
 
 def chrome(html, out, w, h):
     path = os.path.join(OUT, "page.html")
@@ -84,6 +88,9 @@ def generate(chats, prompt, out_path):
     end = paste_text(src, prompt, COMPOSER_SIZE, COMPOSER_COLOR, "#ffffff", COMPOSER_X, COMPOSER_CAP)
     top = COMPOSER_CAP - (CARET_H - 31) // 2
     draw.rectangle((end + CARET_GAP, top, end + CARET_GAP + 1, top + CARET_H), fill=COMPOSER_COLOR)
+
+    draw.rectangle((ACTIVE_BOX[0], ACTIVE_BOX[1], ACTIVE_BOX[2] - 1, ACTIVE_BOX[3] - 1),
+                   fill=hexstr(src.getpixel((ACTIVE_BOX[0], ACTIVE_BOX[1]))))
 
     src.putalpha(base.getchannel("A"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
