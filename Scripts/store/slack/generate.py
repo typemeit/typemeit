@@ -165,7 +165,8 @@ def ink_colour(a, bbox, bg):
 
 def generate(msgs, composer, other, me, workspace, avatars, out_path):
     os.makedirs(OUT, exist_ok=True)
-    src = Image.open(os.path.join(HERE, "base.png")).convert("RGB")
+    base = Image.open(os.path.join(HERE, "base.png")).convert("RGBA")
+    src = base.convert("RGB")
     a = np.array(src)
     rail = tuple(int(v) for v in a[RAIL_AT[1], RAIL_AT[0]])
     sidebar = tuple(int(v) for v in a[SIDEBAR_AT[1], SIDEBAR_AT[0]])
@@ -209,6 +210,7 @@ def generate(msgs, composer, other, me, workspace, avatars, out_path):
     paste_text(src, other, 15, 400, hexstr(dm_ink), hexstr(pill), DM_X, DM_CAP)
 
     own_avatar(src, avatars[me], rail)
+    src.putalpha(base.getchannel("A"))   # keep the window shadow transparent
     src.save(out_path)
     return out_path
 
