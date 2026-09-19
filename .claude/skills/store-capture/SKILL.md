@@ -33,14 +33,14 @@ slack → Slack, claude → Claude, notes → Notes.
 If the window geometry changes on purpose, re-measure the constants at the top of
 the scene's `generate.py` and its window box in `frame.py`.
 
-## insights and settings
+## insights, history and settings
 
 These are the app's own settings window over made-up history, so there is
 nothing to repaint and no need for the user to screenshot. Build the dev app
 (CLAUDE.md), then:
 
 ```sh
-python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py insights settings
+python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py insights history settings
 ```
 
 `capture.py` seeds `Scripts/store/app/store/`, launches the binary directly

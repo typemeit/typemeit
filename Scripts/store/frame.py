@@ -38,6 +38,11 @@ SCENES = {
         head="three times faster than typing.",
         text="every dictation counted: words, speed, streaks, and the apps you spoke into.",
     ),
+    "history": dict(
+        image="app/history.png",
+        head="all of it on this mac.",
+        text="transcribed, formatted and tidied on device, and kept here with what was heard. nothing is sent anywhere.",
+    ),
     "settings": dict(
         image="app/settings.png",
         head="customise your cloud and config.",

@@ -147,7 +147,7 @@ struct HistoryTab: View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 selectToggle(e.id)
-                Text(e.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                Text(e.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2).frame(width: 44, alignment: .leading).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(e.displayText).font(.system(size: 13)).textSelection(.enabled)

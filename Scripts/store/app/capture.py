@@ -4,7 +4,7 @@
     python3 Scripts/store/app/capture.py            # every tab
     python3 Scripts/store/app/capture.py settings   # one tab
 
-Builds nothing: run the Debug build first (see CLAUDE.md). Launches the binary
+Builds nothing: run the Debug build first (see CLAUDE.md). Needs cliclick (brew). Launches the binary
 directly with TYPEMEIT_SUPPORT_DIR pointing at the seeded store, so the real
 history in ~/Library is never read, brings it to the front so the capture has
 the key window's shadow and traffic lights, clicks the sidebar tab, and saves
@@ -53,6 +53,12 @@ def main(tabs):
             # traffic lights.
             osascript(app.pid, "set frontmost to true")
             time.sleep(1.5)
+            if tab == "history":
+                # Open the first row's "heard" panel so the capture shows what
+                # was heard against what was typed. Screen points: the chip
+                # sits at (351, 229) in the window, which is placed at y=33.
+                subprocess.run(["cliclick", "c:351,262"], check=True)
+                time.sleep(1)
             out = os.path.join(HERE, f"{tab}.png")
             subprocess.run(["screencapture", "-l", wid, "-x", out], check=True)
             print(out)

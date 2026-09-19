@@ -33,6 +33,55 @@ APPS = [
     (4, "com.google.Chrome", "Google Chrome", "Porto in October — Google Search"),
 ]
 
+# The newest dictations are what the History capture shows, so they are
+# written by hand: what was heard, with the fillers, and what was typed once
+# Apple Intelligence had tidied it. Oldest first; the last few are today's.
+# (heard, typed, appName, appId)
+RECENT = [
+    ("um so the deck is in the shared folder now I moved the pricing slide to the end so it lands after the demo can you take another look before the call",
+     "The deck is in the shared folder now. I moved the pricing slide to the end so it lands after the demo. Can you take another look before the call?",
+     "Slack", "com.tinyspeck.slackmacgap"),
+    ("hey are we still on for thursday I can do any time after two",
+     "Hey, are we still on for Thursday? I can do any time after two.",
+     "Messages", "com.apple.MobileSMS"),
+    ("write a function that takes a list of dates and returns the longest run of consecutive days um it should ignore duplicates",
+     "Write a function that takes a list of dates and returns the longest run of consecutive days. It should ignore duplicates.",
+     "Claude", "com.anthropic.claudefordesktop"),
+    ("thanks for sending this over I've had a read and I think the second option is the one to go with mainly because it's the least work for the team happy to talk it through tomorrow if that helps",
+     "Thanks for sending this over. I've had a read and I think the second option is the one to go with, mainly because it's the least work for the team. Happy to talk it through tomorrow if that helps.",
+     "Mail", "com.apple.mail"),
+    ("porto ideas so the ribeira for the first night then the day trip to the douro on the saturday and um leave sunday free",
+     "Porto ideas: the Ribeira for the first night, then the day trip to the Douro on the Saturday, and leave Sunday free.",
+     "Notes", "com.apple.Notes"),
+    ("can you move the retro to four I've got a dentist thing at three",
+     "Can you move the retro to four? I've got a dentist thing at three.",
+     "Slack", "com.tinyspeck.slackmacgap"),
+    ("so the failing test is the one that checks the streak um it breaks when there's a gap of exactly one day I think the off by one is in the date comparison",
+     "The failing test is the one that checks the streak. It breaks when there's a gap of exactly one day. I think the off-by-one is in the date comparison.",
+     "Claude", "com.anthropic.claudefordesktop"),
+    ("dinner at ours on friday bring nothing we've got too much wine already",
+     "Dinner at ours on Friday. Bring nothing, we've got too much wine already.",
+     "Messages", "com.apple.MobileSMS"),
+    ("ok rename the branch to store screenshots and um squash the last two commits before you push",
+     "Rename the branch to store screenshots and squash the last two commits before you push.",
+     "Ghostty", "com.mitchellh.ghostty"),
+    ("quick one before I forget the invoice for august is still showing as unpaid on our side can you check whether it went out",
+     "Quick one before I forget: the invoice for August is still showing as unpaid on our side. Can you check whether it went out?",
+     "Mail", "com.apple.mail"),
+    ("things to ask the landlord um the boiler service the broken latch on the back gate and whether the lease can go to eighteen months",
+     "Things to ask the landlord: the boiler service, the broken latch on the back gate, and whether the lease can go to eighteen months.",
+     "Notes", "com.apple.Notes"),
+    ("draft a short reply saying thanks we'll come back to them next week once the numbers are in",
+     "Draft a short reply saying thanks, we'll come back to them next week once the numbers are in.",
+     "Claude", "com.anthropic.claudefordesktop"),
+    ("running about ten minutes late um order me whatever you're having",
+     "Running about ten minutes late. Order me whatever you're having.",
+     "Messages", "com.apple.MobileSMS"),
+    ("the demo went fine the only question was about export so I said it's on the list for next quarter which I think is still true",
+     "The demo went fine. The only question was about export, so I said it's on the list for next quarter, which I think is still true.",
+     "Slack", "com.tinyspeck.slackmacgap"),
+]
+
 WORDS = ("the deck is in the shared folder and I moved the pricing slide to the end so it lands after the demo "
          "can you take another look before the call and tell me if the numbers still make sense to you").split()
 
@@ -56,7 +105,8 @@ def main():
         if back > 21 and rng.random() < (0.55 if weekend else 0.08):
             continue
         count = max(1, int(rng.gauss(4 if weekend else 14, 4) * ramp))
-        for _ in range(count):
+        handwritten = RECENT[:6] if back == 1 else RECENT[6:] if back == 0 else []
+        for i in range(len(handwritten) or count):
             weights = [a[0] for a in APPS]
             _, app_id, app_name, title = rng.choices(APPS, weights)[0]
             words = max(4, int(rng.lognormvariate(3.3, 0.6)))
@@ -83,6 +133,11 @@ def main():
                 changed = rng.random() < 0.6
                 entry["postProcessed"] = entry["transcript"].replace(" the ", " that ", 1) if changed else entry["transcript"]
                 entry["postProcessMs"] = int(rng.gauss(1900, 400))
+            if i < len(handwritten):
+                heard, typed, app_name, app_id = handwritten[i]
+                entry.update(transcript=heard, postProcessed=typed, postProcessRequested=True, appName=app_name, appId=app_id,
+                             postProcessMs=int(rng.gauss(1900, 400)), recordingFile=entry["id"] + ".wav")
+                entry.pop("windowTitle", None)
             if title:
                 entry["windowTitle"] = title
             entries.append(entry)
