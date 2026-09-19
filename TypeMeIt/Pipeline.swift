@@ -64,9 +64,11 @@ final class Pipeline {
     func start() {
         Feedback.preload()
         if !shortcuts.install() {
-            Log.app.error("Shortcuts not installed; Input Monitoring is missing")
+            Log.app.error("Shortcuts not installed; Accessibility is missing")
         }
         if settings.postProcessingEnabled, settings.screenContextEnabled { Task.detached { await ScreenContext.prewarm() } }
+        // Loading the model takes seconds; done here, the first dictation does not pay for it.
+        if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
     }
 
     var isBusy: Bool { phase != .idle }

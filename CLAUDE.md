@@ -20,8 +20,8 @@ pgrep -fil "type me it dev.app/Contents/MacOS"
 pkill -fi "type me it dev.app/Contents/MacOS"
 ```
 
-Because the signature is stable, macOS keeps the dev app's Input Monitoring, Microphone
-and Accessibility grants across rebuilds. They are granted once through the dev app's
+Because the signature is stable, macOS keeps the dev app's Microphone and Accessibility
+grants across rebuilds. They are granted once through the dev app's
 own onboarding. The dev app has its own UserDefaults, so settings and onboarding state
 do not carry over from the release app.
 
@@ -39,3 +39,9 @@ sits over already tells the reader what the numbers are. When you find yourself
 writing an explainer inside a label, the label is wrong. This rule holds even
 when a longer version scans fine on its own: on a page of short strings a long
 one snags, and the page reads as noisier than it is.
+
+## Counts agree with their noun
+
+A string that shows a count next to a noun goes through `counted(n, "word")`
+(TypeMeIt/Plural.swift), so it reads "1 word" and "2 words". Never write
+"\(n) words" or "word(s)" in anything the user sees.

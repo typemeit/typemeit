@@ -627,8 +627,8 @@ struct IntelligenceTab: View {
     }
 
     private func headline(for word: String, matches: [VerifyCustomWord.Match], scanned: Int) -> String {
-        if matches.isEmpty { return "'\(word)' would not have changed the last \(scanned) dictations" }
-        return "'\(word)' would have caught \(matches.count) of the last \(scanned) dictations"
+        if matches.isEmpty { return "'\(word)' would not have changed the last \(counted(scanned, "dictation"))" }
+        return "'\(word)' would have caught \(matches.count) of the last \(counted(scanned, "dictation"))"
     }
 
     @ViewBuilder

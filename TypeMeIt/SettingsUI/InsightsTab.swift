@@ -64,13 +64,13 @@ struct InsightsTab: View {
         } else {
             delta = "\(s.wordsThisMonth.formatted()) this month"
         }
-        return "\(delta) · \(s.totalDictations) dictations"
+        return "\(delta) · \(counted(s.totalDictations, "dictation"))"
     }
 
     /// The fixes as a share of everything dictated, then the two kinds of fix
     /// they are made of.
     private func fixCaption(_ s: InsightsStats) -> String {
-        let breakdown = "\(s.dictionaryFixes.formatted()) words · \(s.postProcessFixes.formatted()) clean-ups"
+        let breakdown = "\(counted(s.dictionaryFixes, "word")) · \(counted(s.postProcessFixes, "clean-up"))"
         guard s.totalWords > 0 else { return breakdown }
         let share = Double(s.dictionaryFixes + s.postProcessFixes) / Double(s.totalWords) * 100
         return String(format: "%.1f%% of words · ", share) + breakdown
@@ -227,7 +227,7 @@ struct InsightsTab: View {
                     HStack {
                         Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
                         Spacer()
-                        Text("\(a.words.formatted()) words").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                        Text(counted(a.words, "word")).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                     }
                     .padding(.vertical, 5)
                 }

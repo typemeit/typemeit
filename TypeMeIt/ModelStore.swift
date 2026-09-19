@@ -88,6 +88,7 @@ final class ModelStore: NSObject, URLSessionDownloadDelegate {
                     self.task = nil
                     self.state = .installed
                     Log.model.info("Model installed")
+                    Task { await Transcriber.shared.preload() }
                 } catch {
                     self.fail("Could not move the model into place: \(error.localizedDescription)")
                 }

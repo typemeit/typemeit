@@ -92,7 +92,7 @@ struct HistoryTab: View {
                 .padding(.horizontal, 8).frame(height: 26)
                 .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
-                Text("\(store.history.count) dictations")
+                Text(counted(store.history.count, "dictation"))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 if !selected.isEmpty {
                     Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
@@ -101,7 +101,7 @@ struct HistoryTab: View {
                 Button("delete all") { confirmDeleteAll = true }
                     .buttonStyle(InkButtonStyle())
                     .disabled(store.history.isEmpty)
-                    .confirmationDialog("Delete all \(store.history.count) dictations?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                    .confirmationDialog("Delete all \(counted(store.history.count, "dictation"))?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
                         Button("Delete All", role: .destructive) { store.deleteAllHistory(); selected = [] }
                     } message: { Text("This cannot be undone.") }
             }
