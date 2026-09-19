@@ -285,7 +285,10 @@ struct InkLink: View {
         Text(title)
             .underline(!hovering, color: DesignTokens.Colors.inkA32)
             .contentShape(Rectangle())
-            .onHover { hovering = $0 }
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
             .onTapGesture { NSWorkspace.shared.open(url) }
             .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
     }
