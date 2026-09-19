@@ -388,7 +388,7 @@ struct MainSettingsTab: View {
                     }
                 }
                 SettingsGroup(title: "cloud") {
-                    SettingsRow(label: "colour") {
+                    SettingsRow(label: "custom colour") {
                         Toggle("", isOn: $settings.cloudColorEnabled).toggleStyle(.switch).labelsHidden()
                     }
                     if settings.cloudColorEnabled {
