@@ -474,7 +474,7 @@ edges:
     to: typemeit.transcriber.parakeet-gguf
     payload: speech model
     direction: one-way
-    transport: http
+    transport: download
     delivery: pull
     description: |-
       Downloaded once during setup, then used from disk. The app never contacts GitHub
@@ -493,7 +493,7 @@ edges:
     to: typemeit.updater
     payload: appcast.xml
     direction: one-way
-    transport: http
+    transport: download
     delivery: pull
     description: The list of released versions. The request carries nothing about the Mac.
     frequency: hourly, and at launch
@@ -508,7 +508,7 @@ edges:
     to: typemeit.updater
     payload: signed DMG
     direction: one-way
-    transport: http
+    transport: download
     delivery: pull
     description: |-
       The new build, fetched when the feed advertises a version newer than the one
