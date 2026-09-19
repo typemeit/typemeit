@@ -1,6 +1,7 @@
 nodes:
   - key: device.macos
     kind: device
+    icon: apple
     name: macOS
     summary: The Mac, where microphone audio comes in and pasted text goes out.
     description: |-
