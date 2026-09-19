@@ -150,6 +150,10 @@ enum Output {
     /// out. Skipped where the read-back is: password fields and the apps on
     /// its denylist.
     private static func checkLanded(_ text: String, previousClipboard: Saved) async {
+        guard Sandbox.readsOtherApps else {
+            DebugLog.write("Paste check skipped: the sandbox does not allow reading the field")
+            return
+        }
         if let owner = SecureInput.owner {
             DebugLog.write("Paste check skipped: secure input held by \(owner.name)")
             return

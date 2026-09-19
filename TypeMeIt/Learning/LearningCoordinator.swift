@@ -11,7 +11,7 @@ final class LearningCoordinator {
     private var store: Store { Store.shared }
 
     func learn(original: String, edited: String, source: String, historyId: UUID?) {
-        guard settings.learnFromCorrections else { return }
+        guard settings.learnFromCorrections, Sandbox.readsOtherApps else { return }
         guard case .available = PostProcessor.availability else { return }
         let context = LearnContext(customWords: settings.customWords, denylist: settings.undoneWords)
         Task { [weak self] in
