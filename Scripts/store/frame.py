@@ -17,17 +17,25 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 W, H = 2560, 1600
 
 # The macOS screenshot includes a transparent margin holding the window shadow;
-# this is the opaque window inside slack/base.png, used to size the window
-# rather than its shadow.
-SLACK_WINDOW = (112, 76, 3135, 1973)
+# this is the opaque window inside a base.png taken with window.sh, used to
+# size the window rather than its shadow.
+WINDOW = (112, 76, 3136, 1974)
 
 SCENES = {
     "slack": dict(
         image="slack/out/slack.png",
-        window=SLACK_WINDOW,
+        window=WINDOW,
         lead="Talk instead of typing.",
         rest="Say it, and it's typed wherever your cursor is.",
         layout="top",          # headline centred above the window
+        cloud="dark",
+    ),
+    "claude": dict(
+        image="claude/out/claude.png",
+        window=WINDOW,
+        lead="Speak the prompt.",
+        rest="Hold a key, say it, let go. It lands in the box.",
+        layout="top",
         cloud="dark",
     ),
 }
