@@ -44,8 +44,11 @@ python3 Scripts/store/insights/seed.py
 TYPEMEIT_SUPPORT_DIR="$PWD/Scripts/store/insights/store" "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev" &
 ```
 
-Wait for the settings window, find its window number with
-`CGWindowListCopyWindowInfo` filtered to that pid and the name `settings`, then
+Wait for the settings window, activate that pid with
+`NSRunningApplication(processIdentifier:).activate` so the capture gets the
+key window's shadow and traffic lights (an inactive window comes out grey with
+a thinner shadow), find its window number with `CGWindowListCopyWindowInfo`
+filtered to the pid and the name `settings`, then
 `screencapture -l <number> -x Scripts/store/insights/base.png` and
 `python3 Scripts/store/frame.py insights`. Quit the app afterwards. Launch the
 binary directly, not with `open`: the env var has to reach the process, and
