@@ -259,18 +259,43 @@ struct RowRule: View {
     var body: some View { Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: DesignTokens.hairline) }
 }
 
+/// A question mark after a row's label that holds its explanation as a tooltip.
+struct HelpMark: View {
+    let text: String
+    @State private var hovering = false
+
+    var body: some View {
+        Image(systemName: "questionmark.circle")
+            .font(.system(size: 11))
+            .foregroundStyle(hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+            .onHover { hovering = $0 }
+            .help(text)
+            .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
+    }
+}
+
+/// A link in the settings: the web's `.link`, underlined in ink-a32 at rest,
+/// and the underline lifts under the pointer.
+struct InkLink: View {
+    let title: String
+    let url: URL
+    @State private var hovering = false
+
+    var body: some View {
+        Text(title)
+            .underline(!hovering, color: DesignTokens.Colors.inkA32)
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture { NSWorkspace.shared.open(url) }
+            .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
+    }
+}
+
 extension SettingsRow {
-    /// Parses a subtitle as markdown and underlines link runs, so any link in
-    /// a subtitle carries the same underline the standalone `Link` rows do.
-    /// Plain strings render unchanged; a malformed markdown string falls back
+    /// Parses a label or subtitle as markdown; a malformed string falls back
     /// to a plain AttributedString.
-    /// Labels and subtitles are markdown, so either can carry a link.
     static func attributed(_ s: String) -> AttributedString {
-        var attr = (try? AttributedString(markdown: s)) ?? AttributedString(s)
-        for run in attr.runs where run.link != nil {
-            attr[run.range].underlineStyle = .single
-        }
-        return attr
+        (try? AttributedString(markdown: s)) ?? AttributedString(s)
     }
 }
 
@@ -278,15 +303,26 @@ struct SettingsRow<Control: View>: View {
     var label: String
     var subtitle: String?
     var last = false
+    /// A label that holds a link, in place of the plain string.
+    var labelView: AnyView?
+    /// Links under the label; the plain `subtitle` is a tooltip instead.
+    var subtitleView: AnyView?
     @ViewBuilder var control: Control
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(SettingsRow.attributed(label)).font(DesignTokens.Fonts.ui.monospaced()).tint(DesignTokens.Colors.ink)
-                    if let subtitle {
-                        Text(SettingsRow.attributed(subtitle)).font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2).tint(DesignTokens.Colors.ink).frame(maxWidth: 400, alignment: .leading)
+                    HStack(spacing: 6) {
+                        Group {
+                            if let labelView { labelView } else { Text(SettingsRow.attributed(label)) }
+                        }
+                        .font(DesignTokens.Fonts.ui.monospaced())
+                        if let subtitle { HelpMark(text: subtitle) }
+                    }
+                    if let subtitleView {
+                        subtitleView
+                            .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: 400, alignment: .leading)
                     }
                 }
                 Spacer()
@@ -427,12 +463,20 @@ struct MainSettingsTab: View {
                     }
                 }
                 SettingsGroup(title: "about") {
-                    SettingsRow(label: "[version \(AppVersion.current)](\(Fixed.releaseURL(AppVersion.current)))", subtitle: "[parakeet 0.6b](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) · [apple intelligence](https://www.apple.com/apple-intelligence/)") {
+                    SettingsRow(
+                        label: "version",
+                        labelView: AnyView(InkLink(title: "version \(AppVersion.current)", url: URL(string: Fixed.releaseURL(AppVersion.current))!)),
+                        subtitleView: AnyView(HStack(spacing: 4) {
+                            InkLink(title: "parakeet 0.6b", url: URL(string: "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2")!)
+                            Text("·")
+                            InkLink(title: "apple intelligence", url: URL(string: "https://www.apple.com/apple-intelligence/")!)
+                        })
+                    ) {
                         updateStatus
                     }
                     SettingsRow(label: "website", last: true) {
-                        Link("typeme.it", destination: Fixed.websiteURL)
-                            .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink).underline()
+                        InkLink(title: "typeme.it", url: Fixed.websiteURL)
+                            .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
                     }
                 }
             }
