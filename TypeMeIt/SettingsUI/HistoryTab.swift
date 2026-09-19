@@ -198,7 +198,7 @@ struct HistoryTab: View {
                     Image("akar-chevron-down").resizable().frame(width: 10, height: 10)
                         .rotationEffect(.degrees(open ? 0 : -90))
                     Text("heard")
-                    WordDelta(heard: e.transcript, typed: e.displayText)
+                    CharDelta(heard: e.transcript, typed: e.displayText)
                 }
                 .font(.system(size: 10).monospaced())
                 .padding(.horizontal, 7).padding(.vertical, 3)
@@ -216,7 +216,7 @@ struct HistoryTab: View {
             if let label {
                 HStack(spacing: 5) {
                     Text(label)
-                    WordDelta(heard: heard, typed: typed)
+                    CharDelta(heard: heard, typed: typed)
                 }
                 .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
             }
@@ -279,14 +279,15 @@ struct HistoryTab: View {
     }
 }
 
-/// How many words the clean-up put in and took out, `+3 −1`, in the diff
-/// colours. Nothing when the text was left as heard.
-private struct WordDelta: View {
+/// How many characters the clean-up put in and took out, `+12 −3`, in the
+/// diff colours. Nothing when the text was left as heard.
+private struct CharDelta: View {
     let heard: String
     let typed: String
 
     var body: some View {
-        let (added, removed) = TranscriptDiff.counts(heard: heard, typed: typed)
+        let diff = Array(typed).difference(from: Array(heard))
+        let (added, removed) = (diff.insertions.count, diff.removals.count)
         if added > 0 { Text("+\(added.formatted())").foregroundStyle(DesignTokens.Colors.diffAdd) }
         if removed > 0 { Text("−\(removed.formatted())").foregroundStyle(DesignTokens.Colors.diffRemove) }
     }
@@ -325,12 +326,6 @@ private struct TranscriptDiff: View {
 
     private static func words(_ text: String) -> [String] {
         text.split(whereSeparator: \.isWhitespace).map(String.init)
-    }
-
-    /// Words put in and taken out between the two texts.
-    static func counts(heard: String, typed: String) -> (added: Int, removed: Int) {
-        let diff = words(typed).difference(from: words(heard))
-        return (diff.insertions.count, diff.removals.count)
     }
 
     /// The two texts merged back into one reading order. Removals are offsets
