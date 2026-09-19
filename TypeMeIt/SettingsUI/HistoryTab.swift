@@ -198,6 +198,7 @@ struct HistoryTab: View {
                     Image("akar-chevron-down").resizable().frame(width: 10, height: 10)
                         .rotationEffect(.degrees(open ? 0 : -90))
                     Text("heard")
+                    WordDelta(heard: e.transcript, typed: e.displayText)
                 }
                 .font(.system(size: 10).monospaced())
                 .padding(.horizontal, 7).padding(.vertical, 3)
@@ -212,7 +213,13 @@ struct HistoryTab: View {
 
     private func stage(_ label: String?, heard: String, typed: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let label { Text(label).font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3) }
+            if let label {
+                HStack(spacing: 5) {
+                    Text(label)
+                    WordDelta(heard: heard, typed: typed)
+                }
+                .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            }
             TranscriptDiff(heard: heard, typed: typed)
         }
         .foregroundStyle(DesignTokens.Colors.ink2)
@@ -272,6 +279,19 @@ struct HistoryTab: View {
     }
 }
 
+/// How many words the clean-up put in and took out, `+3 −1`, in the diff
+/// colours. Nothing when the text was left as heard.
+private struct WordDelta: View {
+    let heard: String
+    let typed: String
+
+    var body: some View {
+        let (added, removed) = TranscriptDiff.counts(heard: heard, typed: typed)
+        if added > 0 { Text("+\(added.formatted())").foregroundStyle(DesignTokens.Colors.diffAdd) }
+        if removed > 0 { Text("−\(removed.formatted())").foregroundStyle(DesignTokens.Colors.diffRemove) }
+    }
+}
+
 /// What was heard against what was typed, a word at a time: words the
 /// clean-up dropped are struck through in red, the words it put in their
 /// place are green, and the rest reads as the transcript did. Every word
@@ -303,12 +323,22 @@ private struct TranscriptDiff: View {
         .font(.system(size: 12))
     }
 
+    private static func words(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    /// Words put in and taken out between the two texts.
+    static func counts(heard: String, typed: String) -> (added: Int, removed: Int) {
+        let diff = words(typed).difference(from: words(heard))
+        return (diff.insertions.count, diff.removals.count)
+    }
+
     /// The two texts merged back into one reading order. Removals are offsets
     /// into what was heard and insertions offsets into what was typed, so the
     /// two walks advance together and every word lands once.
     private var runs: [(change: Change, words: String)] {
-        let old = heard.split(whereSeparator: \.isWhitespace).map(String.init)
-        let new = typed.split(whereSeparator: \.isWhitespace).map(String.init)
+        let old = TranscriptDiff.words(heard)
+        let new = TranscriptDiff.words(typed)
         var removed: Set<Int> = []
         var inserted: [Int: String] = [:]
         for change in new.difference(from: old) {
