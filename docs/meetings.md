@@ -16,11 +16,38 @@ toolchain in the environment it was written in).
 2. **Meeting recording, with consent.** Something else takes the mic, we ask
    once, and record both sides.
 3. **In-person meetings.** Started by hand, one track, everyone in the room.
-4. **Speakers.** Who said what, named where the meeting app will tell us and
-   recognised by voice where it will not.
+4. **Speakers.** Who said what — numbered by diarization, anchored to "You"
+   by the track split, renamed by the user.
 
 Each phase is useful alone. Phase 2 is where the permission and storage
 questions land, and it is blocked on the one open question at the bottom.
+
+## Scope: Slack and Meet first
+
+Two targets to start — **Slack huddles** and **Google Meet**. Everything else
+(Zoom, Teams, FaceTime, Webex) should work anyway, because the gate does not
+ask what the app is, but nothing else is a release blocker and nothing else
+gets tuned for.
+
+Picking these two settles an argument the rest of the plan was leaving open:
+
+- **Neither gives us speaker names.** Meet is a browser tab — DOM, not an
+  accessibility tree — and a Slack huddle is Electron, so the tree is whatever
+  the web content happens to expose. So **diarization plus the mic/tap split
+  is the whole speaker story**, not a fallback behind a nicer source. The
+  accessibility route is deferred, with its probe, until a native app is a
+  target.
+- **Both run audio in a helper process.** Chrome's audio service, Slack's
+  helper. Helper-process resolution is not an optimisation for later; it is
+  the difference between the gate firing and never firing at all. The code on
+  the branch gets this wrong today.
+- **Neither has a usable window title.** A Chrome window says whatever the
+  active tab says, which is not the meeting once the user switches tabs, and a
+  huddle has no window of its own. Titles come from the transcript, and the
+  user renames. No title parsing anywhere.
+
+In-person stays in scope as its own thing — it is started by hand and shares
+nothing with detection.
 
 ## Constraints that shaped this
 
@@ -50,7 +77,7 @@ below forks on it.
 | Starts | Detected, then we ask | By hand — menu bar or a shortcut |
 | Tracks | Two: mic and far end | One: the mic |
 | "You" | Free and exact, from the track split | Voice print, or nothing |
-| Other speakers | The meeting app's names, else diarization | Diarization only |
+| Other speakers | Diarization | Diarization |
 | Title | Window title, else the transcript | The transcript |
 
 There is no signal to detect an in-person meeting, and there should not be:
@@ -249,37 +276,45 @@ speaker's centroid — see above. That guard is worth having even at step 1.
 
 ## Speakers
 
-Which sources exist depends on the kind of meeting. In person, only the last
-one does — which is why diarization is now required rather than a fallback.
+Which sources exist depends on the kind of meeting. In person only
+diarization does, which is why it is required rather than a fallback.
 
-Three sources, best first:
+Neither launch target hands us names, so the order is not the one a
+Zoom-first plan would pick:
 
-1. **The meeting app's own UI.** Granola reads display names *and the
-   active-speaker indicator* from the Zoom desktop app over Accessibility —
-   no bot, no SDK, no cloud. **typemeit already holds Accessibility**
-   (`Focus.swift`, `Frontmost.swift`), so this costs no new permission.
+1. **The mic/tap split.** On a call this always gives "You", exactly, with no
+   model — our mic is us, the tap is everyone else. It also anchors
+   diarization: whichever arrival-order ID lines up with the mic track is the
+   user.
 
-   Where it works it beats diarization outright: real names, no speaker cap,
-   no label permutation, no second model. For Meet the equivalent is a browser
-   extension reading the DOM — a whole other shipping surface, and out of
-   scope.
+2. **Diarization** for everyone on the far end, and for the whole room in
+   person. On Slack and Meet this is the only thing naming — or rather
+   numbering — the other speakers, so it carries the feature rather than
+   backing something up. Labels are `Speaker 1`, `Speaker 2`; the user
+   renames them in the meeting, and the rename sticks for that meeting.
 
-   None of this is verified beyond Zoom, and not on a version we have
-   checked. The probe below runs before phase 3 leans on it.
+3. **The meeting app's own UI**, over Accessibility — real display names and
+   an active-speaker indicator, read straight from a native app's tree.
+   typemeit already holds Accessibility (`Focus.swift`, `Frontmost.swift`), so
+   it costs no new permission, and where it works it beats diarization
+   outright: real names, no speaker cap, no label permutation, no second
+   model.
 
-2. **Diarization** for everything else — browsers, in-person, any app whose
-   tree we cannot read.
+   **Deferred.** It is worth nothing on the two launch targets — a browser tab
+   is DOM, and an Electron huddle exposes whatever its web content does — and
+   it is unverified even where it should work. Revisit when a native app
+   (Zoom, Teams) becomes a target; the probe below is what that starts with.
 
-3. **The mic/tap split**, which on a call always gives "You" correctly, and
-   anchors whichever arrival-order ID lines up with the mic track.
+### The AX probe, when we get there
 
-### The AX probe, before anything is built on it
+Not launch work — this is the first step of source 3, whenever a native app
+becomes a target. Written down now so it is not re-derived later.
 
-Source 1 is unproven. It works somewhere, on some version of one app. Nothing
+The technique is unproven. It works somewhere, on some version of one app. Nothing
 tells us whether the tree is readable with the participants panel closed,
 whether the active-speaker indicator updates fast enough to segment on, or
 whether any of it survives an app update. Run the inspector against a real
-call on each platform and write the answers down before phase 3 commits to
+call on each platform and write the answers down before anything is built on
 this path.
 
 For each app, four questions:
@@ -298,9 +333,9 @@ For each app, four questions:
 | --- | --- | --- |
 | Zoom | Best odds — native AppKit, and this is the app the technique is known to work against | The most common call |
 | Teams | Poor — Electron, so the tree is whatever the web content exposes | Common enough that "no names on Teams" is a real gap |
-| Slack huddles | Poor, same reason | Asked for explicitly |
+| Slack huddles | Poor, same reason | A launch target, so worth one check even expecting no |
 | Webex, Discord | Unknown | Cheap to check once the harness exists |
-| Meet, any browser | Assume no — DOM, not AX, and an extension is out of scope | Rules the source out for the most common case, which is why 2 and 3 have to stand alone |
+| Meet, any browser | No — DOM, not AX, and an extension is out of scope | The other launch target; this is why diarization carries the feature |
 
 Ship the probe as a throwaway tool, not app code: a command that attaches to
 the frontmost meeting window, dumps the tree, and polls the candidate
@@ -493,12 +528,16 @@ is that nobody has better detection than the CoreAudio signal.
 
 ## Verification
 
-- Meet in Chrome, mic live → detected. Same in Safari, where the commercial
-  products' auto-stop does not fire.
+- Meet in Chrome, mic live → detected, through Chrome's audio helper rather
+  than Chrome. Same in Safari, where the commercial products' auto-stop does
+  not fire.
 - Meet tab backgrounded behind another tab → still detected. This is the case
   a window-title check fails, and why we do not use one.
-- Zoom and Teams native → detected, which is what proves the helper-process
-  resolution works.
+- A Slack huddle → detected, through Slack's helper, and ended when the huddle
+  ends rather than when the window closes.
+- A Slack huddle joined from the browser → same as any other tab.
+- Zoom and Teams native → detected. Not a launch target, but free if the
+  helper-process resolution is right.
 - Leave and rejoin within two minutes → one meeting with a gap, not two.
 - A 30-second mic blip → no prompt, nothing kept.
 - Krisp or Loopback running with no call → no prompt.
@@ -514,11 +553,8 @@ is that nobody has better detection than the CoreAudio signal.
 - A voice message longer than a few seconds → no recording. Mic-input
   detection alone fails this, which is what the far-end confirmation and the
   blip filter are for.
-- AX probe, per app in the table above → names present, panel-closed answer
-  recorded, active-speaker latency measured. A "no" on any app is a result,
-  not a blocker: that app falls through to diarization.
-- Zoom updates → the probe reruns and the attribution degrades to diarization
-  rather than throwing or mislabelling.
+- Two people on a Meet call → two speakers, "You" correct from the track
+  split, the other renameable.
 
 ## Open
 
@@ -526,7 +562,9 @@ is that nobody has better detection than the CoreAudio signal.
    stored only — no paste, no clipboard.
 2. **Live speaker labels during the call, or only at the end?** Only-at-the-end
    keeps the diarizer at a cheap operating point.
-3. **FluidAudio or the multitalker bundle.** Spike both, though in person
-   points hard at FluidAudio.
+3. **FluidAudio or the multitalker bundle.** Now the first thing to spike,
+   not the last: with the accessibility route deferred, diarization is the
+   only speaker source on both launch targets. In person points hard at
+   FluidAudio.
 4. **Voice-print enrolment** — opt in or on by default, and what happens to
    the print when the user clears their history.
