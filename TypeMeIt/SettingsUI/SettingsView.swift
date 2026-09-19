@@ -277,6 +277,7 @@ struct HelpMark: View {
             .popover(isPresented: Binding(get: { hovering || pinned }, set: { if !$0 { pinned = false } }), arrowEdge: .bottom) {
                 Text(text)
                     .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 280, alignment: .leading)
                     .padding(.horizontal, 10).padding(.vertical, 8)
             }
