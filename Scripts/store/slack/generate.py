@@ -3,7 +3,7 @@
 
     python3 Scripts/store/slack/generate.py            # writes out/slack.png
 
-base.png is a 2x capture of Slack at 90% zoom (1 CSS px = 1.8 device px). The
+base.png is a 2x capture of Slack (light theme, composer focused) at 90% zoom (1 CSS px = 1.8 device px). The
 constants below are pixel positions measured on that capture; re-measure them if
 the base changes. Text is rendered with Slack's own Lato build in headless
 Chrome at device scale 1.8, which reproduces the capture's rasterisation exactly.
@@ -22,7 +22,6 @@ DSF = 1.8
 
 # Measured on base.png (device px).
 PANE = (710, 305, 3120, 1690)        # message pane: left, top, right, composer top
-TOAST = (2471, 1693, 3150, 1872)     # "marked as read" toast, tiled over from column 2470
 COMPOSER_X, COMPOSER_CAP = 771, 1807  # caret x and cap-height top of the composer text
 CARET = (1800, 1832)
 HEADER_TILE = (805, 170, 44)         # x, y, size of the channel avatar
@@ -35,12 +34,14 @@ DM_TILE = (296, 899, 28)
 DM_X, DM_CAP = 339, 903
 OWN_TILE = (143, 1866, 64)           # own avatar in the rail
 OWN_STATUS = (199, 1922)             # centre of the status cutout
-RAIL = (55, 13, 59)
-SIDEBAR = (85, 46, 90)
-SIDEBAR_HEX = "#552e5a"
-PILL = (247, 238, 254)
-PILL_HEX = "#f7eefe"
 INK = "#1d1c1d"
+# Theme colours are sampled from base.png at these points so a re-capture in
+# another Slack theme only needs the geometry re-checked.
+RAIL_AT = (125, 1000)
+SIDEBAR_AT = (240, 700)
+PILL_AT = (260, 915)
+WORKSPACE_INK_AT = (269, 180, 429, 207)   # bbox of the workspace name's ink
+DM_INK_AT = (330, 903, 479, 939)          # bbox of the selected DM row's label
 ACTIVE_GREEN = (43, 172, 118)
 LAST_LINE_GAP = 26                   # device px between the last message and the composer
 
@@ -133,30 +134,44 @@ def avatar(name, colour):
     return path
 
 
-def own_avatar(dst, path):
+def own_avatar(dst, path, rail):
     x, y, size = OWN_TILE
     s = 4
-    big = Image.new("RGB", (size * s, size * s), RAIL)
+    big = Image.new("RGB", (size * s, size * s), rail)
     av = Image.open(path).convert("RGB").resize((size * s, size * s), Image.LANCZOS)
     mask = Image.new("L", (size * s, size * s), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, size * s - 1, size * s - 1), radius=8 * s, fill=255)
     big.paste(av, (0, 0), mask)
     d = ImageDraw.Draw(big)
     cx, cy = (OWN_STATUS[0] - x) * s, (OWN_STATUS[1] - y) * s
-    d.ellipse((cx - 14.5 * s, cy - 14.5 * s, cx + 14.5 * s, cy + 14.5 * s), fill=RAIL)
+    d.ellipse((cx - 14.5 * s, cy - 14.5 * s, cx + 14.5 * s, cy + 14.5 * s), fill=rail)
     d.ellipse((cx - 7.5 * s, cy - 7.5 * s, cx + 7.5 * s, cy + 7.5 * s), fill=ACTIVE_GREEN)
-    ImageDraw.Draw(dst).rectangle((x - 3, y - 3, x + size + 3, y + size + 3), fill=RAIL)
+    ImageDraw.Draw(dst).rectangle((x - 3, y - 3, x + size + 3, y + size + 3), fill=rail)
     dst.paste(big.resize((size, size), Image.LANCZOS), (x, y))
+
+
+def hexstr(rgb):
+    return "#%02x%02x%02x" % tuple(rgb)
+
+
+def ink_colour(a, bbox, bg):
+    """The pixel in bbox furthest in luminance from bg: the text colour."""
+    x0, y0, x1, y1 = bbox
+    region = a[y0:y1, x0:x1].reshape(-1, 3).astype(int)
+    lum = region.mean(axis=1)
+    i = lum.argmin() if np.mean(bg) > 128 else lum.argmax()
+    return tuple(int(v) for v in region[i])
 
 
 def generate(msgs, composer, other, me, workspace, avatars, out_path):
     os.makedirs(OUT, exist_ok=True)
     src = Image.open(os.path.join(HERE, "base.png")).convert("RGB")
     a = np.array(src)
-    x0, y0, x1, y1 = TOAST
-    a[y0:y1, x0:x1 - 64] = a[y0:y1, x0 - 1:x0]
-    a[y0:y1, x1 - 64:x1] = a[y1 + 8:y1 + 9, x1 - 64:x1]
-    src = Image.fromarray(a)
+    rail = tuple(int(v) for v in a[RAIL_AT[1], RAIL_AT[0]])
+    sidebar = tuple(int(v) for v in a[SIDEBAR_AT[1], SIDEBAR_AT[0]])
+    pill = tuple(int(v) for v in a[PILL_AT[1], PILL_AT[0]])
+    workspace_ink = ink_colour(a, WORKSPACE_INK_AT, sidebar)
+    dm_ink = ink_colour(a, DM_INK_AT, pill)
     d = ImageDraw.Draw(src)
 
     # Message pane, bottom-aligned above the composer and clipped at the tab bar.
@@ -183,17 +198,17 @@ def generate(msgs, composer, other, me, workspace, avatars, out_path):
 
     # Workspace name and tile.
     chevron = src.crop(WORKSPACE_CHEVRON).copy()
-    d.rectangle((WORKSPACE_X - 7, 172, 460, 215), fill=SIDEBAR)
-    end = paste_text(src, workspace, 18, 900, "#ffffff", SIDEBAR_HEX, WORKSPACE_X, WORKSPACE_CAP)
+    d.rectangle((WORKSPACE_X - 7, 172, 460, 215), fill=sidebar)
+    end = paste_text(src, workspace, 18, 900, hexstr(workspace_ink), hexstr(sidebar), WORKSPACE_X, WORKSPACE_CAP)
     src.paste(chevron, (end + 17, WORKSPACE_CHEVRON[1]))
     tile(src, avatars["workspace"], *WORKSPACE_TILE, 8)
 
     # Selected DM row in the sidebar.
-    d.rectangle(DM_ROW, fill=PILL)
+    d.rectangle(DM_ROW, fill=pill)
     tile(src, avatars[other], *DM_TILE, 5)
-    paste_text(src, other, 15, 400, "#340a38", PILL_HEX, DM_X, DM_CAP)
+    paste_text(src, other, 15, 400, hexstr(dm_ink), hexstr(pill), DM_X, DM_CAP)
 
-    own_avatar(src, avatars[me])
+    own_avatar(src, avatars[me], rail)
     src.save(out_path)
     return out_path
 
