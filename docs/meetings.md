@@ -91,6 +91,38 @@ app in the prompt, and knowing which process to tap. It decides nothing.
 A call has both directions; a mic filter does not. That removes the
 Krisp/Loopback false positive without a list to maintain.
 
+### Event-driven, not polled
+
+Register an `AudioObjectAddPropertyListenerBlock` on
+`kAudioHardwarePropertyProcessObjectList`, plus per-process listeners on
+`IsRunning`, `IsRunningInput` and `IsRunningOutput`, reconciling the
+per-process set whenever the list changes. Biscotti does exactly this and
+yields every fire into one stream to re-snapshot from; `meeting-transcriber`
+polls instead, and pays for it with a confirmation count and a cooldown to
+damp the noise.
+
+### Traps, all found the hard way by others
+
+- **FaceTime's input belongs to `com.apple.avconferenced`**, a daemon —
+  `com.apple.FaceTime` never reports input at all (measured on macOS 26.5.2).
+  So resolution cannot assume the owner is a `.app`: tap the daemon, and
+  expect no window and no participant list. A FaceTime *link* opened in a
+  browser is `com.apple.WebKit.GPU` instead.
+- **A process with no bundle answers `noErr` with an empty string**, not an
+  error. `afplay` and friends have to be filtered explicitly.
+- **Power assertions are a third channel**, and a tempting one: meeting apps
+  hold `PreventUserIdleDisplaySleep` during calls, readable with
+  `IOPMCopyAssertionsByProcess()`, no entitlement. It is also a minefield —
+  newer Zoom builds name theirs with Apple's sample placeholder ("Describe
+  Activity Type") so no keyword matches, and Teams holds a "Video Wake Lock"
+  with no call in progress at all. Worth knowing about; not worth leading
+  with.
+
+`meeting-transcriber` runs all three channels behind one composite detector:
+first confirmed hit wins, and the meeting stays alive while *any* channel
+still sees it. We lead with mic input, and that structure is where to put a
+second channel if one is ever needed.
+
 ### The state machine
 
 Starting values from `atrium-pa-mac`, which publishes its heuristics and flags
@@ -136,6 +168,9 @@ invisibly, and the prompt is the moment they can say so.
 
 ## Capture
 
+Both reference apps capture the same way we plan to: `CATapDescription` for
+the far end, `AVAudioEngine` for the mic, 16 kHz per track, kept separate.
+
 Two tracks, never mixed for attribution:
 
 | Track | Source | Is |
@@ -153,7 +188,9 @@ makes speaker recognition load-bearing rather than a nicety.
 
 One qualifier: on speakers rather than headphones, the mic picks up the far
 end too. When both tracks are hot, attribute to the far end unless the mic
-clearly leads. No echo canceller.
+clearly leads. Start without an echo canceller — but note that
+`meeting-transcriber` ships both a bleed detector and a canceller, so the
+problem is real enough that someone building this seriously reached for one.
 
 `insidegui/AudioCap` is the reference for the tap itself — Gui Rambo wrote it
 because Apple shipped the API undocumented.
@@ -408,6 +445,11 @@ is that nobody has better detection than the CoreAudio signal.
   four-speaker merge, and "You" found by voice print.
 - In person with the voice print off → speakers stay unnamed, everything else
   works.
+- A FaceTime call → detected through `avconferenced`, tapped there, and the
+  missing window title falls through to a generated one.
+- A voice message longer than a few seconds → no recording. This is the case
+  `meeting-transcriber` documents itself failing, and the far-end
+  confirmation plus the blip filter are what stop it.
 
 ## Open
 
