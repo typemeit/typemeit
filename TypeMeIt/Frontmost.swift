@@ -38,6 +38,7 @@ enum Frontmost {
     /// it the attribute copy fails with `kAXErrorAPIDisabled` and this
     /// returns `nil`.
     private static func focusedWindowTitle(pid: pid_t) -> String? {
+        guard Sandbox.readsOtherApps else { return nil }
         let app = AXUIElementCreateApplication(pid)
         app.applyMessagingTimeout()
         guard case .success(let value) = app.copyAttribute(kAXFocusedWindowAttribute),
