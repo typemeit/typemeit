@@ -351,16 +351,18 @@ struct MainSettingsTab: View {
                             .padding(.horizontal, 12).padding(.vertical, 6)
                         RowRule()
                     }
-                    SettingsRow(label: "match what is behind it", subtitle: backdropSubtitle) {
-                        HStack(spacing: 8) {
-                            if settings.cloudMatchesBackdrop, !screenGranted {
-                                Button("system settings") { NSWorkspace.shared.open(SecureInput.screenRecordingSettingsURL) }.buttonStyle(InkButtonStyle())
+                    if !settings.cloudColorEnabled {
+                        SettingsRow(label: "match what is behind it", subtitle: backdropSubtitle) {
+                            HStack(spacing: 8) {
+                                if settings.cloudMatchesBackdrop, !screenGranted {
+                                    Button("system settings") { NSWorkspace.shared.open(SecureInput.screenRecordingSettingsURL) }.buttonStyle(InkButtonStyle())
+                                }
+                                Toggle("", isOn: Binding(get: { settings.cloudMatchesBackdrop }, set: { on in
+                                    settings.cloudMatchesBackdrop = on
+                                    if on, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
+                                    screenGranted = CGPreflightScreenCaptureAccess()
+                                })).toggleStyle(.switch).labelsHidden()
                             }
-                            Toggle("", isOn: Binding(get: { settings.cloudMatchesBackdrop }, set: { on in
-                                settings.cloudMatchesBackdrop = on
-                                if on, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
-                                screenGranted = CGPreflightScreenCaptureAccess()
-                            })).toggleStyle(.switch).labelsHidden()
                         }
                     }
                     SettingsRow(label: "cloud position") {
