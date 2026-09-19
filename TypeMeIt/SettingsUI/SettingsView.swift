@@ -259,18 +259,27 @@ struct RowRule: View {
     var body: some View { Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: DesignTokens.hairline) }
 }
 
-/// A question mark after a row's label that holds its explanation as a tooltip.
+/// A question mark after a row's label. Its explanation pops up at once on
+/// hover, and a click holds it open.
 struct HelpMark: View {
     let text: String
     @State private var hovering = false
+    @State private var pinned = false
 
     var body: some View {
         Image(systemName: "questionmark.circle")
             .font(.system(size: 11))
-            .foregroundStyle(hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+            .foregroundStyle(hovering || pinned ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+            .frame(width: 18, height: 18)
+            .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .help(text)
-            .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
+            .onTapGesture { pinned.toggle() }
+            .popover(isPresented: Binding(get: { hovering || pinned }, set: { if !$0 { pinned = false } }), arrowEdge: .bottom) {
+                Text(text)
+                    .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
+                    .frame(maxWidth: 280, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+            }
     }
 }
 
@@ -290,7 +299,6 @@ struct InkLink: View {
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
             .onTapGesture { NSWorkspace.shared.open(url) }
-            .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
     }
 }
 
