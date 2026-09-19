@@ -68,10 +68,11 @@ def render(name, s):
     top = 262 - round(y0 * scale)
     cloud = ""
     if s.get("cloud"):
-        # Straddles the composer, as the app draws it at the bottom of the screen.
+        # Sits fully inside the frame just above the bottom edge, where the app
+        # draws it on screen.
         size = 160
         cloud = (f'<img class=cloud src="clouds/{s["cloud"]}.png" style="width:{size}px;height:{size}px;'
-                 f'left:{W / 2 - size / 2}px;top:{H - size * 0.55}px">')
+                 f'left:{W / 2 - size / 2}px;top:{H - size - 40}px">')
     html = (f'<!doctype html><meta charset=utf-8><base href="file://{HERE}/"><style>'
             f"{CSS % dict(w=W, h=H)}</style>"
             f'<div class=copy><b>{s["lead"]}</b> <span>{s["rest"]}</span></div>'
