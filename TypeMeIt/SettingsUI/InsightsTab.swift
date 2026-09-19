@@ -4,9 +4,8 @@ struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var whereHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
-    @State private var hoveredDay: String?
-    /// A clicked cell stays shown after the pointer leaves; a click on the
-    /// box outside the cells lets it go.
+    /// The streak cell whose day is shown; a click on the box outside the
+    /// cells lets it go.
     @State private var selectedDay: String?
 
     private var stats: InsightsStats {
@@ -243,8 +242,8 @@ struct InsightsTab: View {
     private static let calendarWeeks = 16
 
     /// One cell a day for the last sixteen weeks, shaded by how many
-    /// dictations it saw. Hovering or clicking a cell puts its date and count
-    /// where the legend sits, so nothing moves.
+    /// dictations it saw. Clicking a cell puts its date and count where the
+    /// legend sits, so nothing moves.
     private func calendar(_ s: InsightsStats) -> some View {
         let byDate = Dictionary(uniqueKeysWithValues: s.activity.map { ($0.date, $0) })
         let cal = Calendar.current
@@ -264,15 +263,14 @@ struct InsightsTab: View {
                             Rectangle()
                                 .fill(DesignTokens.Colors.ink.opacity(n == 0 ? 0.08 : 0.3 + 0.7 * Double(n) / Double(maxCount)))
                                 .frame(width: 11, height: 11)
-                                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: hoveredDay == key || selectedDay == key ? 1 : 0))
-                                .onHover { hoveredDay = $0 ? key : (hoveredDay == key ? nil : hoveredDay) }
+                                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: selectedDay == key ? 1 : 0))
                                 .onTapGesture { selectedDay = selectedDay == key ? nil : key }
                         }
                     }
                 }
             }
             Spacer()
-            if let shown = hoveredDay ?? selectedDay {
+            if let shown = selectedDay {
                 Text(InsightsTab.dayCaption(shown, byDate[shown]))
                     .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
             } else {
