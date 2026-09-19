@@ -1,0 +1,54 @@
+# The App Store side of the release: the listing in fastlane/metadata and
+# the framed screenshots in Scripts/store/out go up with `deliver`. The
+# direct-download DMG is Scripts/release-dmg.sh and does not come through
+# here.
+#
+# Needs an App Store Connect API key: ASC_KEY_ID, ASC_ISSUER_ID and
+# ASC_KEY_PATH, the same three release-dmg.sh uses.
+
+default_platform(:mac)
+
+BUNDLE_ID = "it.typeme.typemeit"
+SCREENSHOTS = File.expand_path("../Scripts/store/out", __dir__)
+
+def api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: ENV.fetch("ASC_KEY_PATH")
+  )
+end
+
+platform :mac do
+  desc "Print the app record App Store Connect holds for the bundle id, or say there is none"
+  lane :store_status do
+    api_key
+    app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+    if app
+      UI.message("#{app.name} (#{app.bundle_id}) sku=#{app.sku} id=#{app.id}")
+      app.get_app_store_versions.each { |v| UI.message("  #{v.platform} #{v.version_string}: #{v.app_store_state}") }
+    else
+      UI.important("no app record for #{BUNDLE_ID}; create one in App Store Connect before `deliver`")
+    end
+  end
+
+  desc "Upload the listing text and screenshots. Uploads no build and submits nothing for review"
+  lane :listing do
+    api_key
+    screenshots = Dir[File.join(SCREENSHOTS, "*.png")]
+    UI.user_error!("no screenshots in #{SCREENSHOTS}; run python3 Scripts/store/build.py") if screenshots.empty?
+    deliver(
+      app_identifier: BUNDLE_ID,
+      platform: "osx",
+      metadata_path: "./fastlane/metadata",
+      screenshots_path: SCREENSHOTS,
+      overwrite_screenshots: true,
+      skip_binary_upload: true,
+      skip_app_version_update: true,
+      submit_for_review: false,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      run_precheck_before_submit: false
+    )
+  end
+end
