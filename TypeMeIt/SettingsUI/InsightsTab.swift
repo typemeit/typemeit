@@ -4,7 +4,9 @@ struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var whereHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
-    @State private var hoveredDay: String?
+    /// The streak cell whose day is shown; a click on the box outside the
+    /// cells lets it go.
+    @State private var selectedDay: String?
 
     private var stats: InsightsStats {
         Insights.compute(store.history.map {
@@ -96,8 +98,7 @@ struct InsightsTab: View {
     private func speed(_ s: InsightsStats) -> some View {
         VStack(spacing: 0) {
             percentileHeader
-            percentileRow("parakeet", s.transcribeMs, InsightsTab.duration,
-                          detail: s.transcribeRealtime.flatMap { $0 > 0 ? String(format: "%.0f× faster than you spoke", 1 / $0) : nil })
+            percentileRow("parakeet", s.transcribeMs, InsightsTab.duration)
             RowRule()
             percentileRow("apple intelligence", s.cleanUpMs, InsightsTab.duration,
                           detail: s.cleanUpMs == nil ? "no clean-ups yet" : nil)
@@ -232,7 +233,7 @@ struct InsightsTab: View {
                     .padding(.vertical, 5)
                 }
             }
-            .padding(.horizontal, 14).padding(.top, 3).padding(.bottom, 8)
+            .padding(.horizontal, 14).padding(.vertical, 8)
         }
         .scrollIndicators(.never)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -241,7 +242,7 @@ struct InsightsTab: View {
     private static let calendarWeeks = 16
 
     /// One cell a day for the last sixteen weeks, shaded by how many
-    /// dictations it saw. Hovering a cell puts its date and count where the
+    /// dictations it saw. Clicking a cell puts its date and count where the
     /// legend sits, so nothing moves.
     private func calendar(_ s: InsightsStats) -> some View {
         let byDate = Dictionary(uniqueKeysWithValues: s.activity.map { ($0.date, $0) })
@@ -262,15 +263,15 @@ struct InsightsTab: View {
                             Rectangle()
                                 .fill(DesignTokens.Colors.ink.opacity(n == 0 ? 0.08 : 0.3 + 0.7 * Double(n) / Double(maxCount)))
                                 .frame(width: 11, height: 11)
-                                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: hoveredDay == key ? 1 : 0))
-                                .onHover { hoveredDay = $0 ? key : (hoveredDay == key ? nil : hoveredDay) }
+                                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: selectedDay == key ? 1 : 0))
+                                .onTapGesture { selectedDay = selectedDay == key ? nil : key }
                         }
                     }
                 }
             }
             Spacer()
-            if let hoveredDay {
-                Text(InsightsTab.dayCaption(hoveredDay, byDate[hoveredDay]))
+            if let shown = selectedDay {
+                Text(InsightsTab.dayCaption(shown, byDate[shown]))
                     .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
             } else {
                 HStack(spacing: 4) {
@@ -281,6 +282,8 @@ struct InsightsTab: View {
             }
         }
         .padding(14)
+        .contentShape(Rectangle())
+        .onTapGesture { selectedDay = nil }
     }
 
     /// `thu 12 sep · 14 dictations · 1,203 words`, or `thu 12 sep · nothing`.
