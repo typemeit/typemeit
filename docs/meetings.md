@@ -79,7 +79,7 @@ below forks on it.
 | Tracks | Two: mic and far end | One: the mic |
 | "You" | Free and exact, from the track split | Voice print, or nothing |
 | Other speakers | Diarization | Diarization |
-| Title | Window title, else the transcript | The transcript |
+| Title | Channel and people, else the transcript | The transcript |
 
 There is no signal to detect an in-person meeting, and there should not be:
 auto-recording a room because someone started talking is the one behaviour
@@ -452,25 +452,43 @@ artifacts and should be portable, greppable and deletable as one thing:
 
 ```
 Meetings/
-  2026-09-19 1430 Weekly sync (Zoom)/
+  2026-09-19 1430 45m #design, Ana +2 (Slack)/
     transcript.md
     mic.m4a
     others.m4a
 ```
 
-- `YYYY-MM-DD HHMM` first, 24-hour, so lexical sort is chronological.
+- `YYYY-MM-DD HHMM 45m` first — 24-hour, so lexical sort is chronological,
+  then how long it ran. Duration is compact (`8m`, `45m`, `1h20m`) and rounded
+  to the minute; nobody scans seconds. It means the folder is named when the
+  meeting ends, not when it starts, which is already when we transcribe.
 - No colons: legal on APFS, broken in shells, URLs and half of everything else.
 - Sanitise — strip `/`, collapse whitespace and newlines, no leading dot, cap
   around 80 characters. Same minute twice: append ` 2`.
 - `Store` writes whole JSON files atomically. That is wrong for this: one
   folder per meeting, not one growing file.
 
-**The title**, with no calendar to supply one:
+**The title**, with no calendar to supply one. For a huddle the two things
+worth knowing are *where* it happened and *who was in it*, so:
 
-1. The window title at start, over AX, with the app's own suffix stripped.
-2. Generated from the finished transcript — Zoom's window title is usually
-   just "Zoom Meeting".
-3. The app name alone.
+1. **Channel and participants**, whichever we have, channel first:
+   `#design, Ana +2`. A channel huddle is usually remembered by its channel; a
+   direct one only by who was in it.
+   - Names: first names only, alphabetical, at most two spelled out, then
+     `+N`. `Ana, Ben` for three people including you; `Ana +3` for five.
+   - Exclude yourself — every meeting has you in it, so the name carries no
+     information and costs characters.
+   - Both come from the roster sources under *Names off the screen*; a huddle
+     panel shows its channel in the same place it shows the people. If the
+     roster is empty this rung produces nothing and we fall through.
+2. **The window title**, where it is worth anything — a native app with a real
+   meeting name. Not Slack or a browser, per the scope note.
+3. **Generated from the finished transcript.**
+4. **The app name alone.**
+
+So a good huddle reads `2026-09-19 1430 45m #design, Ana +2 (Slack)` and a bare
+one reads `2026-09-19 1430 45m Slack`. The prefix is always right even when
+everything after it fails.
 
 Renaming in the UI rewrites the folder. A human-readable name nobody can fix
 decays into noise.
@@ -486,9 +504,12 @@ kind: call
 started: 2026-09-19T14:30:12Z
 ended: 2026-09-19T15:04:48Z
 duration_s: 2076
-app: us.zoom.xos
-app_name: Zoom
-window_title: Weekly sync
+recorded_s: 2014
+app: com.tinyspeck.slackmacgap
+app_name: Slack
+channel: "#design"
+participants: [Ana Oyelaran, Ben Marsh, Cho Ishii]
+window_title: null
 device: MacBook Pro Microphone
 headphones: true
 segments: [{start: 0, end: 1840}, {start: 1902, end: 2076}]
@@ -503,11 +524,13 @@ model: multitalker-parakeet-streaming-0.6b-v1-Q8_0
 Morning — shall we start with the deploy?
 ```
 
-`segments` records reconnects, so a dropped call reads as one meeting with a
-gap. `dictations` marks the spans where you were talking to your notes. An
-in-person meeting carries `kind: in-person`, no `app` or `window_title`
-fields, and its folder is named from the generated title alone —
-`2026-09-19 1430 Roadmap review`.
+`duration_s` is wall clock, start to end, gaps included — what someone means
+by "how long was it". `recorded_s` is the audio we actually have, which is
+less whenever a call dropped. `segments` records those reconnects, so a
+dropped call reads as one meeting with a gap. `dictations` marks the spans where you were talking to your notes. An
+in-person meeting carries `kind: in-person`, no `app`, `channel` or
+`window_title` fields, and its folder is named from the generated title alone
+— `2026-09-19 1430 52m Roadmap review`.
 
 Talk ratio, length distribution and over-run are all things the Insights code
 already knows how to present.
@@ -602,6 +625,12 @@ is that nobody has better detection than the CoreAudio signal.
   blip filter are for.
 - Two people on a Meet call → two speakers, "You" correct from the track
   split, the other renameable.
+- A huddle in `#design` with three others → folder reads
+  `… 45m #design, Ana +2 (Slack)`, and the user is not one of the named.
+- A huddle with no roster → `… 45m Slack`, and the date, time and duration are
+  still right. Nothing in the name is ever a guess.
+- A call that dropped and resumed → `duration_s` spans the gap, `recorded_s`
+  does not, and the folder name shows the wall-clock length.
 
 ## Open
 
