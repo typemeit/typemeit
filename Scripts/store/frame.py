@@ -40,7 +40,7 @@ SCENES = {
     ),
     "history": dict(
         image="app/history.png",
-        head="all of it on this mac.",
+        head="all of it on your mac.",
         text="transcribed, formatted and tidied on device, and kept here with what was heard. nothing is sent anywhere.",
     ),
     "settings": dict(

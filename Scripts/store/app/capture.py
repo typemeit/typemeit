@@ -19,6 +19,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 APP = os.path.join(ROOT, "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev")
 TABS = ["insights", "intelligence", "history", "settings"]  # sidebar order
+# By path: the dev app is not sandboxed, but a container for its bundle id
+# exists, and `defaults` would otherwise write to the plist in there instead.
+DEFAULTS = os.path.expanduser("~/Library/Preferences/it.typeme.typemeit.dev.plist")
+KEEP = "100"  # the smallest "keep" choice, shown in the history capture's picker
+
+
+def default(key):
+    r = subprocess.run(["defaults", "read", DEFAULTS, key], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def set_default(key, value):
+    if value is None:
+        subprocess.run(["defaults", "delete", DEFAULTS, key], check=True, capture_output=True)
+    else:
+        subprocess.run(["defaults", "write", DEFAULTS, key, "-int", value], check=True)
 
 WINDOW_ID = '''
 import AppKit
@@ -40,6 +56,10 @@ def osascript(pid, script):
 def main(tabs):
     subprocess.run([sys.executable, os.path.join(HERE, "seed.py")], check=True)
     env = dict(os.environ, TYPEMEIT_SUPPORT_DIR=os.path.join(HERE, "store"))
+    # The dev app's own preferences are read as it launches; the keep limit
+    # only prunes on the next dictation, so the seeded count stands.
+    keep_before = default("historyLimit")
+    set_default("historyLimit", KEEP)
     app = subprocess.Popen([APP], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(6)
@@ -64,6 +84,8 @@ def main(tabs):
             print(out)
     finally:
         app.terminate()
+        app.wait()
+        set_default("historyLimit", keep_before)
 
 
 if __name__ == "__main__":
