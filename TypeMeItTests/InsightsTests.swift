@@ -79,7 +79,7 @@ final class CategoryTests: XCTestCase {
         let ghostty = "com.mitchellh.ghostty"
         XCTAssertEqual(classify(ghostty, "Ghostty", "zsh"), .code)
         XCTAssertEqual(classify(ghostty, "Ghostty", nil), .code)
-        XCTAssertEqual(classify(ghostty, "Ghostty", "✳ Claude Code — handy"), .aiPrompts)
+        XCTAssertEqual(classify(ghostty, "Ghostty", "✳ Claude Code — typemeit"), .aiPrompts)
         XCTAssertEqual(classify("com.apple.Terminal", "Terminal", "codex — 80×24"), .aiPrompts)
     }
 
@@ -181,9 +181,30 @@ final class InsightsTests: XCTestCase {
         let stats = compute([timed, zero, untimed], today: day(2026, 9, 3))
         XCTAssertEqual(stats.timedDictations, 1)
         XCTAssertEqual(stats.wordsPerMinute, 150.0)
+        // Ten words take 15 s to type at 40 wpm and took 4 s to say.
+        XCTAssertEqual(stats.timeSavedMs, 11_000)
     }
 
-    func testStageSpeedsAreMediansAndRealtimeIsOverTheAudioItTimed() {
+    func testTimeSavedIsNegativeWhenSpeakingWasSlowerThanTyping() {
+        var slow = row(day(2026, 9, 3), "one two")
+        slow.durationMs = 10_000
+        XCTAssertEqual(compute([slow], today: day(2026, 9, 3)).timeSavedMs, -7_000)
+        XCTAssertNil(compute([row(day(2026, 9, 3), "untimed")], today: day(2026, 9, 3)).timeSavedMs)
+    }
+
+    func testDictationLengthIsAudioOverTimedRowsAndWordsOverAll() {
+        var a = row(day(2026, 9, 3), "one two three")
+        a.durationMs = 2_000
+        var b = row(day(2026, 9, 3), "one")
+        b.durationMs = 6_000
+        let untimed = row(day(2026, 9, 3), "one two three four five")
+        let stats = compute([a, b, untimed], today: day(2026, 9, 3))
+        XCTAssertEqual(stats.audioMs, Percentiles(p50: 4_000, p75: 5_000, p90: 5_600, p95: 5_800))
+        XCTAssertEqual(stats.wordsPerDictation, Percentiles(p50: 3, p75: 4, p90: 5, p95: 5))
+        XCTAssertNil(compute([], today: day(2026, 9, 3)).audioMs)
+    }
+
+    func testStageSpeedsArePercentilesAndRealtimeIsOverTheAudioItTimed() {
         var a = row(day(2026, 9, 3), "one")
         a.durationMs = 4_000
         a.transcribeMs = 200
@@ -199,24 +220,37 @@ final class InsightsTests: XCTestCase {
         // Not requested, so its time is not a clean-up time.
         slow.postProcessMs = 9_000
         let stats = compute([a, b, slow], today: day(2026, 9, 3))
-        XCTAssertEqual(stats.transcribeMedianMs, 300)
-        XCTAssertEqual(stats.cleanUpMedianMs, 1_000)
+        // Interpolated between the sorted values: 200, 300, 5_000.
+        XCTAssertEqual(stats.transcribeMs, Percentiles(p50: 300, p75: 2_650, p90: 4_060, p95: 4_530))
+        // 900 and 1_100, so every percentile sits between the two.
+        XCTAssertEqual(stats.cleanUpMs, Percentiles(p50: 1_000, p75: 1_050, p90: 1_080, p95: 1_090))
         // Only a and b timed their audio: 500 ms of transcribing over 10 s.
         XCTAssertEqual(stats.transcribeRealtime, 0.05)
     }
 
+    func testPercentilesOfOneValueAreThatValue() {
+        XCTAssertEqual(Percentiles([420]), Percentiles(p50: 420, p75: 420, p90: 420, p95: 420))
+    }
+
+    func testPercentilesInterpolateBetweenNeighbouringRanks() {
+        // Ranks 0…10 of the sorted sample are 100…1_100, so the rank is the value.
+        let sample = (1...11).map { $0 * 100 }.reversed()
+        XCTAssertEqual(Percentiles(Array(sample)), Percentiles(p50: 600, p75: 850, p90: 1_000, p95: 1_050))
+        XCTAssertNil(Percentiles([]))
+    }
+
     func testStageSpeedsAreNilWithoutTimings() {
         let stats = compute([row(day(2026, 9, 3), "nothing timed")], today: day(2026, 9, 3))
-        XCTAssertNil(stats.transcribeMedianMs)
+        XCTAssertNil(stats.transcribeMs)
         XCTAssertNil(stats.transcribeRealtime)
-        XCTAssertNil(stats.cleanUpMedianMs)
+        XCTAssertNil(stats.cleanUpMs)
     }
 
     func testFixesComeFromTheDictionaryCounterAndPostProcessingDiffs() {
-        var a = row(day(2026, 9, 3), "we shipped handy today")
+        var a = row(day(2026, 9, 3), "we shipped typemeit today")
         a.dictionaryFixes = 2
         a.postProcessRequested = true
-        a.postProcessed = "We shipped handy today."
+        a.postProcessed = "We shipped typemeit today."
         var b = row(day(2026, 9, 3), "meet at five pm tomorrow ok")
         b.postProcessRequested = true
         b.postProcessed = "Meet at 5pm tomorrow."

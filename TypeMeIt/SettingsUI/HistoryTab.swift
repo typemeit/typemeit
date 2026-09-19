@@ -92,7 +92,7 @@ struct HistoryTab: View {
                 .padding(.horizontal, 8).frame(height: 26)
                 .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
-                Text("\(store.history.count) dictations")
+                Text(counted(store.history.count, "dictation"))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 if !selected.isEmpty {
                     Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
@@ -101,7 +101,7 @@ struct HistoryTab: View {
                 Button("delete all") { confirmDeleteAll = true }
                     .buttonStyle(InkButtonStyle())
                     .disabled(store.history.isEmpty)
-                    .confirmationDialog("Delete all \(store.history.count) dictations?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                    .confirmationDialog("Delete all \(counted(store.history.count, "dictation"))?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
                         Button("Delete All", role: .destructive) { store.deleteAllHistory(); selected = [] }
                     } message: { Text("This cannot be undone.") }
             }
@@ -147,7 +147,7 @@ struct HistoryTab: View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 selectToggle(e.id)
-                Text(e.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                Text(e.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2).frame(width: 44, alignment: .leading).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(e.displayText).font(.system(size: 13)).textSelection(.enabled)
@@ -159,12 +159,10 @@ struct HistoryTab: View {
                         if let app = e.appName { Text(app.lowercased()).font(.system(size: 10)).foregroundStyle(DesignTokens.Colors.ink3) }
                     }
                     telemetry(e)
-                    if e.transcript != e.displayText {
-                        if e.recordingFile != nil {
-                            stages(e)
-                        } else if expanded.contains(e.id) {
-                            stage("heard", heard: e.transcript, typed: e.displayText)
-                        }
+                    if e.recordingFile != nil {
+                        stages(e)
+                    } else if expanded.contains(e.id) {
+                        stage("heard", heard: e.transcript, typed: e.displayText)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -188,9 +186,9 @@ struct HistoryTab: View {
         if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
     }
 
-    /// An accordion under rows that kept their audio and whose text changed
-    /// after the engine heard it, so the original can be checked against the
-    /// recording. Rows where nothing changed have nothing to show.
+    /// An accordion under rows that kept their audio, so what the engine
+    /// heard can be checked against the recording and any word of it
+    /// corrected.
     @ViewBuilder
     private func stages(_ e: HistoryEntry) -> some View {
         let open = expanded.contains(e.id)
@@ -200,6 +198,7 @@ struct HistoryTab: View {
                     Image("akar-chevron-down").resizable().frame(width: 10, height: 10)
                         .rotationEffect(.degrees(open ? 0 : -90))
                     Text("heard")
+                    CharDelta(heard: e.transcript, typed: e.displayText)
                 }
                 .font(.system(size: 10).monospaced())
                 .padding(.horizontal, 7).padding(.vertical, 3)
@@ -214,7 +213,13 @@ struct HistoryTab: View {
 
     private func stage(_ label: String?, heard: String, typed: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let label { Text(label).font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3) }
+            if let label {
+                HStack(spacing: 5) {
+                    Text(label)
+                    CharDelta(heard: heard, typed: typed)
+                }
+                .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            }
             TranscriptDiff(heard: heard, typed: typed)
         }
         .foregroundStyle(DesignTokens.Colors.ink2)
@@ -274,9 +279,25 @@ struct HistoryTab: View {
     }
 }
 
+/// How many characters the clean-up put in and took out, `+12 −3`, in the
+/// diff colours, not counting spaces. Nothing when the text was left as heard.
+private struct CharDelta: View {
+    let heard: String
+    let typed: String
+
+    var body: some View {
+        let diff = typed.filter { !$0.isWhitespace }.difference(from: heard.filter { !$0.isWhitespace })
+        let (added, removed) = (diff.insertions.count, diff.removals.count)
+        if added > 0 { Text("+\(added.formatted())").foregroundStyle(DesignTokens.Colors.diffAdd) }
+        if removed > 0 { Text("−\(removed.formatted())").foregroundStyle(DesignTokens.Colors.diffRemove) }
+    }
+}
+
 /// What was heard against what was typed, a word at a time: words the
 /// clean-up dropped are struck through in red, the words it put in their
-/// place are green, and the rest reads as the transcript did.
+/// place are green, and the rest reads as the transcript did. Every word
+/// is a button: a red run can be kept as heard, and any word can be given
+/// the spelling it should have had.
 private struct TranscriptDiff: View {
     let heard: String
     let typed: String
@@ -284,28 +305,35 @@ private struct TranscriptDiff: View {
     private enum Change { case same, added, removed }
 
     var body: some View {
-        text.font(.system(size: 12)).textSelection(.enabled)
-    }
-
-    private var text: Text {
-        var out = Text("")
-        for (i, run) in runs.enumerated() {
-            if i > 0 { out = out + Text(" ") }
-            switch run.change {
-            case .same: out = out + Text(run.words).foregroundColor(DesignTokens.Colors.ink2)
-            case .added: out = out + Text(run.words).foregroundColor(DesignTokens.Colors.diffAdd).fontWeight(.semibold)
-            case .removed: out = out + Text(run.words).foregroundColor(DesignTokens.Colors.diffRemove).strikethrough()
+        FlowLayout(spacing: 4) {
+            ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
+                switch run.change {
+                case .same:
+                    ForEach(Array(run.words.split(separator: " ").enumerated()), id: \.offset) { _, word in
+                        HeardRun(words: String(word), changed: false)
+                    }
+                case .added:
+                    ForEach(Array(run.words.split(separator: " ").enumerated()), id: \.offset) { _, word in
+                        Text(word).foregroundStyle(DesignTokens.Colors.diffAdd).fontWeight(.semibold)
+                    }
+                case .removed:
+                    HeardRun(words: run.words, changed: true)
+                }
             }
         }
-        return out
+        .font(.system(size: 12))
+    }
+
+    private static func words(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isWhitespace).map(String.init)
     }
 
     /// The two texts merged back into one reading order. Removals are offsets
     /// into what was heard and insertions offsets into what was typed, so the
     /// two walks advance together and every word lands once.
     private var runs: [(change: Change, words: String)] {
-        let old = heard.split(whereSeparator: \.isWhitespace).map(String.init)
-        let new = typed.split(whereSeparator: \.isWhitespace).map(String.init)
+        let old = TranscriptDiff.words(heard)
+        let new = TranscriptDiff.words(typed)
         var removed: Set<Int> = []
         var inserted: [Int: String] = [:]
         for change in new.difference(from: old) {
@@ -329,5 +357,108 @@ private struct TranscriptDiff: View {
     /// struck through in one piece rather than word by word.
     private func append(_ out: inout [(change: Change, words: String)], _ change: Change, _ word: String) {
         if out.last?.change == change { out[out.count - 1].words += " " + word } else { out.append((change, word)) }
+    }
+}
+
+/// A run of the transcript, and where it stands with the custom words. The
+/// click opens the entries the settings field takes: a struck-through run
+/// can be kept as heard, and any run can name the spelling it should have
+/// been. A run already kept, or already a spelling of a custom word, offers
+/// to be forgotten instead; a struck-through one wears a check to say so.
+/// The standing is read from the custom words each time, so every row shows
+/// it and nothing is written to the history.
+private struct HeardRun: View {
+    let words: String
+    /// Struck through by the clean-up, as opposed to left as heard.
+    let changed: Bool
+    @State private var store = Store.shared
+    @State private var settings = Settings.shared
+    @State private var open = false
+    @State private var hovering = false
+
+    private var term: String { HeardWord.term(for: words) }
+    private var standing: HeardWord.Standing {
+        HeardWord.standing(of: words, terms: store.terms(for: settings.customWords))
+    }
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            HStack(spacing: 3) {
+                if changed {
+                    Text(words).foregroundStyle(DesignTokens.Colors.diffRemove).strikethrough()
+                } else {
+                    Text(words).foregroundStyle(DesignTokens.Colors.ink2)
+                }
+                if changed, standing != .unknown {
+                    Image("akar-check").resizable().frame(width: 8, height: 8).foregroundStyle(DesignTokens.Colors.ink2)
+                }
+            }
+            .padding(.horizontal, 2)
+            .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.sm)
+                .fill(hovering || open ? DesignTokens.Colors.inkA08 : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
+        .help(help)
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            HeardRunMenu(term: term, standing: standing, changed: changed, open: $open)
+        }
+    }
+
+    private var help: String {
+        switch standing {
+        case .unknown: return changed ? "keep “\(term)”, or say what it should be" : "say what it should be"
+        case .kept: return "in custom words"
+        case .heard(let word): return "heard as “\(term)” for \(word)"
+        }
+    }
+}
+
+private struct HeardRunMenu: View {
+    let term: String
+    let standing: HeardWord.Standing
+    let changed: Bool
+    @Binding var open: Bool
+    @State private var store = Store.shared
+    @State private var settings = Settings.shared
+    @State private var spelling = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch standing {
+            case .unknown:
+                if changed {
+                    Button("keep “\(term)”") { settings.addCustomWord(term); open = false }
+                        .buttonStyle(InkButtonStyle())
+                }
+                TextField("should be…", text: $spelling)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
+                    .onSubmit(correct)
+            case .kept:
+                Button("forget “\(term)”") {
+                    store.forgetLearned(word: term)
+                    settings.removeCustomWord(term)
+                    open = false
+                }
+                .buttonStyle(InkButtonStyle())
+            case .heard(let word):
+                Button("forget “\(term) = \(word)”") { store.forgetAlias(heard: term, for: word); open = false }
+                    .buttonStyle(InkButtonStyle())
+            }
+        }
+        .padding(12)
+    }
+
+    /// The same entry as "heard = word" in settings: the spelling becomes a
+    /// custom word and the run a spelling the speech model produces for it.
+    private func correct() {
+        let w = spelling.trimmingCharacters(in: .whitespaces)
+        guard !w.isEmpty else { return }
+        settings.addCustomWord(w)
+        if w.caseInsensitiveCompare(term) != .orderedSame { store.addAlias(heard: term, for: w) }
+        open = false
     }
 }

@@ -27,10 +27,16 @@ const FRAG = `#version 300 es
 precision highp float;
 ${GLSL}
 uniform vec2 uCentre; uniform float uSize; uniform float uTime;
-uniform float uExpansion; uniform float uTrail; uniform float uFlow; uniform vec4 uTint;
+uniform float uExpansion; uniform float uTrail; uniform float uFlow; uniform float uDensity;
 out vec4 fragColor;
 void main(){ vec2 p = gl_FragCoord.xy - uCentre; p.y = -p.y;
-  fragColor = render(p + 0.5*vec2(uSize), vec2(uSize), uTime, uExpansion, uTrail, uFlow, uTint); }`;
+  // No dispersal and no lightning (a negative strike is none). The frame's
+  // 'dens' scales the opacity after Beer-Lambert through the tint's alpha,
+  // which saturates the dense cores the stills were tuned around; the
+  // shader's density argument thickens the smoke inside the exponent and
+  // reads softer, so it stays at 1.
+  fragColor = render(p + 0.5*vec2(uSize), vec2(uSize), uTime, uExpansion, uTrail, uFlow,
+                     0.0, -1.0, 1.0, vec4(1.0, 1.0, 1.0, uDensity)); }`;
 const VERT = `#version 300 es
 in vec2 aPos; void main(){ gl_Position = vec4(aPos,0.0,1.0); }`;
 function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
@@ -53,7 +59,7 @@ for (const f of FRAMES.length ? FRAMES : [{x:0.5,size:SIZE,exp:EXP,trail:TRAIL,f
   gl.uniform2f(U('uCentre'), f.x * W, H - (f.y ?? 0.5) * H); gl.uniform1f(U('uSize'), f.size);
   gl.uniform1f(U('uTime'), f.time); gl.uniform1f(U('uExpansion'), f.exp);
   gl.uniform1f(U('uTrail'), f.trail ?? f.exp); gl.uniform1f(U('uFlow'), f.flow);
-  gl.uniform4f(U('uTint'), 1, 1, 1, f.dens ?? 1);
+  gl.uniform1f(U('uDensity'), f.dens ?? 1);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 

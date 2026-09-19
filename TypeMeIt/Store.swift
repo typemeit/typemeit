@@ -48,7 +48,12 @@ final class Store {
     private(set) var history: [HistoryEntry] = []
     private(set) var learned: [LearnedWord] = []
 
+    /// TYPEMEIT_SUPPORT_DIR points a build at another store, so a screenshot
+    /// run can show made-up history without touching the real one.
     nonisolated static let directory: URL = {
+        if let dir = ProcessInfo.processInfo.environment["TYPEMEIT_SUPPORT_DIR"] {
+            return URL(fileURLWithPath: dir, isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("TypeMeIt", isDirectory: true)
     }()
@@ -192,6 +197,19 @@ final class Store {
         let h = heard.trimmingCharacters(in: .whitespaces)
         guard !h.isEmpty, !aliases(for: word).contains(where: { $0.caseInsensitiveCompare(h) == .orderedSame }) else { return }
         appendLearned([LearnedWord(batchId: UUID(), heard: h, meant: word, source: "typed", historyId: nil, learnedAt: Date())])
+    }
+
+    /// Marks the records that say `heard` is how the speech model writes
+    /// `word` undone, leaving the word and its other spellings alone.
+    func forgetAlias(heard: String, for word: String) {
+        var changed = false
+        for i in learned.indices where !learned[i].undone
+            && learned[i].meant.caseInsensitiveCompare(word) == .orderedSame
+            && learned[i].heard.trimmingCharacters(in: .whitespaces).caseInsensitiveCompare(heard) == .orderedSame {
+            learned[i].undone = true
+            changed = true
+        }
+        if changed { save(learned, to: learnedURL) }
     }
 
     func learnedRecord(for word: String) -> LearnedWord? {

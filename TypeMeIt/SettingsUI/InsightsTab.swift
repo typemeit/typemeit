@@ -3,6 +3,11 @@ import SwiftUI
 struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var whereHeight: CGFloat = 0
+    @State private var appsHeight: CGFloat = 0
+    /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
+    /// The streak cell whose day is shown; a click on the box outside the
+    /// cells lets it go.
+    @State private var selectedDay: String?
 
     private var stats: InsightsStats {
         Insights.compute(store.history.map {
@@ -13,7 +18,6 @@ struct InsightsTab: View {
         })
     }
 
-    private static let typingWPM = 40.0
     private static let gaugeMax = 200.0
     /// Tonal ramp of ink, darkest for the largest share. Indexed by rank.
     private static let ramp: [Color] = [
@@ -34,18 +38,25 @@ struct InsightsTab: View {
                     statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                // Both boxes stand as tall as the taller one, so every app
+                // is a whole row with the same room above and below.
                 HStack(alignment: .top, spacing: 12) {
-                    SettingsGroup(title: "where") { categories(s) }
+                    SettingsGroup(title: "where") { categories(s).frame(maxHeight: .infinity, alignment: .top) }
                         .frame(maxWidth: .infinity)
+                        .frame(minHeight: max(whereHeight, appsHeight))
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
-                    SettingsGroup(title: "apps · \(s.totalApps)") { topApps(s) }
+                    SettingsGroup(title: "apps · \(s.totalApps)") { topApps(s).frame(maxHeight: .infinity, alignment: .top) }
                         .frame(width: 240)
-                        .frame(height: whereHeight > 0 ? whereHeight : nil, alignment: .top)
+                        .frame(minHeight: max(whereHeight, appsHeight))
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { appsHeight = $0 }
                 }
                 SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
                     calendar(s)
                 }
-                SettingsGroup(title: "speed") { speed(s) }
+                HStack(alignment: .top, spacing: 12) {
+                    SettingsGroup(title: "length") { length(s) }
+                    SettingsGroup(title: "speed") { speed(s) }
+                }
             }
             .padding(20)
         }
@@ -60,36 +71,66 @@ struct InsightsTab: View {
         } else {
             delta = "\(s.wordsThisMonth.formatted()) this month"
         }
-        return "\(delta) · \(s.totalDictations) dictations"
+        return "\(delta) · \(counted(s.totalDictations, "dictation"))"
     }
 
     /// The fixes as a share of everything dictated, then the two kinds of fix
     /// they are made of.
     private func fixCaption(_ s: InsightsStats) -> String {
-        let breakdown = "\(s.dictionaryFixes.formatted()) words · \(s.postProcessFixes.formatted()) clean-ups"
+        let breakdown = "\(counted(s.dictionaryFixes, "word")) · \(counted(s.postProcessFixes, "clean-up"))"
         guard s.totalWords > 0 else { return breakdown }
         let share = Double(s.dictionaryFixes + s.postProcessFixes) / Double(s.totalWords) * 100
         return String(format: "%.1f%% of words · ", share) + breakdown
     }
 
-    /// How long each half of the pipeline takes over one dictation. Medians,
-    /// so a single slow run does not carry the figure.
-    private func speed(_ s: InsightsStats) -> some View {
+    private static let percentileColumns: [(name: String, value: KeyPath<Percentiles, Int>)] = [
+        ("p50", \.p50), ("p75", \.p75), ("p90", \.p90), ("p95", \.p95),
+    ]
+    private static let percentileColumnWidth: CGFloat = 56
+
+    /// How long one dictation runs and how much it says, by percentile.
+    private func length(_ s: InsightsStats) -> some View {
         VStack(spacing: 0) {
-            speedRow("parakeet", s.transcribeMedianMs.map(InsightsTab.duration),
-                     detail: s.transcribeRealtime.flatMap { $0 > 0 ? String(format: "%.0f× faster than the audio", 1 / $0) : nil })
+            percentileHeader
+            percentileRow("speech", s.audioMs, InsightsTab.duration)
             RowRule()
-            speedRow("apple intelligence", s.cleanUpMedianMs.map(InsightsTab.duration),
-                     detail: s.cleanUpMedianMs == nil ? "no clean-ups yet" : nil, last: true)
+            percentileRow("words", s.wordsPerDictation, { $0.formatted() })
         }
     }
 
-    private func speedRow(_ label: String, _ value: String?, detail: String? = nil, last: Bool = false) -> some View {
+    /// How long each half of the pipeline takes over one dictation, by
+    /// percentile, so the slow tail shows next to the typical run.
+    private func speed(_ s: InsightsStats) -> some View {
+        VStack(spacing: 0) {
+            percentileHeader
+            percentileRow("parakeet", s.transcribeMs, InsightsTab.duration)
+            RowRule()
+            percentileRow("apple intelligence", s.cleanUpMs, InsightsTab.duration,
+                          detail: s.cleanUpMs == nil ? "no clean-ups yet" : nil)
+        }
+    }
+
+    private var percentileHeader: some View {
+        HStack(spacing: 12) {
+            Spacer()
+            ForEach(InsightsTab.percentileColumns, id: \.name) { column in
+                Text(column.name).font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                    .frame(width: InsightsTab.percentileColumnWidth, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 4)
+    }
+
+    private func percentileRow(_ label: String, _ value: Percentiles?, _ format: @escaping (Int) -> String, detail: String? = nil) -> some View {
         HStack(spacing: 12) {
             Text(label).font(.system(size: 12))
             Spacer()
             if let detail { Text(detail).font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3) }
-            Text(value ?? "–").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+            ForEach(InsightsTab.percentileColumns, id: \.name) { column in
+                Text(value.map { format($0[keyPath: column.value]) } ?? "–")
+                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    .frame(width: InsightsTab.percentileColumnWidth, alignment: .trailing)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
@@ -110,23 +151,38 @@ struct InsightsTab: View {
         .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
     }
 
+    /// `2.5× faster than typing · 4.2 h saved`. The saving is left off when
+    /// speaking came out slower, since there is none.
+    private func wpmCaption(_ s: InsightsStats) -> String {
+        guard let wpm = s.wordsPerMinute, wpm > 0 else { return "not yet" }
+        let faster = String(format: "%.1f× faster than typing", wpm / Insights.typingWPM)
+        guard let saved = s.timeSavedMs, saved > 0 else { return faster }
+        return "\(faster) · \(InsightsTab.span(saved)) saved"
+    }
+
+    /// Minutes under an hour, hours above it.
+    private static func span(_ ms: Int) -> String {
+        let minutes = Double(ms) / 60_000
+        return minutes < 60 ? "\(Int(minutes.rounded())) min" : String(format: "%.1f h", minutes / 60)
+    }
+
     private func wpmCard(_ s: InsightsStats) -> some View {
         let wpm = s.wordsPerMinute ?? 0
         return VStack(alignment: .leading, spacing: 2) {
             Text("words per minute").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
             Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "–").font(.system(size: 26, weight: .medium, design: .monospaced))
-            Text(wpm > 0 ? String(format: "%.1f× faster than typing", wpm / InsightsTab.typingWPM) : "not yet")
+            Text(wpmCaption(s))
                 .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(DesignTokens.Colors.inkA08).frame(height: 6)
                     Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * min(1, wpm / InsightsTab.gaugeMax), height: 6)
                     Rectangle().fill(DesignTokens.Colors.ink2).frame(width: 1.5, height: 12)
-                        .offset(x: geo.size.width * (InsightsTab.typingWPM / InsightsTab.gaugeMax), y: 0)
+                        .offset(x: geo.size.width * (Insights.typingWPM / InsightsTab.gaugeMax), y: 0)
                 }
             }
             .frame(height: 12).padding(.top, 8)
-            HStack { Text("typing 40"); Spacer(); Text("you \(Int(wpm.rounded()))") }.font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            HStack { Text("typing \(Int(Insights.typingWPM))"); Spacer(); Text("you \(Int(wpm.rounded()))") }.font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -170,29 +226,30 @@ struct InsightsTab: View {
     }
 
     private func topApps(_ s: InsightsStats) -> some View {
-        ScrollView(.vertical) {
-            VStack(spacing: 0) {
-                if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).padding(.vertical, 8) }
-                ForEach(s.topApps, id: \.name) { a in
-                    HStack {
-                        Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
-                        Spacer()
-                        Text("\(a.words.formatted()) words").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                    }
-                    .padding(.vertical, 5)
+        VStack(spacing: 0) {
+            if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).padding(.vertical, 8) }
+            ForEach(s.topApps, id: \.name) { a in
+                HStack {
+                    Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
+                    Spacer()
+                    Text(counted(a.words, "word")).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 }
+                .padding(.vertical, 5)
             }
-            .padding(.horizontal, 14).padding(.top, 3).padding(.bottom, 8)
         }
-        .scrollIndicators(.never)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
+    private static let calendarWeeks = 16
+
+    /// One cell a day for the last sixteen weeks, shaded by how many
+    /// dictations it saw. Clicking a cell puts its date and count where the
+    /// legend sits, so nothing moves.
     private func calendar(_ s: InsightsStats) -> some View {
-        let byDate = Dictionary(uniqueKeysWithValues: s.activity.map { ($0.date, $0.dictations) })
+        let byDate = Dictionary(uniqueKeysWithValues: s.activity.map { ($0.date, $0) })
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let weeks = 16
+        let weeks = InsightsTab.calendarWeeks
         let start = cal.date(byAdding: .day, value: -(weeks * 7 - 1), to: today)!
         let maxCount = max(1, s.activity.map(\.dictations).max() ?? 1)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
@@ -202,21 +259,41 @@ struct InsightsTab: View {
                     VStack(spacing: 3) {
                         ForEach(0..<7, id: \.self) { d in
                             let date = cal.date(byAdding: .day, value: w * 7 + d, to: start)!
-                            let n = byDate[f.string(from: date)] ?? 0
+                            let key = f.string(from: date)
+                            let n = byDate[key]?.dictations ?? 0
                             Rectangle()
                                 .fill(DesignTokens.Colors.ink.opacity(n == 0 ? 0.08 : 0.3 + 0.7 * Double(n) / Double(maxCount)))
                                 .frame(width: 11, height: 11)
+                                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: selectedDay == key ? 1 : 0))
+                                .onTapGesture { selectedDay = selectedDay == key ? nil : key }
                         }
                     }
                 }
             }
             Spacer()
-            HStack(spacing: 4) {
-                Text("less").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
-                ForEach([0.08, 0.3, 0.55, 0.8, 1.0], id: \.self) { o in Rectangle().fill(DesignTokens.Colors.ink.opacity(o)).frame(width: 9, height: 9) }
-                Text("more").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            if let shown = selectedDay {
+                Text(InsightsTab.dayCaption(shown, byDate[shown]))
+                    .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            } else {
+                HStack(spacing: 4) {
+                    Text("less").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                    ForEach([0.08, 0.3, 0.55, 0.8, 1.0], id: \.self) { o in Rectangle().fill(DesignTokens.Colors.ink.opacity(o)).frame(width: 9, height: 9) }
+                    Text("more").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                }
             }
         }
         .padding(14)
+        .contentShape(Rectangle())
+        .onTapGesture { selectedDay = nil }
+    }
+
+    /// `thu 12 sep · 14 dictations · 1,203 words`, or `thu 12 sep · nothing`.
+    static func dayCaption(_ key: String, _ day: DayActivity?) -> String {
+        let iso = DateFormatter(); iso.dateFormat = "yyyy-MM-dd"
+        let shown = DateFormatter(); shown.dateFormat = "EEE d MMM"
+        let date = iso.date(from: key).map { shown.string(from: $0).lowercased() } ?? key
+        guard let day, day.dictations > 0 else { return "\(date) · nothing" }
+        let dictations = day.dictations == 1 ? "1 dictation" : "\(day.dictations.formatted()) dictations"
+        return "\(date) · \(dictations) · \(day.words.formatted()) words"
     }
 }
