@@ -252,10 +252,25 @@ labelled recording of the user speaking alone.** `RecordingArchive` is a
 voice-print enrolment corpus that a notetaker cannot have and does not need
 to ask for.
 
-Enrol from it once, match by cosine similarity against the diarizer's speaker
-embeddings, and "You" is identified in a room the same way it is on a call.
-The same embedding answers the browser case, where the meeting app gives us
-no names at all.
+Enrol from it once, match against the diarizer's speaker embeddings, and
+"You" is identified in a room the same way it is on a call. The same
+embedding answers the browser case, where the meeting app gives us no names
+at all.
+
+`meeting-transcriber` has all of this already, and its shape is worth
+following: per speaker keep a **centroid** (running mean of every confirmed
+embedding) plus a short FIFO of recent samples, match on the smaller cosine
+distance of the two, and accept only past a **0.40 distance threshold** with
+a **0.10 margin** over the runner-up. Fold only quality-filtered samples into
+the centroid — short snippets stay as fallback anchors — and **quarantine
+embeddings suspected of echo bleed**, or a speakerphone will poison a
+participant's print with the user's own voice.
+
+The difference is the enrolment itself. Theirs is a sheet: pick a file,
+diarize it, name the speakers by hand. Ours needs no sheet for the user —
+every kept dictation is already a labelled recording of one known speaker.
+Their flow is still worth building later for *other* people, since naming a
+voice from a past meeting is now the only route to real names.
 
 Two things to get right: enrol from recordings the user kept, never from
 audio they asked not to keep; and let them turn it off, since a stored voice
