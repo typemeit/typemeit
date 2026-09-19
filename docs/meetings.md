@@ -31,12 +31,13 @@ gets tuned for.
 
 Picking these two settles an argument the rest of the plan was leaving open:
 
-- **Neither gives us speaker names.** Meet is a browser tab — DOM, not an
-  accessibility tree — and a Slack huddle is Electron, so the tree is whatever
-  the web content happens to expose. So **diarization plus the mic/tap split
-  is the whole speaker story**, not a fallback behind a nicer source. The
-  accessibility route is deferred, with its probe, until a native app is a
-  target.
+- **Neither hands us names the easy way.** Both are web content — a Meet tab,
+  an Electron huddle — so there is no native list of participants to read.
+  Plan for **diarization plus the mic/tap split as the whole speaker story**,
+  and treat any name we manage to recover as a bonus that renames the
+  numbers. Two ways to recover them, both unproven, both cheap to test:
+  the web-content accessibility tree and the screen itself. See *Names off
+  the screen* under Speakers.
 - **Both run audio in a helper process.** Chrome's audio service, Slack's
   helper. Helper-process resolution is not an optimisation for later; it is
   the difference between the gate firing and never firing at all. The code on
@@ -300,10 +301,56 @@ Zoom-first plan would pick:
    outright: real names, no speaker cap, no label permutation, no second
    model.
 
-   **Deferred.** It is worth nothing on the two launch targets — a browser tab
-   is DOM, and an Electron huddle exposes whatever its web content does — and
-   it is unverified even where it should work. Revisit when a native app
-   (Zoom, Teams) becomes a target; the probe below is what that starts with.
+   **Deferred for native apps** (Zoom, Teams), where it is unverified; the
+   probe below is what that starts with. But the web-content version of it is
+   *not* deferred — see below.
+
+### Names off the screen
+
+Correcting something above: "a browser tab is DOM, not an accessibility tree"
+is wrong, and it is wrong in a way that changes the plan. Chromium builds an
+accessibility tree from the DOM whenever it detects an assistive client, and
+exposes it to macOS under an `AXWebArea`; Electron is Chromium, so a Slack
+huddle has one too. Meet's participant tiles carry accessible names, and in
+some builds a speaking state. So the first thing to try on both launch targets
+is the tree we can already read — **we hold Accessibility today, and this
+costs no new permission.**
+
+Test that before anything else, in the same inspector session as the probe
+below:
+
+- Does the `AXWebArea` populate at all, or does Chrome only build it after an
+  assistive client announces itself — and does our existing use count?
+- Do Meet's tiles expose names, and does anything change as people speak?
+- Same for a huddle, collapsed as well as expanded.
+
+**If the tree is empty or useless, the screen still shows the names.** Capture
+the window, OCR it, read the roster off the tiles. It is a real option, with a
+real price:
+
+- **Cost: the Screen Recording grant.** The most alarming permission in the
+  list, and macOS re-prompts about it periodically. Asking for it to put
+  nicer labels on a transcript is a bad trade unless the rest of the feature
+  already earns it. Ask only when the user opts into names, never at
+  onboarding.
+- **Capture one window, not the screen.** `ScreenCaptureKit` with a content
+  filter pinned to the meeting window. Frames stay in memory, are OCR'd with
+  Vision on device, and are never written to disk — a meeting window may be
+  showing someone's shared screen, and that is not ours to keep.
+- **Good for the roster, weak for the active speaker.** Names are text and OCR
+  reads them reliably. Who is talking is a ring around an avatar — a visual
+  affordance that moves with every Slack and Meet redesign, needs the panel
+  visible and unoccluded the whole call, and needs sustained capture rather
+  than one frame. Take the roster; leave the active speaker to diarization.
+- **A roster alone finishes two-person calls.** The track split already gives
+  "You", so on a 1:1 the only other name is the answer — no active-speaker
+  signal needed at all. That is a large share of huddles.
+- **Cheap when scoped to the roster.** One capture when the meeting starts,
+  one on reconnect, one when the user asks — not a video feed.
+
+Order of attack: web-content tree first (free), screenshot roster second (one
+permission, opt-in), native tree third (deferred). Diarization carries the
+feature in all three cases; these only trade `Speaker 2` for a name.
 
 ### The AX probe, when we get there
 
@@ -332,10 +379,10 @@ For each app, four questions:
 | App | Expectation | Why it is worth the probe |
 | --- | --- | --- |
 | Zoom | Best odds — native AppKit, and this is the app the technique is known to work against | The most common call |
-| Teams | Poor — Electron, so the tree is whatever the web content exposes | Common enough that "no names on Teams" is a real gap |
-| Slack huddles | Poor, same reason | A launch target, so worth one check even expecting no |
+| Teams | Electron, so the web-content tree is the question, not a native one | Common enough that "no names on Teams" is a real gap |
+| Slack huddles | Unknown — Electron is Chromium, so same question as Meet | A launch target, and free to check |
 | Webex, Discord | Unknown | Cheap to check once the harness exists |
-| Meet, any browser | No — DOM, not AX, and an extension is out of scope | The other launch target; this is why diarization carries the feature |
+| Meet, any browser | Unknown — the `AXWebArea` may carry tile names; an extension is still out of scope | A launch target, and free to check |
 
 Ship the probe as a throwaway tool, not app code: a command that attaches to
 the frontmost meeting window, dumps the tree, and polls the candidate
