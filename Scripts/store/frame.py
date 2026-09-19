@@ -26,7 +26,7 @@ SCENES = {
     "slack": dict(
         image="slack/out/slack.png", cloud="dark",
         head="hold fn, speak, let go.",
-        text="typed wherever the cursor is. slack, claude, anything with a text box.",
+        text="typed wherever the cursor is - be it slack, claude, anything with a text box.",
     ),
     "claude": dict(
         image="claude/out/claude.png", cloud="white",
