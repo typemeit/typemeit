@@ -33,23 +33,18 @@ slack → Slack, claude → Claude, notes → Notes.
 If the window geometry changes on purpose, re-measure the constants at the top of
 the scene's `generate.py` and its window box in `frame.py`.
 
-## insights
+## insights and settings
 
-The insights scene is the app's own settings window over made-up history, so
-there is nothing to repaint and no need for the user to screenshot. Build the
-dev app, then:
+These are the app's own settings window over made-up history, so there is
+nothing to repaint and no need for the user to screenshot. Build the dev app
+(CLAUDE.md), then:
 
 ```sh
-python3 Scripts/store/insights/seed.py
-TYPEMEIT_SUPPORT_DIR="$PWD/Scripts/store/insights/store" "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev" &
+python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py insights settings
 ```
 
-Wait for the settings window, activate that pid with
-`NSRunningApplication(processIdentifier:).activate` so the capture gets the
-key window's shadow and traffic lights (an inactive window comes out grey with
-a thinner shadow), find its window number with `CGWindowListCopyWindowInfo`
-filtered to the pid and the name `settings`, then
-`screencapture -l <number> -x Scripts/store/insights/base.png` and
-`python3 Scripts/store/frame.py insights`. Quit the app afterwards. Launch the
-binary directly, not with `open`: the env var has to reach the process, and
-`open` may start another worktree's copy.
+`capture.py` seeds `Scripts/store/app/store/`, launches the binary directly
+with `TYPEMEIT_SUPPORT_DIR` (never `open`, which may start another worktree's
+copy and cannot pass the env var), clicks each sidebar tab, brings the app to
+the front so the capture has the key window's shadow, and writes
+`Scripts/store/app/<tab>.png`. Quit any other dev instance first.

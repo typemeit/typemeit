@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lay out one App Store screenshot: a headline over an app window on flat paper.
+"""Lay out one App Store screenshot: one line of copy over an app window on flat paper.
 
     python3 Scripts/store/frame.py slack
 
@@ -19,27 +19,14 @@ OUT = os.path.join(HERE, "out")
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 W, H = 2560, 1600
 
+# One line each, in the listing's voice (fastlane/metadata): lowercase, a
+# fact per frame. The listing name already says "Transcription App", so the
+# frames say what is different, not what it is.
 SCENES = {
-    "slack": dict(
-        image="slack/out/slack.png",
-        lead="Talk instead of typing.",
-        rest="Say it, and it's typed wherever your cursor is.",
-        layout="top",          # headline centred above the window
-        cloud="dark",
-    ),
-    "claude": dict(
-        image="claude/out/claude.png",
-        lead="Speak the prompt.",
-        rest="Hold a key, say it, let go. It lands in the box.",
-        layout="top",
-        cloud="dark",
-    ),
-    "insights": dict(
-        image="insights/base.png",
-        lead="Kept count.",
-        rest="Words, speed and streaks, worked out on your Mac.",
-        layout="top",
-    ),
+    "slack": dict(image="slack/out/slack.png", copy="hold fn, speak, let go.", cloud="dark"),
+    "claude": dict(image="claude/out/claude.png", copy="tidied by apple intelligence. nothing leaves the mac.", cloud="dark"),
+    "insights": dict(image="app/insights.png", copy="three times faster than typing."),
+    "settings": dict(image="app/settings.png", copy="your key, your colour, your corner."),
 }
 
 CSS = """
@@ -48,9 +35,7 @@ CSS = """
 @font-face{font-family:M;src:url(fonts/DMMono-Light.ttf);font-weight:300}
 html,body{margin:0;width:%(w)dpx;height:%(h)dpx;overflow:hidden;background:#f4f4f2}
 body{font-family:M,monospace;color:#0a0a0a;-webkit-font-smoothing:antialiased;position:relative}
-.copy{position:absolute;left:0;right:0;top:118px;text-align:center;font-size:40px;line-height:1.3;letter-spacing:-0.01em;padding:0 240px}
-.copy b{font-weight:500}
-.copy span{color:#4a4a4a;font-weight:300}
+.copy{position:absolute;left:0;right:0;top:118px;text-align:center;font-size:40px;line-height:1.3;letter-spacing:-0.01em;padding:0 240px;font-weight:500}
 .win{position:absolute;overflow:visible}
 .win img{position:absolute;display:block}
 .cloud{position:absolute;pointer-events:none}
@@ -86,7 +71,7 @@ def render(name, s):
                  f'left:{W / 2 - size / 2}px;top:{H - size - 40}px">')
     html = (f'<!doctype html><meta charset=utf-8><base href="file://{HERE}/"><style>'
             f"{CSS % dict(w=W, h=H)}</style>"
-            f'<div class=copy><b>{s["lead"]}</b> <span>{s["rest"]}</span></div>'
+            f'<div class=copy>{s["copy"]}</div>'
             f'<div class=win style="left:{left}px;top:{top}px"><img src="{s["image"]}" style="width:{img_w}px"></div>'
             f"{cloud}")
     page = os.path.join(OUT, f"{name}.html")

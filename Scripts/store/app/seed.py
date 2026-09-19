@@ -2,8 +2,8 @@
 """Write a made-up history.json for a throwaway store, so the dev app launched
 with TYPEMEIT_SUPPORT_DIR pointing there shows it in its Insights tab.
 
-    python3 Scripts/store/insights/seed.py
-    TYPEMEIT_SUPPORT_DIR=Scripts/store/insights/store "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev"
+    python3 Scripts/store/app/seed.py
+    TYPEMEIT_SUPPORT_DIR=Scripts/store/app/store "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev"
 
 The dev app otherwise reads the real history in ~/Library, which this never
 touches. Deterministic: the same numbers come out every
