@@ -7,7 +7,11 @@ import CoreAudio
 /// audio output; pressing it into silence would start playback.
 @MainActor
 enum MediaPause {
-    private static var paused = false
+    /// Two media key presses closer than this read as one gesture to the
+    /// system, and the second is lost.
+    private static let minimumKeyGap: TimeInterval = 1.5
+
+    private static var pressedAt: Date?
 
     private static func global(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
@@ -56,18 +60,21 @@ enum MediaPause {
     }
 
     static func pause() {
-        guard !paused else { return }
+        guard pressedAt == nil else { return }
         let playing = playingProcesses()
-        guard !playing.isEmpty else { DebugLog.write("Pause: nothing playing, key not pressed"); return }
+        guard !playing.isEmpty else { DebugLog.write("Pause: nothing playing"); return }
         DebugLog.write("Pause: play/pause pressed, output running in \(playing.joined(separator: ", "))")
-        paused = true
+        pressedAt = Date()
         pressPlayPause()
     }
 
+    /// Presses again to resume, no sooner than `minimumKeyGap` after the
+    /// pause press.
     static func resume() {
-        guard paused else { return }
-        paused = false
-        DebugLog.write("Pause: play/pause pressed again to resume")
-        pressPlayPause()
+        guard let pressedAt else { return }
+        self.pressedAt = nil
+        let wait = max(0, minimumKeyGap - Date().timeIntervalSince(pressedAt))
+        DebugLog.write("Pause: play/pause pressed again to resume\(wait > 0 ? String(format: ", after %.1f s", wait) : "")")
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { pressPlayPause() }
     }
 }
