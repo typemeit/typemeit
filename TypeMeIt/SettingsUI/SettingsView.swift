@@ -388,7 +388,7 @@ struct MainSettingsTab: View {
                     }
                 }
                 SettingsGroup(title: "cloud") {
-                    SettingsRow(label: "cloud colour") {
+                    SettingsRow(label: "colour") {
                         Toggle("", isOn: $settings.cloudColorEnabled).toggleStyle(.switch).labelsHidden()
                     }
                     if settings.cloudColorEnabled {
@@ -410,7 +410,7 @@ struct MainSettingsTab: View {
                             }
                         }
                     }
-                    SettingsRow(label: "cloud position") {
+                    SettingsRow(label: "position") {
                         Picker("", selection: $settings.cloudPosition) {
                             ForEach(CloudPosition.allCases, id: \.self) { Text($0.label).tag($0) }
                         }.pickerStyle(.segmented).labelsHidden().fixedSize()
