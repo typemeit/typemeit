@@ -81,7 +81,19 @@ final class Settings {
     private let defaults = UserDefaults.standard
 
     var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: "microphoneUID") } }
-    var muteWhileRecording: Bool { didSet { defaults.set(muteWhileRecording, forKey: "muteWhileRecording") } }
+    // Mute and pause are alternatives: switching one on switches the other off.
+    var muteWhileRecording: Bool {
+        didSet {
+            defaults.set(muteWhileRecording, forKey: "muteWhileRecording")
+            if muteWhileRecording, pauseWhileRecording { pauseWhileRecording = false }
+        }
+    }
+    var pauseWhileRecording: Bool {
+        didSet {
+            defaults.set(pauseWhileRecording, forKey: "pauseWhileRecording")
+            if pauseWhileRecording, muteWhileRecording { muteWhileRecording = false }
+        }
+    }
     var audioFeedback: Bool { didSet { defaults.set(audioFeedback, forKey: "audioFeedback") } }
     var copyPromptEnabled: Bool { didSet { defaults.set(copyPromptEnabled, forKey: "copyPromptEnabled") } }
     var postProcessingEnabled: Bool { didSet { defaults.set(postProcessingEnabled, forKey: "postProcessingEnabled") } }
@@ -137,6 +149,7 @@ final class Settings {
         func bool(_ key: String, _ fallback: Bool) -> Bool { d.object(forKey: key) == nil ? fallback : d.bool(forKey: key) }
         microphoneUID = d.string(forKey: "microphoneUID")
         muteWhileRecording = bool("muteWhileRecording", true)
+        pauseWhileRecording = bool("pauseWhileRecording", false)
         audioFeedback = bool("audioFeedback", true)
         copyPromptEnabled = bool("copyPromptEnabled", true)
         postProcessingEnabled = bool("postProcessingEnabled", true)

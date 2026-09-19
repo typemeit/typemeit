@@ -335,8 +335,11 @@ struct MainSettingsTab: View {
                         .labelsHidden().fixedSize()
                         .onAppear { devices = AudioCapture.inputDevices() }
                     }
-                    SettingsRow(label: "mute other audio", last: true) {
+                    SettingsRow(label: "mute other audio") {
                         Toggle("", isOn: $settings.muteWhileRecording).toggleStyle(.switch).labelsHidden()
+                    }
+                    SettingsRow(label: "pause audio", last: true) {
+                        Toggle("", isOn: $settings.pauseWhileRecording).toggleStyle(.switch).labelsHidden()
                     }
                 }
                 SettingsGroup(title: "cloud") {

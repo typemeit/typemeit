@@ -118,6 +118,7 @@ final class Pipeline {
         ReadBack.shared.finishNow()
         shortcuts.setPhase(.recording)
         if settings.muteWhileRecording { OutputMute.mute() }
+        if settings.pauseWhileRecording { MediaPause.pause() }
         do {
             try capture.start(uid: settings.microphoneUID)
         } catch {
@@ -125,6 +126,7 @@ final class Pipeline {
             phase = .idle
             shortcuts.setPhase(.idle)
             OutputMute.restore()
+            MediaPause.resume()
             return
         }
         overlay.show(.arming)
@@ -162,6 +164,7 @@ final class Pipeline {
         shortcuts.setPhase(.idle)
         if wasRecording { capture.cancel() }
         OutputMute.restore()
+        MediaPause.resume()
         Task { Transcriber.shared.cancel() }
         PostProcessor.shared.cancel()
         overlay.hide()
@@ -174,6 +177,7 @@ final class Pipeline {
         let duration = Double(pcm.count) / 16000
         let durationMs = Int(duration * 1000)
         let wasMuted = OutputMute.restore()
+        MediaPause.resume()
         if settings.audioFeedback {
             // The device takes a moment to come back from mute; a cue played
             // in the same instant is lost.
