@@ -3,6 +3,7 @@ import SwiftUI
 struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var whereHeight: CGFloat = 0
+    @State private var appsHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
     /// The streak cell whose day is shown; a click on the box outside the
     /// cells lets it go.
@@ -37,13 +38,17 @@ struct InsightsTab: View {
                     statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                // Both boxes stand as tall as the taller one, so every app
+                // is a whole row with the same room above and below.
                 HStack(alignment: .top, spacing: 12) {
-                    SettingsGroup(title: "where") { categories(s) }
+                    SettingsGroup(title: "where") { categories(s).frame(maxHeight: .infinity, alignment: .top) }
                         .frame(maxWidth: .infinity)
+                        .frame(minHeight: max(whereHeight, appsHeight))
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
-                    SettingsGroup(title: "apps · \(s.totalApps)") { topApps(s) }
+                    SettingsGroup(title: "apps · \(s.totalApps)") { topApps(s).frame(maxHeight: .infinity, alignment: .top) }
                         .frame(width: 240)
-                        .frame(height: whereHeight > 0 ? whereHeight : nil, alignment: .top)
+                        .frame(minHeight: max(whereHeight, appsHeight))
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { appsHeight = $0 }
                 }
                 SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
                     calendar(s)
@@ -221,22 +226,18 @@ struct InsightsTab: View {
     }
 
     private func topApps(_ s: InsightsStats) -> some View {
-        ScrollView(.vertical) {
-            VStack(spacing: 0) {
-                if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).padding(.vertical, 8) }
-                ForEach(s.topApps, id: \.name) { a in
-                    HStack {
-                        Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
-                        Spacer()
-                        Text(counted(a.words, "word")).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                    }
-                    .padding(.vertical, 5)
+        VStack(spacing: 0) {
+            if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).padding(.vertical, 8) }
+            ForEach(s.topApps, id: \.name) { a in
+                HStack {
+                    Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
+                    Spacer()
+                    Text(counted(a.words, "word")).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 }
+                .padding(.vertical, 5)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
         }
-        .scrollIndicators(.never)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
     private static let calendarWeeks = 16
