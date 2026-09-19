@@ -1,1 +1,1 @@
-type me it: Transcription App
+type me it: Transcription

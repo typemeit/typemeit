@@ -16,12 +16,12 @@ key.
 
 ## Not in place
 
-- No app record for `it.typeme.typemeit`, and the bundle id is not
-  registered for macOS. Both are made in App Store Connect (name `type me
-  it: Transcription App`, SKU, primary language English (UK)). The name is
-  only known to be free once the record is created.
-- No Paid Apps agreement. Pricing is set on the record, per storefront;
-  £4.99 is the UK tier nearest £5.
+- The app record exists since 19 September 2026: `type me it:
+  Transcription`, SKU `typemeit`, Apple ID 6813950813, primary language
+  English (U.S.), priced £2.99 in the UK with Apple's equivalents elsewhere.
+  Pricing takes effect only once the Paid Apps agreement is signed, and the
+  updated Developer Program License Agreement has to be accepted by the
+  Account Holder before a new app can be submitted.
 - No build the store accepts. The app ships as a Developer ID DMG with
   Sparkle updates, which the store rejects: a store build needs the App
   Sandbox, `Apple Distribution` signing with a Mac App Store provisioning
@@ -57,8 +57,8 @@ Also different in a store build:
 2. Add a `typemeit` target in `project.yml`: same sources, sandbox
    entitlements, Apple Distribution signing, Sparkle excluded behind a
    build flag.
-3. Create the app record and register the bundle id; sign the Paid Apps
-   agreement; set the price.
+3. Sign the Paid Apps agreement and accept the updated license agreement
+   in App Store Connect.
 4. `fastlane mac listing` for the text and screenshots.
 5. Archive the store target, upload with `deliver` or Transporter, and
    submit for review with notes on the Input Monitoring and Microphone
