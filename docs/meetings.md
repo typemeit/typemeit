@@ -96,10 +96,9 @@ Krisp/Loopback false positive without a list to maintain.
 Register an `AudioObjectAddPropertyListenerBlock` on
 `kAudioHardwarePropertyProcessObjectList`, plus per-process listeners on
 `IsRunning`, `IsRunningInput` and `IsRunningOutput`, reconciling the
-per-process set whenever the list changes. Biscotti does exactly this and
-yields every fire into one stream to re-snapshot from; `meeting-transcriber`
-polls instead, and pays for it with a confirmation count and a cooldown to
-damp the noise.
+per-process set whenever the list changes, and yield every fire into one
+stream to re-snapshot from. Polling the same properties works, but pays for
+itself in confirmation counts and cooldowns to damp the noise.
 
 ### Traps, all found the hard way by others
 
@@ -118,10 +117,10 @@ damp the noise.
   with no call in progress at all. Worth knowing about; not worth leading
   with.
 
-`meeting-transcriber` runs all three channels behind one composite detector:
-first confirmed hit wins, and the meeting stays alive while *any* channel
-still sees it. We lead with mic input, and that structure is where to put a
-second channel if one is ever needed.
+The structure that holds all three is a composite detector: first confirmed
+hit wins, and the meeting stays alive while *any* channel still sees it. We
+lead with mic input, and that is where a second channel would go if one is
+ever needed.
 
 ### The state machine
 
@@ -168,9 +167,6 @@ invisibly, and the prompt is the moment they can say so.
 
 ## Capture
 
-Both reference apps capture the same way we plan to: `CATapDescription` for
-the far end, `AVAudioEngine` for the mic, 16 kHz per track, kept separate.
-
 Two tracks, never mixed for attribution:
 
 | Track | Source | Is |
@@ -188,9 +184,9 @@ makes speaker recognition load-bearing rather than a nicety.
 
 One qualifier: on speakers rather than headphones, the mic picks up the far
 end too. When both tracks are hot, attribute to the far end unless the mic
-clearly leads. Start without an echo canceller — but note that
-`meeting-transcriber` ships both a bleed detector and a canceller, so the
-problem is real enough that someone building this seriously reached for one.
+clearly leads. Bleed is real enough that serious implementations of this ship
+both a detector and a canceller for it — see **Echo** below for how far we go
+and when.
 
 `insidegui/AudioCap` is the reference for the tap itself — Gui Rambo wrote it
 because Apple shipped the API undocumented.
@@ -220,6 +216,36 @@ Estimate for the wait: `multitalker` runs ~207× realtime and the diarizer
 ~111× on an M4 Max, so the combined pass lands near ~70× — under a minute for
 an hour, a few minutes on CPU or an older machine. It needs a progress state
 in the pill, not a silent gap.
+
+## Echo
+
+A call taken on speakers puts the far end back into the mic track. It costs
+us twice: attribution stops being free, and a mixed signal carries the same
+words twice, slightly offset, which is worse for the model than either track
+alone. Headphones and in-person recordings have no echo at all, so this is
+one case of three.
+
+Three steps, cheapest first, and stop as soon as it is good enough:
+
+1. **Do not mix.** We transcribe at the end, and the one-stream-per-model
+   limit only bites on concurrent streams — so run the two tracks through the
+   model one after the other and merge by timestamp. Each track is
+   transcribed alone, the far end is never doubled in one signal, and
+   attribution comes out exact instead of inferred. It costs roughly double
+   the end-of-meeting wait, and it is free of new dependencies. This is
+   better than mixing on every axis but time.
+2. **Voice-processing I/O, meeting sessions only.** macOS will cancel echo on
+   an input node for the asking. It also brings automatic gain control and
+   noise suppression with it, which is why it must never be switched on for
+   the shared dictation path — that would move dictation WER, and dictation
+   is the product. Measure before and after.
+3. **A dedicated AEC model, only if 1 and 2 leave audible bleed.** Small
+   streaming cancellers exist under Apache-2.0 at a few MB, bundled rather
+   than downloaded. By the time we know whether it is warranted we will have
+   real recordings to judge it on.
+
+Whatever we do, quarantine embeddings suspected of bleed before they reach a
+speaker's centroid — see above. That guard is worth having even at step 1.
 
 ## Speakers
 
@@ -257,8 +283,7 @@ Enrol from it once, match against the diarizer's speaker embeddings, and
 embedding answers the browser case, where the meeting app gives us no names
 at all.
 
-`meeting-transcriber` has all of this already, and its shape is worth
-following: per speaker keep a **centroid** (running mean of every confirmed
+The established shape is worth following: per speaker keep a **centroid** (running mean of every confirmed
 embedding) plus a short FIFO of recent samples, match on the smaller cosine
 distance of the two, and accept only past a **0.40 distance threshold** with
 a **0.10 margin** over the runner-up. Fold only quality-filtered samples into
@@ -266,11 +291,11 @@ the centroid — short snippets stay as fallback anchors — and **quarantine
 embeddings suspected of echo bleed**, or a speakerphone will poison a
 participant's print with the user's own voice.
 
-The difference is the enrolment itself. Theirs is a sheet: pick a file,
-diarize it, name the speakers by hand. Ours needs no sheet for the user —
-every kept dictation is already a labelled recording of one known speaker.
-Their flow is still worth building later for *other* people, since naming a
-voice from a past meeting is now the only route to real names.
+The usual enrolment is a sheet: pick a file, diarize it, name the speakers by
+hand. Ours needs no sheet for the user — every kept dictation is already a
+labelled recording of one known speaker. That sheet is still worth building
+later for *other* people, since naming a voice from a past meeting is now the
+only route to real names.
 
 Two things to get right: enrol from recordings the user kept, never from
 audio they asked not to keep; and let them turn it off, since a stored voice
@@ -402,26 +427,12 @@ Read these before writing any of it.
 - [`chrisns/MacWhisperAuto`](https://github.com/chrisns/MacWhisperAuto) — its
   supported-app matrix doubles as a test plan
 
-**The reference implementation**
-
-[`pasrom/meeting-transcriber`](https://github.com/pasrom/meeting-transcriber)
-is phases 2 and 3 already built, in Swift and SwiftUI, under **MIT**:
-`CATapDescription` at 16 kHz per track, dual-track diarization through
-FluidAudio on the ANE, voice embeddings matched across meetings by cosine
-similarity, Markdown on disk. Read it first.
-
-Its weakness is our differentiator: it leads with window-title polling, which
-is why it does not support Slack huddles and would miss a backgrounded Meet
-tab, and its mic-based mode is off by default and records without asking.
-
-**Read but do not copy**
-
-[`scosman/Biscotti`](https://github.com/scosman/Biscotti) is the best product
-reference for the cases we just took on — Slack huddles and in person — and
-is native Swift by an ex-Apple engineer (WhisperKit, Pyannote via SpeakerKit,
-Gemma via llama.cpp). It is licensed **PolyForm Perimeter 1.0.1**, which is
-source-available and forbids use in a competing product. We are one. Ideas
-only.
+**Check the licence before reading, every time.** Several mature projects in
+this space are *source-available* rather than open source, under licences
+that forbid use in a competing product. We are one. Where this plan states a
+technique — the process-object listeners, the tap geometry, the matcher
+thresholds, the echo ladder — it is sourced from Apple's documentation or
+from MIT-licensed code, and it should stay that way.
 
 **Whole products**
 
@@ -462,9 +473,9 @@ is that nobody has better detection than the CoreAudio signal.
   works.
 - A FaceTime call → detected through `avconferenced`, tapped there, and the
   missing window title falls through to a generated one.
-- A voice message longer than a few seconds → no recording. This is the case
-  `meeting-transcriber` documents itself failing, and the far-end
-  confirmation plus the blip filter are what stop it.
+- A voice message longer than a few seconds → no recording. Mic-input
+  detection alone fails this, which is what the far-end confirmation and the
+  blip filter are for.
 
 ## Open
 
