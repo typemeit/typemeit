@@ -39,7 +39,6 @@ SCENES = {
         lead="Kept count.",
         rest="Words, speed and streaks, worked out on your Mac.",
         layout="top",
-        cloud="dark",
     ),
 }
 
