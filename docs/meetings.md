@@ -15,7 +15,9 @@ toolchain in the environment it was written in).
    when a call is encoding video at the same time.
 2. **Meeting recording, with consent.** Something else takes the mic, we ask
    once, and record both sides.
-3. **Speakers.** Who said what, named where the meeting app will tell us.
+3. **In-person meetings.** Started by hand, one track, everyone in the room.
+4. **Speakers.** Who said what, named where the meeting app will tell us and
+   recognised by voice where it will not.
 
 Each phase is useful alone. Phase 2 is where the permission and storage
 questions land, and it is blocked on the one open question at the bottom.
@@ -37,6 +39,26 @@ From `transcribe.cpp` v0.2.3, which the app already pins:
   exposes single-speaker text. Fine for a run at the end; useless live.
 - `MOSS-Transcribe-Diarize` is out: not streaming, and memory grows ~85 MB per
   minute of audio (~5 GB for an hour).
+
+## Two kinds of meeting
+
+A meeting is either a **call** or **in person**, and almost every decision
+below forks on it.
+
+| | Call | In person |
+| --- | --- | --- |
+| Starts | Detected, then we ask | By hand — menu bar or a shortcut |
+| Tracks | Two: mic and far end | One: the mic |
+| "You" | Free and exact, from the track split | Voice print, or nothing |
+| Other speakers | The meeting app's names, else diarization | Diarization only |
+| Title | Window title, else the transcript | The transcript |
+
+There is no signal to detect an in-person meeting, and there should not be:
+auto-recording a room because someone started talking is the one behaviour
+this app must never have. In person is a deliberate act — the menu bar item
+and a shortcut — and the menu bar shows it recording the whole time.
+
+Everything about detection below is about calls.
 
 ## Detection
 
@@ -125,6 +147,10 @@ That split is exact and free. It is also what Granola falls back to when its
 platform hooks are unavailable, labelled "Me" and "Them" — the industry
 default, not a shortcut.
 
+In person there is only the mic track, and with it goes the free "You" —
+everyone in the room, you included, arrives in one mono channel. That is what
+makes speaker recognition load-bearing rather than a nicety.
+
 One qualifier: on speakers rather than headphones, the mic picks up the far
 end too. When both tracks are hot, attribute to the far end unless the mic
 clearly leads. No echo canceller.
@@ -160,6 +186,9 @@ in the pill, not a silent gap.
 
 ## Speakers
 
+Which sources exist depends on the kind of meeting. In person, only the last
+one does — which is why diarization is now required rather than a fallback.
+
 Three sources, best first:
 
 1. **The meeting app's own UI.** Granola reads display names *and the
@@ -175,12 +204,32 @@ Three sources, best first:
 2. **Diarization** for everything else — browsers, in-person, any app whose
    tree we cannot read.
 
-3. **The mic/tap split**, which always gives "You" correctly, and anchors
-   whichever arrival-order ID lines up with the mic track.
+3. **The mic/tap split**, which on a call always gives "You" correctly, and
+   anchors whichever arrival-order ID lines up with the mic track.
+
+### "You", in a room
+
+In person the split is gone, so "You" has to be recognised by voice. The app
+is in an unusual position here: **every dictation ever made is a clean,
+labelled recording of the user speaking alone.** `RecordingArchive` is a
+voice-print enrolment corpus that a notetaker cannot have and does not need
+to ask for.
+
+Enrol from it once, match by cosine similarity against the diarizer's speaker
+embeddings, and "You" is identified in a room the same way it is on a call.
+The same embedding answers the browser case, where the meeting app gives us
+no names at all.
+
+Two things to get right: enrol from recordings the user kept, never from
+audio they asked not to keep; and let them turn it off, since a stored voice
+print is a different kind of data from a transcript.
 
 ### Which diarizer
 
-Undecided, and worth a spike before building.
+In person probably settles this. A meeting room holds more than four people,
+and a four-speaker cap merges the rest into the wrong mouths — which rules
+out the `multitalker` bundle and Sortformer for the case we now have to
+support.
 
 `FluidAudio` (Apache-2.0/MIT models, CoreML) offers Pyannote offline, LS-EEND
 streaming to **10 speakers**, and Sortformer; plus **dual-track** diarization
@@ -188,9 +237,10 @@ of separate mic and system streams, and **speaker embeddings** for identity
 across meetings. It runs on the **ANE, explicitly avoiding GPU/MPS** — which
 answers the objection to diarizing during a call, when the GPU is contended.
 
-Against the `multitalker` bundle it lifts the 4-speaker cap, solves names
-without a calendar, and stays off the GPU. It costs a second model stack:
-CoreML beside the GGUFs, two download and update paths, two runtimes.
+Against the `multitalker` bundle it lifts the 4-speaker cap, gives us the
+voice prints that "You" in a room depends on, and stays off the GPU. It costs
+a second model stack: CoreML beside the GGUFs, two download and update paths,
+two runtimes. For in-person that cost looks unavoidable.
 
 Dictation stays on transcribe.cpp either way.
 
@@ -235,6 +285,7 @@ all work on it unaided.
 
 ```markdown
 ---
+kind: call
 started: 2026-09-19T14:30:12Z
 ended: 2026-09-19T15:04:48Z
 duration_s: 2076
@@ -256,7 +307,10 @@ Morning — shall we start with the deploy?
 ```
 
 `segments` records reconnects, so a dropped call reads as one meeting with a
-gap. `dictations` marks the spans where you were talking to your notes.
+gap. `dictations` marks the spans where you were talking to your notes. An
+in-person meeting carries `kind: in-person`, no `app` or `window_title`
+fields, and its folder is named from the generated title alone —
+`2026-09-19 1430 Roadmap review`.
 
 Talk ratio, length distribution and over-run are all things the Insights code
 already knows how to present.
@@ -296,13 +350,37 @@ Read these before writing any of it.
 - [`chrisns/MacWhisperAuto`](https://github.com/chrisns/MacWhisperAuto) — its
   supported-app matrix doubles as a test plan
 
+**The reference implementation**
+
+[`pasrom/meeting-transcriber`](https://github.com/pasrom/meeting-transcriber)
+is phases 2 and 3 already built, in Swift and SwiftUI, under **MIT**:
+`CATapDescription` at 16 kHz per track, dual-track diarization through
+FluidAudio on the ANE, voice embeddings matched across meetings by cosine
+similarity, Markdown on disk. Read it first.
+
+Its weakness is our differentiator: it leads with window-title polling, which
+is why it does not support Slack huddles and would miss a backgrounded Meet
+tab, and its mic-based mode is off by default and records without asking.
+
+**Read but do not copy**
+
+[`scosman/Biscotti`](https://github.com/scosman/Biscotti) is the best product
+reference for the cases we just took on — Slack huddles and in person — and
+is native Swift by an ex-Apple engineer (WhisperKit, Pyannote via SpeakerKit,
+Gemma via llama.cpp). It is licensed **PolyForm Perimeter 1.0.1**, which is
+source-available and forbids use in a competing product. We are one. Ideas
+only.
+
 **Whole products**
 
 - [`abhi-wan-kenobi/notare`](https://github.com/abhi-wan-kenobi/notare) —
   closest match: local-first notetaker *plus* dictation. A fork of
   [`anarlog`](https://github.com/fastrepl/anarlog), formerly Hyprnote.
-- [`pasrom/meeting-transcriber`](https://github.com/pasrom/meeting-transcriber)
-  — on-device, auto-records Teams/Zoom/Webex, dual-track speakers
+- [`iamchuck504/yapper`](https://github.com/iamchuck504/yapper) — detects
+  which app holds the mic, including Slack, and offers to record in a
+  notification. Our gate and our prompt, already built.
+- [`alejacre/meetscribe`](https://github.com/alejacre/meetscribe) —
+  configurable triggers by bundle ID, Slack included
 - [`Zackriya-Solutions/meetily`](https://github.com/Zackriya-Solutions/meetily)
   — Parakeet plus diarization already shipping
 - [`anshuman-pandey/open-granola`](https://github.com/anshuman-pandey/open-granola)
@@ -326,6 +404,10 @@ is that nobody has better detection than the CoreAudio signal.
 - Dictate mid-meeting → dictation transcribes normally, the meeting transcript
   keeps the far end, and the dictated span is marked.
 - Nothing on the mic → the offline dictation path, unchanged.
+- In person, six people round a table → started by hand, one track, no
+  four-speaker merge, and "You" found by voice print.
+- In person with the voice print off → speakers stay unnamed, everything else
+  works.
 
 ## Open
 
@@ -333,6 +415,7 @@ is that nobody has better detection than the CoreAudio signal.
    stored only — no paste, no clipboard.
 2. **Live speaker labels during the call, or only at the end?** Only-at-the-end
    keeps the diarizer at a cheap operating point.
-3. **FluidAudio or the multitalker bundle.** Spike both.
-4. **More than four speakers** — with LS-EEND the cap is ten, and the question
-   goes away. With the bundle, decide whether to warn.
+3. **FluidAudio or the multitalker bundle.** Spike both, though in person
+   points hard at FluidAudio.
+4. **Voice-print enrolment** — opt in or on by default, and what happens to
+   the print when the user clears their history.
