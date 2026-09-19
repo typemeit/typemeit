@@ -264,11 +264,49 @@ Three sources, best first:
    extension reading the DOM — a whole other shipping surface, and out of
    scope.
 
+   None of this is verified beyond Zoom, and not on a version we have
+   checked. The probe below runs before phase 3 leans on it.
+
 2. **Diarization** for everything else — browsers, in-person, any app whose
    tree we cannot read.
 
 3. **The mic/tap split**, which on a call always gives "You" correctly, and
    anchors whichever arrival-order ID lines up with the mic track.
+
+### The AX probe, before anything is built on it
+
+Source 1 is unproven. It works somewhere, on some version of one app. Nothing
+tells us whether the tree is readable with the participants panel closed,
+whether the active-speaker indicator updates fast enough to segment on, or
+whether any of it survives an app update. Run the inspector against a real
+call on each platform and write the answers down before phase 3 commits to
+this path.
+
+For each app, four questions:
+
+- **Names.** Is the participant list in the tree at all, and does it carry
+  real display names or just row indices?
+- **Panel closed.** Does it still read with the participants panel hidden —
+  the normal state — or does AppKit only build those children when visible?
+  If it needs the panel open, the source is dead for most calls.
+- **Active speaker.** Is there an attribute that changes as people talk, how
+  fast does it settle, and is the latency stable enough to cut segments on?
+- **Churn.** Does it survive joins, leaves, renames, screen share, and
+  gallery vs speaker view?
+
+| App | Expectation | Why it is worth the probe |
+| --- | --- | --- |
+| Zoom | Best odds — native AppKit, and this is the app the technique is known to work against | The most common call |
+| Teams | Poor — Electron, so the tree is whatever the web content exposes | Common enough that "no names on Teams" is a real gap |
+| Slack huddles | Poor, same reason | Asked for explicitly |
+| Webex, Discord | Unknown | Cheap to check once the harness exists |
+| Meet, any browser | Assume no — DOM, not AX, and an extension is out of scope | Rules the source out for the most common case, which is why 2 and 3 have to stand alone |
+
+Ship the probe as a throwaway tool, not app code: a command that attaches to
+the frontmost meeting window, dumps the tree, and polls the candidate
+attribute for thirty seconds so the timing is measured rather than guessed.
+Record the result per app and per app version — an update can take it away,
+so whatever is built on it degrades to diarization rather than breaking.
 
 ### "You", in a room
 
@@ -476,6 +514,11 @@ is that nobody has better detection than the CoreAudio signal.
 - A voice message longer than a few seconds → no recording. Mic-input
   detection alone fails this, which is what the far-end confirmation and the
   blip filter are for.
+- AX probe, per app in the table above → names present, panel-closed answer
+  recorded, active-speaker latency measured. A "no" on any app is a result,
+  not a blocker: that app falls through to diarization.
+- Zoom updates → the probe reruns and the attribution degrades to diarization
+  rather than throwing or mislabelling.
 
 ## Open
 
