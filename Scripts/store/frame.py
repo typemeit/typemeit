@@ -40,7 +40,7 @@ SCENES = {
     ),
     "settings": dict(
         image="app/settings.png",
-        head="your key, your cloud.",
+        head="customise your cloud and config.",
         text="the key to hold, the cloud's colour and corner, sounds on or off.",
     ),
 }
