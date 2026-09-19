@@ -64,9 +64,11 @@ final class Pipeline {
     func start() {
         Feedback.preload()
         if !shortcuts.install() {
-            Log.app.error("Shortcuts not installed; Input Monitoring is missing")
+            Log.app.error("Shortcuts not installed; Accessibility is missing")
         }
         if settings.postProcessingEnabled, settings.screenContextEnabled { Task.detached { await ScreenContext.prewarm() } }
+        // Loading the model takes seconds; done here, the first dictation does not pay for it.
+        if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
     }
 
     var isBusy: Bool { phase != .idle }
@@ -118,6 +120,7 @@ final class Pipeline {
         ReadBack.shared.finishNow()
         shortcuts.setPhase(.recording)
         if settings.muteWhileRecording { OutputMute.mute() }
+        if settings.pauseWhileRecording { MediaPause.pause() }
         do {
             try capture.start(uid: settings.microphoneUID)
         } catch {
@@ -125,6 +128,7 @@ final class Pipeline {
             phase = .idle
             shortcuts.setPhase(.idle)
             OutputMute.restore()
+            MediaPause.resume()
             return
         }
         overlay.show(.arming)
@@ -162,6 +166,7 @@ final class Pipeline {
         shortcuts.setPhase(.idle)
         if wasRecording { capture.cancel() }
         OutputMute.restore()
+        MediaPause.resume()
         Task { Transcriber.shared.cancel() }
         PostProcessor.shared.cancel()
         overlay.hide()
@@ -174,6 +179,7 @@ final class Pipeline {
         let duration = Double(pcm.count) / 16000
         let durationMs = Int(duration * 1000)
         let wasMuted = OutputMute.restore()
+        MediaPause.resume()
         if settings.audioFeedback {
             // The device takes a moment to come back from mute; a cue played
             // in the same instant is lost.
@@ -183,6 +189,7 @@ final class Pipeline {
 
         if duration < Fixed.minimumRecordingSeconds || AudioCapture.peak(pcm) < Fixed.silencePeak {
             Log.app.info("Empty recording discarded (\(duration) s)")
+            DebugLog.write("Dictation discarded: \(durationMs) ms of audio, \(duration < Fixed.minimumRecordingSeconds ? "too short" : "silent")")
             phase = .idle
             shortcuts.setPhase(.idle)
             overlay.hide()
@@ -205,6 +212,7 @@ final class Pipeline {
             } catch {
                 if gen == self.generation {
                     Log.transcriber.error("\(error.localizedDescription)")
+                    DebugLog.write("Dictation discarded: transcription failed (\(error.localizedDescription))")
                     self.finishIdle(discarding: recordingFile)
                 }
                 return
@@ -226,12 +234,15 @@ final class Pipeline {
     }
 
     private static func elapsedMs(since start: ContinuousClock.Instant) -> Int {
-        let d = ContinuousClock.now - start
-        return Int(d.components.seconds * 1000) + Int(d.components.attoseconds / 1_000_000_000_000_000)
+        (ContinuousClock.now - start).milliseconds
     }
 
     private func deliver(raw: Transcriber.Transcript, durationMs: Int, transcribeMs: Int, target: Frontmost.Target?, entryId: UUID, recordingFile: String?, generation gen: Int) async {
-        if ModelText.isBlank(raw.text) { finishIdle(discarding: recordingFile); return }
+        if ModelText.isBlank(raw.text) {
+            DebugLog.write("Dictation discarded: transcript blank after \(durationMs) ms of audio")
+            finishIdle(discarding: recordingFile)
+            return
+        }
         let requested = settings.postProcessingEnabled
         let matched = CustomWordMatcher.apply(raw.matcherWords, terms: store.terms(for: settings.customWords))
         if matched.fixes > 0 { Log.postProcess.info("Custom words replaced \(matched.fixes) run(s)") }
@@ -257,11 +268,16 @@ final class Pipeline {
         finalText = LocalCleanup.run(finalText)
         if requested { finalText = ModelText.stripTrailingFullStop(finalText) }
         // Fillers alone ("um", "uh") clean down to nothing; that is silence, not a dictation.
-        if finalText.isEmpty { finishIdle(discarding: recordingFile); return }
+        if finalText.isEmpty {
+            DebugLog.write("Dictation discarded: clean-up left nothing of \"\(DebugLog.excerpt(raw.text))\"")
+            finishIdle(discarding: recordingFile)
+            return
+        }
 
         if settings.appendTrailingSpace { finalText += " " }
         let focusedIsTextInput = Focus.focusedElementIsTextInput()
-        let pasted = await Output.paste(finalText, autoSubmit: settings.autoSubmit, autoSubmitKey: settings.autoSubmitKey)
+        let paste = await Output.paste(finalText, autoSubmit: settings.autoSubmit, autoSubmitKey: settings.autoSubmitKey)
+        let pasted = paste.posted
         guard gen == generation else { return }
 
         let entry = HistoryEntry(
@@ -277,11 +293,26 @@ final class Pipeline {
             ReadBack.shared.start(pasted: finalText, historyId: entry.id, appId: target?.appId)
         }
 
-        if settings.copyPromptEnabled, !pasted || focusedIsTextInput == false {
-            showCopyPrompt(finalText)
-        } else {
+        let appName = target?.appName ?? "unknown app"
+        let focus = focusedIsTextInput.map { $0 ? "text input" : "not text input" } ?? "unknown"
+        guard settings.copyPromptEnabled else {
+            DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V \(pasted ? "posted" : "not posted") → done")
             overlay.hide()
+            return
         }
+        if !pasted || focusedIsTextInput == false {
+            DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V \(pasted ? "posted" : "not posted") → copy prompt")
+            showCopyPrompt(finalText)
+            return
+        }
+        // The role could not rule the paste out; whether anything reads the
+        // clipboard can. A focused container (Zed's window, Finder's list)
+        // looks the same either way.
+        overlay.hide()
+        let landed = await paste.landed(within: Fixed.pasteLandedWaitMs)
+        guard gen == generation else { return }
+        DebugLog.write("Delivery to \(appName): focus \(focus), Cmd+V posted, clipboard \(landed ? "read → done" : "not read within \(Fixed.pasteLandedWaitMs) ms → copy prompt")")
+        if !landed { showCopyPrompt(finalText) }
     }
 
     private func skipPostProcessing() {

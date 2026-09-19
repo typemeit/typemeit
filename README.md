@@ -16,7 +16,7 @@ DEVELOPMENT_TEAM=Z28DW76Y3W xcodegen generate
 Debug builds are a separate app, `type me it dev` with bundle id
 `it.typeme.typemeit.dev`, signed with the Developer ID certificate. It runs
 beside the installed release with its own settings, and because the signature
-is stable across rebuilds, macOS keeps its Input Monitoring and Microphone
+is stable across rebuilds, macOS keeps its Accessibility and Microphone
 grants: they are asked for once, not after every build. Without that
 certificate in the keychain, drop the `Debug` block under `configs` in
 `project.yml` before generating.
@@ -30,7 +30,7 @@ Dependencies are the transcribe.cpp XCFramework, fetched by SwiftPM from the ups
 
 ## Permissions
 
-Microphone, Accessibility (pasting and reading corrections) and Input Monitoring (the fn key). Grants are keyed to the code signature, so run a Developer ID signed build from `/Applications` or expect to re-grant after each rebuild.
+Microphone, and Accessibility (the fn key, pasting, and reading corrections). Grants are keyed to the code signature, so run a Developer ID signed build from `/Applications` or expect to re-grant after each rebuild.
 
 ## Layout
 

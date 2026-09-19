@@ -7,7 +7,7 @@ struct OnboardingView: View {
     var finished: () -> Void
     var startRunning: () -> Void
 
-    enum Step: Int, CaseIterable { case model, microphone, accessibility, cleanup, fnKey, tryIt }
+    enum Step: Int, CaseIterable { case model, microphone, accessibility, cleanup, globeKey, tryIt }
 
     /// Opens on the first step that is not yet satisfied, so a permission
     /// lost since the last launch (a reinstall, a signature change, a TCC
@@ -16,8 +16,9 @@ struct OnboardingView: View {
     @State private var modelStore = ModelStore.shared
     @State private var micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var axGranted = AXIsProcessTrusted()
-    @State private var listenGranted = CGPreflightListenEventAccess()
     @State private var fnOK = SecureInput.fnKeyDoesNothing
+    /// The one-click fix did not take, so the button opens Keyboard settings.
+    @State private var fnNeedsSettings = false
     @State private var availability = PostProcessor.availability
     @State private var dictated = false
     /// Steps whose grant click did not produce a permission. macOS shows the
@@ -51,10 +52,6 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 StepDots(current: step.rawValue, count: Step.allCases.count)
                 Spacer()
-                if step != .model {
-                    Button("back") { move(to: Step(rawValue: step.rawValue - 1) ?? .model) }
-                        .buttonStyle(InkButtonStyle(quiet: true))
-                }
                 if step == .tryIt, !dictated {
                     Button("skip") { finished() }
                         .buttonStyle(InkButtonStyle(quiet: true))
@@ -80,7 +77,7 @@ struct OnboardingView: View {
         case .model: "speech model"
         case .microphone: "microphone"
         case .accessibility: "accessibility"
-        case .fnKey: "the fn key"
+        case .globeKey: "the 🌐 key"
         case .cleanup: "clean-up"
         case .tryIt: "try it"
         }
@@ -90,8 +87,8 @@ struct OnboardingView: View {
         switch step {
         case .model: "hold the fn key, speak, let go. your words are transcribed on this mac by parakeet, about 700 mb downloaded once, tidied up by apple intelligence, and typed where your cursor is. nothing leaves your computer."
         case .microphone: "type me it needs the microphone."
-        case .accessibility: "lets type me it type into the app you are using and learn when you correct a word."
-        case .fnKey: "input monitoring lets type me it see fn while other apps are in front. macos uses fn for a shortcut of its own, which is turned off in keyboard settings."
+        case .accessibility: "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+        case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
         case .cleanup: "apple intelligence tidies your words on this mac - optional."
         case .tryIt: "hold fn and say something. let go when you are done."
         }
@@ -134,21 +131,29 @@ struct OnboardingView: View {
                 axGranted = AXIsProcessTrustedWithOptions(opts)
                 return true
             }, missing: { !AXIsProcessTrusted() }, settings: SecureInput.accessibilitySettingsURL)
-        case .fnKey:
+        case .globeKey:
             SettingsGroup {
-                permissionRow("input monitoring", granted: listenGranted, grant: {
-                    listenGranted = CGRequestListenEventAccess()
-                    return true
-                }, missing: { !CGPreflightListenEventAccess() }, settings: SecureInput.inputMonitoringSettingsURL, last: false)
-                SettingsRow(label: "press 🌐 key to", subtitle: fnOK ? nil : "set it to “do nothing” to overwrite the macos defaults.", last: true) {
+                SettingsRow(label: "press 🌐 key to", subtitle: fnNeedsSettings && !fnOK ? "keyboard settings, the row below." : nil, last: true) {
                     if fnOK {
                         Status("do nothing", done: true)
-                    } else {
+                    } else if fnNeedsSettings {
                         Button("keyboard settings") { NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
                             .buttonStyle(InkButtonStyle(primary: true))
+                    } else {
+                        Button("set to do nothing") {
+                            fnOK = SecureInput.setFnKeyToDoNothing()
+                            if !fnOK { fnNeedsSettings = true; NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
+                        }
+                        .buttonStyle(InkButtonStyle(primary: true))
                     }
                 }
             }
+            Image("fn-key-setting")
+                .resizable().aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.md))
+                .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
+                .padding(.top, 12)
         case .cleanup:
             SettingsGroup {
                 switch availability {
@@ -240,7 +245,7 @@ struct OnboardingView: View {
         case .model: modelStore.state == .installed
         case .microphone: micGranted
         case .accessibility: axGranted
-        case .fnKey: listenGranted && fnOK
+        case .globeKey: fnOK
         case .cleanup: if case .available = availability { true } else { false }
         case .tryIt: dictated
         }
@@ -272,21 +277,24 @@ struct OnboardingView: View {
 
     /// Every permission the app cannot run without.
     static var permissionsGranted: Bool {
-        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && AXIsProcessTrusted() && CGPreflightListenEventAccess()
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && AXIsProcessTrusted()
     }
 
     private static func firstUnsatisfiedStep() -> Step {
+        // `-onboardingStep globeKey` opens on that step, for looking at one
+        // whose requirement this Mac already meets.
+        if let name = UserDefaults.standard.string(forKey: "onboardingStep"),
+           let step = Step.allCases.first(where: { "\($0)" == name }) { return step }
         guard Settings.shared.onboardingComplete, ModelStore.isInstalled else { return .model }
         if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized { return .microphone }
         if !AXIsProcessTrusted() { return .accessibility }
-        if !CGPreflightListenEventAccess() { return .fnKey }
+        if !SecureInput.fnKeyDoesNothing { return .globeKey }
         return .model
     }
 
     private func refresh() {
         micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         axGranted = AXIsProcessTrusted()
-        listenGranted = CGPreflightListenEventAccess()
         fnOK = SecureInput.fnKeyDoesNothing
         availability = PostProcessor.availability
         if step == .tryIt, let last = store.newest, Date().timeIntervalSince(last.timestamp) < 120 { dictated = true }

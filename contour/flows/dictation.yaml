@@ -1,0 +1,66 @@
+key: flow.dictation
+name: How a dictation happens
+description: |-
+  From holding the hotkey to text at the cursor, then the correction the user makes
+  afterwards, which teaches the app a word and feeds the next dictation. Every step runs on
+  the user's Mac.
+steps:
+  - edge:
+      from: device.macos
+      to: typemeit.audio-capture
+      payload: mic audio
+    note: Only while the hotkey is held. A press shorter than 300 ms is a tap, and cancels.
+  - edge:
+      from: typemeit.audio-capture
+      to: typemeit.transcriber
+      payload: 16 kHz audio
+    note: A take under 0.3 s, or one with nothing but silence in it, is dropped here.
+  - edge:
+      from: typemeit.transcriber
+      to: typemeit.custom-word-matcher
+      payload: raw transcript
+    note: The speech model's own words, each with a score for how sure it was.
+  - edge:
+      from: typemeit.custom-word-matcher
+      to: typemeit.post-processor
+      payload: matched transcript
+    note: Skipped when Apple Intelligence clean-up is off; the text goes straight to step 8.
+    otherwise: 8
+  - edge:
+      from: typemeit.post-processor
+      to: device.macos.apple-intelligence
+      payload: transcript to tidy
+    note: Skipped when the setting is off, or when this Mac has no Apple Intelligence.
+  - edge:
+      from: device.macos.apple-intelligence
+      to: typemeit.post-processor
+      payload: tidied text
+    note: An answer that reads like a rewrite is thrown away here.
+  - edge:
+      from: typemeit.post-processor
+      to: typemeit.local-cleanup
+      payload: cleaned draft
+    note: The tidied text gets the mechanical pass.
+  - edge:
+      from: typemeit.local-cleanup
+      to: device.macos
+      payload: final text
+    note: Pasted at the cursor through the system clipboard, which is then put back.
+  - edge:
+      from: device.macos
+      to: typemeit.read-back
+      payload: field contents
+    note: The field is watched for up to 90 seconds in case the user corrects something.
+  - edge:
+      from: typemeit.read-back
+      to: typemeit.learned-words-json
+      payload: corrected words
+    note: Only names, products, projects, acronyms and technical terms are kept.
+  - edge:
+      from: typemeit.learned-words-json
+      to: typemeit.custom-word-matcher
+      payload: learned terms
+    note: Returns to step 4. A spelling the speech model misheard once is restored on the next dictation.
+provenance:
+  source: human
+  author: max
