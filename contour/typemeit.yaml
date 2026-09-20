@@ -273,7 +273,6 @@ nodes:
     subtype: key-value
     meta:
       engine: UserDefaults, macOS's own preference store
-      keys: microphoneUID, customWords, postProcessingEnabled, learnFromCorrections, keepRecordings, historyLimit, autoUpdate, askBeforeUpdating, undoneWords, screenContextEnabled, and 16 more
     sample: |-
       {
         "customWords": ["Parakey", "Zentryx", "Priya"],
@@ -340,6 +339,73 @@ nodes:
                 if debugLogs { DebugLog.writeHeader() }
             }
         }
+      fields:
+        - name: microphoneUID
+          type: String?
+          note: The microphone to open; nil is the system default.
+        - name: muteWhileRecording
+          type: Bool
+        - name: audioFeedback
+          type: Bool
+        - name: copyPromptEnabled
+          type: Bool
+        - name: postProcessingEnabled
+          type: Bool
+          note: Apple Intelligence clean-up on or off.
+        - name: customWords
+          type: "[String]"
+          note: Names and terms the matcher restores.
+        - name: learnFromCorrections
+          type: Bool
+        - name: appendTrailingSpace
+          type: Bool
+        - name: autoSubmit
+          type: Bool
+        - name: autoSubmitKey
+          type: AutoSubmitKey
+          note: The key pressed after the paste when autoSubmit is on.
+        - name: historyLimit
+          type: Int
+          note: How many dictations history keeps.
+        - name: keepRecordings
+          type: Bool
+          note: Keeps each dictation's audio next to its history entry.
+        - name: autoUpdate
+          type: Bool
+          note: Checks for, downloads and installs updates on its own; off, only from Settings.
+        - name: askBeforeUpdating
+          type: Bool
+          note: With autoUpdate on, a ready update waits for a click instead of restarting.
+        - name: launchAtLogin
+          type: Bool
+        - name: showDockIcon
+          type: Bool
+        - name: appearance
+          type: Appearance
+        - name: cloudColorEnabled
+          type: Bool
+          note: Off, the cloud is white or dark grey with the appearance.
+        - name: cloudColor
+          type: CloudColor
+        - name: cloudPosition
+          type: CloudPosition
+        - name: cloudMatchesBackdrop
+          type: Bool
+          note: The cloud goes white or dark against the screen under it; needs Screen Recording.
+        - name: screenContextEnabled
+          type: Bool
+          note: The clean-up model is told the names visible in the window; needs Screen Recording.
+        - name: onboardingComplete
+          type: Bool
+        - name: copyLastShortcut
+          type: KeyCombo?
+          note: Copies the newest transcript to the clipboard; nil is no shortcut.
+        - name: undoneWords
+          type: "[String]"
+          note: Words removed by the learned-words toast's Undo, never learned again.
+        - name: debugLogs
+          type: Bool
+          note: Writes what each dictation and paste did to the debug log, for bug reports.
     description: |-
       Everything chosen in the settings window, stored by macOS in UserDefaults and
       written the moment it changes.
