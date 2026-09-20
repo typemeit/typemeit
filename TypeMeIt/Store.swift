@@ -10,6 +10,10 @@ struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
     /// Apple Intelligence output; nil when off, skipped, rejected or failed.
     var postProcessed: String?
     var postProcessRequested: Bool
+    /// What was typed into the app: the transcript, or Apple Intelligence's
+    /// output, after the local clean-up and the writing styles. nil on
+    /// entries from before it was kept, which showed `postProcessed`.
+    var typed: String?
     var edited: String?
     var editedAt: Date?
     var durationMs: Int?
@@ -24,7 +28,7 @@ struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
     /// File name in `RecordingArchive.directory`; nil when audio was not kept.
     var recordingFile: String?
 
-    var displayText: String { edited ?? postProcessed ?? transcript }
+    var displayText: String { edited ?? typed ?? postProcessed ?? transcript }
 }
 
 struct LearnedWord: Codable, Identifiable, Sendable, Equatable {

@@ -275,6 +275,7 @@ final class Pipeline {
             return
         }
 
+        let typed = finalText
         if settings.appendTrailingSpace { finalText += " " }
         let focusedIsTextInput = Focus.focusedElementIsTextInput()
         let paste = await Output.paste(finalText, autoSubmit: settings.autoSubmit, autoSubmitKey: settings.autoSubmitKey)
@@ -282,7 +283,7 @@ final class Pipeline {
         guard gen == generation else { return }
 
         let entry = HistoryEntry(
-            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested,
+            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested, typed: typed,
             durationMs: durationMs, transcribeMs: transcribeMs, postProcessMs: postProcessMs, appId: target?.appId, appName: target?.appName, windowTitle: target?.windowTitle,
             dictionaryFixes: matched.fixes, recordingFile: recordingFile)
         store.append(entry, limit: settings.historyLimit)

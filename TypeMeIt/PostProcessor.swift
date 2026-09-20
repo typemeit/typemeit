@@ -157,14 +157,20 @@ actor PostProcessor {
     /// be added but never taken away. A corrected first word still counts when
     /// it keeps the first letter and is within two edits ("their" → "they're").
     /// Filler sounds are deleted on instruction, so a transcript that opens
-    /// with one is judged from its first real word.
+    /// with one is judged from its first real word. An opening number the
+    /// model wrote as digits ("one hundred and thirty four" → "134") is the
+    /// same opening, so the transcript is also judged with its numbers as
+    /// digits.
     static let fillers: Set<String> = ["um", "umm", "uh", "uhh", "er", "erm", "ah"]
 
     static func lostOpening(transcript: String, output: String) -> Bool {
-        let first = transcript.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).first { !fillers.contains($0) }
-        guard let first else { return false }
+        func firstWord(_ s: String) -> String? {
+            s.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).first { !fillers.contains($0) }
+        }
+        guard let first = firstWord(transcript) else { return false }
+        let firsts = [first, firstWord(Digits.apply(transcript))].compactMap { $0 }
         let outWords = output.lowercased().split { !$0.isLetter && !$0.isNumber }.prefix(2).map(String.init)
-        return !outWords.contains { $0 == first || ($0.first == first.first && ModelText.levenshtein($0, first) <= 2) }
+        return !outWords.contains { o in firsts.contains { f in o == f || (o.first == f.first && ModelText.levenshtein(o, f) <= 2) } }
     }
 
     // MARK: Rewrite guard

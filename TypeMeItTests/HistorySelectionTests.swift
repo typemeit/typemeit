@@ -65,3 +65,20 @@ final class HistorySelectionTests: XCTestCase {
         XCTAssertEqual(out, [rows[3]])
     }
 }
+
+final class HistoryEntryDisplayTests: XCTestCase {
+    private func entry(postProcessed: String?, typed: String?) -> HistoryEntry {
+        HistoryEntry(timestamp: Date(), transcript: "a hundred and thirty four", postProcessed: postProcessed, postProcessRequested: true, typed: typed, dictionaryFixes: 0)
+    }
+
+    func testDisplayTextIsWhatWasTyped() {
+        // The model fell back but the digits style still ran: the row shows the digits, not the words.
+        XCTAssertEqual(entry(postProcessed: nil, typed: "134.").displayText, "134.")
+        XCTAssertEqual(entry(postProcessed: "One hundred and thirty four.", typed: "134.").displayText, "134.")
+    }
+
+    func testEntriesFromBeforeTypedWasKeptShowTheModelOutput() {
+        XCTAssertEqual(entry(postProcessed: "One hundred and thirty four.", typed: nil).displayText, "One hundred and thirty four.")
+        XCTAssertEqual(entry(postProcessed: nil, typed: nil).displayText, "a hundred and thirty four")
+    }
+}

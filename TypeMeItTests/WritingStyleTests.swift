@@ -11,6 +11,8 @@ final class WritingStyleTests: XCTestCase {
         XCTAssertEqual(WritingStyle.digits("twenty five people"), "25 people")
         XCTAssertEqual(WritingStyle.digits("Twenty-five people"), "25 people")
         XCTAssertEqual(WritingStyle.digits("one hundred and twenty pounds"), "120 pounds")
+        XCTAssertEqual(WritingStyle.digits("One hundred and thirty four."), "134.")
+        XCTAssertEqual(WritingStyle.digits("a hundred and thirty four."), "134.")
         XCTAssertEqual(WritingStyle.digits("two thousand and six"), "2006")
         XCTAssertEqual(WritingStyle.digits("three million"), "3000000")
         XCTAssertEqual(WritingStyle.digits("call one two three"), "call 1 2 3")
