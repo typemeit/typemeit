@@ -15,6 +15,13 @@ final class PostProcessorTests: XCTestCase {
         XCTAssertFalse(PostProcessor.lostOpening(transcript: "were meeting at there house", output: "We're meeting at their house."))
     }
 
+    func testLostOpeningAllowsTheOpeningNumberAsDigits() {
+        XCTAssertFalse(PostProcessor.lostOpening(transcript: "One hundred and thirty four", output: "134."))
+        XCTAssertFalse(PostProcessor.lostOpening(transcript: "a hundred and thirty four", output: "134."))
+        XCTAssertFalse(PostProcessor.lostOpening(transcript: "twenty five percent of them left", output: "25% of them left."))
+        XCTAssertTrue(PostProcessor.lostOpening(transcript: "twenty five people came", output: "People came."))
+    }
+
     func testJoinSpelledLettersMakesAcronyms() {
         XCTAssertEqual(ModelText.joinSpelledLetters("lottie h q signed with anthropic"), "lottie HQ signed with anthropic")
         XCTAssertEqual(ModelText.joinSpelledLetters("send it as a p d f to the c e o"), "send it as a PDF to the CEO")
