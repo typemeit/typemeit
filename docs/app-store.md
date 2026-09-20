@@ -45,7 +45,7 @@ and profile from the repo secrets (`APPLE_DISTRIBUTION_CERT_*`,
 `MAC_INSTALLER_CERT_*`, `MAC_APP_STORE_PROFILE`), uploads it, renders the
 screenshots with `Scripts/store/build.py`, puts the listing on the version
 named by the tag with `fastlane mac listing version:X`, and submits it with
-`fastlane mac submit version:X build:N`, N being the commit count. The
+`fastlane mac submit version:X build:N`, N being the minute of the run. The
 release is manual: once approved, the version is released by hand in App
 Store Connect, so the store and the DMG can go out together.
 

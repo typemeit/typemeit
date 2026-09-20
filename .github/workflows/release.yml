@@ -74,8 +74,9 @@ jobs:
   # App Store Connect, the listing text and screenshots put on the version,
   # and the version submitted for review. Approval does not release it: the
   # store version is released by hand in App Store Connect, so the DMG and
-  # the store can go out on the same day. The build number is the tag's
-  # commit count so it always moves forward.
+  # the store can go out on the same day. The build number is the minute
+  # of the run, so it outranks every earlier upload; the store refuses a
+  # bundle version lower than one it already has.
   release-store:
     runs-on: macos-26
     environment: production
@@ -87,12 +88,10 @@ jobs:
       LC_ALL: en_US.UTF-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0 # the build number is the commit count
       - run: brew install xcodegen fastlane
       - run: |
           echo "MARKETING_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$(date +%Y%m%d%H%M)" >> "$GITHUB_ENV"
       - name: Import App Store signing assets
         env:
           APPLE_DISTRIBUTION_CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERT_P12 }}
