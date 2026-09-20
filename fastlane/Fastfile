@@ -6,10 +6,15 @@
 # Needs an App Store Connect API key: ASC_KEY_ID, ASC_ISSUER_ID and
 # ASC_KEY_PATH, the same three release-dmg.sh uses.
 
+require "tmpdir"
+require "fileutils"
+
 default_platform(:mac)
 
 BUNDLE_ID = "it.typeme.typemeit"
 SCREENSHOTS = File.expand_path("../Scripts/store/out", __dir__)
+# The order the store shows them in.
+ORDER = %w[slack claude history insights settings]
 
 def api_key
   app_store_connect_api_key(
@@ -38,13 +43,24 @@ platform :mac do
         in App Store Connect"
   lane :listing do |options|
     api_key
-    screenshots = Dir[File.join(SCREENSHOTS, "*.png")]
+    screenshots = Dir[File.join(SCREENSHOTS, "*.png")].sort
     UI.user_error!("no screenshots in #{SCREENSHOTS}; run python3 Scripts/store/build.py") if screenshots.empty?
+    # deliver reads screenshots from a locale folder, and orders them by file
+    # name; the frames are staged as 1_slack.png ... so the store shows them
+    # in the order below.
+    staged = Dir.mktmpdir("store-screenshots")
+    locale = File.join(staged, "en-US")
+    FileUtils.mkdir_p(locale)
+    ORDER.each_with_index do |name, i|
+      file = File.join(SCREENSHOTS, "#{name}.png")
+      UI.user_error!("missing #{file}") unless File.exist?(file)
+      FileUtils.cp(file, File.join(locale, "#{i + 1}_#{name}.png"))
+    end
     deliver(
       app_identifier: BUNDLE_ID,
       platform: "osx",
       metadata_path: "./fastlane/metadata",
-      screenshots_path: SCREENSHOTS,
+      screenshots_path: staged,
       overwrite_screenshots: true,
       skip_binary_upload: true,
       skip_metadata: options[:metadata] == false,
