@@ -161,75 +161,6 @@ actor Transcriber {
         return words
     }
 
-    // MARK: Streaming
-
-    /// A dictation transcribed while it is spoken. The library buffers the
-    /// audio into `[left | chunk | right]` windows itself, so `feed` takes
-    /// whatever the tap produced; the encoder runs per window instead of
-    /// once over the whole recording at the end.
-    ///
-    /// Only the final transcript is read. Nothing shows partial text yet, so
-    /// the committed/tentative views go unused and the finished stream is
-    /// read through the same accessors as an offline run.
-    ///
-    /// Every call can fail, and none of them is worth losing a dictation
-    /// over: the caller keeps the audio and falls back to `transcribeScored`.
-    func beginStream() throws {
-        unloadTask?.cancel()
-        try ensureLoaded()
-        abortFlag.set(false)
-        var rp = transcribe_run_params()
-        transcribe_run_params_init(&rp)
-        var sp = transcribe_stream_params()
-        transcribe_stream_params_init(&sp)
-        // Left/chunk/right context stays at the model's default 5.6 / 1.04 /
-        // 1.04 s, which is both its most accurate tuple and its cheapest:
-        // a shorter chunk only buys lookahead latency, and nothing here is
-        // waiting on the text before the key comes up.
-        do {
-            try Transcriber.check(transcribe_stream_begin(session, &rp, &sp))
-        } catch {
-            scheduleUnload()
-            throw error
-        }
-        Log.transcriber.info("Streaming started")
-    }
-
-    /// pcm: mono Float32 at 16 kHz, in the order it was recorded.
-    func feedStream(_ pcm: [Float]) throws {
-        guard !pcm.isEmpty else { return }
-        do {
-            try Transcriber.check(pcm.withUnsafeBufferPointer {
-                transcribe_stream_feed(session, $0.baseAddress, Int32(pcm.count), nil)
-            })
-        } catch {
-            endStream()
-            throw error
-        }
-    }
-
-    func finishStream() throws -> Transcript {
-        let started = ContinuousClock.now
-        do {
-            try Transcriber.check(transcribe_stream_finalize(session, nil))
-        } catch {
-            endStream()
-            throw error
-        }
-        defer { scheduleUnload() }
-        let text = String(cString: transcribe_full_text(session))
-        Log.transcriber.info("Stream finalized in \(ContinuousClock.now - started)")
-        return Transcript(text: text, words: Transcriber.words(of: session))
-    }
-
-    /// Drops the stream and returns the session to idle, so the next offline
-    /// run is not refused for a stream that is still active.
-    func endStream() {
-        guard session != nil else { return }
-        transcribe_stream_reset(session)
-        scheduleUnload()
-    }
-
     nonisolated func cancel() { abortFlag.set(true) }
 
     private func scheduleUnload() {
@@ -243,9 +174,6 @@ actor Transcriber {
 
     func unload() {
         guard session != nil || model != nil else { return }
-        // A dictation longer than the idle window is still a dictation: an
-        // active stream holds the session it is being fed into.
-        guard transcribe_stream_get_state(session) != TRANSCRIBE_STREAM_ACTIVE else { return }
         transcribe_session_free(session)
         transcribe_model_free(model)
         session = nil
