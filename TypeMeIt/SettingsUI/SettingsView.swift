@@ -448,11 +448,13 @@ struct MainSettingsTab: View {
                     SettingsRow(label: "open at login") {
                         Toggle("", isOn: Binding(get: { settings.launchAtLogin }, set: { settings.launchAtLogin = $0; AppDelegate.shared?.reconcileLaunchAtLogin() })).toggleStyle(.switch).labelsHidden()
                     }
-                    SettingsRow(label: "auto update", subtitle: "off, the version row still offers updates") {
-                        Toggle("", isOn: Binding(get: { settings.autoUpdate }, set: { settings.autoUpdate = $0; Updates.shared.preferencesChanged() })).toggleStyle(.switch).labelsHidden()
-                            .disabled(Updates.isDevBuild)
+                    if Sandbox.updatesItself {
+                        SettingsRow(label: "auto update", subtitle: "off, the version row still offers updates") {
+                            Toggle("", isOn: Binding(get: { settings.autoUpdate }, set: { settings.autoUpdate = $0; Updates.shared.preferencesChanged() })).toggleStyle(.switch).labelsHidden()
+                                .disabled(Updates.isDevBuild)
+                        }
                     }
-                    if settings.autoUpdate {
+                    if Sandbox.updatesItself, settings.autoUpdate {
                         SettingsRow(label: "ask before updating", subtitle: "restarts itself when idle when turned off") {
                             Toggle("", isOn: Binding(get: { settings.askBeforeUpdating }, set: { settings.askBeforeUpdating = $0; Updates.shared.preferencesChanged() })).toggleStyle(.switch).labelsHidden()
                                 .disabled(Updates.isDevBuild)
@@ -508,6 +510,8 @@ struct MainSettingsTab: View {
     private var updateStatus: some View {
         if Updates.isDevBuild {
             statusText("dev build · never updates")
+        } else if !Sandbox.updatesItself {
+            statusText("updated by the app store")
         } else {
             switch updates.state {
             case .checking: statusText("checking…")

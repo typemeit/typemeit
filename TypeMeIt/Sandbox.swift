@@ -12,4 +12,8 @@ enum Sandbox {
     /// paste, the read-back that learns from corrections, window titles in
     /// history and the insights built on them.
     static var readsOtherApps: Bool { !isActive }
+
+    /// The build is the App Store's: it links no Sparkle, so the update rows
+    /// and the version row's install button have nothing to drive.
+    static var updatesItself: Bool { !isActive }
 }

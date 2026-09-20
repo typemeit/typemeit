@@ -45,6 +45,9 @@ targets:
           - "Resources/AppIcon.icns"
           - "Resources/AppIcon-Dev.icns"
           - "Support/Icon/**"
+          # The store target's; left in, they would be copied as resources.
+          - "Support/Info-Store.plist"
+          - "Support/TypeMeIt-Store.entitlements"
       - path: TypeMeIt/Resources/AppIcon.icns
         buildPhase: resources
       - path: TypeMeIt/Resources/AppIcon-Dev.icns
@@ -92,6 +95,58 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.dev
           PRODUCT_NAME: type me it dev
           APP_ICON_FILE: AppIcon-Dev
+  # The Mac App Store build: the same sources in the App Sandbox, signed for
+  # distribution through the store, with no Sparkle (the store updates it).
+  # Sandboxed, the app hides what the sandbox takes away (Sandbox.swift).
+  typemeit:
+    type: application
+    platform: macOS
+    sources:
+      - path: TypeMeIt
+        excludes:
+          - "Resources/AppIcon.icns"
+          - "Resources/AppIcon-Dev.icns"
+          - "Support/Icon/**"
+          # The DMG target's; left in, they would be copied as resources.
+          - "Support/Info.plist"
+          - "Support/TypeMeIt.entitlements"
+      - path: TypeMeIt/Resources/AppIcon.icns
+        buildPhase: resources
+    dependencies:
+      - package: TranscribeCpp
+        product: TranscribeCpp
+    info:
+      path: TypeMeIt/Support/Info-Store.plist
+      properties:
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleIconFile: AppIcon
+        LSMinimumSystemVersion: "26.0"
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+        # No encryption of its own, so no export compliance step per build.
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: TypeMeIt/Support/TypeMeIt-Store.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.device.audio-input: true
+        # The speech model is downloaded from a GitHub release on first run.
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
+        PRODUCT_NAME: type me it
+        PRODUCT_MODULE_NAME: TypeMeIt
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+        OTHER_LDFLAGS: "-lc++ -lz"
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        PROVISIONING_PROFILE_SPECIFIER: "it.typeme.typemeit AppStore"
   TypeMeItTests:
     type: bundle.unit-test
     platform: macOS
@@ -108,6 +163,12 @@ targets:
           TEST_HOST: "$(BUILT_PRODUCTS_DIR)/type me it dev.app/Contents/MacOS/type me it dev"
           BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
+  typemeit:
+    build:
+      targets:
+        typemeit: all
+    archive:
+      config: Release
   TypeMeIt:
     build:
       targets:
