@@ -277,6 +277,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarClick.install()
         observePipeline()
         previewToastIfAsked()
+        MeetingProbes.runIfAsked()
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let owner = SecureInput.owner

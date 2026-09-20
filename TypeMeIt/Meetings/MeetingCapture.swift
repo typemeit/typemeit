@@ -39,7 +39,6 @@ final class MeetingCapture: @unchecked Sendable {
     private var drainTimer: DispatchSourceTimer?
     private var producer: Producer?
     private var stopped = false
-    private var rebuildAttempts = 0
     private var listeners: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
     /// Host time of the very first IO proc callback: frame 0 of every track.
     private(set) var firstHostTime: UInt64 = 0
@@ -116,7 +115,7 @@ final class MeetingCapture: @unchecked Sendable {
         guard status == noErr else { throw CaptureError.status(what, status) }
     }
 
-    static func property<T>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, _ zero: T) -> T? {
+    static func property<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, _ zero: T) -> T? {
         var address = address(selector, scope: scope)
         var value = zero
         var size = UInt32(MemoryLayout<T>.size)
@@ -124,8 +123,7 @@ final class MeetingCapture: @unchecked Sendable {
     }
 
     static func string(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String? {
-        let value: CFString? = property(object, selector, "" as CFString)
-        return value as String?
+        AudioProcesses.string(object, selector)
     }
 
     static func defaultDevice(input: Bool) -> AudioDeviceID? {
@@ -209,8 +207,8 @@ final class MeetingCapture: @unchecked Sendable {
             kAudioAggregateDeviceMainSubDeviceKey: mainUID,
             kAudioAggregateDeviceSubDeviceListKey: subDevices,
         ]
-        if tapID != 0, let uuid = MeetingCapture.property(tapID, kAudioTapPropertyUID, "" as CFString) {
-            composition[kAudioAggregateDeviceTapListKey] = [[kAudioSubTapUIDKey: uuid as String, kAudioSubTapDriftCompensationKey: 1]]
+        if tapID != 0, let uuid = MeetingCapture.string(tapID, kAudioTapPropertyUID) {
+            composition[kAudioAggregateDeviceTapListKey] = [[kAudioSubTapUIDKey: uuid, kAudioSubTapDriftCompensationKey: 1]]
         }
         var aggregateID: AudioObjectID = 0
         do {
@@ -266,8 +264,6 @@ final class MeetingCapture: @unchecked Sendable {
     private static func consume(_ p: Producer, _ inputData: UnsafePointer<AudioBufferList>, _ inputTime: UnsafePointer<AudioTimeStamp>) {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
         let time = inputTime.pointee
-        if p.callbacks == 0 { p.firstHostTime.store(time.mHostTime, ordering: .releasing) }
-        p.callbacks += 1
         var frames = 0
         if let index = p.micBuffers.first, index < buffers.count {
             frames = write(buffers[index], into: p.micRing)
@@ -278,10 +274,17 @@ final class MeetingCapture: @unchecked Sendable {
             if tapFrames > frames { p.micRing.writeZeros(count: tapFrames - frames); frames = tapFrames }
             else if frames > tapFrames { ring.writeZeros(count: frames - tapFrames) }
         }
-        if p.expectedSampleTime >= 0, time.mSampleTime > p.expectedSampleTime + 1 {
-            p.pendingGapFrames.add(Int(time.mSampleTime - p.expectedSampleTime), ordering: .relaxed)
+        // The clock is followed from the first callback that carries audio;
+        // the device's opening callbacks can be empty and its sample time
+        // settles with them.
+        if frames > 0 {
+            if p.callbacks == 0 { p.firstHostTime.store(time.mHostTime, ordering: .releasing) }
+            p.callbacks += 1
+            if p.expectedSampleTime >= 0, time.mSampleTime > p.expectedSampleTime + 1 {
+                p.pendingGapFrames.add(Int(time.mSampleTime - p.expectedSampleTime), ordering: .relaxed)
+            }
+            p.expectedSampleTime = time.mSampleTime + Double(frames)
         }
-        p.expectedSampleTime = time.mSampleTime + Double(frames)
         p.lastHostTime.store(time.mHostTime + UInt64(Double(frames) / p.rate * MeetingCapture.hostTicksPerSecond), ordering: .releasing)
     }
 

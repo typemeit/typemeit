@@ -6,8 +6,11 @@ notice a call, ask once, record both sides, transcribe when it ends, and keep
 the result in a Meetings tab. A meeting in a room is the same thing started by
 hand.
 
-Nothing here is built. The streaming-dictation commit on this branch is not
-part of the plan; see section 15.
+Phase 1 is built (section 7, plus the room's menu item and shortcut from
+8.1) with the probes of section 6 behind launch arguments on the dev app.
+Spikes S1 and S2 have not been run against a real huddle or Meet call;
+their pass/fail lines are still to be filled in. The streaming-dictation
+commit that was once on this branch is not part of the plan; see section 15.
 
 ## Contents
 

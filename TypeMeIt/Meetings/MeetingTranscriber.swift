@@ -77,19 +77,20 @@ enum MeetingTranscriber {
                 let id = meeting.speakers[i].id
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
             }
-            meeting.transcription.state = .done
-            meeting.transcription.asr = ModelStore.fileName
-            meeting.transcription.tookMs = (ContinuousClock.now - began).milliseconds
+            meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
-            DebugLog.write("Meeting transcribed: \(counted(meeting.paragraphs.count, "paragraph")) in \(meeting.transcription.tookMs ?? 0) ms, echo \(meeting.echo.rawValue)")
-
             if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
                 meeting.title = title
                 meeting.titleSource = .generated
             }
             meeting = await transcode(meeting, in: folder)
+            // Done last: the store publishes any done meeting it sees, and the
+            // folder must not move while the transcode is still writing into it.
+            meeting.transcription.state = .done
+            meeting.transcription.tookMs = (ContinuousClock.now - began).milliseconds
             await save(meeting)
+            DebugLog.write("Meeting transcribed: \(counted(meeting.paragraphs.count, "paragraph")) in \(meeting.transcription.tookMs ?? 0) ms, echo \(meeting.echo.rawValue)")
         } catch Failure.cancelled {
             meeting.transcription.state = .pending
             await save(meeting)
@@ -244,7 +245,7 @@ enum MeetingTranscriber {
         guard !words.isEmpty else { return nil }
         let session = LanguageModelSession(instructions: "You title meeting transcripts. The user message is the start of one transcript. Answer with a title of three to five words naming what the meeting was about. No quotes, no trailing punctuation.")
         do {
-            let response = try await session.respond(to: "<transcript>\n\(words)\n</transcript>", generating: MeetingTitle.self, options: GenerationOptions(sampling: .greedy))
+            let response = try await session.respond(to: "<transcript>\n\(words)\n</transcript>", generating: MeetingTitle.self, options: GenerationOptions(samplingMode: .greedy))
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
             return title.isEmpty ? nil : title
         } catch {

@@ -24,11 +24,20 @@ enum AudioProcesses {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
-    private static func property<T>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ zero: T) -> T? {
+    private static func property<T: BitwiseCopyable>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ zero: T) -> T? {
         var address = global(selector)
         var value = zero
         var size = UInt32(MemoryLayout<T>.size)
         return AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr ? value : nil
+    }
+
+    /// A CFString property; CoreAudio hands it over retained.
+    static func string(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String? {
+        var address = global(selector)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
+        return value.takeRetainedValue() as String
     }
 
     static func objectIDs() -> [AudioObjectID] {
@@ -42,10 +51,10 @@ enum AudioProcesses {
 
     static func info(of object: AudioObjectID) -> AudioProcessInfo? {
         guard let pid = property(object, kAudioProcessPropertyPID, pid_t(0)) else { return nil }
-        let bundle: CFString? = property(object, kAudioProcessPropertyBundleID, "" as CFString)
-        let bundleID = (bundle as String?).flatMap { $0.isEmpty ? nil : $0 }
+        let bundleID = string(object, kAudioProcessPropertyBundleID).flatMap { $0.isEmpty ? nil : $0 }
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-        let path = proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 ? String(cString: buffer) : nil
+        let length = Int(proc_pidpath(pid, &buffer, UInt32(buffer.count)))
+        let path = length > 0 ? String(decoding: buffer[..<length].map { UInt8(bitPattern: $0) }, as: UTF8.self) : nil
         return AudioProcessInfo(
             objectID: object, pid: pid, bundleID: bundleID, path: path,
             input: property(object, kAudioProcessPropertyIsRunningInput, UInt32(0)) != 0,

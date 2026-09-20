@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// The meetings page (docs/meetings.md 7.11): the list by day, with what
@@ -231,7 +232,7 @@ struct MeetingsTab: View {
             }
             ForEach(Array(m.paragraphs.enumerated()), id: \.offset) { _, p in
                 VStack(alignment: .leading, spacing: 2) {
-                    (Text(m.speakerName(p.speaker)).bold() + Text(" · \(TranscriptRender.timestamp(ms: p.startMs))"))
+                    Text("\(Text(m.speakerName(p.speaker)).bold()) · \(TranscriptRender.timestamp(ms: p.startMs))")
                         .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
                     Text(p.text).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).textSelection(.enabled)
                 }

@@ -405,7 +405,8 @@ final class MeetingCoordinator {
         transcribeTask = nil
         switch meeting.transcription.state {
         case .done:
-            if store.publish(meeting.id) {
+            // The tick may have published it between the run's last save and here.
+            if store.meeting(meeting.id)?.published == true || store.publish(meeting.id) {
                 if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
             } else {
                 toast(.meetingFolderUnavailable)

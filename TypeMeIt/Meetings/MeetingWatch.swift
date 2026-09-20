@@ -40,7 +40,9 @@ final class MeetingWatch {
         listener = AudioProcesses.Listener(queue: queue) { [weak self] why in self?.snapshot(why: why) }
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + .seconds(Fixed.meetingWatchPollSeconds), repeating: .seconds(Fixed.meetingWatchPollSeconds))
-        timer.setEventHandler { [weak self] in self?.snapshot(why: "poll") }
+        // @Sendable, so the closure does not inherit this method's main-actor
+        // isolation and trap when the timer fires on the watch queue.
+        timer.setEventHandler { @Sendable [weak self] in self?.snapshot(why: "poll") }
         timer.resume()
         poll = timer
         snapshot(why: "start")
