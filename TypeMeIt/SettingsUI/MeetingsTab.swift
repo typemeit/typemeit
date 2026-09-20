@@ -169,7 +169,9 @@ struct MeetingsTab: View {
                     if let folder = store.folder(for: m.id) {
                         iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
                     }
-                    iconButton("akar-trash-can", "delete") { store.delete(ids: [m.id]) }
+                    if !coordinator.liveIDs.contains(m.id) {
+                        iconButton("akar-trash-can", "delete") { store.delete(ids: [m.id]) }
+                    }
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 10)

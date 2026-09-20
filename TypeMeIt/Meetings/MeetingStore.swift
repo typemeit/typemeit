@@ -101,11 +101,13 @@ final class MeetingStore {
             let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current, duration: meeting.duration, title: trimmed,
                                           existing: MeetingFolder.existingNames(under: root).filter { $0 != folder.lastPathComponent })
             let destination = root.appendingPathComponent(name, isDirectory: true)
-            do {
-                try FileManager.default.moveItem(at: folder, to: destination)
-                folders[id] = destination
-            } catch {
-                Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
+            if destination.path != folder.path {
+                do {
+                    try FileManager.default.moveItem(at: folder, to: destination)
+                    folders[id] = destination
+                } catch {
+                    Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
+                }
             }
         }
         save(meeting)
@@ -120,8 +122,11 @@ final class MeetingStore {
         save(meeting)
     }
 
-    /// Moves the folders to the Trash.
-    func delete(ids: Set<UUID>) {
+    /// Moves the folders to the Trash. A meeting being recorded or
+    /// transcribed is left alone: its files are still being written.
+    func delete(ids requested: Set<UUID>) {
+        let ids = requested.subtracting(MeetingCoordinator.shared.liveIDs)
+        guard !ids.isEmpty else { return }
         let urls = ids.compactMap { folders[$0] }
         RecordingPlayer.shared.stopIfPlaying(any: ids)
         MeetingFolder.recycle(urls)
@@ -200,10 +205,11 @@ final class MeetingStore {
 
     /// Staged meetings left from a quit or a crash: one still marked
     /// recording gets its end from its track's length, then every staged
-    /// meeting not yet done is returned for transcription.
+    /// meeting still pending or running is returned for transcription. A
+    /// failed one waits for the row's retry.
     func recoverAtLaunch() -> [Meeting] {
         var toTranscribe: [Meeting] = []
-        for var meeting in meetings where !meeting.published && !meeting.isDone {
+        for var meeting in meetings where !meeting.published && (meeting.transcription.state == .pending || meeting.transcription.state == .running) {
             guard let folder = folders[meeting.id] else { continue }
             if meeting.ended == nil {
                 var longest = 0

@@ -66,6 +66,14 @@ final class MeetingCoordinator {
 
     var isIdle: Bool { recording == nil && transcribing == nil && machine.state == .idle }
 
+    /// Meetings whose files are being written: recording, transcribing or waiting to be.
+    var liveIDs: Set<UUID> {
+        var ids = Set(queued)
+        if let recording { ids.insert(recording.id) }
+        if let transcribing { ids.insert(transcribing.id) }
+        return ids
+    }
+
     private init() {}
 
     /// From `Pipeline.start()`: the watch, the tick, sleep, launch recovery

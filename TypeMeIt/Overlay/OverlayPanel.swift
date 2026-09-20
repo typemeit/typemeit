@@ -66,6 +66,13 @@ final class OverlayPanel {
     }
 
     func show(_ state: OverlayModel.State) {
+        // A dictation over a meeting pill: a prompt that stands until
+        // answered is parked and comes back when the cloud leaves; a toast
+        // is let go. Either way the panel goes back into display shares.
+        if model.state.isMeeting, !state.isMeeting {
+            if model.state.isStanding { model.pendingMeeting = model.state }
+            panel.sharingType = .readOnly
+        }
         if state == .arming {
             model.level = 0
             model.shownAt = Date()
