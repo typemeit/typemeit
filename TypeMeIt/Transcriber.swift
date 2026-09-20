@@ -88,7 +88,7 @@ actor Transcriber {
     }
 
     /// One word of a transcript with how sure the model was of it.
-    struct Word: Sendable, Equatable {
+    struct Word: Sendable, Equatable, Codable {
         let text: String
         /// The lowest per-token probability among the word's tokens. Parakeet
         /// reports a joint-softmax probability per emitted token; the library
