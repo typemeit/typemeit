@@ -21,13 +21,17 @@ enum Feedback {
         }
     }
 
-    static func play(_ kind: Kind) {
+    /// The cues' own volume; the system-audio test plays louder so a quiet
+    /// tap still shows signal.
+    static let cueVolume: Float = 0.2
+
+    static func play(_ kind: Kind, volume: Float = cueVolume) {
         let sound: NSSound? = switch kind {
         case .pin: pin
         case .stop: stop
         }
         sound?.stop()
-        sound?.volume = 0.2
+        sound?.volume = volume
         sound?.play()
     }
 }

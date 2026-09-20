@@ -3,7 +3,7 @@ import SwiftUI
 
 enum SettingsTab: String, CaseIterable {
     // The order the sidebar lists them in.
-    case insights, intelligence, history, settings
+    case insights, intelligence, history, meetings, settings
 
     /// The tabs this build shows. Insights are built on window titles, which
     /// the sandbox cannot read, so a sandboxed build has no insights page.
@@ -17,6 +17,7 @@ enum SettingsTab: String, CaseIterable {
         case .settings: "akar-gear"
         case .intelligence: "akar-sparkles"
         case .history: "akar-history"
+        case .meetings: "akar-people-group"
         }
     }
 }
@@ -58,6 +59,7 @@ struct SettingsView: View {
                     case .settings: MainSettingsTab()
                     case .intelligence: IntelligenceTab()
                     case .history: HistoryTab()
+                    case .meetings: MeetingsTab()
                     case .insights: InsightsTab()
                     }
                 }
@@ -70,8 +72,10 @@ struct SettingsView: View {
         }
         .tint(DesignTokens.Colors.ink)
         .frame(minWidth: 780, minHeight: 700)
-        .onAppear { takeRequestedTab(); Updates.shared.checkNow() }
+        .onAppear { takeRequestedTab(); Updates.shared.checkNow(); appState.visibleTab = current }
+        .onDisappear { appState.visibleTab = nil }
         .onChange(of: appState.settingsTab) { _, _ in takeRequestedTab() }
+        .onChange(of: tab) { _, _ in appState.visibleTab = current }
         .onChange(of: activeState) { _, state in if state == .key { Updates.shared.checkNow() } }
     }
 
@@ -394,6 +398,38 @@ struct MainSettingsTab: View {
                         Toggle("", isOn: $settings.pauseWhileRecording).toggleStyle(.switch).labelsHidden()
                     }
                 }
+                SettingsGroup(title: "meetings") {
+                    SettingsRow(label: "record meetings", subtitle: "a call is detected when another app opens the microphone. nothing is recorded until you say record.") {
+                        Picker("", selection: Binding(get: { settings.meetingAsk }, set: { settings.meetingAsk = $0 })) {
+                            Text("ask").tag(true)
+                            Text("never").tag(false)
+                        }.pickerStyle(.segmented).labelsHidden().fixedSize()
+                    }
+                    if !settings.meetingNeverAsk.isEmpty {
+                        SettingsRow(label: "never ask for") {
+                            FlowLayout(spacing: 6) {
+                                ForEach(settings.meetingNeverAsk, id: \.self) { bundleID in
+                                    let name = MainSettingsTab.appName(for: bundleID)
+                                    HStack(spacing: 5) {
+                                        Text(name.lowercased()).font(.system(size: 12))
+                                        Button { settings.meetingNeverAsk.removeAll { $0 == bundleID } } label: {
+                                            Image("akar-cross").resizable().frame(width: 8, height: 8)
+                                        }
+                                        .buttonStyle(QuietButtonStyle(side: 16, radius: DesignTokens.Radius.full))
+                                        .help("ask again for \(name.lowercased())")
+                                    }
+                                    .padding(.leading, 9).padding(.trailing, 6)
+                                    .frame(height: 22)
+                                    .background(Capsule().fill(DesignTokens.Colors.inkA08))
+                                }
+                            }
+                            .frame(maxWidth: 360, alignment: .trailing)
+                        }
+                    }
+                    SettingsRow(label: "record the room", last: true) {
+                        ShortcutRecorder(combo: $settings.recordRoomShortcut)
+                    }
+                }
                 SettingsGroup(title: "cloud") {
                     SettingsRow(label: "custom colour") {
                         Toggle("", isOn: $settings.cloudColorEnabled).toggleStyle(.switch).labelsHidden()
@@ -528,6 +564,13 @@ struct MainSettingsTab: View {
 
     private func statusText(_ text: String) -> some View {
         Text(text).font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+    }
+
+    /// The app's name for a never-ask chip, from its bundle on disk; the
+    /// bundle id itself when the app is gone.
+    static func appName(for bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 }
 

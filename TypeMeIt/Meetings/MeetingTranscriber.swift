@@ -40,7 +40,8 @@ enum MeetingTranscriber {
         do {
             var trackWords: [TrackWords] = []
             var rms: [Meeting.Track.Role: [Float]] = [:]
-            let totalChunks = try meeting.tracks.reduce(0) { $0 + chunkCount(of: $1, in: folder) }
+            var totalChunks = 0
+            for track in meeting.tracks { totalChunks += try chunkCount(of: track, in: folder) }
             var doneChunks = meeting.transcription.done.values.reduce(0, +)
             for track in meeting.tracks {
                 let url = folder.appendingPathComponent(track.file)

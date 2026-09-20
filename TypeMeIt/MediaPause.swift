@@ -1,5 +1,4 @@
 import AppKit
-import CoreAudio
 
 /// Pauses whatever is playing while recording by pressing the play/pause
 /// media key, the way F8 does, and presses it again afterwards. The key
@@ -13,33 +12,11 @@ enum MediaPause {
 
     private static var pressedAt: Date?
 
-    private static func global(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
-        AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-    }
-
-    private static func property<T>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ zero: T) -> T? {
-        var address = global(selector)
-        var value = zero
-        var size = UInt32(MemoryLayout<T>.size)
-        return AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr ? value : nil
-    }
-
     /// Bundle ids of the processes other than this one with output running,
     /// from CoreAudio's per-process objects. The app's own cues keep a
     /// stream open and must not count.
     private static func playingProcesses() -> [String] {
-        var address = global(kAudioHardwarePropertyProcessObjectList)
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return [] }
-        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr else { return [] }
-        let me = ProcessInfo.processInfo.processIdentifier
-        return objects.compactMap { object in
-            guard property(object, kAudioProcessPropertyPID, pid_t(0)) != me,
-                  property(object, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0 else { return nil }
-            let bundle: CFString? = property(object, kAudioProcessPropertyBundleID, "" as CFString)
-            return (bundle as String?) ?? "pid \(property(object, kAudioProcessPropertyPID, pid_t(0)) ?? 0)"
-        }
+        AudioProcesses.snapshot().filter { $0.output && !ProcessOwner.isOurs($0) }.map { $0.bundleID ?? "pid \($0.pid)" }
     }
 
     private static let playPauseKey = Int(NX_KEYTYPE_PLAY)

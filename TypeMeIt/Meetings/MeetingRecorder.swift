@@ -49,7 +49,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     private var stopped = false
     private static let diskCheckInterval: Duration = .seconds(60)
 
-    init(kind: Kind, folder: URL, mic: MeetingCapture.Device) throws {
+    init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device) throws {
         self.kind = kind
         self.folder = folder
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -70,7 +70,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             ? [Meeting.Speaker(id: Meeting.Speaker.room, name: "Room", isYou: false, talkMs: 0)]
             : [Meeting.Speaker(id: Meeting.Speaker.you, name: "You", isYou: true, talkMs: 0), Meeting.Speaker(id: Meeting.Speaker.them, name: "Them", isYou: false, talkMs: 0)]
         meeting = Meeting(
-            id: UUID(), kind: owner == nil ? .room : .call, started: Date(), timeZone: TimeZone.current.identifier, ended: nil,
+            id: id, kind: owner == nil ? .room : .call, started: Date(), timeZone: TimeZone.current.identifier, ended: nil,
             durationMs: 0, recordedMs: 0, firstHostTime: nil,
             app: owner.map { Meeting.App(bundleId: $0.bundleID, name: $0.name) },
             title: owner?.name ?? "Room", titleSource: .app, published: false,

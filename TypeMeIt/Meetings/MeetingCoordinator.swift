@@ -1,0 +1,533 @@
+import AppKit
+import CoreAudio
+import Foundation
+import Observation
+
+/// Owns the meeting machine: feeds it what the watch sees, the clock and
+/// the user's clicks, and applies its effects to the pill, the recorder and
+/// the transcriber (docs/meetings.md 7.7). The only writer of the machine;
+/// the tab's status row and the menu read the live state here, and
+/// `MeetingStore` holds the list.
+@MainActor
+@Observable
+final class MeetingCoordinator {
+    static let shared = MeetingCoordinator()
+
+    typealias Owner = ProcessOwner.Owner
+
+    struct Live: Equatable {
+        let id: UUID
+        let kind: Meeting.Kind
+        let started: Date
+    }
+
+    struct Transcribing: Equatable {
+        let id: UUID
+        var fraction: Double
+    }
+
+    enum SystemAudioTest: Equatable { case notTested, testing, working, silent }
+
+    /// Any holder with input and output, for the menu's item.
+    private(set) var detected: Owner?
+    private(set) var prompting: Owner?
+    private(set) var recording: Live?
+    private(set) var levels: (mic: Float, others: Float?) = (0, nil)
+    private(set) var transcribing: Transcribing?
+    private(set) var systemAudioTest: SystemAudioTest = .notTested
+    /// Meetings waiting behind the one being transcribed.
+    private(set) var queued: [UUID] = []
+
+    let watch = MeetingWatch()
+    @ObservationIgnored private var machine = MeetingMachine()
+    @ObservationIgnored private var tick: Timer?
+    @ObservationIgnored private var recorder: MeetingRecorder?
+    @ObservationIgnored private var recordingMeeting: Meeting?
+    @ObservationIgnored private var recordingOwner: Owner?
+    @ObservationIgnored private var tapObjects: [AudioObjectID] = []
+    @ObservationIgnored private var silenceDeadline: Task<Void, Never>?
+    @ObservationIgnored private var shownSystemAudioOff = false
+    @ObservationIgnored private var stoppedForDisk = false
+    @ObservationIgnored private var transcribeQueue: [Meeting] = []
+    @ObservationIgnored private var transcribeTask: Task<Void, Never>?
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var dictationStart: UInt64?
+    @ObservationIgnored private var started = false
+
+    private var overlay: OverlayPanel { Pipeline.shared.overlay }
+    private var store: MeetingStore { MeetingStore.shared }
+    private var settings: Settings { Settings.shared }
+
+    private var rules: MeetingMachine.Rules {
+        var rules = MeetingMachine.Rules.fixed
+        rules.neverAsk = Set(settings.meetingNeverAsk)
+        return rules
+    }
+
+    var isIdle: Bool { recording == nil && transcribing == nil && machine.state == .idle }
+
+    private init() {}
+
+    /// From `Pipeline.start()`: the watch, the tick, sleep, launch recovery
+    /// and the model install.
+    func start() {
+        guard !started else { return }
+        started = true
+        wirePill()
+        watch.onChange = { [weak self] holders in self?.holders(holders) }
+        watch.start()
+        tick = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in self.ticked() }
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in self.send(.willSleep) }
+        }
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in self.send(.didWake) }
+        }
+        for meeting in store.recoverAtLaunch() { enqueue(meeting) }
+        store.republishPending()
+        observeModel()
+    }
+
+    /// Meetings that waited for the speech model go when it lands.
+    private func observeModel() {
+        withObservationTracking {
+            _ = ModelStore.shared.state
+        } onChange: {
+            Task { @MainActor in
+                if ModelStore.shared.state == .installed {
+                    for meeting in self.store.pendingForModel where !self.transcribeQueue.contains(where: { $0.id == meeting.id }) && self.transcribing?.id != meeting.id {
+                        self.enqueue(meeting)
+                    }
+                }
+                self.observeModel()
+            }
+        }
+    }
+
+    private func wirePill() {
+        let model = overlay.model
+        model.onRecordMeeting = { [weak self] in self?.recordFromPrompt() }
+        model.onDeclineMeeting = { [weak self] in self?.decline() }
+        model.onStopMeeting = { [weak self] in self?.dismissToast(); self?.stopMeeting() }
+        model.onShowMeeting = { [weak self] id in self?.dismissToast(); self?.showTab(id) }
+        model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
+        model.onUndoNeverAsk = { [weak self] in self?.undoNeverAsk() }
+        model.onDismissMeeting = { [weak self] in self?.dismissToast() }
+    }
+
+    // MARK: The machine
+
+    private func send(_ event: MeetingMachine.Event) {
+        let before = machine.state
+        let effects = machine.handle(event, now: .now, rules: rules)
+        if machine.state != before || !effects.isEmpty {
+            DebugLog.write("Meeting machine: \(MeetingCoordinator.describe(event)) → \(MeetingCoordinator.describe(machine.state))\(effects.isEmpty ? "" : " · \(effects.map(MeetingCoordinator.describe).joined(separator: ", "))")")
+        }
+        for effect in effects { apply(effect) }
+        prompting = { if case .prompting(let owner, _) = machine.state { return owner } else { return nil } }()
+    }
+
+    private func holders(_ holders: [MeetingWatch.Holder]) {
+        detected = holders.first { $0.input && $0.output }?.owner ?? holders.first { $0.input }?.owner
+        send(.holders(holders))
+        // A helper that restarted mid-call is a new process object: retarget the tap.
+        if let owner = recordingOwner, let recorder {
+            let objects = holders.first { $0.owner == owner }?.objectIDs ?? []
+            if !objects.isEmpty, objects != tapObjects {
+                tapObjects = objects
+                recorder.updateTap(processes: objects)
+            }
+        }
+    }
+
+    private func ticked() {
+        send(.tick(.now))
+        if store.meetings.contains(where: { $0.isDone && !$0.published }) { store.republishPending() }
+    }
+
+    private func apply(_ effect: MeetingMachine.Effect) {
+        switch effect {
+        case .showPrompt(let owner):
+            guard settings.meetingAsk else { return }
+            overlay.showMeeting(.meetingPrompt(app: owner))
+        case .hidePrompt:
+            if case .meetingPrompt = overlay.model.state { overlay.hideMeeting(overlay.model.state) }
+            if case .meetingPrompt? = overlay.model.pendingMeeting { overlay.model.pendingMeeting = nil }
+        case .showResumed(let owner):
+            toast(.meetingResumed(app: owner))
+        case .startRecording(let owner):
+            startRecording(owner)
+        case .pauseRecording:
+            recorder?.pause()
+        case .resumeRecording:
+            recorder?.resume()
+        case .stopRecording:
+            stopRecording()
+        case .finished(let keep):
+            finished(keep: keep)
+        }
+    }
+
+    // MARK: Recording
+
+    private func startRecording(_ owner: Owner?) {
+        let id = UUID()
+        let kind: MeetingRecorder.Kind
+        if let owner {
+            let objects = watch.holders.first { $0.owner == owner }?.objectIDs ?? []
+            tapObjects = objects
+            kind = .call(owner, processes: objects)
+        } else {
+            kind = .room
+        }
+        guard let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID) else {
+            Log.meetings.error("No microphone to record the meeting with")
+            abandonRecording()
+            return
+        }
+        do {
+            let recorder = try MeetingRecorder(id: id, kind: kind, folder: MeetingFolder.staged(id), mic: mic)
+            recorder.onLevels = { [weak self] mic, others in Task { @MainActor in self?.levels = (mic, others) } }
+            recorder.onSilenceChanged = { [weak self] silent in Task { @MainActor in self?.silenceChanged(silent) } }
+            recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
+            recorder.onFailed = { [weak self] _ in Task { @MainActor in self?.send(.stop) } }
+            self.recorder = recorder
+            recordingMeeting = recorder.meeting
+            recordingOwner = owner
+            shownSystemAudioOff = false
+            stoppedForDisk = false
+            store.adopt(recorder.meeting, folder: recorder.folder)
+            recording = Live(id: id, kind: recorder.meeting.kind, started: recorder.meeting.started)
+            AppState.shared.meeting = true
+        } catch {
+            Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")
+            DebugLog.write("Meeting recorder failed to start: \(error.localizedDescription)")
+            abandonRecording()
+        }
+    }
+
+    /// The recorder never started: walk the machine back to idle.
+    private func abandonRecording() {
+        send(.stop)
+        send(.recorderEnded(recordedMs: 0))
+    }
+
+    private func stopRecording() {
+        silenceDeadline?.cancel()
+        silenceDeadline = nil
+        guard let recorder else { send(.recorderEnded(recordedMs: 0)); return }
+        self.recorder = nil
+        Task.detached { [recorder] in
+            let result = recorder.stop()
+            await MainActor.run { self.recorderEnded(result) }
+        }
+    }
+
+    private var lastResult: MeetingRecorder.Result?
+
+    private func recorderEnded(_ result: MeetingRecorder.Result) {
+        lastResult = result
+        levels = (0, nil)
+        send(.recorderEnded(recordedMs: result.recordedMs))
+    }
+
+    private func finished(keep: Bool) {
+        defer {
+            recording = nil
+            recordingMeeting = nil
+            recordingOwner = nil
+            tapObjects = []
+            lastResult = nil
+            AppState.shared.meeting = false
+        }
+        guard var meeting = recordingMeeting else { return }
+        let folder = MeetingFolder.staged(meeting.id)
+        guard keep, let result = lastResult else {
+            DebugLog.write("Meeting dropped: \(lastResult?.recordedMs ?? 0) ms recorded")
+            try? FileManager.default.removeItem(at: folder)
+            store.drop(meeting.id)
+            return
+        }
+        meeting.ended = Date()
+        meeting.durationMs = result.durationMs
+        meeting.recordedMs = result.recordedMs
+        meeting.tracks = result.tracks
+        meeting.dictations = result.dictations
+        meeting.bothSilentMs = result.bothSilentMs
+        meeting.firstHostTime = result.firstHostTime
+        store.save(meeting)
+        if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
+        enqueue(meeting)
+    }
+
+    private func silenceChanged(_ silent: Bool) {
+        silenceDeadline?.cancel()
+        silenceDeadline = nil
+        guard silent else { return }
+        if recording?.kind == .call, !shownSystemAudioOff {
+            shownSystemAudioOff = true
+            toast(.meetingSystemAudioOff)
+        }
+        let remaining = Fixed.meetingBothSilentEndSeconds - Fixed.meetingSilentSeconds
+        silenceDeadline = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            self?.send(.bothSilent)
+        }
+    }
+
+    // MARK: The user
+
+    /// The pill's record button.
+    func recordFromPrompt() {
+        guard let owner = prompting else { return }
+        send(.record(owner))
+    }
+
+    /// The menu's Record This Meeting: the owner detected at click time.
+    func recordDetected() {
+        guard let owner = detected else { return }
+        send(.record(owner))
+    }
+
+    func decline() { send(.decline) }
+
+    func stopMeeting() { send(.stop) }
+
+    func recordRoom() { send(.room) }
+
+    /// The menu's Don't Ask for <app> Again, with the undo toast.
+    func neverAsk(_ owner: Owner) {
+        guard owner.canNeverAsk, !settings.meetingNeverAsk.contains(owner.bundleID) else { return }
+        settings.meetingNeverAsk.append(owner.bundleID)
+        if prompting == owner { send(.decline) }
+        toast(.meetingNeverAsking(app: owner))
+    }
+
+    private func undoNeverAsk() {
+        if case .meetingNeverAsking(let owner) = overlay.model.state {
+            settings.meetingNeverAsk.removeAll { $0 == owner.bundleID }
+        }
+        dismissToast()
+    }
+
+    private func showTab(_ id: UUID?) {
+        AppState.shared.settingsTab = .meetings
+        AppState.shared.revealMeeting = id
+        NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+    }
+
+    // MARK: Dictation
+
+    /// `Pipeline` reports the host time it opened and closed its own
+    /// microphone, so the dictation's words are folded out of the meeting.
+    func dictationBegan(hostTime: UInt64) {
+        dictationStart = hostTime
+    }
+
+    func dictationEnded(hostTime: UInt64, historyId: UUID) {
+        guard let start = dictationStart else { return }
+        dictationStart = nil
+        recorder?.noteDictation(startHostTime: start, endHostTime: hostTime, historyId: historyId)
+    }
+
+    // MARK: Quit
+
+    /// Stops the meeting and waits, bounded, for the writers, so a quit
+    /// mid-meeting keeps what was recorded and transcribes it on relaunch.
+    func stopForQuit() {
+        guard let recorder, let meeting = recordingMeeting else { return }
+        self.recorder = nil
+        let done = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+        Thread.detachNewThread {
+            box.result = recorder.stop()
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + .seconds(Fixed.meetingQuitWaitSeconds))
+        var finished = meeting
+        if let result = box.result {
+            finished.ended = Date()
+            finished.durationMs = result.durationMs
+            finished.recordedMs = result.recordedMs
+            finished.tracks = result.tracks
+            finished.dictations = result.dictations
+            finished.bothSilentMs = result.bothSilentMs
+            finished.firstHostTime = result.firstHostTime
+        }
+        try? MeetingFolder.write(finished, to: MeetingFolder.staged(meeting.id))
+        DebugLog.write("Meeting saved for quit: \(finished.durationMs) ms")
+    }
+
+    private final class ResultBox: @unchecked Sendable {
+        var result: MeetingRecorder.Result?
+    }
+
+    // MARK: Transcription
+
+    func enqueue(_ meeting: Meeting) {
+        guard transcribing?.id != meeting.id, !transcribeQueue.contains(where: { $0.id == meeting.id }) else { return }
+        transcribeQueue.append(meeting)
+        queued = transcribeQueue.map(\.id)
+        pump()
+    }
+
+    /// The row's retry: from step 1, skipping chunks already done.
+    func retry(_ id: UUID) {
+        guard var meeting = store.meeting(id), meeting.transcription.state == .failed else { return }
+        meeting.transcription.state = .pending
+        meeting.transcription.error = nil
+        store.save(meeting)
+        enqueue(meeting)
+    }
+
+    private func pump() {
+        guard transcribeTask == nil, !transcribeQueue.isEmpty else { return }
+        let meeting = transcribeQueue.removeFirst()
+        queued = transcribeQueue.map(\.id)
+        guard let folder = store.folder(for: meeting.id) else { pump(); return }
+        transcribing = Transcribing(id: meeting.id, fraction: 0)
+        transcribeTask = Task.detached { [meeting, folder] in
+            let result = await MeetingTranscriber.run(meeting, folder: folder) { fraction in
+                Task { @MainActor in
+                    if MeetingCoordinator.shared.transcribing?.id == meeting.id { MeetingCoordinator.shared.transcribing?.fraction = fraction }
+                }
+            }
+            await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
+        }
+    }
+
+    private func transcribed(_ meeting: Meeting) {
+        transcribing = nil
+        transcribeTask = nil
+        switch meeting.transcription.state {
+        case .done:
+            if store.publish(meeting.id) {
+                if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
+            } else {
+                toast(.meetingFolderUnavailable)
+            }
+        case .failed:
+            toast(.meetingFailed(id: meeting.id))
+        case .pending, .running:
+            break
+        }
+        pump()
+    }
+
+    // MARK: System audio test
+
+    /// Taps our own process while a cue plays and reports whether signal
+    /// arrived: the only check there is for the grant (docs/meetings.md D13).
+    func testSystemAudio() {
+        guard systemAudioTest != .testing, let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID),
+              let object = AudioProcesses.objectID(forPID: ProcessInfo.processInfo.processIdentifier) else { return }
+        systemAudioTest = .testing
+        let probe = SystemAudioProbe()
+        do {
+            let capture = try MeetingCapture(mic: mic, tapProcesses: [object], sink: probe)
+            probe.capture = capture
+        } catch {
+            Log.meetings.error("System audio test could not start: \(error.localizedDescription)")
+            systemAudioTest = .silent
+            return
+        }
+        Feedback.play(.stop, volume: 1)
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            probe.capture?.stop()
+            probe.capture = nil
+            let heard = probe.peak >= Fixed.meetingSilenceFloor
+            DebugLog.write("System audio test: peak \(probe.peak) → \(heard ? "working" : "silent")")
+            self?.systemAudioTest = heard ? .working : .silent
+        }
+    }
+
+    private final class SystemAudioProbe: MeetingCaptureSink, @unchecked Sendable {
+        var capture: MeetingCapture?
+        private let lock = NSLock()
+        private var peakValue: Float = 0
+        var peak: Float { lock.lock(); defer { lock.unlock() }; return peakValue }
+        func capture(_ capture: MeetingCapture, mic: [Float], others: [Float]?) {
+            guard let others else { return }
+            let p = AudioCapture.peak(others)
+            lock.lock(); peakValue = max(peakValue, p); lock.unlock()
+        }
+        func captureGap(_ capture: MeetingCapture, frames: Int) {}
+        func captureFailed(_ capture: MeetingCapture, error: Error) {}
+    }
+
+    // MARK: Toasts
+
+    /// A meeting toast: shown now or parked behind the cloud, and taken
+    /// down after `ToastTiming.timeout` unless it stands until answered.
+    private func toast(_ state: OverlayModel.State) {
+        toastTask?.cancel()
+        overlay.showMeeting(state)
+        guard !state.isStanding else { return }
+        toastTask = Task { [weak self] in
+            var remaining = ToastTiming.timeout
+            let step: Duration = .milliseconds(100)
+            let deadline = ContinuousClock.now + ToastTiming.safetyHide
+            while remaining > .zero, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: step)
+                guard !Task.isCancelled, let self else { return }
+                if self.overlay.model.state == state, !self.overlay.model.toastPaused { remaining -= step }
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.overlay.hideMeeting(state)
+        }
+    }
+
+    private func dismissToast() {
+        toastTask?.cancel()
+        let state = overlay.model.state
+        guard state.isMeeting else { return }
+        overlay.hideMeeting(state)
+    }
+
+    // MARK: Logging
+
+    private static func describe(_ event: MeetingMachine.Event) -> String {
+        switch event {
+        case .holders(let h): "holders(\(MeetingWatch.describe(h)))"
+        case .tick: "tick"
+        case .record(let o): "record(\(o.name))"
+        case .decline: "decline"
+        case .stop: "stop"
+        case .room: "room"
+        case .bothSilent: "bothSilent"
+        case .willSleep: "willSleep"
+        case .didWake: "didWake"
+        case .recorderEnded(let ms): "recorderEnded(\(ms) ms)"
+        }
+    }
+
+    private static func describe(_ state: MeetingMachine.State) -> String {
+        switch state {
+        case .idle: "idle"
+        case .candidate(let o, _, let both): "candidate(\(o.name)\(both == nil ? "" : ", both"))"
+        case .prompting(let o, _): "prompting(\(o.name))"
+        case .declined(let o): "declined(\(o.name))"
+        case .recording(let o, _): "recording(\(o?.name ?? "room"))"
+        case .paused(let o, _, let before): "paused(\(o.name), \(before))"
+        case .finishing(let o): "finishing(\(o?.name ?? "room"))"
+        }
+    }
+
+    private static func describe(_ effect: MeetingMachine.Effect) -> String {
+        switch effect {
+        case .showPrompt(let o): "showPrompt(\(o.name))"
+        case .hidePrompt: "hidePrompt"
+        case .showResumed(let o): "showResumed(\(o.name))"
+        case .startRecording(let o): "startRecording(\(o?.name ?? "room"))"
+        case .pauseRecording: "pauseRecording"
+        case .resumeRecording: "resumeRecording"
+        case .stopRecording: "stopRecording"
+        case .finished(let keep): "finished(keep: \(keep))"
+        }
+    }
+}

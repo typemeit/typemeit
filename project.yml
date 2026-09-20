@@ -67,6 +67,12 @@ targets:
         CFBundleIconFile: "$(APP_ICON_FILE)"
         LSMinimumSystemVersion: "26.0"
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
+        NSAudioCaptureUsageDescription: "type me it records the other side of a call when you ask it to record a meeting."
+        NSDocumentsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSDesktopFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSDownloadsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSRemovableVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSNetworkVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
         SUFeedURL: https://github.com/typemeit/typemeit/releases/latest/download/appcast.xml

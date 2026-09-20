@@ -52,6 +52,18 @@ enum AudioProcesses {
             output: property(object, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0)
     }
 
+    /// The process object for a pid, ours included.
+    static func objectID(forPID pid: pid_t) -> AudioObjectID? {
+        var address = global(kAudioHardwarePropertyTranslatePIDToProcessObject)
+        var pid = pid
+        var object = AudioObjectID(0)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = withUnsafeMutablePointer(to: &pid) { pidPointer in
+            AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<pid_t>.size), pidPointer, &size, &object)
+        }
+        return status == noErr && object != 0 ? object : nil
+    }
+
     /// Every process object CoreAudio lists, read now.
     static func snapshot() -> [AudioProcessInfo] {
         objectIDs().compactMap(info(of:))

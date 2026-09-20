@@ -35,7 +35,7 @@ enum MenuBarIconRenderer {
         return image
     }
 
-    static func puff(recording: Bool, transcribing: Bool, struck: Bool, updateReady: Bool = false) -> NSImage {
+    static func puff(recording: Bool, transcribing: Bool, struck: Bool, updateReady: Bool = false, meeting: Bool = false) -> NSImage {
         let size = NSSize(width: 20, height: 20)
         let image = NSImage(size: size, flipped: false) { rect in
 
@@ -66,14 +66,22 @@ enum MenuBarIconRenderer {
             // A downloaded update waiting to be installed is a dot at the
             // top right, with the puff cut away underneath so it sits on
             // the mark rather than merging into it.
-            if updateReady {
-                let dot = NSRect(x: rect.maxX - 6.5, y: rect.maxY - 6.5, width: 5, height: 5)
+            func dot(_ dot: NSRect, _ color: NSColor) {
                 NSGraphicsContext.current?.compositingOperation = .destinationOut
                 NSColor.black.set()
                 NSBezierPath(ovalIn: dot.insetBy(dx: -1.25, dy: -1.25)).fill()
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
-                NSColor.labelColor.set()
+                color.set()
                 NSBezierPath(ovalIn: dot).fill()
+            }
+            if updateReady {
+                dot(NSRect(x: rect.maxX - 6.5, y: rect.maxY - 6.5, width: 5, height: 5), .labelColor)
+            }
+            // A meeting being recorded is a dot at the bottom left in the
+            // recording tint, whatever the dictation is doing, so a
+            // dictation inside a meeting reads as orange mark plus dot.
+            if meeting {
+                dot(NSRect(x: rect.minX + 1.5, y: rect.minY + 1.5, width: 5, height: 5), recordingTint)
             }
 
             if struck {
