@@ -1,8 +1,9 @@
+import AppKit
+import AVFoundation
 import Foundation
 
-/// A meeting's folder name: pure, tested (docs/meetings.md 7.9). The file
-/// operations that move a meeting between staging and the published folder
-/// are added alongside this later.
+/// A meeting's folder: its name, pure and tested, and the file operations
+/// that move one between staging and the published folder (docs/meetings.md 7.9).
 enum MeetingFolder {
     // MARK: Naming
 
@@ -146,5 +147,122 @@ enum MeetingFolder {
             rest = rest[rest.index(after: spaceIndex)...]
         }
         return String(rest)
+    }
+}
+
+/// The file half: where meetings live, and moving, writing, transcoding and
+/// recycling them (docs/meetings.md 7.9). Every path is built with
+/// `appendingPathComponent`, never `URL(string:)`, so a title with `#` or
+/// spaces is a plain folder name.
+extension MeetingFolder {
+    // MARK: Files
+
+    static let meetingFile = "meeting.json"
+    static let transcriptFile = "transcript.md"
+
+    /// Raw tracks and the in-progress record, under Application Support and
+    /// excluded from backup.
+    nonisolated static var stagingRoot: URL {
+        Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent(".in-progress", isDirectory: true)
+    }
+
+    nonisolated static var defaultPublishedRoot: URL {
+        Store.directory.appendingPathComponent("Meetings", isDirectory: true)
+    }
+
+    nonisolated static func staged(_ id: UUID) -> URL {
+        stagingRoot.appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    /// Writes `meeting.json` atomically and renders `transcript.md` beside it.
+    nonisolated static func write(_ meeting: Meeting, to folder: URL) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try meeting.encoded().write(to: folder.appendingPathComponent(meetingFile), options: .atomic)
+        try Data(TranscriptRender.markdown(meeting).utf8).write(to: folder.appendingPathComponent(transcriptFile), options: .atomic)
+    }
+
+    nonisolated static func read(_ folder: URL) -> Meeting? {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(meetingFile)) else { return nil }
+        return Meeting.decode(data)
+    }
+
+    /// Every meeting folder directly under `root`, with its meeting.
+    nonisolated static func meetings(under root: URL) -> [(folder: URL, meeting: Meeting)] {
+        guard let entries = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else { return [] }
+        return entries.compactMap { url in
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true, let meeting = read(url) else { return nil }
+            return (url, meeting)
+        }
+    }
+
+    /// The names already taken under `root`, for collision handling.
+    nonisolated static func existingNames(under root: URL) -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [])
+    }
+
+    /// Moves `folder` under `root` as `name`, creating `root`. The parent of
+    /// `root` must already resolve; a missing volume is the caller's cue to
+    /// leave the folder staged.
+    nonisolated static func move(_ folder: URL, under root: URL, name: String) throws -> URL {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let destination = root.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.moveItem(at: folder, to: destination)
+        return destination
+    }
+
+    nonisolated static func recycle(_ folders: [URL]) {
+        guard !folders.isEmpty else { return }
+        NSWorkspace.shared.recycle(folders) { _, error in
+            if let error { Log.meetings.error("Could not move to the Trash: \(error.localizedDescription)") }
+        }
+    }
+
+    nonisolated static func diskUsage(of root: URL) -> Int64 {
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.totalFileAllocatedSizeKey]) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in enumerator {
+            total += Int64((try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize) ?? 0)
+        }
+        return total
+    }
+
+    /// The folder is inside iCloud Drive's container.
+    nonisolated static func isInICloudDrive(_ url: URL) -> Bool {
+        let cloud = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        return url.standardizedFileURL.path.hasPrefix(cloud.standardizedFileURL.path)
+    }
+
+    /// The folder's parent resolves: not an ejected disk or an offline share.
+    nonisolated static func parentResolves(_ root: URL) -> Bool {
+        FileManager.default.fileExists(atPath: root.deletingLastPathComponent().path)
+    }
+
+    /// Reads the CAF a second at a time and writes AAC at
+    /// `Fixed.meetingAudioBitrate`. Returns false when the written file does
+    /// not reopen with a frame count within one buffer of the source, in
+    /// which case the caller keeps the CAF.
+    nonisolated static func transcode(from source: URL, to destination: URL) throws -> Bool {
+        let input = try AVAudioFile(forReading: source)
+        let format = input.processingFormat
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: format.sampleRate,
+            AVNumberOfChannelsKey: format.channelCount,
+            AVEncoderBitRateKey: Fixed.meetingAudioBitrate,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue,
+        ]
+        try? FileManager.default.removeItem(at: destination)
+        let frames = AVAudioFrameCount(format.sampleRate)
+        do {
+            let output = try AVAudioFile(forWriting: destination, settings: settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved)
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return false }
+            while input.framePosition < input.length {
+                try input.read(into: buffer, frameCount: frames)
+                guard buffer.frameLength > 0 else { break }
+                try output.write(from: buffer)
+            }
+        }
+        let written = try AVAudioFile(forReading: destination)
+        return abs(written.length - input.length) <= AVAudioFramePosition(frames)
     }
 }

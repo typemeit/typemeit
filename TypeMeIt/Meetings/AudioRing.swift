@@ -42,6 +42,26 @@ final class AudioRing: @unchecked Sendable {
         }
     }
 
+    /// Writes `count` zeros, dropping and counting what does not fit, for a
+    /// track that has to keep step with a longer buffer from the other.
+    /// Producer side, allocation-free.
+    func writeZeros(count: Int) {
+        let head = head.load(ordering: .relaxed)
+        let tail = tail.load(ordering: .acquiring)
+        let free = capacity - (head - tail)
+        let toWrite = max(0, min(count, free))
+        for i in 0 ..< toWrite {
+            storage[(head + i) % capacity] = 0
+        }
+        if toWrite > 0 {
+            self.head.store(head + toWrite, ordering: .releasing)
+        }
+        let overrun = count - toWrite
+        if overrun > 0 {
+            dropped.wrappingAdd(overrun, ordering: .relaxed)
+        }
+    }
+
     /// Convenience for tests; production callers hold an `UnsafePointer` from
     /// the IO proc's buffer list already.
     func write(_ samples: [Float]) {

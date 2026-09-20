@@ -61,9 +61,21 @@ struct PillView: View {
             .help("Open intelligence")
         case .updateReady, .updateFailed:
             Image("akar-sparkles").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink)
+        case .meetingPrompt(let app), .meetingNeverAsking(let app), .meetingResumed(let app):
+            Image(nsImage: PillView.icon(for: app)).resizable().frame(width: 18, height: 18)
+        case .meetingSystemAudioOff:
+            Image("akar-microphone").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink2)
+        case .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingFolderUnavailable:
+            Image("akar-people-group").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink2)
         default:
             Color.clear.frame(width: 24, height: 24)
         }
+    }
+
+    /// The app's own icon, or the generic one for a daemon or web content.
+    static func icon(for app: ProcessOwner.Owner) -> NSImage {
+        if let url = app.appURL { return NSWorkspace.shared.icon(forFile: url.path) }
+        return NSWorkspace.shared.icon(for: .applicationBundle)
     }
 
     @ViewBuilder private var centre: some View {
@@ -84,6 +96,22 @@ struct PillView: View {
             label(Text("version ") + Text(v).bold() + Text(" is ready"))
         case .updateFailed(let v):
             label("version \(v) didn't download")
+        case .meetingPrompt:
+            label("record this meeting?")
+        case .meetingNeverAsking(let app):
+            label("won't ask for \(app.name.lowercased()) again")
+        case .meetingSystemAudioOff:
+            label("system audio is off")
+        case .meetingSaved:
+            label("meeting saved")
+        case .meetingFailed:
+            label("meeting not transcribed")
+        case .meetingDiskFull:
+            label("disk full · meeting stopped")
+        case .meetingResumed(let app):
+            label("recording again · \(app.name.lowercased())")
+        case .meetingFolderUnavailable:
+            label("meetings folder unavailable")
         default:
             EmptyView()
         }
@@ -122,6 +150,41 @@ struct PillView: View {
             }
         case .updateFailed:
             cross(help: "Dismiss") { model.onKeep?() }
+        case .meetingPrompt:
+            HStack(spacing: 6) {
+                Button("record") { model.onRecordMeeting?() }.buttonStyle(InkButtonStyle(primary: true))
+                cross(help: "Not now") { model.onDeclineMeeting?() }
+            }
+        case .meetingNeverAsking:
+            HStack(spacing: 6) {
+                Button("undo") { model.onUndoNeverAsk?() }.buttonStyle(InkButtonStyle())
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingSystemAudioOff:
+            HStack(spacing: 6) {
+                Button("system settings") { model.onOpenSystemAudio?() }.buttonStyle(InkButtonStyle(primary: true))
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingSaved(let id), .meetingDiskFull(let id):
+            HStack(spacing: 6) {
+                Button("show") { model.onShowMeeting?(id) }.buttonStyle(InkButtonStyle(primary: true))
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingFailed(let id):
+            HStack(spacing: 6) {
+                Button("show") { model.onShowMeeting?(id) }.buttonStyle(InkButtonStyle())
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingResumed:
+            HStack(spacing: 6) {
+                Button("stop") { model.onStopMeeting?() }.buttonStyle(InkButtonStyle(primary: true))
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingFolderUnavailable:
+            HStack(spacing: 6) {
+                Button("settings") { model.onShowMeeting?(nil) }.buttonStyle(InkButtonStyle(primary: true))
+                cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
         default:
             Color.clear.frame(width: 22, height: 22)
         }

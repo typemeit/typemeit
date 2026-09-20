@@ -36,7 +36,7 @@ final class AudioCapture: @unchecked Sendable {
 
     // MARK: Device selection
 
-    private static func deviceID(forUID uid: String) -> AudioDeviceID? {
+    static func deviceID(forUID uid: String) -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -158,9 +158,8 @@ final class AudioCapture: @unchecked Sendable {
         peakSinceReport = max(peakSinceReport, peak)
         if now - lastLevelAt >= 1.0 / 30.0 {
             lastLevelAt = now
-            let db = 20 * log10(max(peakSinceReport * 0.8, 1e-6))
+            let level = AudioCapture.level(forPeak: peakSinceReport)
             peakSinceReport = 0
-            let level = min(1, max(0, (db + 52) / 50))
             onLevel?(level)
         }
     }
@@ -175,6 +174,12 @@ final class AudioCapture: @unchecked Sendable {
     static func inputDevices() -> [Device] {
         let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified)
         return session.devices.map { Device(id: $0.uniqueID, name: $0.localizedName) }
+    }
+
+    /// A peak sample as a meter level in 0...1: −52 dBFS is empty, −2 dBFS full.
+    static func level(forPeak peak: Float) -> Float {
+        let db = 20 * log10(max(peak * 0.8, 1e-6))
+        return min(1, max(0, (db + 52) / 50))
     }
 
     static func peak(_ pcm: [Float]) -> Float {

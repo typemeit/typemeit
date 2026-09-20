@@ -17,7 +17,7 @@ enum TranscriptMerge {
     ) -> [Meeting.Paragraph] {
         var assigned: [(word: Transcriber.Word, speaker: String)] = []
         for track in tracks {
-            if let segments, track.role != "you" {
+            if let segments, track.role != Meeting.Speaker.you {
                 var previousSpeaker = track.role
                 for word in track.words {
                     let speaker = speaker(for: word, segments: segments, fallback: previousSpeaker)
@@ -30,7 +30,7 @@ enum TranscriptMerge {
         }
 
         assigned.removeAll { entry in
-            entry.speaker == "you" && dictations.contains { contains($0, midpoint(of: entry.word)) }
+            entry.speaker == Meeting.Speaker.you && dictations.contains { contains($0, midpoint(of: entry.word)) }
         }
 
         let sorted = assigned.sorted { $0.word.start < $1.word.start }

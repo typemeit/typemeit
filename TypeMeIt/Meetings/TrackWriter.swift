@@ -76,6 +76,8 @@ final class TrackWriter: @unchecked Sendable {
     private var secondPeaks: [Float] = []
     private var currentSecondPeak: Float = 0
     private var currentSecondFrames = 0
+    /// The loudest sample of the whole track.
+    private var overallPeak: Float = 0
 
     init(url: URL) throws {
         FileManager.default.createFile(atPath: url.path, contents: nil)
@@ -111,11 +113,11 @@ final class TrackWriter: @unchecked Sendable {
         queue.async { [self] in appendOnQueue([Float](repeating: 0, count: frames)) }
     }
 
-    /// Drains the queue and closes the handle.
+    /// Drains the queue and closes the handle. `peak` is the whole track's.
     func finish() -> (frames: Int, peak: Float) {
         queue.sync {
             try? handle.close()
-            return (framesWrittenStorage, recentPeakOnQueue())
+            return (framesWrittenStorage, overallPeak)
         }
     }
 
@@ -145,6 +147,7 @@ final class TrackWriter: @unchecked Sendable {
 
     private func noteSecondPeak(_ magnitude: Float) {
         currentSecondPeak = max(currentSecondPeak, magnitude)
+        overallPeak = max(overallPeak, magnitude)
         currentSecondFrames += 1
         guard currentSecondFrames >= framesPerSecond else { return }
         secondPeaks.append(currentSecondPeak)

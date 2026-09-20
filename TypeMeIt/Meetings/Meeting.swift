@@ -33,6 +33,8 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var frames: Int
         /// Stretches of zeros: a drop and rejoin, or a device rebuild.
         var gaps: [Span] = []
+        /// The loudest sample, so a track that never left the floor is known.
+        var peak: Float?
     }
 
     struct Audio: Codable, Equatable, Sendable {
@@ -49,6 +51,11 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     }
 
     struct Speaker: Codable, Equatable, Sendable, Identifiable {
+        /// The speaker ids phase 1 uses: the mic track, the far end, a room.
+        static let you = "you"
+        static let them = "them"
+        static let room = "room"
+
         var id: String
         var name: String
         var isYou: Bool
@@ -137,7 +144,10 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
 
     /// The others track never left the floor: the far end was silent, or
     /// the system-audio grant was missing (docs/meetings.md D13).
-    var onlyYourSide: Bool { kind == .call && bothSilentMs > 0 && bothSilentMs >= durationMs }
+    var onlyYourSide: Bool {
+        guard kind == .call, let peak = tracks.first(where: { $0.role == .others })?.peak else { return false }
+        return peak < Fixed.meetingSilenceFloor
+    }
 
     /// The tracks that have a playable `.m4a`, in file order.
     var audioFiles: [String] { tracks.map(\.file).filter { $0.hasSuffix(".m4a") } }
