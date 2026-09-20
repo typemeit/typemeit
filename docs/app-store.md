@@ -33,21 +33,32 @@ key.
 
 ## Not in place
 
-- The U.S. tax questionnaire (App Store Connect › Business › Agreements ›
-  Add Tax Info). Until it is in, the Paid Apps Agreement sits at "Pending
-  User Info" and the price does not take effect.
-- App Review contact details on the version (a phone number is required),
-  the App Privacy answers, and the age rating. All in App Store Connect, or
-  the contact via the API once a number is known.
-- The build has to be picked on the version once processed, then the
-  version submitted for review.
+- Nothing on the record. Version 1.0 has the listing, screenshots, review
+  contact and notes, privacy answers (nothing collected) and age rating
+  (4+), and build 202609201117 is processed. It has not been submitted.
+
+## Releasing
+
+A `v*` tag runs `release-store` in `.github/workflows/release.yml` beside
+the DMG job: it archives the `typemeit` target with the store certificates
+and profile from the repo secrets (`APPLE_DISTRIBUTION_CERT_*`,
+`MAC_INSTALLER_CERT_*`, `MAC_APP_STORE_PROFILE`), uploads it, renders the
+screenshots with `Scripts/store/build.py`, puts the listing on the version
+named by the tag with `fastlane mac listing version:X`, and submits it with
+`fastlane mac submit version:X build:N`, N being the commit count. The
+release is manual: once approved, the version is released by hand in App
+Store Connect, so the store and the DMG can go out together.
+
+The screenshots' inputs are committed (the Slack and Claude captures, the
+app tab captures); only the frames are rendered on the runner. Retaking a
+capture is local work (the `store-screenshots` skill).
 
 ## What the sandbox changes
 
 The sandbox refuses the Accessibility API on other apps whatever the user
 grants (probe of 15 September 2026). Posting key events, the microphone and
-the clipboard still work, so dictation and the paste do. PR #127 (merged)
-makes a sandboxed build detect itself and drop what it cannot do:
+the clipboard still work, so dictation and the paste do. PR #127 makes a
+sandboxed build detect itself and drop what it cannot do:
 
 - the focus check before a paste;
 - the read-back that learns from corrections, and its settings row;
@@ -60,9 +71,3 @@ Also different in a store build:
 - The insights screenshot shows a tab the store build does not have; either
   the frame goes, or insights come back without the window-title
   categories.
-
-## Order of work
-
-1. Tax questionnaire, review contact, privacy answers, age rating.
-2. Pick the build on version 1.0 and submit for review, with notes on the
-   Input Monitoring and Microphone prompts and why the app posts key events.

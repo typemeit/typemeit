@@ -16,6 +16,9 @@ SCREENSHOTS = File.expand_path("../Scripts/store/out", __dir__)
 # The order the store shows them in.
 ORDER = %w[slack claude history insights settings]
 
+# sync_screenshots is gated behind this until fastlane calls it stable.
+ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
+
 def api_key
   app_store_connect_api_key(
     key_id: ENV.fetch("ASC_KEY_ID"),
@@ -40,7 +43,8 @@ platform :mac do
   desc "Upload the listing text and screenshots. Uploads no build and submits nothing for review.
         `listing metadata:false` sends the screenshots alone: deliver's metadata pass reads the
         version's App Review contact, which a new version does not have until it is filled in once
-        in App Store Connect"
+        in App Store Connect. `listing version:1.0.1` names the version the text goes on, creating
+        it if the store has none in preparation"
   lane :listing do |options|
     api_key
     screenshots = Dir[File.join(SCREENSHOTS, "*.png")].sort
@@ -59,16 +63,45 @@ platform :mac do
     deliver(
       app_identifier: BUNDLE_ID,
       platform: "osx",
+      app_version: options[:version],
       metadata_path: "./fastlane/metadata",
       screenshots_path: staged,
-      overwrite_screenshots: true,
+      # Checksums decide what goes up, so an unchanged frame is left alone
+      # and nothing is deleted and re-verified before the store has
+      # processed it, which is what doubled every screenshot once.
+      sync_screenshots: true,
       skip_binary_upload: true,
       skip_metadata: options[:metadata] == false,
-      skip_app_version_update: true,
+      skip_app_version_update: options[:version].nil?,
       submit_for_review: false,
       force: true,
       precheck_include_in_app_purchases: false,
       run_precheck_before_submit: false
+    )
+  end
+
+  desc "Attach an uploaded build to the version and submit it for review:
+        `submit version:1.0.1 build:202609201117`. Waits for the build to finish processing.
+        The release is manual: approved, it goes on sale when released in App Store Connect"
+  lane :submit do |options|
+    api_key
+    deliver(
+      app_identifier: BUNDLE_ID,
+      platform: "osx",
+      app_version: options.fetch(:version),
+      build_number: options.fetch(:build),
+      skip_metadata: true,
+      skip_screenshots: true,
+      skip_binary_upload: true,
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      run_precheck_before_submit: false,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+        add_id_info_uses_idfa: false
+      }
     )
   end
 end
