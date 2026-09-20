@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+#if canImport(Sparkle)
 import Sparkle
 
 /// Sparkle's updater, wrapped so the rest of the app never imports Sparkle.
@@ -334,3 +335,32 @@ private final class SilentDriver: NSObject, SPUUserDriver {
         foundReply = nil
     }
 }
+
+#else
+
+/// The App Store build links no Sparkle: the store delivers its updates.
+/// The same surface, so nothing else in the app tells the builds apart;
+/// the state stays `upToDate` and every action is a no-op.
+@MainActor
+@Observable
+final class Updates {
+    static let shared = Updates()
+
+    enum State: Equatable {
+        case checking, upToDate
+        case available(version: String), downloading(version: String), readyToInstall(version: String)
+        case installing, unreachable
+        case downloadFailed(version: String)
+    }
+
+    static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+    private(set) var state: State = .upToDate
+
+    func checkNow() {}
+    func install() {}
+    func putOff(_ version: String) {}
+    func remind() {}
+    func preferencesChanged() {}
+}
+
+#endif
