@@ -32,8 +32,11 @@ platform :mac do
     end
   end
 
-  desc "Upload the listing text and screenshots. Uploads no build and submits nothing for review"
-  lane :listing do
+  desc "Upload the listing text and screenshots. Uploads no build and submits nothing for review.
+        `listing metadata:false` sends the screenshots alone: deliver's metadata pass reads the
+        version's App Review contact, which a new version does not have until it is filled in once
+        in App Store Connect"
+  lane :listing do |options|
     api_key
     screenshots = Dir[File.join(SCREENSHOTS, "*.png")]
     UI.user_error!("no screenshots in #{SCREENSHOTS}; run python3 Scripts/store/build.py") if screenshots.empty?
@@ -44,6 +47,7 @@ platform :mac do
       screenshots_path: SCREENSHOTS,
       overwrite_screenshots: true,
       skip_binary_upload: true,
+      skip_metadata: options[:metadata] == false,
       skip_app_version_update: true,
       submit_for_review: false,
       force: true,
