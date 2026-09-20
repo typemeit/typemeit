@@ -125,8 +125,9 @@ jobs:
         # The frames are drawn by headless Chrome over the captures in the
         # repo; the runner image ships Chrome.
         run: |
-          python3 -m pip install --quiet pillow numpy
-          python3 Scripts/store/build.py
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          "$RUNNER_TEMP/store-venv/bin/pip" install --quiet pillow numpy
+          "$RUNNER_TEMP/store-venv/bin/python" Scripts/store/build.py
       - name: Put the listing on the version and submit it
         run: |
           fastlane mac listing version:"$MARKETING_VERSION"
