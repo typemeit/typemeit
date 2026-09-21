@@ -209,7 +209,7 @@ final class MeetingStore {
     /// failed one waits for the row's retry.
     func recoverAtLaunch() -> [Meeting] {
         var toTranscribe: [Meeting] = []
-        for var meeting in meetings where !meeting.published && (meeting.transcription.state == .pending || meeting.transcription.state == .running) {
+        for var meeting in meetings where meeting.transcription.state == .pending || meeting.transcription.state == .running {
             guard let folder = folders[meeting.id] else { continue }
             if meeting.ended == nil {
                 var longest = 0

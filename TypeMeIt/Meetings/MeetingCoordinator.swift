@@ -392,6 +392,18 @@ final class MeetingCoordinator {
         enqueue(meeting)
     }
 
+    /// The whole pass again on a finished meeting's kept audio, from the
+    /// first chunk, keeping the title and the speaker names.
+    func transcribeAgain(_ id: UUID) {
+        guard var meeting = store.meeting(id), meeting.isDone, !meeting.audioFiles.isEmpty, !liveIDs.contains(id) else { return }
+        meeting.transcription.state = .pending
+        meeting.transcription.error = nil
+        meeting.transcription.done = [:]
+        meeting.paragraphs = []
+        store.save(meeting)
+        enqueue(meeting)
+    }
+
     private func pump() {
         guard transcribeTask == nil, !transcribeQueue.isEmpty else { return }
         let meeting = transcribeQueue.removeFirst()

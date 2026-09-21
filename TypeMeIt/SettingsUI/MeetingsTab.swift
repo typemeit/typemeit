@@ -228,6 +228,9 @@ struct MeetingsTab: View {
     /// The paragraphs, each headed by its speaker and time.
     private func transcript(_ m: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if m.isDone, !m.audioFiles.isEmpty, !coordinator.liveIDs.contains(m.id) {
+                Button("transcribe again") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle(quiet: true))
+            }
             if m.paragraphs.isEmpty {
                 Text(m.transcription.state == .done ? "nothing was said" : "not transcribed yet")
                     .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3)
