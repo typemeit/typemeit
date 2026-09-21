@@ -93,7 +93,8 @@ enum MeetingTranscriber {
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
             }
             // A speaker the diarizer found but no word landed on is not listed.
-            meeting.speakers.removeAll { !$0.isYou && $0.talkMs == 0 && !meeting.paragraphs.contains(where: { p in p.speaker == $0.id }) }
+            let spoken = Set(meeting.paragraphs.map(\.speaker))
+            meeting.speakers.removeAll { !$0.isYou && !spoken.contains($0.id) }
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
