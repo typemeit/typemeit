@@ -587,7 +587,30 @@ directory in place.
 `-diarizeFile <path>`: run the offline pipeline with `computeUnits:
 .cpuAndNeuralEngine` on S1's `others.caf` from a three-person call at
 `stepRatio` 0.2 and 0.1, log segments, speaker count, wall time, and the
-`speakerDatabase` embedding per speaker. Then run the same pipeline over ten
+`speakerDatabase` embedding per speaker.
+
+Start from a shipping MIT app's `OfflineDiarizerConfig` rather than the
+defaults; it runs the same pipeline and its reasons are written down. Measure
+each against the defaults, do not adopt blind:
+
+- `clusteringThreshold` 0.5 against the 0.6 default. Higher stops merging
+  earlier and yields *more* speakers — the polarity 3.3 warns about, stated
+  the same way there.
+- `segmentationMinDurationOn` 1.0, up from 0.0. At the default the
+  segmentation model emits sub-second blips for backchannels ("yeah",
+  "right") inside a monologue, which split one sentence across three speaker
+  lines once words are aligned. Pyannote's paper recommends ≥1.0; FluidAudio's
+  source puts the cost at 1.4% DER, which buys a transcript a person can read.
+- `segmentationMinDurationOff` 0.5, up from 0.0, so a breath mid-sentence
+  does not end a turn.
+- Leave `excludeOverlap` and `exclusiveSegments` at their defaults. The second
+  is load-bearing for 8.3: non-overlapping output is what makes one word map
+  to exactly one speaker.
+- `withSpeakers(exactly:)` overrides VBx's automatic count. Without it VBx
+  picks its own, and on a conversation one person dominates it tends to pick
+  **1** — the failure that merges the quiet participant into the loud one.
+  Measure whether passing the count (phase 3's roster, or "far end + 1" on a
+  1:1) is what fixes the three-speaker test. Then run the same pipeline over ten
 kept dictation recordings (one speaker each) and log the cosine distance of
 each embedding to the others and to the diarized speakers.
 
@@ -1555,6 +1578,16 @@ On a real machine, each of these, with debug logs on and the log read afterwards
   word's speaker. Tests: a word between two segments, a word before the first
   segment, overlapping segments (the one whose centre is nearer wins).
 - `transcription.diarizer` records the pipeline name and version.
+- **The mic track stays `you` even when two people share it.** Two of us
+  round one laptop is an ordinary call, and the mic is then two voices under
+  one label. Accepted for now rather than solved: diarizing the mic track as
+  well costs a second run, and on a speakers call its bleed makes the result
+  worse than the label it would replace. Section 10 carries it. What must not
+  happen is the inverse — a stray far-end chunk (a notification chime during
+  an in-person meeting) routing a room down the call path and collapsing
+  everyone in it to `You`. The room is chosen by the user, never inferred
+  from the presence of far-end audio, so this is a property to keep, not a
+  fix to make.
 - The diarizer failing keeps the transcript with `Them` (or `Room`) and logs;
   it does not fail the meeting.
 - On `echo == .affected`, mic-side audio is never used for speaker
@@ -1662,9 +1695,15 @@ Not in this plan, written down so they are not re-derived:
 - Echo removal. Voice-processing I/O would have to run on a separate
   engine, ducks every other app's output (the far end included, before or
   after the tap, unknown) and cannot be scoped away from a dictation taken
-  on the same node; text dedup deletes the user's own sentences in
+  on the same node. A shipping MIT notetaker settled the first half of that
+  unknown the expensive way: the unit takes the device in *both* directions,
+  and the user stops being able to hear the person they are talking to. Its
+  source carries the finding as a comment next to the call it does not make; text dedup deletes the user's own sentences in
   meeting-transcriber's measurements and ships off by default there. The
   detector in D14 is the whole answer until someone measures one of these.
+- Diarizing the mic track on a call, so two people at one laptop are two
+  speakers rather than one `You` (8.3). Gated on echo: worth it on
+  headphones, probably harmful on speakers.
 - Power assertions as a second detection channel; the calendar as an end
   signal.
 - Native apps' accessibility trees (Zoom, Teams).
@@ -1791,6 +1830,7 @@ lifted.
 | Repo | Licence | Take |
 | --- | --- | --- |
 | `pasrom/meeting-transcriber` | MIT, active (177 stars) | `EchoBleedDetector` (constants, `Result` and `analyse`, fed envelopes; 7.10), `SilentRecordingMonitor` (the 90 s both-channels rule), `SpeakerMatcher` (0.40 / 0.10 defaults), `DualSourceRecorder.resolveTapPIDs` (tap the whole app), `MicInputDetector` (the FaceTime and WebKit.GPU facts), `AppTapSession` (teardown order), `DiarizationProcess.mergeDualSourceSegments` (the merge, written here in Swift of our own) |
+| `michaelwilhelmsen/humla` | MIT, active | `OfflineDiarizerConfig` starting values and the reasons for each (S3), `withSpeakers(exactly:)` against VBx's dominant-speaker under-count, and the voice-processing-I/O finding in section 10. Ships the same FluidAudio pipeline this plan picks, so its tuning is measured on our problem, not an adjacent one |
 | `insidegui/AudioCap` | BSD-2-Clause, last push 2025-08 | Tap and aggregate-device geometry, tap format read. Keep its copyright notice where code is lifted |
 | `FluidInference/FluidAudio` | Apache-2.0 (library); pyannote/WeSpeaker weights CC-BY-4.0 | A dependency, not lifted code. Attribute in the about row |
 | `brendanbank/atrium-pa-mac` | BSD-2-Clause | The 45 s / 2 min / 90 s starting values and the zero-buffer warning |
