@@ -128,6 +128,22 @@ final class Settings {
     /// The clean-up model is told the names and terms visible in the window
     /// being dictated into. Needs Screen Recording.
     var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
+    /// Lists this Mac on the local network, so another Mac running type me it
+    /// can be sent notes and can send them here. Off until it is asked for:
+    /// while it is on, the name below is visible to everyone on the network.
+    var sharing: Bool {
+        didSet {
+            defaults.set(sharing, forKey: "sharing")
+            Sharing.shared.sync()
+        }
+    }
+    /// What this Mac is called in the other Mac's list.
+    var shareName: String {
+        didSet {
+            defaults.set(shareName, forKey: "shareName")
+            Sharing.shared.rename()
+        }
+    }
     var onboardingComplete: Bool { didSet { defaults.set(onboardingComplete, forKey: "onboardingComplete") } }
     /// Copies the newest transcript to the clipboard. Nil means no shortcut.
     var copyLastShortcut: KeyCombo? {
@@ -173,6 +189,8 @@ final class Settings {
         cloudPosition = CloudPosition(rawValue: d.string(forKey: "cloudPosition") ?? "") ?? .centre
         cloudMatchesBackdrop = bool("cloudMatchesBackdrop", false)
         screenContextEnabled = bool("screenContextEnabled", false)
+        sharing = bool("sharing", false)
+        shareName = d.string(forKey: "shareName") ?? Sharing.defaultName()
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []

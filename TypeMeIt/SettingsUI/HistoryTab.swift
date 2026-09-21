@@ -62,6 +62,8 @@ struct HistoryTab: View {
     /// The row a range is measured from: the last one whose box was clicked.
     @State private var anchor: UUID?
     @State private var confirmDeleteAll = false
+    /// The notes the share sheet is offering, or nil while it is closed.
+    @State private var draft: ShareDraft?
 
     private var filtered: [HistoryEntry] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
@@ -95,6 +97,9 @@ struct HistoryTab: View {
                 Text(counted(store.history.count, "dictation"))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 if !selected.isEmpty {
+                    Button("share \(selected.count)") { draft = ShareDraft(notes: sharedNotes(selected)) }
+                        .buttonStyle(InkButtonStyle())
+                        .disabled(sharedNotes(selected).isEmpty)
                     Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                         .buttonStyle(InkButtonStyle())
                 }
@@ -133,13 +138,32 @@ struct HistoryTab: View {
                         Text("nothing · never keep").tag(-1)
                     }.labelsHidden().fixedSize()
                 }
-                SettingsRow(label: "keep the audio", subtitle: "deleted along with the dictation", last: true) {
+                SettingsRow(label: "keep the audio", subtitle: "deleted along with the dictation") {
                     Toggle("", isOn: $settings.keepRecordings).toggleStyle(.switch).labelsHidden()
                         .disabled(settings.historyLimit < 0)
+                }
+                SettingsRow(label: "share with nearby macs",
+                            subtitle: "lists this mac by name on the network, so another mac running type me it can send notes here and be sent them. nothing moves until four digits match on both screens.",
+                            last: !settings.sharing) {
+                    Toggle("", isOn: $settings.sharing).toggleStyle(.switch).labelsHidden()
+                }
+                if settings.sharing {
+                    SettingsRow(label: "as", last: true) { ShareNameField() }
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 2)
         }
+        .sheet(item: $draft) { draft in
+            ShareSheet(notes: draft.notes) { self.draft = nil }
+        }
+    }
+
+    /// The selected rows as notes to send, newest last and empty ones left
+    /// out: a dictation that came out blank is not worth anyone's screen.
+    private func sharedNotes(_ ids: Set<UUID>) -> [SharedNote] {
+        store.history
+            .filter { ids.contains($0.id) && !$0.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { SharedNote(id: $0.id, timestamp: $0.timestamp, text: $0.displayText) }
     }
 
     @ViewBuilder

@@ -64,6 +64,9 @@ targets:
         CFBundleIconFile: "$(APP_ICON_FILE)"
         LSMinimumSystemVersion: "26.0"
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
+        NSLocalNetworkUsageDescription: "type me it finds the other Macs running it on this network, so notes can be sent between them without going through a server."
+        NSBonjourServices:
+          - _typemeit._tcp
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
         SUFeedURL: https://github.com/typemeit/typemeit/releases/latest/download/appcast.xml
@@ -75,6 +78,9 @@ targets:
       path: TypeMeIt/Support/TypeMeIt.entitlements
       properties:
         com.apple.security.device.audio-input: true
+        # Sharing notes between two Macs: each end both dials and listens.
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
