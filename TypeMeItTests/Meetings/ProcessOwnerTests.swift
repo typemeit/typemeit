@@ -14,6 +14,13 @@ struct ProcessOwnerTests {
         #expect(owner == ProcessOwner.Owner(bundleID: "com.google.Chrome", name: "Google Chrome", appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")))
     }
 
+    @Test func aHelperListedAsARunningAppStillResolvesToTheAppThatOwnsIt() {
+        let chrome = ProcessOwner.RunningApp(bundleID: "com.google.Chrome", name: "Google Chrome", url: URL(fileURLWithPath: "/Applications/Google Chrome.app"))
+        let helper = ProcessOwner.RunningApp(bundleID: "com.google.Chrome.helper", name: "Google Chrome Helper", url: URL(fileURLWithPath: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper.app"))
+        let owner = ProcessOwner.owner(of: info(bundleID: "com.google.Chrome.helper"), apps: [helper, chrome])
+        #expect(owner == ProcessOwner.Owner(bundleID: "com.google.Chrome", name: "Google Chrome", appURL: chrome.url))
+    }
+
     @Test func slackHelperResolvesToSlack() {
         let apps = [ProcessOwner.RunningApp(bundleID: "com.tinyspeck.slackmacgap", name: "Slack", url: URL(fileURLWithPath: "/Applications/Slack.app"))]
         let owner = ProcessOwner.owner(of: info(bundleID: "com.tinyspeck.slackmacgap.helper"), apps: apps)

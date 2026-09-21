@@ -199,8 +199,10 @@ enum ProcessOwner {
             if bundleID == Fixed.meetingWebContentBundleID {
                 return Owner(bundleID: bundleID, name: webContentName, appURL: nil)
             }
+            // NSWorkspace lists a helper bundle as a running app of its own,
+            // so the shortest matching id is the app that owns it.
             let owning = apps.filter { bundleID == $0.bundleID || bundleID.hasPrefix($0.bundleID + ".") }
-                .max { $0.bundleID.count < $1.bundleID.count }
+                .min { $0.bundleID.count < $1.bundleID.count }
             if let owning { return Owner(bundleID: owning.bundleID, name: owning.name, appURL: owning.url) }
             let name = Fixed.meetingDaemonNames[bundleID] ?? bundleID.split(separator: ".").last.map(String.init) ?? bundleID
             return Owner(bundleID: bundleID, name: name, appURL: nil)
