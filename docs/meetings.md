@@ -135,11 +135,17 @@ change any of them; the default is what gets built.
   `Fixed.meetingSilentSeconds` (90 s) and the Meetings tab has a `test`
   button that taps our own process and checks for signal. The mic track is
   kept whatever the far end does.
-- **D14. Echo is detected, never removed.** Every two-track meeting is run
-  through an envelope cross-correlation detector at the end. An affected
-  meeting is marked `echo: affected`, its row says `on speakers`, and
-  nothing is deleted from either transcript. Voice-processing I/O and text
-  dedup are out (section 10).
+- **D14. Echo is detected, and folded out by the clock.** Every two-track
+  meeting is run through an envelope cross-correlation detector at the end.
+  An affected meeting is marked `echo: affected` and its row says `on
+  speakers`. On such a meeting, and only there, a run of two or more
+  identical words at the same instant on both tracks (within 400 ms; the
+  tracks share a clock, 5.4) is one utterance heard twice, and the copy on
+  the track that is quieter over that run, the one that came through a
+  speaker, is dropped (`EchoFold`). A lone shared word is left alone.
+  Voice-processing I/O and text-only dedup are out (section 10): the first
+  ducks the far end, the second cannot tell an echo from a coincidence
+  without the clock.
 - **D15. Voice prints are opt-in and die with history.** The **You** print
   is built only when the user turns it on, from kept dictation recordings
   and from dictations as they happen, and deleted when they turn it off or
@@ -422,6 +428,7 @@ Rules for every task below:
 | `Meetings/ChunkCutter.swift` | Cut points for a long track from its peak envelope (pure) |
 | `Meetings/TranscriptMerge.swift` | Words from one or two tracks plus speaker segments plus dictation spans to paragraphs (pure) |
 | `Meetings/EchoBleedDetector.swift` | Lifted from meeting-transcriber (MIT): envelope cross-correlation verdict (pure) |
+| `Meetings/EchoFold.swift` | On an affected call, drops the quieter copy of a run of words both tracks share at the same instant (pure) |
 | `Meetings/MeetingTranscriber.swift` | The end-of-meeting pipeline: read tracks, chunk, transcribe, (phase 2) diarize, echo, merge, write, transcode, publish |
 | `Meetings/DiarizerModelStore.swift` (phase 2) | Download and pin the FluidAudio model archive, modelled on `ModelStore` |
 | `Meetings/Diarizer.swift` (phase 2) | FluidAudio offline pipeline behind two functions |

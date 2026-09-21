@@ -69,6 +69,12 @@ enum MeetingTranscriber {
 
             if meeting.kind == .call, let mic = rms[.mic], let others = rms[.others] {
                 meeting.echo = EchoVerdict.verdict(EchoBleedDetector.analyse(micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz))
+                if meeting.echo == .affected, let m = trackWords.firstIndex(where: { $0.role == Meeting.Speaker.you }), let o = trackWords.firstIndex(where: { $0.role == Meeting.Speaker.them }) {
+                    let folded = EchoFold.fold(mic: trackWords[m].words, others: trackWords[o].words, micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz)
+                    trackWords[m].words = folded.mic
+                    trackWords[o].words = folded.others
+                    DebugLog.write("Meeting echo folded: \(counted(folded.droppedFromMic, "word")) off the mic, \(counted(folded.droppedFromOthers, "word")) off the far end")
+                }
             }
 
             let segments = await speakers(of: &meeting, in: folder)
