@@ -53,6 +53,7 @@ private struct SelectBox: View {
 }
 
 struct HistoryTab: View {
+    @Environment(\.openWindow) private var openWindow
     @State private var store = Store.shared
     @State private var settings = Settings.shared
     @State private var player = RecordingPlayer.shared
@@ -103,6 +104,9 @@ struct HistoryTab: View {
                     Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                         .buttonStyle(InkButtonStyle())
                 }
+                Button("receive") { openWindow(id: "share") }
+                    .buttonStyle(InkButtonStyle())
+                    .disabled(!settings.sharing)
                 Button("delete all") { confirmDeleteAll = true }
                     .buttonStyle(InkButtonStyle())
                     .disabled(store.history.isEmpty)
@@ -142,8 +146,8 @@ struct HistoryTab: View {
                     Toggle("", isOn: $settings.keepRecordings).toggleStyle(.switch).labelsHidden()
                         .disabled(settings.historyLimit < 0)
                 }
-                SettingsRow(label: "share with nearby macs",
-                            subtitle: "lists this mac by name on the network, so another mac running type me it can send notes here and be sent them. nothing moves until four digits match on both screens.",
+                SettingsRow(label: "sharing",
+                            subtitle: "hands notes to another mac running type me it, wherever it is. typeme.it only introduces the two macs to each other and never sees a note; the notes themselves go straight between them, sealed, once four digits match on both screens. nothing happens until you press share.",
                             last: !settings.sharing) {
                     Toggle("", isOn: $settings.sharing).toggleStyle(.switch).labelsHidden()
                 }

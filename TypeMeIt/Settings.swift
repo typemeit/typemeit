@@ -128,22 +128,13 @@ final class Settings {
     /// The clean-up model is told the names and terms visible in the window
     /// being dictated into. Needs Screen Recording.
     var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
-    /// Lists this Mac on the local network, so another Mac running type me it
-    /// can be sent notes and can send them here. Off until it is asked for:
-    /// while it is on, the name below is visible to everyone on the network.
-    var sharing: Bool {
-        didSet {
-            defaults.set(sharing, forKey: "sharing")
-            Sharing.shared.sync()
-        }
-    }
-    /// What this Mac is called in the other Mac's list.
-    var shareName: String {
-        didSet {
-            defaults.set(shareName, forKey: "shareName")
-            Sharing.shared.rename()
-        }
-    }
+    /// Whether notes can be handed to another Mac running type me it. Nothing
+    /// runs in the background either way: with this on, typeme.it hears from
+    /// this Mac only while a share the user started is being set up. Off is
+    /// for people who would rather it never did.
+    var sharing: Bool { didSet { defaults.set(sharing, forKey: "sharing") } }
+    /// What the other end calls this Mac while a share is being agreed.
+    var shareName: String { didSet { defaults.set(shareName, forKey: "shareName") } }
     var onboardingComplete: Bool { didSet { defaults.set(onboardingComplete, forKey: "onboardingComplete") } }
     /// Copies the newest transcript to the clipboard. Nil means no shortcut.
     var copyLastShortcut: KeyCombo? {
@@ -189,7 +180,7 @@ final class Settings {
         cloudPosition = CloudPosition(rawValue: d.string(forKey: "cloudPosition") ?? "") ?? .centre
         cloudMatchesBackdrop = bool("cloudMatchesBackdrop", false)
         screenContextEnabled = bool("screenContextEnabled", false)
-        sharing = bool("sharing", false)
+        sharing = bool("sharing", true)
         shareName = d.string(forKey: "shareName") ?? Sharing.defaultName()
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }

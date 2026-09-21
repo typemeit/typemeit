@@ -5,12 +5,17 @@ import Foundation
 ///
 /// Each end makes a throwaway X25519 key pair, sends the public half, and
 /// derives the same secret from the other's. That alone would be wide open to
-/// anyone on the network who can answer first, so the derivation also yields
-/// four digits — the same four on both Macs, and different ones if a third
-/// party sat in the middle. Both users are shown them, and the notes only go
-/// once the person receiving has said yes to the digits they can see on the
-/// sending Mac. The digits are the authentication; the key agreement on its
-/// own is not.
+/// whoever relayed the introduction, so two things are added to it.
+///
+/// The pairing code goes into the derivation. The server that introduced the
+/// two Macs only ever saw a hash of it, so it cannot derive what either end
+/// derives, and notes sealed for one Mac do not open for it.
+///
+/// And the derivation yields four digits — the same four on both Macs, and
+/// different ones if a third party sat in the middle. Both people are shown
+/// them, and the notes only go once the one receiving has said yes to the
+/// digits they can see on the sending screen. That check is what holds even
+/// if the code itself were learned; the key agreement on its own is not.
 enum ShareHandshake {
     private static let keyInfo = Data("type me it share v1 key".utf8)
     private static let codeInfo = Data("type me it share v1 code".utf8)
@@ -27,7 +32,7 @@ enum ShareHandshake {
         case cannotOpen
     }
 
-    static func agree(ours: Curve25519.KeyAgreement.PrivateKey, theirs: Data) throws -> Agreement {
+    static func agree(ours: Curve25519.KeyAgreement.PrivateKey, theirs: Data, pairing: String) throws -> Agreement {
         guard let peer = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: theirs) else {
             throw Failure.badKey
         }
@@ -35,8 +40,9 @@ enum ShareHandshake {
             throw Failure.badKey
         }
         let salt = transcript(ours.publicKey.rawRepresentation, theirs)
-        let key = secret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: keyInfo, outputByteCount: 32)
-        let digits = secret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: codeInfo, outputByteCount: 4)
+        let pairing = Data(pairing.utf8)
+        let key = secret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: keyInfo + pairing, outputByteCount: 32)
+        let digits = secret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: codeInfo + pairing, outputByteCount: 4)
         return Agreement(key: key, code: code(from: digits))
     }
 

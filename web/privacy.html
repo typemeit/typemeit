@@ -75,19 +75,21 @@
 <ul>
   <li><em>the speech model</em>, downloaded once during onboarding from this app's github releases page. github sees an ordinary download request from your ip address.</li>
   <li><em>update checks</em>, made by the sparkle framework against the app's github releases page. by default the app checks on a schedule sparkle manages. the request includes the app version and macos version so the right update can be offered. nothing else about your mac is sent. you can turn automatic checks off in settings, and check by hand from the menu instead.</li>
+  <li><em>the introduction between two macs</em>, made to typeme.it only while you are setting up a share, and described under sharing below.</li>
 </ul>
 <p>there is no account, no sign-in, no analytics, no crash reporting and no advertising. the app makes no other network requests over the internet.</p>
   </div>
 </section>
 
 <section>
-  <h2>sharing notes with a nearby mac</h2>
+  <h2>sharing notes with another mac</h2>
   <div>
-<p>sharing is off until you turn it on, in the history tab. while it is off the app is not on the network at all and nothing below applies.</p>
-<p>while it is on, the app lists this mac by a name you choose on the local network, using bonjour, and answers connections from other macs running it. anyone on that network can see the name. no note is sent or accepted on that alone.</p>
-<p>to send, you pick the notes and the mac. both macs then show the same four digits, and the notes only move once the person receiving has checked the digits against the sending screen and said yes. the notes are encrypted with a key the two macs agree between themselves and throw away afterwards; the digits are what proves nobody sat in the middle of that agreement, which is why they are worth checking rather than waving through.</p>
+<p>nothing here runs in the background. the app advertises nothing, listens for nothing, and contacts nothing until you press share or type in a code. turning sharing off in the history tab stops even that.</p>
+<p>to send, you pick the notes and the app shows an eight-character code. the other person types that code into their copy. both macs then show the same four digits, and the notes only move once the person receiving has checked those digits against the sending screen and said yes.</p>
+<p>getting the two macs talking takes a short introduction through typeme.it. what that server is given is a hash of the code, never the code, and the messages that pass through it say only how to reach a mac — an address and a port — never what is being sent. it cannot read a note, and it cannot work out the key the two macs agree, because that key is derived partly from the code it does not have.</p>
+<p>once the two macs have found each other the notes go directly between them, and typeme.it is dropped from the conversation. two macs on the same network end up talking over that network; two in different places go out through their own routers. the exception is a pair behind networks strict enough that no direct path exists, which fall back to relaying through cloudflare's turn service — that relay carries the same sealed bytes and has no key for them either.</p>
 <p>a note that is sent carries its text and the time it was said, and nothing else: not the audio, not the app it was typed into, not the window title, not what the speech engine heard before clean-up. notes that arrive are shown in a window and are not written to disk — close it and they are gone unless you copied them out.</p>
-<p>none of this goes through a server. the two macs talk to each other on the network they are both on.</p>
+<p>a code is good for one share and for ten minutes. the room it names holds two macs and turns away a third, and it is not stored anywhere once it closes.</p>
   </div>
 </section>
 

@@ -1,5 +1,7 @@
 # Every request is served from ./web as a static file, except /download, which
-# worker.js answers by streaming the latest DMG from GitHub under its own name.
+# worker.js answers by streaming the latest DMG from GitHub under its own name,
+# and /share/*, which introduces two Macs to each other so they can send notes
+# directly. See the comment at the top of worker.js.
 name = "typemeit-web-dev"
 main = "worker.js"
 compatibility_date = "2026-07-01"
@@ -8,6 +10,16 @@ compatibility_date = "2026-07-01"
 directory = "./web"
 binding = "ASSETS"
 
+# The room two Macs meet in. One object per code, and it closes itself after
+# ten minutes whatever state it is in.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "ShareRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShareRoom"]
+
 [env.production]
 name = "typemeit-web"
 routes = [{ pattern = "typeme.it", custom_domain = true }]
@@ -15,3 +27,13 @@ routes = [{ pattern = "typeme.it", custom_domain = true }]
 [env.production.assets]
 directory = "./web"
 binding = "ASSETS"
+
+# Bindings are per environment and are not inherited from the top level.
+[[env.production.durable_objects.bindings]]
+name = "ROOMS"
+class_name = "ShareRoom"
+
+# TURN is optional. Set TURN_KEY_ID and TURN_API_TOKEN as secrets
+# (`wrangler secret put TURN_KEY_ID --env production`) to let pairs behind
+# strict NATs connect through Cloudflare's relay; without them /share/ice
+# offers STUN alone and most pairs still connect.

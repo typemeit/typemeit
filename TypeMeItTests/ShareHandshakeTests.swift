@@ -9,12 +9,12 @@ struct ShareHandshakeTests {
         SharedNote(id: UUID(), timestamp: Date(timeIntervalSince1970: 1_700_000_060), text: "and the second"),
     ])
 
-    /// Both ends of one exchange.
-    private func pair() throws -> (ShareHandshake.Agreement, ShareHandshake.Agreement) {
+    /// Both ends of one exchange, having been given the same pairing code.
+    private func pair(code: String = "ABCD2345") throws -> (ShareHandshake.Agreement, ShareHandshake.Agreement) {
         let a = Curve25519.KeyAgreement.PrivateKey()
         let b = Curve25519.KeyAgreement.PrivateKey()
-        return (try ShareHandshake.agree(ours: a, theirs: b.publicKey.rawRepresentation),
-                try ShareHandshake.agree(ours: b, theirs: a.publicKey.rawRepresentation))
+        return (try ShareHandshake.agree(ours: a, theirs: b.publicKey.rawRepresentation, pairing: code),
+                try ShareHandshake.agree(ours: b, theirs: a.publicKey.rawRepresentation, pairing: code))
     }
 
     @Test func bothEndsReachTheSameKey() throws {
@@ -45,8 +45,8 @@ struct ShareHandshakeTests {
         let a = Curve25519.KeyAgreement.PrivateKey()
         let b = Curve25519.KeyAgreement.PrivateKey()
         let middle = Curve25519.KeyAgreement.PrivateKey()
-        let toA = try ShareHandshake.agree(ours: a, theirs: middle.publicKey.rawRepresentation)
-        let toB = try ShareHandshake.agree(ours: b, theirs: middle.publicKey.rawRepresentation)
+        let toA = try ShareHandshake.agree(ours: a, theirs: middle.publicKey.rawRepresentation, pairing: "ABCD2345")
+        let toB = try ShareHandshake.agree(ours: b, theirs: middle.publicKey.rawRepresentation, pairing: "ABCD2345")
         #expect(toA.code != toB.code)
     }
 
@@ -67,8 +67,21 @@ struct ShareHandshakeTests {
     @Test func somethingThatIsNotAPublicKeyIsRefused() {
         let ours = Curve25519.KeyAgreement.PrivateKey()
         #expect(throws: ShareHandshake.Failure.badKey) {
-            try ShareHandshake.agree(ours: ours, theirs: Data([1, 2, 3]))
+            try ShareHandshake.agree(ours: ours, theirs: Data([1, 2, 3]), pairing: "ABCD2345")
         }
+    }
+
+    @Test func theSameKeysUnderAnotherCodeAgreeOnSomethingElse() throws {
+        // What the introducing server would be left with: it relayed the
+        // public keys, so it has those, but it only ever saw a hash of the
+        // code and cannot reach either end's key without it.
+        let a = Curve25519.KeyAgreement.PrivateKey()
+        let b = Curve25519.KeyAgreement.PrivateKey()
+        let right = try ShareHandshake.agree(ours: a, theirs: b.publicKey.rawRepresentation, pairing: "ABCD2345")
+        let wrong = try ShareHandshake.agree(ours: a, theirs: b.publicKey.rawRepresentation, pairing: "ABCD2346")
+        #expect(right.code != wrong.code)
+        let sealed = try ShareHandshake.seal(notes, with: right.key)
+        #expect(throws: ShareHandshake.Failure.cannotOpen) { try ShareHandshake.open(sealed, with: wrong.key) }
     }
 
     @Test func theTranscriptIsTheSameWhicheverEndBuildsIt() {

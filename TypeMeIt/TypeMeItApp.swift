@@ -22,8 +22,8 @@ struct TypeMeItApp: App {
         .windowResizability(.contentMinSize)
         .defaultSize(width: 640, height: 520)
 
-        // Opened when another Mac calls, and by nothing else.
-        Window("shared with you", id: "share") {
+        // Where a pairing code is typed in and what arrives is shown.
+        Window("receive a note", id: "share") {
             ShareInbox()
         }
         .windowResizability(.contentSize)
@@ -68,10 +68,6 @@ struct MenuBarLabel: View {
         Image(nsImage: appState.menuBarImage)
             .onReceive(NotificationCenter.default.publisher(for: MenuBarLabel.openSettings)) { _ in
                 openWindow(id: "settings")
-                NSApp.activate(ignoringOtherApps: true)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Sharing.offered)) { _ in
-                openWindow(id: "share")
                 NSApp.activate(ignoringOtherApps: true)
             }
     }
@@ -127,6 +123,9 @@ struct MenuContent: View {
         }
         Button { openWindow(id: "settings"); NSApp.activate(ignoringOtherApps: true) } label: { Text("Open type me it") }
             .keyboardShortcut(",", modifiers: .command)
+        if Settings.shared.sharing {
+            Button { openWindow(id: "share"); NSApp.activate(ignoringOtherApps: true) } label: { Text("Receive a Note…") }
+        }
         if let version = appState.updateReady {
             Button("Install Update \(version)") { Updates.shared.install() }
         }
@@ -200,7 +199,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Settings.shared
         _ = Store.shared
-        Sharing.shared.sync()
         applyDockIcon()
         applyAppearance()
         // Clean-up is the only clean-up there is, so anything that stops the
