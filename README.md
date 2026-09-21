@@ -36,7 +36,7 @@ Microphone, and Accessibility (the fn key, pasting, and reading corrections). Gr
 
 - `TypeMeIt/` app sources, one file per module
 - `TypeMeIt/Learning/`, `TypeMeIt/Insights/` ports of Handy's learning engine and insights, with their tests in `TypeMeItTests/`
-- `TypeMeIt/Sharing/` handing notes to another Mac running the app. One types the code the other shows, and four digits are checked on both screens before anything moves. The notes go sealed through the room `worker.js` keeps, which has no key for them; `ShareTransport` is where the direct WebRTC path on `claude/share-webrtc-transport` slots back in
+- `TypeMeIt/Sharing/` handing notes to another Mac running the app. The notes are sealed and left at `worker.js` under a code; eight characters of that code name the drop and ten are the key, which is never sent, so the server holds bytes it cannot read. A live WebRTC transport, and a Bonjour one before it, are on `claude/share-webrtc-transport`
 - `Packages/TranscribeCpp/` the XCFramework wrapper
 - `web/` the puff on a web page, driven by the pointer; `generate.py` transpiles the shader from `TypeMeIt/Overlay/Puff.metal`
 - `Scripts/`, `.github/workflows/` the release pipeline; `Scripts/generate-dmg-background.sh` draws the disk image's background from frames of the app's own puff shader in `Scripts/puff/`; `Scripts/generate-og.sh` draws the site's link previews, `web/og.png` and `web/og-square.png`, the same way through `Scripts/og/`

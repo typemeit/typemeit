@@ -3,60 +3,58 @@ import Testing
 @testable import TypeMeIt
 
 struct ShareCodeTests {
-    @Test func aCodeIsEightCharactersOfTheAlphabet() {
+    @Test func aCodeIsEighteenCharactersOfTheAlphabet() {
         for _ in 0..<100 {
-            let code = ShareCode.make()
-            #expect(code.count == ShareCode.length)
-            #expect(code.allSatisfy { ShareCode.alphabet.contains($0) })
+            let pickup = ShareCode.make()
+            #expect(pickup.name.count == ShareCode.nameLength)
+            #expect(pickup.secret.count == ShareCode.secretLength)
+            #expect(pickup.code.allSatisfy { ShareCode.alphabet.contains($0) })
         }
     }
 
     @Test func theCharactersThatGetMisreadAreNotUsed() {
-        // I against 1, L against 1, O against 0. A code is read off one
+        // I against 1, L against 1, O against 0. A code gets read off one
         // screen and typed into another, so none of them are in it.
         for bad in "ILO01" {
             #expect(!ShareCode.alphabet.contains(bad))
         }
     }
 
-    @Test func twoCodesAreNotTheSame() {
-        let codes = Set((0..<200).map { _ in ShareCode.make() })
-        #expect(codes.count == 200)
+    @Test func theTwoHalvesAreDrawnSeparately() {
+        // The whole point of the split: the server is told the name, so if
+        // the secret followed from it the server could work it out. A run of
+        // codes sharing a name would have to share a secret for that to be
+        // true of these.
+        let pickups = (0..<200).map { _ in ShareCode.make() }
+        #expect(Set(pickups.map(\.name)).count == 200)
+        #expect(Set(pickups.map(\.secret)).count == 200)
     }
 
     @Test func aCodeIsTakenHoweverItIsTyped() {
-        #expect(ShareCode.tidy("abcd2345") == "ABCD2345")
-        #expect(ShareCode.tidy("ABCD-2345") == "ABCD2345")
-        #expect(ShareCode.tidy("  abcd 2345 ") == "ABCD2345")
+        let pickup = ShareCode.tidy("abcd2345-jkmn-pqrs-tv")
+        #expect(pickup?.name == "ABCD2345")
+        #expect(pickup?.secret == "JKMNPQRSTV")
+    }
+
+    @Test func spacesAndCaseAreForgiven() {
+        #expect(ShareCode.tidy("  abcd 2345 jkmn pqrs tv ")?.code == "ABCD2345JKMNPQRSTV")
     }
 
     @Test func somethingThatIsNotACodeIsRefused() {
-        #expect(ShareCode.tidy("ABCD234") == nil)
-        #expect(ShareCode.tidy("ABCD23456") == nil)
+        #expect(ShareCode.tidy("ABCD2345JKMNPQRST") == nil)
+        #expect(ShareCode.tidy("ABCD2345JKMNPQRSTVW") == nil)
         #expect(ShareCode.tidy("") == nil)
         // The excluded characters are not quietly read as something else.
-        #expect(ShareCode.tidy("ABCD2I45") == nil)
-        #expect(ShareCode.tidy("ABCD2O45") == nil)
+        #expect(ShareCode.tidy("ABCD2I45JKMNPQRSTV") == nil)
+        #expect(ShareCode.tidy("ABCD2O45JKMNPQRSTV") == nil)
     }
 
-    @Test func aCodeIsShownInTwoHalves() {
-        #expect(ShareCode.spaced("ABCD2345") == "ABCD-2345")
+    @Test func aCodeIsShownInFours() {
+        #expect(ShareCode.spaced("ABCD2345JKMNPQRSTV") == "ABCD-2345-JKMN-PQRS-TV")
     }
 
     @Test func whatIsShownIsWhatCanBeTypedBack() {
-        let code = ShareCode.make()
-        #expect(ShareCode.tidy(ShareCode.spaced(code)) == code)
-    }
-
-    @Test func theRoomIsAHashAndNotTheCode() {
-        let room = ShareCode.room(for: "ABCD2345")
-        #expect(room.count == 64)
-        #expect(room.allSatisfy { $0.isHexDigit && !$0.isUppercase })
-        #expect(!room.contains("ABCD2345".lowercased()))
-    }
-
-    @Test func oneCodeAlwaysNamesTheSameRoom() {
-        #expect(ShareCode.room(for: "ABCD2345") == ShareCode.room(for: "ABCD2345"))
-        #expect(ShareCode.room(for: "ABCD2345") != ShareCode.room(for: "ABCD2346"))
+        let pickup = ShareCode.make()
+        #expect(ShareCode.tidy(ShareCode.spaced(pickup.code)) == pickup)
     }
 }

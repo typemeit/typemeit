@@ -1,31 +1,15 @@
 import SwiftUI
 
-/// The four digits, spaced out and monospaced so they can be read down a
-/// phone line without being misheard.
-private struct Digits: View {
-    let digits: String
-
-    var body: some View {
-        Text(digits.map { String($0) }.joined(separator: " "))
-            .font(.system(size: 28, design: .monospaced))
-            .foregroundStyle(DesignTokens.Colors.ink)
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(Rectangle().fill(DesignTokens.Colors.inkA04))
-            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
-            .textSelection(.enabled)
-    }
-}
-
-/// The pairing code, with the copy that saves reading it out.
-private struct PairingCode: View {
+/// The code, in fours, with the copy that saves reading it out.
+private struct CodePlate: View {
     let code: String
 
     var body: some View {
         HStack(spacing: 8) {
             Text(ShareCode.spaced(code))
-                .font(.system(size: 26, design: .monospaced))
+                .font(.system(size: 18, design: .monospaced))
                 .foregroundStyle(DesignTokens.Colors.ink)
-                .padding(.horizontal, 14).padding(.vertical, 8)
+                .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(Rectangle().fill(DesignTokens.Colors.inkA04))
                 .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
                 .textSelection(.enabled)
@@ -37,8 +21,8 @@ private struct PairingCode: View {
     }
 }
 
-/// The name this Mac is listed under on the other screen. It only lands when
-/// the field is left or Return is pressed.
+/// The name the other end sees this Mac called. It only lands when the field
+/// is left or Return is pressed.
 struct ShareNameField: View {
     @State private var settings = Settings.shared
     @State private var text = ""
@@ -55,7 +39,7 @@ struct ShareNameField: View {
     }
 
     private func commit() {
-        let name = IncomingShare.clean(text)
+        let name = Sharing.clean(text)
         text = name
         guard name != settings.shareName else { return }
         settings.shareName = name
@@ -63,15 +47,14 @@ struct ShareNameField: View {
 }
 
 /// The notes a share sheet is up for. A sheet is presented from a value
-/// rather than a flag so the set it is offering cannot change under it once
-/// the code has been given out.
+/// rather than a flag so the set it is sealing cannot change under it.
 struct ShareDraft: Identifiable {
     let id = UUID()
     let notes: [SharedNote]
 }
 
-/// Shows the code, then how the sending went. Put up as a sheet from the
-/// history tab.
+/// Seals the notes, leaves them, and shows the code. Put up as a sheet from
+/// the history tab.
 struct ShareSheet: View {
     let notes: [SharedNote]
     let done: () -> Void
@@ -88,11 +71,11 @@ struct ShareSheet: View {
             } else if let outgoing = sharing.outgoing {
                 sending(outgoing)
             } else {
-                Text("starting…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
+                Text("sealing…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
             }
             HStack {
                 Spacer()
-                Button(closeLabel) { sharing.outgoing?.cancel(); sharing.outgoing = nil; done() }
+                Button("done") { sharing.outgoing?.cancel(); sharing.outgoing = nil; done() }
                     .buttonStyle(InkButtonStyle())
             }
         }
@@ -100,14 +83,6 @@ struct ShareSheet: View {
         .frame(width: 400)
         .background(DesignTokens.Colors.paper)
         .onAppear { if settings.sharing, sharing.outgoing == nil { sharing.offer(notes) } }
-    }
-
-    private var closeLabel: String {
-        guard let stage = sharing.outgoing?.stage else { return "close" }
-        return switch stage {
-        case .showing, .confirming: "cancel"
-        case .sent, .declined, .failed: "close"
-        }
     }
 
     @ViewBuilder
@@ -121,20 +96,13 @@ struct ShareSheet: View {
     @ViewBuilder
     private func sending(_ outgoing: OutgoingShare) -> some View {
         switch outgoing.stage {
-        case .showing:
-            PairingCode(code: outgoing.pairing)
-            Text("they type this into their copy of type me it, anywhere in the world.")
+        case .sealing:
+            Text("sealing…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
+        case .ready(let code):
+            CodePlate(code: code)
+            Text("hand this over however you like. it opens once, and it is gone in ten minutes.")
                 .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-        case .confirming(let digits):
-            Digits(digits: digits)
-            Text("read these out. the same four are on their screen, and the notes go once they say yes.")
-                .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-        case .sent:
-            Text("sent").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink)
-        case .declined:
-            Text("they said no").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
         case .failed(let reason):
             Text(reason)
                 .font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.diffRemove)
@@ -143,8 +111,8 @@ struct ShareSheet: View {
     }
 }
 
-/// Where a code is typed in, and where what arrives is shown. Nothing here is
-/// written to disk: closing it is the end of the notes unless they were
+/// Where a code is typed in, and where what it opens is shown. Nothing here
+/// is written to disk: closing it is the end of the notes unless they were
 /// copied out.
 struct ShareInbox: View {
     @State private var sharing = Sharing.shared
@@ -163,9 +131,6 @@ struct ShareInbox: View {
         .padding(20)
         .frame(width: 420)
         .background(DesignTokens.Colors.paper)
-        // The window's own close button gets here too. Without this a share
-        // left half-answered would sit in `incoming` and be in the way of the
-        // next one.
         .onDisappear {
             sharing.incoming?.dismiss()
             sharing.incoming = nil
@@ -175,11 +140,11 @@ struct ShareInbox: View {
     @ViewBuilder
     private var entry: some View {
         Text("receive a note").font(DesignTokens.Fonts.heading)
-        Text("type the code the other mac is showing.")
+        Text("paste the code you were given.")
             .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
         TextField("", text: $typed)
             .textFieldStyle(.roundedBorder)
-            .font(.system(size: 18, design: .monospaced))
+            .font(.system(size: 15, design: .monospaced))
             .onSubmit { go() }
             .onChange(of: typed) { _, _ in wrong = false }
         if wrong {
@@ -201,24 +166,11 @@ struct ShareInbox: View {
     @ViewBuilder
     private func content(_ incoming: IncomingShare) -> some View {
         switch incoming.stage {
-        case .joining:
-            Text("finding that mac…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
-            HStack { Spacer(); Button("cancel") { back() }.buttonStyle(InkButtonStyle()) }
-        case .asking(let from, let digits, let count):
-            Text("\(from) wants to send you \(counted(count, "note"))")
+        case .fetching:
+            Text("collecting…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
+        case .arrived(let from, let notes):
+            Text("\(counted(notes.count, "note")) from \(from)")
                 .font(DesignTokens.Fonts.heading).fixedSize(horizontal: false, vertical: true)
-            Digits(digits: digits)
-            Text("say yes only if the same four digits are on their screen.")
-                .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
-            HStack {
-                Spacer()
-                Button("no thanks") { incoming.decline(); back() }.buttonStyle(InkButtonStyle())
-                Button("accept") { incoming.accept() }.buttonStyle(InkButtonStyle(primary: true))
-            }
-        case .opening:
-            Text("opening…").font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
-        case .arrived(let notes):
-            Text(counted(notes.count, "note")).font(DesignTokens.Fonts.heading)
             ScrollView {
                 SettingsGroup {
                     ForEach(Array(notes.enumerated()), id: \.element.id) { i, note in

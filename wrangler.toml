@@ -1,7 +1,7 @@
 # Every request is served from ./web as a static file, except /download, which
 # worker.js answers by streaming the latest DMG from GitHub under its own name,
-# and /share/room/<id>, the room two Macs pass sealed notes through. See the
-# comment at the top of worker.js.
+# and /share/note/<name>, where a sealed drop is left and collected once. See
+# the comment at the top of worker.js.
 name = "typemeit-web-dev"
 main = "worker.js"
 compatibility_date = "2026-07-01"
@@ -10,15 +10,13 @@ compatibility_date = "2026-07-01"
 directory = "./web"
 binding = "ASSETS"
 
-# The room two Macs meet in. One object per code, and it closes itself after
-# ten minutes whatever state it is in.
-[[durable_objects.bindings]]
-name = "ROOMS"
-class_name = "ShareRoom"
-
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["ShareRoom"]
+# Where the sealed drops sit. R2 rather than KV because a drop is collected
+# seconds after it is left, and KV does not promise a read that soon will see
+# the write. Nothing in here is readable without the half of the code that is
+# never sent.
+[[r2_buckets]]
+binding = "NOTES"
+bucket_name = "typemeit-notes-dev"
 
 [env.production]
 name = "typemeit-web"
@@ -29,6 +27,11 @@ directory = "./web"
 binding = "ASSETS"
 
 # Bindings are per environment and are not inherited from the top level.
-[[env.production.durable_objects.bindings]]
-name = "ROOMS"
-class_name = "ShareRoom"
+[[env.production.r2_buckets]]
+binding = "NOTES"
+bucket_name = "typemeit-notes"
+
+# The worker deletes a drop as it hands it over and refuses one past its ten
+# minutes, so the bucket only ever holds drops nobody came for. Give each
+# bucket a lifecycle rule expiring objects after a day to sweep those up:
+#   wrangler r2 bucket lifecycle add typemeit-notes --expire-days 1

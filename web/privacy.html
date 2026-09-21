@@ -75,7 +75,7 @@
 <ul>
   <li><em>the speech model</em>, downloaded once during onboarding from this app's github releases page. github sees an ordinary download request from your ip address.</li>
   <li><em>update checks</em>, made by the sparkle framework against the app's github releases page. by default the app checks on a schedule sparkle manages. the request includes the app version and macos version so the right update can be offered. nothing else about your mac is sent. you can turn automatic checks off in settings, and check by hand from the menu instead.</li>
-  <li><em>a share</em>, made to typeme.it only while you are in one, and described under sharing below. this is the one request of the three that carries anything of yours, and it carries it sealed.</li>
+  <li><em>a share</em>, made to typeme.it only when you press share or paste in a code: one request to leave a sealed drop, one to collect it. this is the one of the three that carries anything of yours, and it carries it sealed. it is described under sharing below.</li>
 </ul>
 <p>there is no account, no sign-in, no analytics, no crash reporting and no advertising. the app makes no other network requests over the internet.</p>
   </div>
@@ -84,12 +84,13 @@
 <section>
   <h2>sharing notes with another mac</h2>
   <div>
-<p>nothing here runs in the background. the app advertises nothing, listens for nothing, and contacts nothing until you press share or type in a code. turning sharing off in the history tab stops even that.</p>
-<p>to send, you pick the notes and the app shows an eight-character code. the other person types that code into their copy. both macs then show the same four digits, and the notes only move once the person receiving has checked those digits against the sending screen and said yes.</p>
-<p>the notes pass through typeme.it, which is how a mac in one place reaches a mac in another without either of them having to be reachable from the internet. they pass through sealed. the key is agreed between the two macs and is derived partly from the pairing code, and what that server is given is the code's sha-256 and never the code, so it cannot read what it is carrying and cannot work out the key by standing in the middle of the two ends agreeing it. it holds nothing: a frame is passed on and gone.</p>
-<p>it is worth being plain about what that does and does not mean. the contents are sealed and unreadable, but the fact of a share — two macs, at a time, from two ip addresses — passes through a server this app's author runs. that is a weaker thing than the notes never leaving your two machines at all, and it is the reason the app is built so that this only happens while you are in the middle of a share you started.</p>
-<p>a note that is sent carries its text and the time it was said, and nothing else: not the audio, not the app it was typed into, not the window title, not what the speech engine heard before clean-up. notes that arrive are shown in a window and are not written to disk — close it and they are gone unless you copied them out.</p>
-<p>a code is good for one share and for ten minutes. the room it names holds two macs and turns away a third, and it is not stored anywhere once it closes.</p>
+<p>nothing here runs in the background. the app advertises nothing, listens for nothing, and contacts nothing until you press share or paste in a code. turning sharing off in the history tab stops even that.</p>
+<p>to send, you pick the notes. the app seals them, leaves them at typeme.it, and shows you an eighteen-character code. you hand that code over however you like — a message, a call, a piece of paper. the other person pastes it into their copy, which collects the drop and opens it.</p>
+<p>the code is two halves doing two different jobs, and this is the part worth understanding. the first eight characters name the drop, and those are the only ones the server is ever told. the last ten are what the notes are sealed with, and they never leave the two of you — they are not sent to typeme.it, not at pickup, not ever. so what the server holds is bytes it has no key for, and holding every drop in the bucket is not a way into any of them.</p>
+<p>the two halves are drawn separately rather than one from the other. if the secret followed from the name, whoever held the name could work back to it, and names are quick to work through. drawn apart, the name says nothing about the secret, and the secret is put through six hundred thousand rounds of pbkdf2 before it becomes a key, which is a long time to spend on each of the very many guesses it would take.</p>
+<p>a drop opens once. the server hands it over and forgets it in the same breath, and refuses it at all after ten minutes. a drop nobody collects is swept up by the bucket's own clean-up.</p>
+<p>a note that is sent carries its text, the time it was said, and the name you have given this mac — that last one from inside the seal, so it is for the person collecting and for nobody else. it does not carry the audio, the app it was typed into, the window title, or what the speech engine heard before clean-up. notes that arrive are shown in a window and are not written to disk — close it and they are gone unless you copied them out.</p>
+<p>being plain about what this is: the contents are sealed and unreadable, but the fact of a share — a drop, at a time, from one ip address and collected from another — passes through a server this app's author runs. that is a weaker thing than the notes never leaving your two machines at all, and it is the reason the app only does it while you are in the middle of a share you started.</p>
   </div>
 </section>
 

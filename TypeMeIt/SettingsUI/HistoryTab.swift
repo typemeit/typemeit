@@ -147,7 +147,7 @@ struct HistoryTab: View {
                         .disabled(settings.historyLimit < 0)
                 }
                 SettingsRow(label: "sharing",
-                            subtitle: "hands notes to another mac running type me it, wherever it is. they pass through typeme.it sealed, with a key it does not have and cannot work out, and only once four digits match on both screens. nothing happens until you press share.",
+                            subtitle: "seals the notes and leaves them at typeme.it under a code you hand over. half that code never goes near the server, so it holds bytes it cannot read. the drop opens once and is gone in ten minutes. nothing happens until you press share.",
                             last: !settings.sharing) {
                     Toggle("", isOn: $settings.sharing).toggleStyle(.switch).labelsHidden()
                 }

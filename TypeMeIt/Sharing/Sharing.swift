@@ -1,204 +1,128 @@
-import CryptoKit
 import Foundation
 import Observation
 
-/// Notes on their way out, and how far they have got.
-///
-/// This end makes the pairing code and waits in its room. The other end joins
-/// by typing that code, and the two connect to each other directly.
+/// Notes sealed and left for someone to collect.
 @MainActor
 @Observable
 final class OutgoingShare {
     enum Stage: Equatable {
-        /// The code is on screen and nobody has joined yet.
-        case showing
-        /// Connected. These are the four digits to read out, and the other
-        /// end is deciding.
-        case confirming(digits: String)
-        case sent
-        case declined
+        case sealing
+        /// Left, and waiting to be collected. This is the code to hand over.
+        case ready(code: String)
         case failed(String)
     }
 
-    /// The code the other person types in.
-    let pairing = ShareCode.make()
-    private(set) var stage: Stage = .showing
+    private(set) var stage: Stage = .sealing
 
     private let notes: [SharedNote]
-    private let ours = Curve25519.KeyAgreement.PrivateKey()
-    private var link: ShareLink?
-    private var agreement: ShareHandshake.Agreement?
-    private var deadline: Task<Void, Never>?
+    private var work: Task<Void, Never>?
 
     init(notes: [SharedNote]) {
         self.notes = notes
     }
 
     func start() {
-        let link = ShareLink(code: pairing)
-        self.link = link
-        // This end speaks first, so the other has something to answer.
-        link.onOpen = { [weak self] in
-            guard let self else { return }
-            self.link?.send(ShareFrame(kind: .hello, key: self.ours.publicKey.rawRepresentation, name: Sharing.thisMac))
+        let pickup = ShareCode.make()
+        let payload = SharePayload(from: Sharing.thisMac, notes: notes)
+        work = Task { [weak self] in
+            do {
+                // Six hundred thousand rounds of PBKDF2 is a third of a
+                // second, which is a third of a second the window should
+                // not spend frozen.
+                let blob = try await Task.detached { try ShareSeal.seal(payload, secret: pickup.secret) }.value
+                try await ShareDrop.put(blob, name: pickup.name)
+                guard let self, !Task.isCancelled else { return }
+                self.stage = .ready(code: pickup.code)
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                Log.sharing.error("Could not leave the notes: \(String(describing: error))")
+                self.stage = .failed(Sharing.reason(error))
+            }
         }
-        link.onFrame = { [weak self] in self?.took($0) }
-        link.onClose = { [weak self] reason in self?.ended(reason) }
-        link.start()
-        // `give(up:)` leaves a share that already finished alone, so the timer
-        // only bites when nobody ever came. It matches the room's own life in
-        // worker.js: past that there is nothing left to join.
-        deadline = Sharing.after(Sharing.timeout) { [weak self] in self?.give(up: "nobody used that code") }
     }
 
     func cancel() {
-        deadline?.cancel()
-        // Hanging up on purpose is not a failure to show.
-        link?.onClose = nil
-        link?.close()
-    }
-
-    private func took(_ frame: ShareFrame) {
-        switch frame.kind {
-        case .hello:
-            guard case .showing = stage else { return }
-            guard let key = frame.key,
-                  let agreed = try? ShareHandshake.agree(ours: ours, theirs: key, pairing: pairing) else {
-                give(up: "could not agree a key with that mac")
-                return
-            }
-            agreement = agreed
-            stage = .confirming(digits: agreed.code)
-            link?.send(ShareFrame(kind: .offer, count: notes.count))
-        case .decision:
-            guard frame.accepted == true else {
-                deadline?.cancel()
-                stage = .declined
-                link?.close()
-                return
-            }
-            guard let agreement, let sealed = try? ShareHandshake.seal(SharePayload(notes: notes), with: agreement.key) else {
-                give(up: "could not seal the notes")
-                return
-            }
-            link?.send(ShareFrame(kind: .notes, sealed: sealed)) { [weak self] in
-                guard let self, case .confirming = self.stage else { return }
-                self.deadline?.cancel()
-                self.stage = .sent
-            }
-        case .offer, .notes:
-            // Nothing the sending end answers.
-            break
-        }
-    }
-
-    private func give(up reason: String) {
-        deadline?.cancel()
-        guard !isFinished else { return }
-        stage = .failed(reason)
-        link?.close()
-    }
-
-    private func ended(_ reason: String?) {
-        deadline?.cancel()
-        guard !isFinished else { return }
-        stage = .failed(reason ?? "that mac hung up")
-    }
-
-    private var isFinished: Bool {
-        switch stage {
-        case .sent, .declined, .failed: true
-        case .showing, .confirming: false
-        }
+        work?.cancel()
+        work = nil
     }
 }
 
-/// Notes on their way in. Started by typing the code the other person read out.
+/// Notes collected with a code somebody handed over.
 @MainActor
 @Observable
 final class IncomingShare {
     enum Stage: Equatable {
-        case joining
-        /// The other end has offered. These are the four digits, which must
-        /// match the ones on the sending Mac before this is worth a yes.
-        case asking(from: String, digits: String, count: Int)
-        case opening
-        case arrived([SharedNote])
+        case fetching
+        case arrived(from: String, notes: [SharedNote])
         case failed(String)
     }
 
-    private(set) var stage: Stage = .joining
+    private(set) var stage: Stage = .fetching
 
-    private let pairing: String
-    private let ours = Curve25519.KeyAgreement.PrivateKey()
-    private var link: ShareLink?
-    private var agreement: ShareHandshake.Agreement?
-    private var theirName = "another mac"
-    private var deadline: Task<Void, Never>?
+    private let pickup: ShareCode.Pickup
+    private var work: Task<Void, Never>?
 
-    init(pairing: String) {
-        self.pairing = pairing
+    init(pickup: ShareCode.Pickup) {
+        self.pickup = pickup
     }
 
     func start() {
-        let link = ShareLink(code: pairing)
-        self.link = link
-        link.onFrame = { [weak self] in self?.took($0) }
-        link.onClose = { [weak self] reason in self?.ended(reason) }
-        link.start()
-        deadline = Sharing.after(Sharing.timeout) { [weak self] in self?.give(up: "nothing came of that code") }
-    }
-
-    func accept() {
-        guard case .asking = stage else { return }
-        stage = .opening
-        link?.send(ShareFrame(kind: .decision, accepted: true))
-    }
-
-    func decline() {
-        deadline?.cancel()
-        link?.send(ShareFrame(kind: .decision, accepted: false)) { [weak self] in self?.link?.close() }
-    }
-
-    /// The user is done reading, or has said no.
-    func dismiss() {
-        deadline?.cancel()
-        link?.onClose = nil
-        link?.close()
-    }
-
-    private func took(_ frame: ShareFrame) {
-        switch frame.kind {
-        case .hello:
-            guard case .joining = stage, let key = frame.key,
-                  let agreed = try? ShareHandshake.agree(ours: ours, theirs: key, pairing: pairing) else {
-                give(up: "could not agree a key with that mac")
-                return
+        let pickup = self.pickup
+        work = Task { [weak self] in
+            do {
+                let blob = try await ShareDrop.take(name: pickup.name)
+                let payload = try await Task.detached { try ShareSeal.open(blob, secret: pickup.secret) }.value
+                guard let self, !Task.isCancelled else { return }
+                self.stage = .arrived(from: Sharing.clean(payload.from), notes: payload.notes)
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                Log.sharing.error("Could not collect the notes: \(String(describing: error))")
+                self.stage = .failed(Sharing.reason(error))
             }
-            agreement = agreed
-            theirName = IncomingShare.clean(frame.name)
-            link?.send(ShareFrame(kind: .hello, key: ours.publicKey.rawRepresentation, name: Sharing.thisMac))
-        case .offer:
-            guard let agreement, case .joining = stage else { return }
-            stage = .asking(from: theirName, digits: agreement.code, count: max(0, frame.count ?? 0))
-        case .notes:
-            guard case .opening = stage, let agreement, let sealed = frame.sealed,
-                  let payload = try? ShareHandshake.open(sealed, with: agreement.key) else {
-                give(up: "the notes did not open")
-                return
-            }
-            deadline?.cancel()
-            stage = .arrived(payload.notes)
-            link?.close()
-        case .decision:
-            // Nothing the receiving end answers.
-            break
         }
     }
 
-    /// A name off the network is shown to the user, so it is cut to a length
-    /// that cannot push a prompt's buttons off the edge and stripped of the
-    /// line breaks that would let it fake one.
+    func dismiss() {
+        work?.cancel()
+        work = nil
+    }
+}
+
+/// The share this Mac is in, if any.
+///
+/// Nothing runs in the background. Nothing is advertised and nothing is
+/// listened for; typeme.it hears from this Mac twice in a share — once to
+/// leave the sealed bytes and once to collect them — and holds no key for
+/// what it was handed. One share at a time in each direction, because the
+/// code on screen only means anything if there is one of it.
+@MainActor
+@Observable
+final class Sharing {
+    static let shared = Sharing()
+
+    var outgoing: OutgoingShare?
+    var incoming: IncomingShare?
+
+    private init() {}
+
+    /// What the other end sees this Mac called, from inside the seal.
+    static var thisMac: String {
+        Settings.shared.shareName
+    }
+
+    static func defaultName() -> String {
+        clean(withoutLocal(ProcessInfo.processInfo.hostName))
+    }
+
+    /// Host names come with `.local` on the end, which is mDNS's business
+    /// and not a thing to show a person.
+    nonisolated static func withoutLocal(_ host: String) -> String {
+        host.hasSuffix(".local") ? String(host.dropLast(6)) : host
+    }
+
+    /// A name that came out of a drop is shown to the user, so it is cut to
+    /// a length that cannot push a window's buttons off the edge and
+    /// stripped of the line breaks that would let it fake one.
     nonisolated static func clean(_ name: String?) -> String {
         let one = (name ?? "").components(separatedBy: .newlines).joined(separator: " ")
         let trimmed = one.trimmingCharacters(in: .whitespaces)
@@ -206,65 +130,7 @@ final class IncomingShare {
         return trimmed.count <= 40 ? trimmed : String(trimmed.prefix(40)) + "…"
     }
 
-    private func give(up reason: String) {
-        deadline?.cancel()
-        guard !isFinished else { return }
-        stage = .failed(reason)
-        link?.close()
-    }
-
-    private func ended(_ reason: String?) {
-        deadline?.cancel()
-        guard !isFinished else { return }
-        stage = .failed(reason ?? "that mac hung up")
-    }
-
-    private var isFinished: Bool {
-        switch stage {
-        case .arrived, .failed: true
-        case .joining, .asking, .opening: false
-        }
-    }
-}
-
-/// The share this Mac is in, if any.
-///
-/// There is nothing running in the background here. Nothing is advertised,
-/// nothing is listened for, and typeme.it hears from this Mac only during a
-/// share the user started — carrying sealed bytes between the two ends, with
-/// no key for them. One share at a time in each direction, because the code
-/// on screen and the digits to check only mean anything if there is exactly
-/// one of each.
-@MainActor
-@Observable
-final class Sharing {
-    static let shared = Sharing()
-
-    /// As long as a room lives in worker.js. Past that there is nothing left
-    /// to join, so waiting longer would only be waiting.
-    static let timeout: Duration = .seconds(600)
-
-    var outgoing: OutgoingShare?
-    var incoming: IncomingShare?
-
-    private init() {}
-
-    /// What the other end calls this Mac.
-    static var thisMac: String {
-        Settings.shared.shareName
-    }
-
-    static func defaultName() -> String {
-        IncomingShare.clean(Sharing.withoutLocal(ProcessInfo.processInfo.hostName))
-    }
-
-    /// Host names come with `.local` on the end, which is mDNS's business and
-    /// not a thing to show a person.
-    nonisolated static func withoutLocal(_ host: String) -> String {
-        host.hasSuffix(".local") ? String(host.dropLast(6)) : host
-    }
-
-    /// Makes a code and waits in its room.
+    /// Seals the notes and leaves them.
     func offer(_ notes: [SharedNote]) {
         outgoing?.cancel()
         let share = OutgoingShare(notes: notes)
@@ -272,23 +138,34 @@ final class Sharing {
         share.start()
     }
 
-    /// Joins the room a code names. False when what was typed is not a code.
+    /// Collects what a code names. False when what was typed is not a code.
     @discardableResult
     func receive(_ typed: String) -> Bool {
-        guard let pairing = ShareCode.tidy(typed) else { return false }
+        guard let pickup = ShareCode.tidy(typed) else { return false }
         incoming?.dismiss()
-        let share = IncomingShare(pairing: pairing)
+        let share = IncomingShare(pickup: pickup)
         incoming = share
         share.start()
         return true
     }
 
-    /// A one-shot timer that runs on the main actor and cancels cleanly.
-    static func after(_ duration: Duration, _ body: @escaping @MainActor @Sendable () -> Void) -> Task<Void, Never> {
-        Task { @MainActor in
-            try? await Task.sleep(for: duration)
-            guard !Task.isCancelled else { return }
-            body()
+    /// What went wrong, in the app's own words rather than the network's.
+    nonisolated static func reason(_ error: Error) -> String {
+        if let drop = error as? ShareDrop.Failure {
+            return switch drop {
+            case .tooMuch: "that is more than fits in one share"
+            case .gone: "nothing there — that code is used up, or the ten minutes are over"
+            case .unreachable(let what): "could not reach \(what)"
+            }
         }
+        if let seal = error as? ShareSeal.Failure {
+            return switch seal {
+            case .cannotSeal: "that is more than fits in one share"
+            // Which of the two it was is not the user's problem, and saying
+            // would be telling someone guessing that they were close.
+            case .notOurs, .cannotOpen: "that code does not open it"
+            }
+        }
+        return "that did not work"
     }
 }
