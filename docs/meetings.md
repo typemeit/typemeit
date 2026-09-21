@@ -158,6 +158,11 @@ change any of them; the default is what gets built.
   pipeline, a meeting out. It covers what detection cannot see (a phone
   call, a room recorded on a phone, a call the user declined) and it is how
   S2 and S3 get an hour of real audio without staging a meeting.
+- **D22. Meetings are queryable over MCP, read-only, off by default.** A
+  stdio binary in the app bundle reads the published folders directly, so it
+  needs no port, no auth and no running app. It is the one path by which
+  meeting text can leave this Mac, so it is a switch the user throws and the
+  help says what it means.
 - **D19. The other participants are not told.** The app announces nothing to
   the call. Recording someone may need their agreement where the user is;
   the Meetings tab footer says so in one line.
@@ -419,6 +424,7 @@ Rules for every task below:
 | `Meetings/MeetingCapture.swift` | One private aggregate device (mic sub-device plus optional process tap), one IO proc, two ring buffers, the drain queue, device-change rebuilds |
 | `Meetings/AudioRing.swift` | A preallocated single-producer single-consumer Float32 ring |
 | `Meetings/PreRoll.swift` | One ring per track sized in seconds; `take()` drains oldest-first and frees; `discard()` zeroes and frees |
+| `MCP/main.swift`, `MCP/Protocol.swift`, `MCP/Tools.swift` | The `typemeit-mcp` target: JSON-RPC framing (pure), the four tools over the meetings folder (pure over a directory) |
 | `Meetings/MeetingImport.swift` | Any file `AVFoundation` can read to a 16 kHz mono `.caf` in a staged folder, plus the `Meeting` that describes it |
 | `Meetings/TrackWriter.swift` | Appends Float32 to a CAF file as Int16 with an open-ended data chunk; silence fill; peak tracking |
 | `Meetings/MeetingRecorder.swift` | Owns a `MeetingCapture` and one or two `TrackWriter`s; the silence monitor; gaps; dictation spans; levels |
@@ -1116,6 +1122,7 @@ verified in S1).
 | `meetingNeverAsk` | [String] bundle ids | [] | main tab: `never ask for` chips, hidden when empty |
 | `meetingKeepAudio` | Bool | true | Meetings tab footer: `keep the audio` |
 | `meetingLimit` | Int | 0 (everything) | Meetings tab footer: `keep` picker like History's |
+| `meetingsMCP` | Bool | false | Meetings tab footer: `mcp` (7.15) |
 | `meetingsFolder` | URL? | nil (= `Store.directory/Meetings`) | Meetings tab footer: `meetings folder` |
 | `recordRoomShortcut` | KeyCombo? | nil | main tab, phase 2 |
 | `voicePrintEnabled` | Bool | false | main tab, phase 3 |
@@ -1135,6 +1142,7 @@ verified in S1).
 | `meetingSilenceFloor` | 0.001 (−60 dBFS) | same |
 | `meetingBothSilentEndSeconds` | 600 | an idle call; also a forgotten room recording |
 | `meetingRebuildAttempts`, `meetingRebuildIntervalSeconds` | 3, 1 | one rebuild usually suffices; three a second apart cover a slow USB re-enumeration |
+| `meetingMCPBudgetBytes` | 24 576 | one meeting's text in a reply without crowding a client's window (7.15) |
 | `meetingPreRollSeconds` | 120 | longer than a prompt is ever left unanswered; 15.4 MB for a call (D20) |
 | `meetingQuitWaitSeconds` | 2 | the writers flush in milliseconds; two seconds bounds a stuck disk |
 | `meetingTitleSourceWords` | 700 | fits the 4,096-token window beside the instructions |
@@ -1560,6 +1568,12 @@ On a real machine, each of these, with debug logs on and the log read afterwards
 - Import a 30-minute recording: a meeting appears, transcribes and publishes
   like any other, and re-importing the same file makes a second meeting
   rather than overwriting the first.
+- Add the MCP binary to a client with the setting off: it connects, lists its
+  tools, and every call says where the switch is. Turn it on: the same client
+  lists, searches and reads without restarting the app, and with the app
+  quit.
+- Point the meetings folder somewhere else: the binary follows the setting,
+  and a path argument aimed outside it is refused.
 - A Sparkle update becomes ready mid-meeting: the app does not relaunch until
   the meeting is done.
 - Rename to `#design/ops: Q3 · 🎉`: the folder name is legal, opens from the
@@ -1607,6 +1621,86 @@ phase 2's diarizer is installed, and `You` only from phase 3's voice print.
 Tests (`MeetingImportTests`): a short `.m4a` fixture, an `.mp4` with one
 audio track, a stereo file (both channels present in the mono output), a
 file with no audio track, and a name that needs sanitising (7.9).
+
+### 7.15 Querying meetings over MCP (D22)
+
+A meeting is worth more if the tools the user already works in can read it.
+The storage decision makes this cheap: a published meeting is a folder with
+`transcript.md` (YAML front matter plus text) and `meeting.json`, so a reader
+needs no database, no IPC and no running app.
+
+`typemeit-mcp`, a second `project.yml` target (`type: tool`, macOS), built
+into `Contents/MacOS/typemeit-mcp` of the same bundle, signed with the same
+identity, sharing `Meetings/Meeting.swift` and `MeetingFolder.swift` through
+a small source list rather than a copy:
+
+- **stdio, never a port.** JSON-RPC over stdin and stdout, launched by the
+  client. Nothing listens, so there is no auth to design, nothing another
+  local process can connect to, and nothing a web page can reach. It works
+  with the app closed, which is most of the time.
+- Methods: `initialize` (echo the client's protocol version; pin the exact
+  string against the current MCP spec when it is built, not from memory),
+  `tools/list`, `tools/call`, and the matching notifications. Roughly 200
+  lines of framing; no SDK dependency.
+- **Read-only, and it never writes anywhere.** No delete, no rename, no
+  re-transcribe. Writes would need the app running to keep the UI honest;
+  section 10 has them.
+- **Off unless the user turns it on.** The binary cannot be stopped from
+  being launched, so the switch lives in the binary: it reads
+  `UserDefaults(suiteName:)` for the bundle id of the `.app` it is inside
+  (derived from its own path, so the dev build reads
+  `it.typeme.typemeit.dev`), and with `meetingsMCP` false every tool returns
+  one error telling the user where the setting is. Default false.
+- **Scope.** Only `Settings.meetingsFolder ?? Store.directory/Meetings`, its
+  own published folders, and only `transcript.md`, `meeting.json` and the
+  folder names. It resolves every path and refuses anything that lands
+  outside, symlinks included. It never reads the audio, the history, the
+  dictation archive or the voice print.
+
+Tools:
+
+| Tool | Arguments | Returns |
+| --- | --- | --- |
+| `list_meetings` | `from`, `to` (dates), `app`, `kind`, `speaker`, `limit` (default 40) | One row per meeting from the front matter only: id, title, started, duration, kind, app, speakers, folder |
+| `get_meeting` | `id`, `part` (default 1) | `transcript.md`, whole when it fits `Fixed.meetingMCPBudgetBytes` (24 KB), else that part and a count of the rest |
+| `search_meetings` | `query`, `limit` (default 20) | Case- and diacritic-insensitive literal matches, each with the meeting, the speaker, the timestamp and the paragraph it sits in |
+| `meeting_stats` | `from`, `to` | Count, total duration, talk time by speaker |
+
+`list_meetings` reads front matter only, so a library of a few hundred
+meetings lists without touching the text; `search_meetings` reads the bodies
+and caches by modification date. No embeddings, no index: a client that can
+query five times and read the plausible answers does better with repeated
+literal search than with one vector guess, and this way there is no model, no
+key and no cost.
+
+**Transcript text is data, never instruction.** Every tool result says so on
+the way out, and a transcript is wrapped as quoted content rather than
+inlined bare. A meeting contains other people's speech, and the client
+holding these tools usually also holds a shell and an editor, so it is a
+better injection target than anything else this app produces. `get_meeting`
+and `search_meetings` carry a one-line reminder in the result itself, not
+only in the tool description, since the description is far away by the time
+the text arrives.
+
+**Errors are content.** A missing folder, an unreadable file or a bad
+argument returns an error result; the process stays up. It never traps, and
+it never prints anything but JSON-RPC to stdout (diagnostics go to stderr).
+
+Setting up: the Meetings tab footer gains an `mcp` row with the toggle and a
+`copy command` button that puts
+`claude mcp add --scope user typemeit -- "<path to the binary>"` on the
+clipboard, using this build's own path, so the dev app copies its own. The
+help line says what it means — that the meetings become readable by whatever
+model that tool uses, which for most clients is not on this Mac. It is the
+one place this app sends meeting text off the machine, and it only does it
+because the user asked.
+
+Tests (`MCPTests`, pure over a fixture folder of three meetings): framing of
+a request and response pair; `list_meetings` filters by date, app and
+speaker; `get_meeting` budget split and reassembly; `search_meetings` finds a
+word across two meetings with the right speaker and timestamp; a path
+argument pointing outside the folder is refused; every tool with the setting
+off returns the same error.
 
 ## 8. Phase 2: the room, and speakers
 
@@ -1830,9 +1924,15 @@ Not in this plan, written down so they are not re-derived:
   built it lives under `Store.directory`, never in a published folder, behind
   a setting, and `deleteAllHistory()` deletes it (D18). CAM++ as a dedicated
   embedding model if the pipeline's embeddings prove weak.
+- MCP writes — rename a speaker, retranscribe, delete. They need the app
+  running to keep the tab honest, so the binary would become a pump to a Unix
+  socket in `Store.directory` and fall back to read-only when the app is
+  closed (7.15). Still no port.
 - Streaming dictation.
-- A store build. Whether a process tap can be created inside the App
-  Sandbox is unverified; if it cannot, the store build hides meetings behind
+- A store build. It would also take the MCP binary with it: a sandboxed
+  helper reaches a user-chosen folder only through a bookmark the app holds,
+  which a separately launched process does not have. Whether a process tap
+  can be created inside the App Sandbox is unverified; if it cannot, the store build hides meetings behind
   `Sandbox.isActive` the way it hides insights.
 
 ## 11. Copy
@@ -1859,6 +1959,7 @@ Not in this plan, written down so they are not re-derived:
 | Row button help | `play` · `stop` · `copy the transcript` · `rename` · `show in finder` · `delete` |
 | Empty | `nothing yet` · `no matches` |
 | Import | `english only` · `no audio in that file` |
+| Footer row `mcp` | `let other tools read your meetings` · `copy command` · help `off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.` · error returned when off: `meetings mcp is off. turn it on in type me it settings.` |
 | Delete all | `Delete all N meetings?` (counted) · `Delete All` · `This cannot be undone.` |
 | Footer rows | `keep` (`the last 50 meetings` … `everything · never delete`) · `keep the audio` (`deleted along with the meeting`) · `meetings folder` (`show`, `change`) · `system audio` (`not tested` / `working` / `silent`, `test`, `quit and reopen after granting`, `the other people on a call are not told you are recording.`) · `meetings folder` subtitle `unavailable` / ` · icloud drive` · `meetings use 2.3 GB` |
 | Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
@@ -1887,6 +1988,7 @@ file each under `TypeMeItTests/Meetings/`:
 | `EchoBleedDetectorTests` | 7.10: silence, a delayed copy, independent noise |
 | `PreRollTests` | 7.7: a wrapped ring drains oldest-first; a short pre-roll; `discard` leaves nothing readable |
 | `MeetingImportTests` | 7.14 |
+| `MCPTests` | 7.15 |
 | `VoicePrintTests` | matcher threshold and margin on unit vectors |
 
 Assertions compare whole values or snapshot the whole rendered file; no
