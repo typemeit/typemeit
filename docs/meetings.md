@@ -32,7 +32,7 @@ part of the plan; see section 15.
 | Step | Delivers | Done when |
 | --- | --- | --- |
 | Spikes S1 to S3 | Measured answers to the unknowns in 3.5, written into this file | Every pass/fail line in section 6 is filled in |
-| Phase 1 | Slack huddles and Google Meet detected; one prompt; two tracks recorded on one clock; transcript with **You** and **Them**; a Meetings tab | The phase-1 verification list (7.13) passes on a real huddle and a real Meet call |
+| Phase 1 | Slack huddles and Google Meet detected; one prompt, with the two minutes before it kept; two tracks recorded on one clock; transcript with **You** and **Them**; a Meetings tab; import a recording | The phase-1 verification list (7.13) passes on a real huddle and a real Meet call |
 | Phase 2 | The room, started by hand; far-end and room speakers numbered by diarization and renameable | 8.5 passes with three people on a call and six in a room |
 | Phase 3 | **You** recognised in a room by voice print; names recovered from the meeting window where the probe says they can be | 9.3 passes; anything the probe failed stays as numbers |
 
@@ -147,6 +147,17 @@ change any of them; the default is what gets built.
 - **D18. No voice but the user's is ever stored, and the user's only opt-in
   (D15).** Far-end and room speaker embeddings exist for one transcription
   pass, in memory, and are never written to disk or to `meeting.json`.
+- **D20. A meeting keeps the minute before the user says yes.** Capture
+  starts when an owner becomes a candidate, into memory only. On `record`
+  the buffer becomes frame 0 of the tracks; on `decline`, on the candidate
+  lapsing, and on quit it is freed and nothing is written. Without it a
+  meeting starts at the click, which is after the part that says what the
+  meeting is about. The cost is that the microphone opens before consent —
+  visibly, since macOS lights its indicator — and the settings row says so.
+- **D21. A recording made elsewhere can be imported.** One file in, the same
+  pipeline, a meeting out. It covers what detection cannot see (a phone
+  call, a room recorded on a phone, a call the user declined) and it is how
+  S2 and S3 get an hour of real audio without staging a meeting.
 - **D19. The other participants are not told.** The app announces nothing to
   the call. Recording someone may need their agreement where the user is;
   the Meetings tab footer says so in one line.
@@ -407,6 +418,8 @@ Rules for every task below:
 | `Meetings/MeetingCoordinator.swift` | `@MainActor` owner of the machine: feeds it watch updates and ticks, shows the prompt, starts and stops the recorder, hands finished meetings to the transcriber, exposes the busy state |
 | `Meetings/MeetingCapture.swift` | One private aggregate device (mic sub-device plus optional process tap), one IO proc, two ring buffers, the drain queue, device-change rebuilds |
 | `Meetings/AudioRing.swift` | A preallocated single-producer single-consumer Float32 ring |
+| `Meetings/PreRoll.swift` | One ring per track sized in seconds; `take()` drains oldest-first and frees; `discard()` zeroes and frees |
+| `Meetings/MeetingImport.swift` | Any file `AVFoundation` can read to a 16 kHz mono `.caf` in a staged folder, plus the `Meeting` that describes it |
 | `Meetings/TrackWriter.swift` | Appends Float32 to a CAF file as Int16 with an open-ended data chunk; silence fill; peak tracking |
 | `Meetings/MeetingRecorder.swift` | Owns a `MeetingCapture` and one or two `TrackWriter`s; the silence monitor; gaps; dictation spans; levels |
 | `Meetings/Meeting.swift` | `Meeting` (Codable) and its parts |
@@ -493,7 +506,8 @@ against origin/main with nothing else built. S1's capture half needs 7.5's
 aggregate, `TrackWriter`'s CAF header and the `NSAudioCaptureUsageDescription`
 key from 7.12 (without the key the dev app never prompts and the tap stays
 silent), so it runs once those exist behind the dev launch argument in 7.1;
-S2 needs `ChunkCutter` from 7.10; S3 needs S1's `others.caf`. Only 7.2 to
+S2 needs `ChunkCutter` from 7.10 and 7.14's import for its hour of audio;
+S3 needs S1's `others.caf`. Only 7.2 to
 7.4, 7.7 and the tap in 7.5 wait for S1's result; the rest of phase 1 is
 built first, in the order 7.1 gives. Each spike opens with what it needs.
 
@@ -649,7 +663,7 @@ phase 3 uses the screen (9.2) or nothing.
 Build first, in this order: 7.8 (settings and constants), 7.5 (capture, no
 tap), 7.6 (the recorder), 7.9 (storage), 7.10 (transcription) and 7.11 (the
 tab, the settings group, and the menu items that do not depend on
-detection), driven by a dev-only launch argument `-recordRoom <seconds>`
+detection), driven by 7.14's import and a dev-only launch argument `-recordRoom <seconds>`
 that records the mic through `MeetingCapture` for that long into a staged
 folder and runs the whole end-of-meeting pipeline. That exercises every file
 but the watch, the machine, the coordinator and the tap without a second
@@ -794,18 +808,18 @@ Transitions:
 
 | From | On | To | Effects |
 | --- | --- | --- | --- |
-| idle | an owner's input turns on, not on `neverAsk` | candidate(owner, now, nil) | |
+| idle | an owner's input turns on, not on `neverAsk` | candidate(owner, now, nil) | beginPreRoll(owner) |
 | idle | record(owner) | recording(owner, now) | startRecording(owner) |
 | idle | room | recording(nil, now) | startRecording(nil) |
 | candidate(bothSince: nil) | owner output on | candidate(owner, since, now) | |
 | candidate | owner output off | candidate(owner, since, nil) | |
 | candidate | now − bothSince ≥ confirm | prompting(owner, now) | showPrompt |
-| candidate | owner input off | idle | |
-| candidate | now − since ≥ armTimeout with output never on | idle (no re-arm until input drops) | |
-| candidate | record(owner) | recording(owner, now) | startRecording(owner) |
-| prompting | record(owner) | recording(owner, now) | hidePrompt, startRecording(owner) |
-| prompting | decline | declined(owner) | hidePrompt |
-| prompting | owner input off | paused(owner, now, .prompting) | hidePrompt |
+| candidate | owner input off | idle | discardPreRoll |
+| candidate | now − since ≥ armTimeout with output never on | idle (no re-arm until input drops) | discardPreRoll |
+| candidate | record(owner) | recording(owner, now) | startRecording(owner), promoting the pre-roll |
+| prompting | record(owner) | recording(owner, now) | hidePrompt, startRecording(owner), promoting the pre-roll |
+| prompting | decline | declined(owner) | hidePrompt, discardPreRoll |
+| prompting | owner input off | paused(owner, now, .prompting) | hidePrompt, discardPreRoll |
 | declined | record(owner) | recording(owner, now) | startRecording(owner) |
 | declined | owner input off | paused(owner, now, .declined) | |
 | recording(owner) | owner input off | paused(owner, now, .recording) | pauseRecording |
@@ -1010,18 +1024,44 @@ from `Pipeline.start()`):
 - `showResumed`: `.meetingResumed(app:)`, whose `stop` sends `stop` to the
   machine. It is a toast, not a question: the recording has already resumed.
 
-**Open, and the owner's call: the first minute is lost.** Capture starts when
-consent is given, so a meeting keeps nothing from before the click —
-`meetingConfirmSeconds` (12 s) plus however long the prompt sits there while
-someone is talking. That is exactly the part where a meeting says what it is
-about. The fix is a pre-roll: start the capture at `candidate` into a ring
-held only in memory, and on `record` write the ring into frame 0 of the
-tracks; on `decline`, or on the candidate lapsing, free it and write nothing.
-120 s at 16 kHz mono Float32 is about 7.7 MB a track, and `AudioRing` already
-does this at 4 s. The reason it is not simply specified here is that it means
-capturing audio before the user has said yes — memory only, never a file,
-discarded on decline, but still capture. That is a decision about what this
-app is, not a detail, so it is written down rather than taken.
+**Pre-roll (D20).** Consent arrives `meetingConfirmSeconds` (12 s) plus a
+human's reaction time after the meeting started, and that is the part of a
+meeting that says what it is about. So the coordinator starts capturing at
+`candidate`, into memory, and only writes on `record`:
+
+- `PreRoll` holds one `AudioRing` per track sized `Fixed.meetingPreRollSeconds`
+  (120) at 16 kHz mono Float32: 7.7 MB a track, 15.4 MB for a call. It
+  overwrites oldest-first and never allocates after `init`.
+- `candidate` gains the effect `beginPreRoll(owner)`: build a `MeetingCapture`
+  exactly as `startRecording` would, with a sink that writes into the rings
+  instead of the writers. Two things can fail softly — without the tap grant
+  the far-end ring is absent and the mic is still buffered; a capture that
+  throws leaves `preRoll = nil` and the meeting simply starts at the click.
+- `record` hands the live capture to `MeetingRecorder` rather than building a
+  second one, so there is no gap at the seam. The recorder opens the tracks,
+  writes each ring's contents first through the same `TrackWriter`, then
+  continues live. Frame 0 is the oldest pre-roll frame and `firstHostTime` is
+  that frame's host time, so 5.4's clock, `dictations[]` and the gap
+  bookkeeping all keep working unchanged. `preRollMs` goes in `meeting.json`.
+- `decline`, `neverAsk`, the candidate lapsing at `armTimeout`, input
+  dropping, and `stopForQuit` all call `discard()`, which zeroes the buffers
+  before freeing them. Nothing reaches a file, and no buffer outlives the
+  candidate that made it.
+- A room is started by hand and has no candidate, so it has no pre-roll.
+  There is no always-on buffer: the app holds audio only while another app
+  is in a call with the mic and the output both live.
+- `Settings.meetingPreRoll`, default on, and `Settings.meetingAsk == false`
+  suppresses the pre-roll with the prompt.
+- Tests (`PreRollTests`): a ring that wrapped yields the newest 120 s
+  oldest-first; consent after 30 s yields 30 s; `discard` leaves nothing
+  readable; a mic-only pre-roll on a call promotes with the far-end track
+  starting at the seam and its pre-roll span zero-filled.
+
+The honest cost: the microphone opens before the user has agreed to anything,
+which macOS shows in the menu bar and in Control Center. That is the right
+way round — the indicator is true — but it is a change in what the app does
+while idle, so the settings row says it plainly (section 11) and turning the
+prompt off turns it off.
 - Exposes `detected: Owner?` (level: any holder with input and output, for
   the menu), `prompting: Owner?`, `recording: (kind, started)?`,
   `levels: (mic: Float, others: Float?)` (from `MeetingRecorder.onLevels`,
@@ -1095,6 +1135,7 @@ verified in S1).
 | `meetingSilenceFloor` | 0.001 (−60 dBFS) | same |
 | `meetingBothSilentEndSeconds` | 600 | an idle call; also a forgotten room recording |
 | `meetingRebuildAttempts`, `meetingRebuildIntervalSeconds` | 3, 1 | one rebuild usually suffices; three a second apart cover a slow USB re-enumeration |
+| `meetingPreRollSeconds` | 120 | longer than a prompt is ever left unanswered; 15.4 MB for a call (D20) |
 | `meetingQuitWaitSeconds` | 2 | the writers flush in milliseconds; two seconds bounds a stuck disk |
 | `meetingTitleSourceWords` | 700 | fits the 4,096-token window beside the instructions |
 | `meetingRosterPollMinutes` (phase 3) | 5 | people join in the first minutes |
@@ -1511,6 +1552,14 @@ On a real machine, each of these, with debug logs on and the log read afterwards
 - Quit the app mid-meeting: the meeting is saved with what was recorded and
   transcribed on relaunch. `kill -9` mid-meeting: the same.
 - Quit mid-transcription: relaunch resumes at the next chunk.
+- Join a call, say a sentence, wait for the prompt, then record: the sentence
+  is in the transcript, `preRollMs` is set, and word timestamps still line up
+  with the audio.
+- Decline instead: nothing is written, and the staged folder never appears.
+- Leave the prompt unanswered until the candidate lapses: same.
+- Import a 30-minute recording: a meeting appears, transcribes and publishes
+  like any other, and re-importing the same file makes a second meeting
+  rather than overwriting the first.
 - A Sparkle update becomes ready mid-meeting: the app does not relaunch until
   the meeting is done.
 - Rename to `#design/ops: Q3 · 🎉`: the folder name is legal, opens from the
@@ -1518,6 +1567,46 @@ On a real machine, each of these, with debug logs on and the log read afterwards
 - Delete a meeting: it is in the Trash. Delete all: the folder is empty.
 - `keep` set to its smallest option with more meetings than that: the oldest
   go to the Trash and the disk line drops.
+
+### 7.14 Importing a recording (D21)
+
+One file in, the same pipeline, a meeting out. Built early, because S2 and S3
+need an hour of real audio and this is how they get it without staging a
+meeting with three people in it.
+
+`MeetingImport.run(url:) async throws -> Meeting`:
+
+1. Read with `AVAudioFile`; if that refuses the container (a `.mp4`, a
+   `.mov`), fall back to `AVAssetReader` over the asset's first audio track.
+   No audio track at all throws `MeetingImport.Error.noAudio`.
+2. Convert to 16 kHz mono Float32 with `AVAudioConverter`, mixing every
+   channel down, in blocks, and write through the existing `TrackWriter` to
+   `room.caf` in a staged folder (7.9). Memory stays at one block; a
+   four-hour file is bounded by disk, and the same
+   `Fixed.meetingMinimumFreeBytes` check applies.
+3. Write `meeting.json` with `kind: room` (one track, so speakers come from
+   diarization and never from a channel split), `source: imported`,
+   `importedFrom` the basename only — never the path, which carries the
+   user's home directory and often a client's name — `started` from the
+   file's `creationDate` when it has one, else now, and
+   `transcription.state = pending`.
+4. Hand it to `MeetingTranscriber`, which runs unchanged from step 1, and to
+   `MeetingStore`.
+
+Entry points: `import…` in the Meetings tab, an `NSOpenPanel` filtered to
+`UTType.audio` and `UTType.movie`; and a drop on the tab's list. Several
+files selected at once import one at a time, since they share the one model.
+The title is the file's basename, renameable like any other. The row shows
+`imported` where a call shows its app.
+
+Two honest limits, both stated in the tab rather than discovered: the model
+is English, so another language returns confident nonsense; and an imported
+file has no mic/far-end split, so phase 1 labels everyone `Speaker 1` until
+phase 2's diarizer is installed, and `You` only from phase 3's voice print.
+
+Tests (`MeetingImportTests`): a short `.m4a` fixture, an `.mp4` with one
+audio track, a stereo file (both channels present in the mono output), a
+file with no audio track, and a name that needs sanitising (7.9).
 
 ## 8. Phase 2: the room, and speakers
 
@@ -1763,14 +1852,16 @@ Not in this plan, written down so they are not re-derived:
 | Menu | `Record This Meeting` · `Don't Ask for Slack Again` · `Record the Room` · `Recording this meeting · 12m` · `Stop Recording Meeting` · `Transcribing meeting · 40%` · `View Meetings…` |
 | Sidebar, page title | `meetings` |
 | Tab count | `counted(n, "meeting")` |
+| Tab buttons | `import…` (help `transcribe a recording`) |
 | Tab status | `recording · 12m` · `stop` · `transcribing · 40%` · `downloading the speaker model · 40%` |
-| Row line 2 | `45m · counted(n, "speaker") · slack` |
+| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` |
 | Row chips | `only your side` · `on speakers` · `transcription failed` · `retry` · `waiting for the speech model` · `download` · `add speakers` · `meetings folder unavailable` · `change` |
 | Row button help | `play` · `stop` · `copy the transcript` · `rename` · `show in finder` · `delete` |
 | Empty | `nothing yet` · `no matches` |
+| Import | `english only` · `no audio in that file` |
 | Delete all | `Delete all N meetings?` (counted) · `Delete All` · `This cannot be undone.` |
 | Footer rows | `keep` (`the last 50 meetings` … `everything · never delete`) · `keep the audio` (`deleted along with the meeting`) · `meetings folder` (`show`, `change`) · `system audio` (`not tested` / `working` / `silent`, `test`, `quit and reopen after granting`, `the other people on a call are not told you are recording.`) · `meetings folder` subtitle `unavailable` / ` · icloud drive` · `meetings use 2.3 GB` |
-| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. nothing is recorded until you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
+| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
 | Speakers | `You` · `Them` · `Room` · `Speaker 1` · `You (echo)` |
 | Default titles | app name · `web content` · `Room` · `meeting` |
 | About row | `speakers: pyannote community-1, wespeaker and vbx (but speech@fit), converted to core ml by fluid inference · cc-by-4.0`, the licence linked to creativecommons.org/licenses/by/4.0 |
@@ -1794,6 +1885,8 @@ file each under `TypeMeItTests/Meetings/`:
 | `ChunkStitchTests` | 7.10 |
 | `TranscriptMergeTests` | 7.10 and 8.3 |
 | `EchoBleedDetectorTests` | 7.10: silence, a delayed copy, independent noise |
+| `PreRollTests` | 7.7: a wrapped ring drains oldest-first; a short pre-roll; `discard` leaves nothing readable |
+| `MeetingImportTests` | 7.14 |
 | `VoicePrintTests` | matcher threshold and margin on unit vectors |
 
 Assertions compare whole values or snapshot the whole rendered file; no
@@ -1837,6 +1930,11 @@ substring checks.
   aggregate: with it the device does not start until the tap delivers
   audio, so a room (no tap), a denied grant or a silent far end would hold
   the mic track back, breaking D13 and the clock in 5.4.
+- The pre-roll opens the microphone at `candidate`, so the menu-bar
+  indicator lights before the user has agreed to anything, and our own
+  process appears in the process list holding input. The watch already
+  excludes both bundle ids by prefix, so this cannot make the app its own
+  candidate — but that exclusion becomes load-bearing rather than tidy.
 - Audio device names are user-authored and routinely carry a real person's
   name ("Michael's AirPods Pro"). Nothing persists one: not `meeting.json`,
   not the transcript's front matter, not a log line. They may be shown live
