@@ -46,6 +46,14 @@ function join(request, env, id) {
 }
 
 /// Two Macs, and the sealed frames that go between them.
+///
+/// The sockets are hibernatable. A share is two people reading a code to each
+/// other and a few frames at the end of it, so nearly all of a room's life is
+/// spent with nothing happening; hibernation is what stops that wait being
+/// billed as wall-clock time, and it is the difference between paying for the
+/// conversation and paying for the silence around it. It also means the room
+/// is not holding its sockets in a variable: `getWebSockets()` is the list,
+/// and it survives the object being evicted and brought back.
 export class ShareRoom {
   // A share takes under a minute. Ten is room for someone reading a code down
   // a phone line; after that the room is closed whatever state it is in, so a
@@ -57,29 +65,24 @@ export class ShareRoom {
 
   constructor(state) {
     this.state = state;
-    this.sockets = [];
   }
 
   async fetch() {
-    if (this.sockets.length >= 2) {
+    if (this.state.getWebSockets().length >= 2) {
       // Somebody is already talking here. This is the shape a guessed or
       // reused code takes, and the two who are in stay undisturbed.
       return new Response("that code is in use", { status: 409 });
     }
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
-    server.accept();
-    this.sockets.push(server);
+    this.state.acceptWebSocket(server);
     await this.state.storage.setAlarm(Date.now() + ShareRoom.LIFETIME);
-
-    server.addEventListener("message", (event) => this.relay(server, event.data));
-    server.addEventListener("close", () => this.left(server));
-    server.addEventListener("error", () => this.left(server));
 
     // How many are here counting this one, so the Mac that joined second
     // knows the other is already waiting.
-    server.send(JSON.stringify({ t: "room", peers: this.sockets.length }));
-    if (this.sockets.length === 2) this.tell(server, { t: "peer" });
+    const peers = this.state.getWebSockets().length;
+    server.send(JSON.stringify({ t: "room", peers }));
+    if (peers === 2) this.pass(server, JSON.stringify({ t: "peer" }));
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -90,19 +93,22 @@ export class ShareRoom {
   /// Text from a Mac is dropped rather than passed on. This room's own
   /// messages are text, so forwarding a Mac's would let one end pose as the
   /// room to the other.
-  relay(from, data) {
-    if (typeof data === "string") return;
-    if (!(data instanceof ArrayBuffer) || data.byteLength > ShareRoom.LIMIT) return;
-    this.pass(from, data);
+  webSocketMessage(from, message) {
+    if (typeof message === "string") return;
+    if (message.byteLength > ShareRoom.LIMIT) return;
+    this.pass(from, message);
   }
 
-  /// One of the room's own messages, as text.
-  tell(from, message) {
-    this.pass(from, JSON.stringify(message));
+  webSocketClose(from) {
+    this.pass(from, JSON.stringify({ t: "gone" }));
+  }
+
+  webSocketError(from) {
+    this.pass(from, JSON.stringify({ t: "gone" }));
   }
 
   pass(from, body) {
-    for (const socket of this.sockets) {
+    for (const socket of this.state.getWebSockets()) {
       if (socket === from) continue;
       try {
         socket.send(body);
@@ -112,20 +118,14 @@ export class ShareRoom {
     }
   }
 
-  left(socket) {
-    this.sockets = this.sockets.filter((s) => s !== socket);
-    this.tell(null, { t: "gone" });
-  }
-
   /// The room's time is up.
   async alarm() {
-    for (const socket of this.sockets) {
+    for (const socket of this.state.getWebSockets()) {
       try {
         socket.close(1000, "the code expired");
       } catch {
         // Already gone.
       }
     }
-    this.sockets = [];
   }
 }
