@@ -289,6 +289,11 @@ enum Fixed {
     static let meetingQuitWaitSeconds = 2
     /// Fits the 4,096-token window beside the title instructions.
     static let meetingTitleSourceWords = 700
+    /// The words are taken as this many runs spread across the meeting:
+    /// the opening is small talk and updates, the subject comes later.
+    /// Measured on an 11-minute call: the first 700 words titled it
+    /// "Weekly Update Meeting", seven runs titled it after its lesson.
+    static let meetingTitleSamples = 7
     /// The process-list listener fires several times per launch.
     static let meetingWatchDebounce: Duration = .milliseconds(250)
     /// The backstop the listeners need (docs/meetings.md 3.2).

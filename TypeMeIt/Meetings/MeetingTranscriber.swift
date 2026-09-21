@@ -92,6 +92,8 @@ enum MeetingTranscriber {
                 let id = meeting.speakers[i].id
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
             }
+            // A speaker the diarizer found but no word landed on is not listed.
+            meeting.speakers.removeAll { !$0.isYou && $0.talkMs == 0 && !meeting.paragraphs.contains(where: { p in p.speaker == $0.id }) }
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
@@ -297,6 +299,19 @@ enum MeetingTranscriber {
         return meeting
     }
 
+    /// `Fixed.meetingTitleSourceWords` words as `Fixed.meetingTitleSamples`
+    /// runs spread evenly across the transcript, joined by an ellipsis line.
+    static func titleSample(of meeting: Meeting) -> String {
+        let words = meeting.paragraphs.flatMap { $0.text.split(separator: " ") }
+        guard !words.isEmpty else { return "" }
+        if words.count <= Fixed.meetingTitleSourceWords { return words.joined(separator: " ") }
+        let size = Fixed.meetingTitleSourceWords / Fixed.meetingTitleSamples
+        return (0..<Fixed.meetingTitleSamples).map { k in
+            let start = k * words.count / Fixed.meetingTitleSamples
+            return words[start..<min(start + size, words.count)].joined(separator: " ")
+        }.joined(separator: "\n…\n")
+    }
+
     @Generable
     struct MeetingTitle: Sendable {
         @Guide(description: "three to five words")
@@ -309,9 +324,9 @@ enum MeetingTranscriber {
     /// Apple Intelligence is unavailable or declines.
     private static func generatedTitle(for meeting: Meeting) async -> String? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
-        let words = meeting.paragraphs.flatMap { $0.text.split(separator: " ") }.prefix(Fixed.meetingTitleSourceWords).joined(separator: " ")
+        let words = titleSample(of: meeting)
         guard !words.isEmpty else { return nil }
-        let session = LanguageModelSession(instructions: "You title meeting transcripts. The user message is the start of one transcript. Answer with a title of three to five words naming what the meeting was about. No quotes, no trailing punctuation.")
+        let session = LanguageModelSession(instructions: "You title meeting transcripts. The user message is the start of one transcript. Answer with a title of three to five words naming the subject the meeting was about, the way someone who was in it would refer to it afterwards. Prefer the topic over a company or product name that merely came up, and never name a person. No quotes, no trailing punctuation.")
         do {
             let response = try await session.respond(to: "<transcript>\n\(words)\n</transcript>", generating: MeetingTitle.self, options: GenerationOptions(samplingMode: .greedy))
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))

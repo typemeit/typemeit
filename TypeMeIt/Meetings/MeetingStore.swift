@@ -91,26 +91,30 @@ final class MeetingStore {
 
     /// A user title. Rewrites the title part of the folder name only.
     func rename(id: UUID, title: String) {
-        guard var meeting = meeting(id), let folder = folders[id] else { return }
+        guard var meeting = meeting(id) else { return }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != meeting.title else { return }
         meeting.title = trimmed
         meeting.titleSource = .user
-        if meeting.published {
-            let root = folder.deletingLastPathComponent()
-            let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current, duration: meeting.duration, title: trimmed,
-                                          existing: MeetingFolder.existingNames(under: root).filter { $0 != folder.lastPathComponent })
-            let destination = root.appendingPathComponent(name, isDirectory: true)
-            if destination.path != folder.path {
-                do {
-                    try FileManager.default.moveItem(at: folder, to: destination)
-                    folders[id] = destination
-                } catch {
-                    Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
-                }
-            }
-        }
         save(meeting)
+        renameFolderIfNeeded(id)
+    }
+
+    /// A published folder's name follows the meeting's title and duration;
+    /// after a rename or a new generated title it is moved to match.
+    func renameFolderIfNeeded(_ id: UUID) {
+        guard let meeting = meeting(id), meeting.published, let folder = folders[id] else { return }
+        let root = folder.deletingLastPathComponent()
+        let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current, duration: meeting.duration, title: meeting.title,
+                                      existing: MeetingFolder.existingNames(under: root).filter { $0 != folder.lastPathComponent })
+        let destination = root.appendingPathComponent(name, isDirectory: true)
+        guard destination.path != folder.path else { return }
+        do {
+            try FileManager.default.moveItem(at: folder, to: destination)
+            folders[id] = destination
+        } catch {
+            Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
+        }
     }
 
     /// Phase 2: a speaker's name, per meeting.

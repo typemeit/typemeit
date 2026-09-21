@@ -400,6 +400,11 @@ final class MeetingCoordinator {
         meeting.transcription.error = nil
         meeting.transcription.done = [:]
         meeting.paragraphs = []
+        // A generated title is generated again from the new words; a typed one stays.
+        if meeting.titleSource == .generated {
+            meeting.title = meeting.app?.name ?? "Room"
+            meeting.titleSource = .app
+        }
         store.save(meeting)
         enqueue(meeting)
     }
@@ -426,7 +431,10 @@ final class MeetingCoordinator {
         switch meeting.transcription.state {
         case .done:
             // The tick may have published it between the run's last save and here.
-            if store.meeting(meeting.id)?.published == true || store.publish(meeting.id) {
+            if store.meeting(meeting.id)?.published == true {
+                store.renameFolderIfNeeded(meeting.id)
+                if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
+            } else if store.publish(meeting.id) {
                 if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
             } else {
                 toast(.meetingFolderUnavailable)
