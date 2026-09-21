@@ -975,6 +975,16 @@ var onLevels: (@Sendable (_ mic: Float, _ others: Float?) -> Void)?   // 10 Hz, 
   `bothSilent` to the machine when it fires. A room shows no pill, since
   there is no tap to blame. A far end at the floor while the mic is alive
   means everyone else is muted, and nothing is said.
+- Sleep. Hold `kIOPMAssertionTypePreventUserIdleSystemSleep` (never the
+  display variant: the screen should still dim and lock) from the first
+  capture callback to `stop()`, named "type me it is recording a meeting".
+  Taken on the first callback rather than on `init` so a denied grant does
+  not hold the machine awake for nothing, and held by our own process, so
+  the OS releases it on every exit path including `_exit(0)` and `kill -9`.
+  This matters for a room, not a call: a call's own app already holds an
+  assertion, but a Mac recording a meeting from the table with nobody
+  touching it idles to sleep mid-sentence. `willSleep` then means the lid
+  closed or the user chose Sleep, which is still a finish (7.4).
 - Gaps: `pause()` records the frame index; `resume()` records the end. Both
   tracks receive zeros for the gap. A capture rebuild reports its gap the
   same way. Every gap goes into `tracks[].gaps`.
@@ -999,6 +1009,19 @@ from `Pipeline.start()`):
   cloud leaves. `hidePrompt` clears both the shown prompt and the parked one.
 - `showResumed`: `.meetingResumed(app:)`, whose `stop` sends `stop` to the
   machine. It is a toast, not a question: the recording has already resumed.
+
+**Open, and the owner's call: the first minute is lost.** Capture starts when
+consent is given, so a meeting keeps nothing from before the click —
+`meetingConfirmSeconds` (12 s) plus however long the prompt sits there while
+someone is talking. That is exactly the part where a meeting says what it is
+about. The fix is a pre-roll: start the capture at `candidate` into a ring
+held only in memory, and on `record` write the ring into frame 0 of the
+tracks; on `decline`, or on the candidate lapsing, free it and write nothing.
+120 s at 16 kHz mono Float32 is about 7.7 MB a track, and `AudioRing` already
+does this at 4 s. The reason it is not simply specified here is that it means
+capturing audio before the user has said yes — memory only, never a file,
+discarded on decline, but still capture. That is a decision about what this
+app is, not a detail, so it is written down rather than taken.
 - Exposes `detected: Owner?` (level: any holder with input and output, for
   the menu), `prompting: Owner?`, `recording: (kind, started)?`,
   `levels: (mic: Float, others: Float?)` (from `MeetingRecorder.onLevels`,
@@ -1305,7 +1328,11 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
 2. For each track: read the `.caf` once to compute the 100 ms peak envelope
    (for `ChunkCutter`) and the 10 ms RMS envelope (for the echo detector),
    cut with `ChunkCutter`, then for each chunk not yet in `done` read only
-   that chunk's samples, call `await Transcriber.shared.transcribeMeetingChunk(chunk)`,
+   that chunk's samples. A chunk whose peak envelope never rises above
+   `Fixed.meetingSilenceFloor` is marked done and skipped without a model
+   call: a call where the far end stays muted is 40 minutes of silence that
+   would otherwise be decoded a chunk at a time, and the envelope needed to
+   tell is already in hand from this same pass. Otherwise call `await Transcriber.shared.transcribeMeetingChunk(chunk)`,
    offset every word by the chunk's start, stitch with `ChunkStitch.append`,
    append the words to a per-track scratch file (`words-mic.json`,
    `words-others.json`, a `TrackWords`) and bump `done`, saving
@@ -1810,6 +1837,11 @@ substring checks.
   aggregate: with it the device does not start until the tap delivers
   audio, so a room (no tap), a denied grant or a silent far end would hold
   the mic track back, breaking D13 and the clock in 5.4.
+- Audio device names are user-authored and routinely carry a real person's
+  name ("Michael's AirPods Pro"). Nothing persists one: not `meeting.json`,
+  not the transcript's front matter, not a log line. They may be shown live
+  (a picker, a warning that names the device it cannot hear) and nowhere
+  else. Today no field holds one; this is here so none is added.
 - Spotlight does not index `~/Library/Application Support`. The folder
   setting exists for that; a folder in `~/Documents` may be synced by iCloud.
 - FluidAudio's offline pipeline needs a different model set from the
