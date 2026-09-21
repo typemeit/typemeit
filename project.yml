@@ -35,6 +35,11 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
+  # The speaker diarizer (docs/meetings.md 8.2). Pinned exactly: its model
+  # files are mirrored per revision and loaded from disk.
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    exactVersion: "0.15.8"
 targets:
   TypeMeIt:
     type: application
@@ -57,6 +62,8 @@ targets:
         product: TranscribeCpp
       - package: Sparkle
         product: Sparkle
+      - package: FluidAudio
+        product: FluidAudio
     info:
       path: TypeMeIt/Support/Info.plist
       properties:
@@ -121,6 +128,8 @@ targets:
     dependencies:
       - package: TranscribeCpp
         product: TranscribeCpp
+      - package: FluidAudio
+        product: FluidAudio
     info:
       path: TypeMeIt/Support/Info-Store.plist
       properties:

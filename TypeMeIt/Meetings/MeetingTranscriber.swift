@@ -71,8 +71,17 @@ enum MeetingTranscriber {
                 meeting.echo = EchoVerdict.verdict(EchoBleedDetector.analyse(micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz))
             }
 
+            let segments = await speakers(of: &meeting, in: folder)
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
-            meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: nil, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
+            meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
+            // A word the segments did not reach keeps its track's label; that
+            // speaker stays in the list so the row can name it.
+            for role in meeting.tracks.map(\.role) {
+                let id = speakerID(for: role)
+                if meeting.paragraphs.contains(where: { $0.speaker == id }), !meeting.speakers.contains(where: { $0.id == id }) {
+                    meeting.speakers.append(Meeting.Speaker(id: id, name: defaultName(for: role), isYou: role == .mic, talkMs: 0))
+                }
+            }
             for i in meeting.speakers.indices {
                 let id = meeting.speakers[i].id
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
@@ -115,6 +124,59 @@ enum MeetingTranscriber {
         case .others: Meeting.Speaker.them
         case .room: Meeting.Speaker.room
         }
+    }
+
+    private static func defaultName(for role: Meeting.Track.Role) -> String {
+        switch role {
+        case .mic: "You"
+        case .others: "Them"
+        case .room: "Room"
+        }
+    }
+
+    // MARK: Speakers (docs/meetings.md 8.3)
+
+    /// Diarizes the far-end track of a call or the one track of a room.
+    /// Speakers become `s1…sN` in first-appearance order named Speaker 1…N,
+    /// keeping a name the user gave the same id before; a call whose far
+    /// end has one speaker stays `Them`. Without the model the meeting
+    /// transcribes as before, and the download starts for the next one.
+    /// The diarizer failing keeps the transcript with `Them` or `Room`.
+    private static func speakers(of meeting: inout Meeting, in folder: URL) async -> [SpeakerSegment]? {
+        let role: Meeting.Track.Role = meeting.kind == .call ? .others : .room
+        guard let track = meeting.tracks.first(where: { $0.role == role }) else { return nil }
+        guard DiarizerModelStore.isInstalled else {
+            await MainActor.run { DiarizerModelStore.shared.download() }
+            return nil
+        }
+        // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
+        let segments: [SpeakerSegment]
+        do {
+            segments = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file)).segments
+        } catch {
+            Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
+            DebugLog.write("Meeting diarization failed: \(error.localizedDescription)")
+            return nil
+        }
+        meeting.transcription.diarizer = DiarizerModelStore.pipelineName
+        var order: [String] = []
+        for segment in segments.sorted(by: { $0.startMs < $1.startMs }) where !order.contains(segment.speaker) { order.append(segment.speaker) }
+        guard !order.isEmpty else { return nil }
+        let previous = meeting.speakers
+        meeting.speakers = meeting.speakers.filter { $0.isYou }
+        if meeting.kind == .call, order.count == 1 {
+            let them = Meeting.Speaker.them
+            meeting.speakers.append(Meeting.Speaker(id: them, name: previous.first { $0.id == them }?.name ?? defaultName(for: .others), isYou: false, talkMs: 0))
+            return nil
+        }
+        let ids = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, "s\($0 + 1)") })
+        for (i, original) in order.enumerated() {
+            let id = ids[original]!
+            let name = previous.first { $0.id == id }?.name ?? "Speaker \(i + 1)"
+            meeting.speakers.append(Meeting.Speaker(id: id, name: name, isYou: false, talkMs: 0))
+        }
+        DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track")
+        return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
     }
 
     // MARK: Audio

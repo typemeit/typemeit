@@ -325,6 +325,10 @@ enum Fixed {
         "com.apple.CoreSpeech", "com.apple.assistantd", "com.apple.universalaccessd",
         "com.apple.accessibility.heard", "com.apple.systemsoundserverd",
     ]
+    /// FluidAudio's segmentation step ratio: its default 0.2; its docs say
+    /// 0.1 measures best on far-field meetings with rapid exchanges. S3
+    /// (docs/meetings.md 6) picks between them; until it runs, the default.
+    static let meetingDiarizerStepRatio = 0.2
     /// Every WKWebView app shares this audio process, Safari included, so it
     /// is named `web content` and never put on the never-ask list.
     static let meetingWebContentBundleID = "com.apple.WebKit.GPU"

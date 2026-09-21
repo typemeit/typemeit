@@ -17,6 +17,10 @@ struct MeetingsTab: View {
     @State private var confirmDeleteAll = false
     @State private var renaming: UUID?
     @State private var renameText = ""
+    @State private var diarizer = DiarizerModelStore.shared
+    /// The speaker label being renamed: meeting id and speaker id.
+    @State private var renamingSpeaker: (meeting: UUID, speaker: String)?
+    @State private var speakerName = ""
     /// Re-reads the clock for the recording row's elapsed time.
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var now = Date()
@@ -45,7 +49,7 @@ struct MeetingsTab: View {
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            if coordinator.recording != nil || coordinator.transcribing != nil {
+            if coordinator.recording != nil || coordinator.transcribing != nil || diarizerBusy {
                 statusRow
                 RowRule()
             }
@@ -127,9 +131,28 @@ struct MeetingsTab: View {
                     .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
                 InkProgress(value: t.fraction).frame(width: 160)
                 Spacer()
+            } else if case .downloading(let received, let total) = diarizer.state {
+                Text("downloading the speaker model · \(Int(Double(received) / Double(max(total, 1)) * 100))%")
+                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                InkProgress(value: Double(received) / Double(max(total, 1))).frame(width: 160)
+                Spacer()
+            } else if case .verifying = diarizer.state {
+                Text("checking the speaker model").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                Spacer()
+            } else if case .failed = diarizer.state {
+                Text("speaker model didn't download").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                Spacer()
+                Button("retry") { diarizer.download() }.buttonStyle(InkButtonStyle())
             }
         }
         .padding(.horizontal, 20).padding(.bottom, 14)
+    }
+
+    private var diarizerBusy: Bool {
+        switch diarizer.state {
+        case .downloading, .verifying, .failed: true
+        case .missing, .installed: false
+        }
     }
 
     // MARK: Rows
@@ -203,8 +226,12 @@ struct MeetingsTab: View {
     private func chips(_ m: Meeting) -> some View {
         let waitingForModel = m.transcription.state == .pending && !ModelStore.isInstalled
         let folderMissing = !m.published && m.isDone && !store.folderAvailable
-        if m.onlyYourSide || m.echo == .affected || m.transcription.state == .failed || waitingForModel || folderMissing {
+        let canAddSpeakers = m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
+        if m.onlyYourSide || m.echo == .affected || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers {
             HStack(spacing: 6) {
+                if canAddSpeakers {
+                    Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle())
+                }
                 if m.onlyYourSide { chip("only your side") }
                 if m.echo == .affected { chip("on speakers") }
                 if m.transcription.state == .failed {
@@ -237,8 +264,11 @@ struct MeetingsTab: View {
             }
             ForEach(Array(m.paragraphs.enumerated()), id: \.offset) { _, p in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Text(m.speakerName(p.speaker)).bold()) · \(TranscriptRender.timestamp(ms: p.startMs))")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
+                    HStack(spacing: 0) {
+                        speakerLabel(p.speaker, in: m)
+                        Text(" · \(TranscriptRender.timestamp(ms: p.startMs))")
+                    }
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
                     Text(p.text).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).textSelection(.enabled)
                 }
             }
@@ -246,6 +276,24 @@ struct MeetingsTab: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Rectangle().fill(DesignTokens.Colors.inkA04))
+    }
+
+    /// A speaker's name; a click turns it into a field, return saves,
+    /// escape cancels (docs/meetings.md 8.4). Per meeting.
+    @ViewBuilder
+    private func speakerLabel(_ speaker: String, in m: Meeting) -> some View {
+        if let r = renamingSpeaker, r.meeting == m.id, r.speaker == speaker {
+            TextField("", text: $speakerName)
+                .textFieldStyle(.plain).font(.system(size: 10, design: .monospaced)).frame(width: 120)
+                .onSubmit { store.rename(speaker: speaker, to: speakerName, in: m.id); renamingSpeaker = nil }
+                .onExitCommand { renamingSpeaker = nil }
+        } else {
+            Button { speakerName = m.speakerName(speaker); renamingSpeaker = (m.id, speaker) } label: {
+                Text(m.speakerName(speaker)).bold()
+            }
+            .buttonStyle(.plain)
+            .help("rename")
+        }
     }
 
     private func toggleExpanded(_ id: UUID) {
