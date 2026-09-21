@@ -1,4 +1,4 @@
-// Serves the site from ./web, and answers three paths of its own:
+// Serves the site from ./web, and answers two paths of its own:
 //
 //   /download           streams the latest release's DMG from GitHub under the
 //                       name "type me it.dmg". The asset on GitHub is
@@ -6,26 +6,19 @@
 //                       fixed name, and GitHub replaces spaces in asset names
 //                       with dots, so the name the visitor saves has to be set
 //                       here, in the Content-Disposition header.
-//   /share/ice          the ICE servers the app should use to find a path
-//                       between two Macs.
-//   /share/room/<id>    a websocket into the room two Macs meet in to swap the
-//                       WebRTC offer, answer and candidates that get them
-//                       connected to each other.
+//   /share/room/<id>    a websocket into the room two Macs share notes through.
 //
-// The room carries nothing else. Once the two Macs have a path, the notes go
-// directly between them and never come back here; and even the messages that
-// do pass through say only how to reach a Mac, never what is being sent.
+// The room passes sealed bytes between two Macs and has no key for them. The
+// key the two ends agree is derived partly from the pairing code, and what
+// reaches this server is only that code's SHA-256, so it can tell one pair of
+// Macs from another without being able to read what they send or to stand in
+// the middle of them agreeing it.
 const DMG = "https://github.com/typemeit/typemeit/releases/latest/download/TypeMeIt.dmg";
-
-// Free, and enough on its own for most pairs: it tells a Mac how the world
-// sees it, which is what the other end needs to aim at.
-const STUN = { urls: ["stun:stun.cloudflare.com:3478"] };
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/download") return download();
-    if (url.pathname === "/share/ice") return ice(env);
     const room = url.pathname.match(/^\/share\/room\/([0-9a-f]{64})$/);
     if (room) return join(request, env, room[1]);
     return env.ASSETS.fetch(request);
@@ -45,42 +38,6 @@ async function download() {
   return new Response(upstream.body, { status: 200, headers });
 }
 
-// Two Macs behind ordinary home routers reach each other with STUN alone. Two
-// behind the stricter kind -- carrier-grade NAT, some corporate networks --
-// cannot, and need a relay to pass the traffic through. That relay is
-// Cloudflare's TURN, which is only offered when the account has been set up
-// for it; without it the app still works for most pairs and says so plainly
-// when a connection cannot be made.
-async function ice(env) {
-  const servers = [STUN];
-  if (env.TURN_KEY_ID && env.TURN_API_TOKEN) {
-    try {
-      const response = await fetch(
-        `https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate-ice-servers`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.TURN_API_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          // Long enough to cover a share, short enough that a credential
-          // taken off one Mac is worth little.
-          body: JSON.stringify({ ttl: 3600 }),
-        },
-      );
-      if (response.ok) {
-        const body = await response.json();
-        for (const server of body.iceServers ?? []) {
-          if (server.username) servers.push(server);
-        }
-      }
-    } catch {
-      // A relay we could not mint is a share that may still work without one.
-    }
-  }
-  return Response.json({ iceServers: servers }, { headers: { "Cache-Control": "no-store" } });
-}
-
 function join(request, env, id) {
   if (request.headers.get("Upgrade") !== "websocket") {
     return new Response("expected a websocket", { status: 426 });
@@ -88,16 +45,15 @@ function join(request, env, id) {
   return env.ROOMS.get(env.ROOMS.idFromName(id)).fetch(request);
 }
 
-/// Two Macs, and the messages that introduce them to each other.
-///
-/// The room is named after the SHA-256 of the code one of them showed the
-/// other, so what reaches this server is a hash and never the code itself: it
-/// can tell two Macs apart without being able to join them.
+/// Two Macs, and the sealed frames that go between them.
 export class ShareRoom {
   // A share takes under a minute. Ten is room for someone reading a code down
   // a phone line; after that the room is closed whatever state it is in, so a
   // room cannot be left open to be walked into later.
   static LIFETIME = 10 * 60 * 1000;
+  // What one frame is allowed to be. The app caps itself well under this; a
+  // message past it is not one of ours.
+  static LIMIT = 1024 * 1024;
 
   constructor(state) {
     this.state = state;
@@ -121,22 +77,31 @@ export class ShareRoom {
     server.addEventListener("error", () => this.left(server));
 
     // How many are here counting this one, so the Mac that joined second
-    // knows not to wait before it starts.
+    // knows the other is already waiting.
     server.send(JSON.stringify({ t: "room", peers: this.sockets.length }));
     if (this.sockets.length === 2) this.tell(server, { t: "peer" });
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /// Messages go to the other socket untouched. Nothing here reads them: what
-  /// they carry is between the two Macs, and a server that parsed it would be
-  /// a server that could change it.
+  /// A Mac's frames are binary and go to the other Mac untouched. Nothing
+  /// here reads them: what they carry is between the two ends, and a server
+  /// that parsed them would be a server that could change them.
+  ///
+  /// Text from a Mac is dropped rather than passed on. This room's own
+  /// messages are text, so forwarding a Mac's would let one end pose as the
+  /// room to the other.
   relay(from, data) {
-    if (typeof data !== "string" || data.length > 64 * 1024) return;
-    this.tell(from, data);
+    if (typeof data === "string") return;
+    if (!(data instanceof ArrayBuffer) || data.byteLength > ShareRoom.LIMIT) return;
+    this.pass(from, data);
   }
 
+  /// One of the room's own messages, as text.
   tell(from, message) {
-    const body = typeof message === "string" ? message : JSON.stringify(message);
+    this.pass(from, JSON.stringify(message));
+  }
+
+  pass(from, body) {
     for (const socket of this.sockets) {
       if (socket === from) continue;
       try {

@@ -35,12 +35,6 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
-  # Google's libwebrtc, prebuilt as an XCFramework. It is what finds a path
-  # between two Macs -- trying the local network, then out through both
-  # routers, then a relay -- and carries the data channel the notes go over.
-  WebRTC:
-    url: https://github.com/stasel/WebRTC.git
-    from: "153.0.0"
 targets:
   TypeMeIt:
     type: application
@@ -60,8 +54,6 @@ targets:
         product: TranscribeCpp
       - package: Sparkle
         product: Sparkle
-      - package: WebRTC
-        product: WebRTC
     info:
       path: TypeMeIt/Support/Info.plist
       properties:
@@ -72,7 +64,6 @@ targets:
         CFBundleIconFile: "$(APP_ICON_FILE)"
         LSMinimumSystemVersion: "26.0"
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
-        NSLocalNetworkUsageDescription: "type me it looks for a direct path to the Mac you are sharing a note with, starting with the network you are both on."
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
         SUFeedURL: https://github.com/typemeit/typemeit/releases/latest/download/appcast.xml
@@ -84,10 +75,9 @@ targets:
       path: TypeMeIt/Support/TypeMeIt.entitlements
       properties:
         com.apple.security.device.audio-input: true
-        # Sharing notes between two Macs: the introduction is dialled out,
-        # and the path ICE settles on can have either end listening.
+        # Sharing notes between two Macs. Outbound only: both ends dial the
+        # room they meet in, and neither is ever listened to.
         com.apple.security.network.client: true
-        com.apple.security.network.server: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit

@@ -123,7 +123,7 @@ struct ShareSheet: View {
         switch outgoing.stage {
         case .showing:
             PairingCode(code: outgoing.pairing)
-            Text("they type this into their copy of type me it. anywhere in the world — the two macs find each other and the notes go straight between them.")
+            Text("they type this into their copy of type me it, anywhere in the world.")
                 .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
                 .fixedSize(horizontal: false, vertical: true)
         case .confirming(let digits):

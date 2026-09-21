@@ -1,7 +1,7 @@
 # Every request is served from ./web as a static file, except /download, which
 # worker.js answers by streaming the latest DMG from GitHub under its own name,
-# and /share/*, which introduces two Macs to each other so they can send notes
-# directly. See the comment at the top of worker.js.
+# and /share/room/<id>, the room two Macs pass sealed notes through. See the
+# comment at the top of worker.js.
 name = "typemeit-web-dev"
 main = "worker.js"
 compatibility_date = "2026-07-01"
@@ -32,8 +32,3 @@ binding = "ASSETS"
 [[env.production.durable_objects.bindings]]
 name = "ROOMS"
 class_name = "ShareRoom"
-
-# TURN is optional. Set TURN_KEY_ID and TURN_API_TOKEN as secrets
-# (`wrangler secret put TURN_KEY_ID --env production`) to let pairs behind
-# strict NATs connect through Cloudflare's relay; without them /share/ice
-# offers STUN alone and most pairs still connect.

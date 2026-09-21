@@ -71,11 +71,11 @@
 <section>
   <h2>what the app connects to</h2>
   <div>
-<p>the app makes two kinds of network request. neither carries your speech, your text or your history. what the other end sees is your ip address and the request itself.</p>
+<p>the app makes three kinds of network request. two of them carry nothing of yours at all. what the other end sees is your ip address and the request itself.</p>
 <ul>
   <li><em>the speech model</em>, downloaded once during onboarding from this app's github releases page. github sees an ordinary download request from your ip address.</li>
   <li><em>update checks</em>, made by the sparkle framework against the app's github releases page. by default the app checks on a schedule sparkle manages. the request includes the app version and macos version so the right update can be offered. nothing else about your mac is sent. you can turn automatic checks off in settings, and check by hand from the menu instead.</li>
-  <li><em>the introduction between two macs</em>, made to typeme.it only while you are setting up a share, and described under sharing below.</li>
+  <li><em>a share</em>, made to typeme.it only while you are in one, and described under sharing below. this is the one request of the three that carries anything of yours, and it carries it sealed.</li>
 </ul>
 <p>there is no account, no sign-in, no analytics, no crash reporting and no advertising. the app makes no other network requests over the internet.</p>
   </div>
@@ -86,8 +86,8 @@
   <div>
 <p>nothing here runs in the background. the app advertises nothing, listens for nothing, and contacts nothing until you press share or type in a code. turning sharing off in the history tab stops even that.</p>
 <p>to send, you pick the notes and the app shows an eight-character code. the other person types that code into their copy. both macs then show the same four digits, and the notes only move once the person receiving has checked those digits against the sending screen and said yes.</p>
-<p>getting the two macs talking takes a short introduction through typeme.it. what that server is given is a hash of the code, never the code, and the messages that pass through it say only how to reach a mac — an address and a port — never what is being sent. it cannot read a note, and it cannot work out the key the two macs agree, because that key is derived partly from the code it does not have.</p>
-<p>once the two macs have found each other the notes go directly between them, and typeme.it is dropped from the conversation. two macs on the same network end up talking over that network; two in different places go out through their own routers. the exception is a pair behind networks strict enough that no direct path exists, which fall back to relaying through cloudflare's turn service — that relay carries the same sealed bytes and has no key for them either.</p>
+<p>the notes pass through typeme.it, which is how a mac in one place reaches a mac in another without either of them having to be reachable from the internet. they pass through sealed. the key is agreed between the two macs and is derived partly from the pairing code, and what that server is given is the code's sha-256 and never the code, so it cannot read what it is carrying and cannot work out the key by standing in the middle of the two ends agreeing it. it holds nothing: a frame is passed on and gone.</p>
+<p>it is worth being plain about what that does and does not mean. the contents are sealed and unreadable, but the fact of a share — two macs, at a time, from two ip addresses — passes through a server this app's author runs. that is a weaker thing than the notes never leaving your two machines at all, and it is the reason the app is built so that this only happens while you are in the middle of a share you started.</p>
 <p>a note that is sent carries its text and the time it was said, and nothing else: not the audio, not the app it was typed into, not the window title, not what the speech engine heard before clean-up. notes that arrive are shown in a window and are not written to disk — close it and they are gone unless you copied them out.</p>
 <p>a code is good for one share and for ten minutes. the room it names holds two macs and turns away a third, and it is not stored anywhere once it closes.</p>
   </div>

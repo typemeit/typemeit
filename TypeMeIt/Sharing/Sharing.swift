@@ -35,7 +35,7 @@ final class OutgoingShare {
     }
 
     func start() {
-        let link = ShareLink(code: pairing, role: .shows)
+        let link = ShareLink(code: pairing)
         self.link = link
         // This end speaks first, so the other has something to answer.
         link.onOpen = { [weak self] in
@@ -141,7 +141,7 @@ final class IncomingShare {
     }
 
     func start() {
-        let link = ShareLink(code: pairing, role: .types)
+        let link = ShareLink(code: pairing)
         self.link = link
         link.onFrame = { [weak self] in self?.took($0) }
         link.onClose = { [weak self] reason in self?.ended(reason) }
@@ -230,11 +230,11 @@ final class IncomingShare {
 /// The share this Mac is in, if any.
 ///
 /// There is nothing running in the background here. Nothing is advertised,
-/// nothing is listened for, and typeme.it hears from this Mac only while a
-/// share the user started is being set up — and only enough to put the two
-/// Macs in touch. One share at a time in each direction, because the code on
-/// screen and the digits to check only mean anything if there is exactly one
-/// of each.
+/// nothing is listened for, and typeme.it hears from this Mac only during a
+/// share the user started — carrying sealed bytes between the two ends, with
+/// no key for them. One share at a time in each direction, because the code
+/// on screen and the digits to check only mean anything if there is exactly
+/// one of each.
 @MainActor
 @Observable
 final class Sharing {

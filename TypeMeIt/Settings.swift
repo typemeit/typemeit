@@ -130,8 +130,9 @@ final class Settings {
     var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
     /// Whether notes can be handed to another Mac running type me it. Nothing
     /// runs in the background either way: with this on, typeme.it hears from
-    /// this Mac only while a share the user started is being set up. Off is
-    /// for people who would rather it never did.
+    /// this Mac only during a share the user started, and only as the sealed
+    /// bytes it passes between the two ends. Off is for people who would
+    /// rather it never did.
     var sharing: Bool { didSet { defaults.set(sharing, forKey: "sharing") } }
     /// What the other end calls this Mac while a share is being agreed.
     var shareName: String { didSet { defaults.set(shareName, forKey: "shareName") } }

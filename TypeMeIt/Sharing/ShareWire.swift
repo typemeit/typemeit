@@ -51,9 +51,12 @@ struct ShareFrame: Codable, Equatable, Sendable {
 /// frame. TCP hands over whatever has arrived, so the length is what says
 /// where one frame ends and the next begins.
 enum ShareWire {
-    /// Notes are text. A frame larger than this is not one of ours, and
-    /// reading it would mean holding it in memory first.
-    static let maxFrame = 1 << 20
+    /// Notes are text, and half a megabyte of it is more than anyone shares
+    /// in one go. The cap is also what keeps an encoded frame inside the one
+    /// megabyte a websocket message is allowed, and a frame larger than this
+    /// is not one of ours anyway — reading it would mean holding it in
+    /// memory first.
+    static let maxFrame = 512 * 1024
 
     enum Failure: Error, Equatable {
         case tooLarge(Int)
