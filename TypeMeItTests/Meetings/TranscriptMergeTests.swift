@@ -16,6 +16,20 @@ struct TranscriptMergeTests {
         ])
     }
 
+    @Test func twoPeopleTalkingAtOnceStayTwoParagraphs() {
+        let you = TrackWords(role: "you", words: (0..<4).map {
+            Transcriber.Word(text: "a\($0)", confidence: 1, start: .milliseconds($0 * 400), end: .milliseconds($0 * 400 + 300))
+        })
+        let them = TrackWords(role: "them", words: (0..<4).map {
+            Transcriber.Word(text: "b\($0)", confidence: 1, start: .milliseconds($0 * 400 + 100), end: .milliseconds($0 * 400 + 350))
+        })
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs == [
+            Meeting.Paragraph(speaker: "you", startMs: 0, endMs: 1500, text: "a0 a1 a2 a3"),
+            Meeting.Paragraph(speaker: "them", startMs: 100, endMs: 1550, text: "b0 b1 b2 b3"),
+        ])
+    }
+
     @Test func dictationRemovesAMicWord() {
         let you = TrackWords(role: "you", words: [
             Transcriber.Word(text: "hello", confidence: 1, start: .milliseconds(0), end: .milliseconds(500)),

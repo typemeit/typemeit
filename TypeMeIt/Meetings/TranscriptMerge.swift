@@ -33,34 +33,45 @@ enum TranscriptMerge {
             entry.speaker == Meeting.Speaker.you && dictations.contains { contains($0, midpoint(of: entry.word)) }
         }
 
-        let sorted = assigned.sorted { $0.word.start < $1.word.start }
-        return buildParagraphs(from: sorted, gap: gap)
+        // Each speaker's words become that speaker's turns first, then the
+        // turns are ordered by start. Sorting the words of both tracks
+        // together would cut two people talking at once, or an echo of one
+        // on the other's track, into one-word paragraphs.
+        var bySpeaker: [String: [Transcriber.Word]] = [:]
+        var order: [String] = []
+        for entry in assigned {
+            if bySpeaker[entry.speaker] == nil { order.append(entry.speaker) }
+            bySpeaker[entry.speaker, default: []].append(entry.word)
+        }
+        var paragraphs: [Meeting.Paragraph] = []
+        for speaker in order {
+            paragraphs += turns(of: bySpeaker[speaker]!.sorted { $0.start < $1.start }, speaker: speaker, gap: gap)
+        }
+        return paragraphs.sorted { $0.startMs < $1.startMs }
     }
 
-    private static func buildParagraphs(
-        from words: [(word: Transcriber.Word, speaker: String)], gap: Duration
-    ) -> [Meeting.Paragraph] {
+    /// One speaker's words as paragraphs, split where a word starts more
+    /// than `gap` after the previous one ended.
+    private static func turns(of words: [Transcriber.Word], speaker: String, gap: Duration) -> [Meeting.Paragraph] {
         var paragraphs: [Meeting.Paragraph] = []
         var current: [Transcriber.Word] = []
-        var currentSpeaker = ""
 
         func flush() {
             guard let first = current.first, let last = current.last else { return }
             paragraphs.append(Meeting.Paragraph(
-                speaker: currentSpeaker,
+                speaker: speaker,
                 startMs: first.start.milliseconds,
                 endMs: last.end.milliseconds,
                 text: current.map(\.text).joined(separator: " ")
             ))
         }
 
-        for entry in words {
-            if let last = current.last, entry.speaker == currentSpeaker, entry.word.start - last.end <= gap {
-                current.append(entry.word)
+        for word in words {
+            if let last = current.last, word.start - last.end <= gap {
+                current.append(word)
             } else {
                 flush()
-                current = [entry.word]
-                currentSpeaker = entry.speaker
+                current = [word]
             }
         }
         flush()
