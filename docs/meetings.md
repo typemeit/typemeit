@@ -547,6 +547,11 @@ Deny the grant first, and record what the tap delivered. Grant it from the
 prompt and record whether audio arrived without a relaunch. Revoke it in
 System Settings while running, re-grant, and record what macOS said.
 
+On AirPods as both default input and output, in a Slack huddle, run the
+capture twice — headset mic in the aggregate, then built-in — and ask the
+far end whether either run was audible to them. Log any `-10868`, route
+change or IO proc stall. This decides 7.5's call-on-Bluetooth rule.
+
 Record in this file:
 
 - Which process object carries input and which carries output for Slack and
@@ -899,7 +904,30 @@ var tapFormat: AudioStreamBasicDescription? { get }
 Geometry:
 
 - Mic device: `Settings.microphoneUID` resolved with `AudioCapture.deviceID(forUID:)`
-  (today `private`; make it internal), else the default input device.
+  (today `private`; make it internal), else the default input device —
+  except for Bluetooth, read from `kAudioDevicePropertyTransportType`
+  (`kAudioDeviceTransportTypeBluetooth`, `…BluetoothLE`):
+  - **A room never records a Bluetooth mic unless the user picked it.** With
+    no explicit `microphoneUID` and a Bluetooth default input, use the
+    built-in mic. An earbud is the wrong microphone for a room, and opening
+    it moves the headset from its music profile to its call profile, so
+    whatever the user is listening to drops to call quality for the length
+    of the meeting.
+  - **A call records the headset mic, pending S1.** The call app already
+    holds it (that is what made the candidate), so the headset is already
+    in its call profile and we change nothing the user can hear; and a mic
+    in the ear is the cleanest `You` track there is. A shipping Parakeet
+    notetaker defaults the other way — built-in whenever a Bluetooth headset
+    is both input and output — after contention with the call app's own
+    use of the headset. S1 runs that case on purpose; if the aggregate
+    glitches, fails to start or flips the route, the call takes the built-in
+    mic too and the row says so.
+  - Chosen once at start and pinned. A device rebuild (below) may fall back
+    to built-in once after a real Bluetooth outage; it never follows a
+    changing default for the rest of the meeting.
+  - Nothing ever writes the Mac-wide default input device. The aggregate
+    binds the device it wants; writing and restoring the default is how the
+    same app got route flip-flops, a slower start, and audible glitches.
 - Tap: `CATapDescription(monoMixdownOfProcesses: processes)` with a fresh
   UUID, `muteBehavior` left at its unmuted default, `privateTap = true`,
   `processRestoreEnabled = true`. Absent for the room.
@@ -1203,7 +1231,8 @@ writing through `AVAudioFile` 1 s at a time (`RecordingArchive.write` is
 whole-array and stays for dictations), at `Fixed.meetingAudioBitrate`
 (32 000; the dictation archive's 16 kbps is tuned for one close speaker, a
 far-end mix gets twice that). The `.caf` is deleted only after the `.m4a`
-reopens with a frame count within one buffer of the source. With
+reopens with a frame count within one buffer of the source *and* its last
+second decodes. A header can claim the right length over a truncated tail. With
 `Settings.meetingKeepAudio` off, the `.caf` files are deleted after
 transcription and no `.m4a` is written.
 
@@ -1369,7 +1398,14 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
 `.notMeasured`; the mic envelope copied into the far end 50 ms later →
 `.affected`; two independent noise envelopes → `.clean`.
 
-`MeetingTranscriber` (enum with one entry point, run in a detached task):
+`MeetingTranscriber` (enum with one entry point, run in a detached task,
+inside `ProcessInfo.processInfo.beginActivity(options: .userInitiated,
+reason: "transcribing a meeting")`, ended on every exit path. A menu-bar
+accessory doing a minute of CPU work in the background is the textbook App
+Nap case, and a napped transcription finishes whenever macOS gets round to
+it. The recorder holds the same activity for the length of a meeting; the
+IOPM assertion (7.6) is what names the reason in `pmset -g assertions`, this
+is what keeps the drain queue and the tick at full speed.)
 
 1. If `ModelStore.isInstalled` is false, stay `pending`, save and return;
    `MeetingStore` re-queues every `pending` meeting when the install
@@ -1389,8 +1425,18 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
    `TRANSCRIBE_ERR_OOM` (`Transcriber.Error.status(code, _)`) is halved and
    retried once; if a half fails again, or the status is anything else
    (`TRANSCRIBE_ERR_BACKEND` is not retryable), its span is marked
-   `[unreadable]` and the loop continues. Report progress as chunks done
-   over chunks total across tracks.
+   `[unreadable]` and the loop continues. A chunk with speech in it that
+   comes back with no words is retried once, trimmed and louder: Parakeet
+   returns nothing on quiet speech rather than something wrong, and a room
+   track's far side of the table or a far end with low gain is exactly
+   that. "Speech in it" is peak ≥ 0.010, RMS ≥ 0.0015, ≥ 0.5% of samples
+   above the activity threshold (8% of peak, clamped to 0.003…0.020) and
+   ≥ 0.2 s of them. The retry trims to the first and last active sample
+   with 0.25 s either side and scales so the peak is 0.45, gain clamped to
+   1…12. All of it is the shipping notetaker's dictation recovery on its
+   own runtime of the same model family; S2 confirms it on ours by feeding
+   a chunk at −30 dB. Report progress as chunks done over chunks total
+   across tracks.
 3. Echo: for a call, run `EchoBleedDetector` over the two RMS envelopes from
    step 2 and store the verdict in `echo`.
 4. `TranscriptMerge.paragraphs(tracks: [TrackWords], segments: [SpeakerSegment]?, dictations: [Span], gap: Duration) -> [Paragraph]`
@@ -1682,6 +1728,14 @@ and `search_meetings` carry a one-line reminder in the result itself, not
 only in the tool description, since the description is far away by the time
 the text arrives.
 
+**No keyword-extracted "decisions" or "action items".** A shipping notetaker
+writes those into every transcript's front matter from cue lists ("let's",
+"have to", "we decided") so rollup tools cover every meeting. Rejected here:
+conversation is full of "let's" and "have to" that commit nobody to
+anything, and once a guess sits in front matter a client reads it as a
+fact. The client holding `get_meeting` extracts decisions better than a cue
+list, and asks for exactly the window it wants with `list_meetings`.
+
 **Errors are content.** A missing folder, an unreadable file or a bad
 argument returns an error result; the process stays up. It never traps, and
 it never prints anything but JSON-RPC to stdout (diagnostics go to stderr).
@@ -1689,7 +1743,15 @@ it never prints anything but JSON-RPC to stdout (diagnostics go to stderr).
 Setting up: the Meetings tab footer gains an `mcp` row with the toggle and a
 `copy command` button that puts
 `claude mcp add --scope user typemeit -- "<path to the binary>"` on the
-clipboard, using this build's own path, so the dev app copies its own. The
+clipboard, using this build's own path, so the dev app copies its own. A
+second button, `copy for claude desktop`, copies the `mcpServers` entry for
+`~/Library/Application Support/Claude/claude_desktop_config.json`; we do not
+edit another app's config file ourselves in this plan (section 10). When the
+app is running translocated (its bundle path is under `AppTranslocation`,
+which Gatekeeper does to a quarantined app launched from where it was
+downloaded) both buttons are disabled and the row says to move the app to
+Applications first: the path they would copy is random and gone on the next
+launch. The
 help line says what it means — that the meetings become readable by whatever
 model that tool uses, which for most clients is not on this Mac. It is the
 one place this app sends meeting text off the machine, and it only does it
@@ -1924,6 +1986,15 @@ Not in this plan, written down so they are not re-derived:
   built it lives under `Store.directory`, never in a published folder, behind
   a setting, and `deleteAllHistory()` deletes it (D18). CAM++ as a dedicated
   embedding model if the pipeline's embeddings prove weak.
+- One-click `connect` for MCP clients: merging our entry into Claude
+  Desktop's, Cursor's and Codex's own config files, with a backup when the
+  file is not valid JSON, and `claude mcp add` run for the user. Worth it once
+  the copy buttons show people use this; it means writing other apps' files.
+- Listen-only calls. A webinar or an all-hands joined muted may never open
+  the mic, so the candidate never forms. Output alone is a usable signal
+  only for a native conferencing app — Slack's own process, never a browser,
+  whose output is YouTube as often as Meet — and needs a longer sustain than
+  input so a notification sound does not count.
 - MCP writes — rename a speaker, retranscribe, delete. They need the app
   running to keep the tab honest, so the binary would become a pump to a Unix
   socket in `Store.directory` and fall back to read-only when the app is
@@ -2032,6 +2103,11 @@ substring checks.
   aggregate: with it the device does not start until the tap delivers
   audio, so a room (no tap), a denied grant or a silent far end would hold
   the mic track back, breaking D13 and the clock in 5.4.
+- Zoom starts its own voice processing on the mic when a call begins. Open
+  that mic first and Zoom's processing can land on our capture too, which
+  is why another notetaker watches for Zoom *running*, not for it taking
+  the mic. Not a launch target; it is why "Zoom works for free" needs its
+  own run before anyone says so.
 - The pre-roll opens the microphone at `candidate`, so the menu-bar
   indicator lights before the user has agreed to anything, and our own
   process appears in the process list holding input. The watch already
@@ -2062,6 +2138,7 @@ lifted.
 | Repo | Licence | Take |
 | --- | --- | --- |
 | `pasrom/meeting-transcriber` | MIT, active (177 stars) | `EchoBleedDetector` (constants, `Result` and `analyse`, fed envelopes; 7.10), `SilentRecordingMonitor` (the 90 s both-channels rule), `SpeakerMatcher` (0.40 / 0.10 defaults), `DualSourceRecorder.resolveTapPIDs` (tap the whole app), `MicInputDetector` (the FaceTime and WebKit.GPU facts), `AppTapSession` (teardown order), `DiarizationProcess.mergeDualSourceSegments` (the merge, written here in Swift of our own) |
+| `r3dbars/transcripted` | MIT, active | The nearest neighbour: dictation *and* meetings, Parakeet (through FluidAudio's Core ML build, not transcribe.cpp), Markdown files, an MCP helper. Taken: the Bluetooth mic rule and its S1 test (7.5), the empty-chunk gain retry and its thresholds (7.10), App Nap during transcription, the decodable-tail check on transcode, the Zoom voice-processing trap, the translocation check and Claude Desktop entry (7.15). Declined, with reasons: keyword-cue decisions in front matter (7.15), a stored database of other people's voices (D18), ScreenCaptureKit for the far end (the tap is per-app, SCK is everything the Mac plays) |
 | `michaelwilhelmsen/humla` | MIT, active | `OfflineDiarizerConfig` starting values and the reasons for each (S3), `withSpeakers(exactly:)` against VBx's dominant-speaker under-count, and the voice-processing-I/O finding in section 10. Ships the same FluidAudio pipeline this plan picks, so its tuning is measured on our problem, not an adjacent one |
 | `insidegui/AudioCap` | BSD-2-Clause, last push 2025-08 | Tap and aggregate-device geometry, tap format read. Keep its copyright notice where code is lifted |
 | `FluidInference/FluidAudio` | Apache-2.0 (library); pyannote/WeSpeaker weights CC-BY-4.0 | A dependency, not lifted code. Attribute in the about row |
