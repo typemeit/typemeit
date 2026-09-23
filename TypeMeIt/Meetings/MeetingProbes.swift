@@ -15,6 +15,7 @@ import Foundation
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
 ///     -diarizeFile <path>                   the file through FluidAudio's defaults and S3's starting values (S3)
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
+///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -38,6 +39,13 @@ enum MeetingProbes {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
                 MeetingCoordinator.shared.transcribeAgain(id)
+            }
+        }
+        if let path = value(after: "-importFile") {
+            DebugLog.enabled = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                MeetingCoordinator.shared.importRecordings([URL(fileURLWithPath: path)])
             }
         }
     }
