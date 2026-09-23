@@ -10,6 +10,14 @@ struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
     /// Apple Intelligence output; nil when off, skipped, rejected or failed.
     var postProcessed: String?
     var postProcessRequested: Bool
+    /// Apple Intelligence's state when clean-up was asked for: `available`,
+    /// or the reason it was not, so an entry the model read and left alone can
+    /// be told from one it never saw. nil when clean-up was not asked for, and
+    /// on entries from before it was kept.
+    var modelState: String?
+    /// The writing styles that were on, in `WritingStyle.allCases` order. An
+    /// empty array is none of them; nil is an entry from before they were kept.
+    var styles: [WritingStyle]?
     /// What was typed into the app: the transcript, or Apple Intelligence's
     /// output, after the local clean-up and the writing styles. nil on
     /// entries from before it was kept, which showed `postProcessed`.

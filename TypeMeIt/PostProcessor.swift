@@ -51,6 +51,15 @@ actor PostProcessor {
 
     static var availability: SystemLanguageModel.Availability { SystemLanguageModel.default.availability }
 
+    /// The availability in one word, for the history record: `available`, or
+    /// the reason it is not (`appleIntelligenceNotEnabled`, `modelNotReady`).
+    static var state: String {
+        switch availability {
+        case .available: "available"
+        case .unavailable(let reason): "\(reason)"
+        }
+    }
+
     /// The session instructions, with the writing styles the user turned on
     /// and the screen's terms appended when there are any. They go here
     /// rather than after the transcript with the custom words: put there, the
