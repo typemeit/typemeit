@@ -37,6 +37,10 @@ final class MeetingCoordinator {
     private(set) var systemAudioTest: SystemAudioTest = .notTested
     /// Meetings waiting behind the one being transcribed.
     private(set) var queued: [UUID] = []
+    /// The file being imported, by basename, while it converts.
+    private(set) var importing: String?
+    /// The last import that failed, for the tab's status row.
+    private(set) var importFailure: String?
 
     let watch = MeetingWatch()
     @ObservationIgnored private var machine = MeetingMachine()
@@ -419,6 +423,30 @@ final class MeetingCoordinator {
 
     private final class ResultBox: @unchecked Sendable {
         var result: MeetingRecorder.Result?
+    }
+
+    // MARK: Import (D21)
+
+    /// Recordings made elsewhere, one at a time since they share the one
+    /// model: each becomes a room meeting and goes through the same pass.
+    func importRecordings(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        importFailure = nil
+        Task { [weak self] in
+            for url in urls {
+                self?.importing = url.lastPathComponent
+                do {
+                    let (meeting, folder) = try await Task.detached { try await MeetingImport.run(url: url) }.value
+                    DebugLog.write("Meeting imported: \(meeting.durationMs) ms")
+                    self?.store.adopt(meeting, folder: folder)
+                    self?.enqueue(meeting)
+                } catch {
+                    Log.meetings.error("Import failed: \(error.localizedDescription)")
+                    self?.importFailure = error.localizedDescription
+                }
+            }
+            self?.importing = nil
+        }
     }
 
     // MARK: Transcription

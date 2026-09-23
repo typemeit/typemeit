@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The meetings page (docs/meetings.md 7.11): the list by day, with what
 /// is live above it and the keep, folder and system-audio rows under it.
@@ -59,7 +60,7 @@ struct MeetingsTab: View {
     private var list: some View {
         VStack(spacing: 0) {
             topBar
-            if coordinator.recording != nil || coordinator.transcribing != nil {
+            if coordinator.recording != nil || coordinator.transcribing != nil || coordinator.importing != nil || coordinator.importFailure != nil {
                 statusRow
                 RowRule()
             }
@@ -80,6 +81,17 @@ struct MeetingsTab: View {
                     }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
+            }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                Task { @MainActor in
+                    var urls: [URL] = []
+                    for provider in providers {
+                        if let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
+                           let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) { urls.append(url) }
+                    }
+                    coordinator.importRecordings(urls)
+                }
+                return true
             }
             RowRule()
             footer
@@ -146,6 +158,9 @@ struct MeetingsTab: View {
             .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
             Text(counted(store.meetings.count, "meeting"))
                 .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+            Button("import…") { chooseRecordings() }
+                .buttonStyle(InkButtonStyle())
+                .help("transcribe a recording")
             if !selected.isEmpty {
                 Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                     .buttonStyle(InkButtonStyle())
@@ -171,6 +186,13 @@ struct MeetingsTab: View {
                 if let others = coordinator.levels.others { Meter(level: others) }
                 Spacer()
                 Button("stop") { coordinator.stopMeeting() }.buttonStyle(InkButtonStyle(primary: true))
+            } else if let name = coordinator.importing {
+                Text("importing \(name) · english only")
+                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink).lineLimit(1).truncationMode(.middle)
+                Spacer()
+            } else if let failure = coordinator.importFailure {
+                Text(failure).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                Spacer()
             } else if let t = coordinator.transcribing {
                 Text("transcribing · \(Int(t.fraction * 100))%")
                     .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
@@ -245,7 +267,9 @@ struct MeetingsTab: View {
             Text(MeetingFolder.durationLabel(m.duration))
             Text(" · ")
             Text(counted(m.speakerCount, "speaker"))
-            if let app = m.app {
+            if m.source == .imported {
+                Text(" · imported")
+            } else if let app = m.app {
                 Text(" · ")
                 Text(app.name.lowercased())
             }
@@ -383,6 +407,16 @@ struct MeetingsTab: View {
             if coordinator.systemAudioTest == .silent { Text("quit and reopen after granting") }
             Text("the other people on a call are not told you are recording.")
         }
+    }
+
+    private func chooseRecordings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio, .movie]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.prompt = "Import"
+        guard panel.runModal() == .OK else { return }
+        coordinator.importRecordings(panel.urls)
     }
 
     /// An open panel for directories; nothing is moved.

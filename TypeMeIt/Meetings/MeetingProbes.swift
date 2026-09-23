@@ -10,6 +10,7 @@ import Foundation
 ///     -meetingProbeCapture <bundle id> <s>  tap an app for <s> seconds beside the mic and log the tracks (S1)
 ///     -recordRoom <s>                       record the room for <s> seconds through the whole pipeline (7.1)
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
+///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -26,6 +27,13 @@ enum MeetingProbes {
         }
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
+        if let path = value(after: "-importFile") {
+            DebugLog.enabled = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                MeetingCoordinator.shared.importRecordings([URL(fileURLWithPath: path)])
+            }
+        }
     }
 
     // MARK: S1, detection
