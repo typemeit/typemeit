@@ -14,7 +14,7 @@ default_platform(:mac)
 BUNDLE_ID = "it.typeme.typemeit"
 SCREENSHOTS = File.expand_path("../Scripts/store/out", __dir__)
 # The order the store shows them in.
-ORDER = %w[slack claude history insights settings]
+ORDER = %w[slack claude insights history settings]
 
 # sync_screenshots is gated behind this until fastlane calls it stable.
 ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
