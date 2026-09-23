@@ -345,7 +345,7 @@ final class Pipeline {
 
     private func dismissCopyPrompt() {
         copyPromptTask?.cancel()
-        overlay.hide()
+        overlay.hide(animated: false)
     }
 
     func copyLastTranscript() {
@@ -389,10 +389,12 @@ final class Pipeline {
         return true
     }
 
+    /// The cross on every pill, and the way to the intelligence page. All of
+    /// them are a click on the pill, so it goes at once.
     private func keepLearned() {
         toastTask?.cancel()
         if case .updateReady(let version) = overlay.model.state { Updates.shared.putOff(version) }
-        overlay.hide()
+        overlay.hide(animated: false)
     }
 
     private func undoLearned() {
