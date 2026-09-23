@@ -44,8 +44,13 @@ actor PostProcessor {
     </transcript>
     """
 
+    /// The start of the user message, up to where the transcript goes.
+    static var promptPrefix: String { template.components(separatedBy: "${output}")[0] }
+
     private var model: SystemLanguageModel { SystemLanguageModel(guardrails: .permissiveContentTransformations) }
     private var current: Task<String?, Never>?
+    /// The session the next clean-up uses when its instructions still match.
+    private var prepared: (instructions: String, session: LanguageModelSession)?
 
     private init() {}
 
@@ -80,10 +85,19 @@ actor PostProcessor {
         return t.replacingOccurrences(of: "${output}", with: transcript)
     }
 
-    /// Warms the on-device model so the first response is not slowed by loading.
-    func prewarm() {
-        let session = LanguageModelSession(model: model, instructions: PostProcessor.instructions)
-        session.prewarm()
+    /// Builds the session the next clean-up will use and prewarms it with its
+    /// instructions and the start of the prompt, so the model has read them
+    /// while the user is still talking. Called at recording start and again when the screen read lands, because the
+    /// terms change the instructions; `run` falls back to a new session when
+    /// they no longer match.
+    func prepare(screenTerms: [String], styles: Set<WritingStyle>) {
+        let instructions = PostProcessor.instructions(screenTerms: screenTerms, styles: styles)
+        guard prepared?.instructions != instructions else { return }
+        let model = self.model
+        guard case .available = model.availability else { return }
+        let session = LanguageModelSession(model: model, instructions: instructions)
+        session.prewarm(promptPrefix: Prompt { PostProcessor.promptPrefix })
+        prepared = (instructions, session)
     }
 
     /// The whole post-transcription path, as the pipeline types it and the
@@ -110,9 +124,13 @@ actor PostProcessor {
         current?.cancel()
         let transcript = ModelText.joinSpelledLetters(transcript)
         let model = self.model
+        let instructions = PostProcessor.instructions(screenTerms: screenTerms, styles: styles)
+        let ready = prepared?.instructions == instructions ? prepared?.session : nil
+        prepared = nil
+        Log.postProcess.info("Clean-up session \(ready != nil ? "prewarmed" : "new")")
         let task = Task<String?, Never> {
             guard case .available = model.availability else { return nil }
-            let session = LanguageModelSession(model: model, instructions: PostProcessor.instructions(screenTerms: screenTerms, styles: styles))
+            let session = ready ?? LanguageModelSession(model: model, instructions: instructions)
             let user = PostProcessor.prompt(for: transcript, keep: keep, hints: hints)
             do {
                 let r = try await session.respond(to: user, generating: CleanedTranscript.self, options: GenerationOptions(sampling: .greedy))

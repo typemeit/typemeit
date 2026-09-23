@@ -133,15 +133,17 @@ final class Pipeline {
         overlay.show(.arming)
         screenTerms = nil
         if settings.postProcessingEnabled {
-            Task { await PostProcessor.shared.prewarm() }
             if settings.screenContextEnabled { readScreen(generation: generation) }
+            let terms = screenTerms ?? [], styles = settings.writingStyles
+            Task { await PostProcessor.shared.prepare(screenTerms: terms, styles: styles) }
         }
         Task { await Transcriber.shared.preload() }
     }
 
-    /// Reads the frontmost window in the background and stores the terms
-    /// for dictation `gen`, unless the same window was read within
-    /// `Fixed.screenReadReuse`, in which case that read is used as is.
+    /// Reads the frontmost window in the background, stores the terms for
+    /// dictation `gen` and prepares the clean-up session with them. A window
+    /// read within `Fixed.screenReadReuse` is not read again: its terms are
+    /// stored at once, for the caller's prepare.
     private func readScreen(generation gen: Int) {
         guard let target = Frontmost.capture(), let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
         if let last = lastScreen, last.pid == pid, last.title == target.windowTitle, ContinuousClock.now - last.at < Fixed.screenReadReuse {
@@ -154,7 +156,10 @@ final class Pipeline {
             let terms = await ScreenContext.terms(from: lines, excluding: customWords)
             guard let self else { return }
             self.lastScreen = (pid, target.windowTitle, ContinuousClock.now, terms)
-            if self.generation == gen { self.screenTerms = terms }
+            guard self.generation == gen else { return }
+            self.screenTerms = terms
+            let styles = self.settings.writingStyles
+            await PostProcessor.shared.prepare(screenTerms: terms, styles: styles)
         }
     }
 
