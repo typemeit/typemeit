@@ -76,6 +76,19 @@
     ]
   },
   {
+    "input": "sorry I just need to do some work by nine am",
+    "expected": "Sorry, I just need to do some work by 9am."
+  },
+  {
+    "input": "can you move the standup to nine thirty am",
+    "expected": "Can you move the standup to 9:30am?"
+  },
+  {
+    "input": "we need three pms on the project",
+    "expected": "We need 3 PMs on the project.",
+    "wish": "PMs is people, not a time. The model returns three pm, dropping the plural s, and the clean-up is then right to write 3pm; by that point nothing can tell the s was ever there."
+  },
+  {
     "input": "what does",
     "expected": "What does",
     "customWords": [
