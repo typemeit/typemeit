@@ -123,6 +123,8 @@ final class MeetingStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         meeting.speakers[i].name = trimmed
+        // A name the user gave is never overwritten by a later re-run (8.6).
+        meeting.speakers[i].nameSource = .user
         save(meeting)
     }
 

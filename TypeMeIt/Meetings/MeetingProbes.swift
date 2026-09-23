@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import CoreAudio
 import FluidAudio
@@ -13,6 +14,7 @@ import Foundation
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
 ///     -diarizeFile <path>                   the file through FluidAudio's defaults and S3's starting values (S3)
+///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -30,6 +32,7 @@ enum MeetingProbes {
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
         if let path = value(after: "-diarizeFile") { diarizeFile(URL(fileURLWithPath: path)) }
+        if let bundle = value(after: "-meetingProbeAX") { probeAccessibility(bundleID: bundle, seconds: value(after: "-meetingProbeAX", 2).flatMap(Int.init) ?? 30) }
         if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
             DebugLog.enabled = true
             Task { @MainActor in
@@ -216,5 +219,76 @@ enum MeetingProbes {
                 DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: S4, the accessibility tree
+
+    /// Sets the app's activation attribute (Electron's `AXManualAccessibility`,
+    /// Chromium's `AXEnhancedUserInterface`), waits for the tree to build,
+    /// writes every element under each `AXWebArea` to `ax-<bundle>-0.txt`,
+    /// then every second logs the lines that appeared or went, and clears
+    /// the attribute at the end. What it finds decides 8.6's sources.
+    private static func probeAccessibility(bundleID: String, seconds: Int) {
+        DebugLog.enabled = true
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first(where: { $0.activationPolicy == .regular }) else {
+            DebugLog.write("Meeting probe AX: \(bundleID) is not running")
+            return
+        }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        let attribute = bundleID == "com.tinyspeck.slackmacgap" ? "AXManualAccessibility" : "AXEnhancedUserInterface"
+        let set = AXUIElementSetAttributeValue(root, attribute as CFString, kCFBooleanTrue)
+        DebugLog.write("Meeting probe AX: \(attribute) on \(bundleID): \(set == .success ? "set" : "refused (\(set.rawValue))")")
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            var previous = Set<String>()
+            for tick in 0...seconds {
+                let lines = webAreaLines(root)
+                if tick == 0 {
+                    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    let file = directory.appendingPathComponent("ax-\(bundleID)-0.txt")
+                    try? lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
+                    DebugLog.write("Meeting probe AX: \(lines.count) elements under the web areas, written to \(file.path)")
+                } else {
+                    let now = Set(lines)
+                    let added = now.subtracting(previous), gone = previous.subtracting(now)
+                    if !added.isEmpty || !gone.isEmpty {
+                        DebugLog.write("Meeting probe AX t=\(tick)s:\n" + (added.sorted().map { "  + \($0)" } + gone.sorted().map { "  - \($0)" }).joined(separator: "\n"))
+                    }
+                }
+                previous = Set(lines)
+                try? await Task.sleep(for: .seconds(1))
+            }
+            AXUIElementSetAttributeValue(root, attribute as CFString, kCFBooleanFalse)
+            DebugLog.write("Meeting probe AX: \(attribute) cleared")
+        }
+    }
+
+    /// One line per element under every web area: depth, role, and the
+    /// title, description, value and help that carry text.
+    private static func webAreaLines(_ root: AXUIElement) -> [String] {
+        var lines: [String] = []
+        func string(_ element: AXUIElement, _ attribute: String) -> String? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let text = value as? String, !text.isEmpty else { return nil }
+            return text
+        }
+        func children(_ element: AXUIElement) -> [AXUIElement] {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success else { return [] }
+            return value as? [AXUIElement] ?? []
+        }
+        func walk(_ element: AXUIElement, depth: Int, inWeb: Bool) {
+            guard depth < 60, lines.count < 20_000 else { return }
+            let role = string(element, kAXRoleAttribute) ?? "?"
+            let web = inWeb || role == "AXWebArea"
+            if web {
+                let texts = [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXHelpAttribute, "AXDOMIdentifier", "AXDOMClassList"]
+                    .compactMap { a in string(element, a).map { "\(a.replacingOccurrences(of: "AX", with: ""))=\($0.prefix(120))" } }
+                lines.append(String(repeating: " ", count: depth) + role + (texts.isEmpty ? "" : " " + texts.joined(separator: " ")))
+            }
+            for child in children(element) { walk(child, depth: depth + 1, inWeb: web) }
+        }
+        walk(root, depth: 0, inWeb: false)
+        return lines
     }
 }
