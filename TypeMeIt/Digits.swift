@@ -33,7 +33,8 @@ enum Digits {
     /// → 100), "second" stays a word since it is also a unit of time unless
     /// it follows the, my, his or the like and a word follows it,
     /// a sentence-opening "First," or the counters of a spoken list stay
-    /// words, "N percent" becomes N%, "five thirty" becomes 5:30, and digits
+    /// words, "N percent" becomes N%, "five thirty" becomes 5:30, a clock
+    /// time takes its meridiem with it ("nine AM" → 9am), and digits
     /// read out one at a time ("oh seven seven one…") become one number.
     static func apply(_ text: String) -> String {
         let tokens = tokenise(text)
@@ -70,9 +71,31 @@ enum Digits {
                 joined.replaceSubrange(r, with: joined[r].replacingOccurrences(of: " ", with: ""))
             }
         }
-        return joined
+        joined = joined
             .replacingOccurrences(of: #"(\d) ?percent\b"#, with: "$1%", options: .regularExpression)
             .replacingOccurrences(of: #"\b(1[0-2]|[1-9]) ([0-5]\d)\b"#, with: "$1:$2", options: .regularExpression)
+        return meridiems(joined)
+    }
+
+    /// An hour and its meridiem are one word: "nine AM" → 9am, "five thirty
+    /// p.m." → 5:30pm. Only 1 to 12 carry a meridiem, which keeps the verb
+    /// "am" out of it. The dots of "a.m." go with the spaces, except a last
+    /// one that a capital follows, which is the sentence's full stop.
+    private static let meridiem = try! NSRegularExpression(
+        pattern: #"(?i)\b(1[0-2]|[1-9])(:[0-5]\d)?\s*([ap])\.?\s?m\b(\.)?(?![A-Za-z])"#)
+
+    private static func meridiems(_ text: String) -> String {
+        let ns = text as NSString
+        var out = text
+        for m in meridiem.matches(in: text, range: NSRange(location: 0, length: ns.length)).reversed() {
+            let minutes = m.range(at: 2).location == NSNotFound ? "" : ns.substring(with: m.range(at: 2))
+            let after = ns.substring(from: m.range.location + m.range.length)
+            let stop = m.range(at: 4).location != NSNotFound
+                && after.first(where: { !$0.isWhitespace })?.isUppercase == true
+            let time = ns.substring(with: m.range(at: 1)) + minutes + ns.substring(with: m.range(at: 3)).lowercased() + "m"
+            out = (out as NSString).replacingCharacters(in: m.range, with: time + (stop ? "." : ""))
+        }
+        return out
     }
 
     private static func tokenise(_ text: String) -> [Token] {
