@@ -91,6 +91,8 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     var durationMs: Int
     var recordedMs: Int
     var firstHostTime: UInt64?
+    /// How much of the recording came before the user said record (D20).
+    var preRollMs: Int?
     var app: App?
     var title: String
     var titleSource: TitleSource

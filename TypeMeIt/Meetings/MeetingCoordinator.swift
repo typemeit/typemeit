@@ -42,6 +42,9 @@ final class MeetingCoordinator {
     @ObservationIgnored private var machine = MeetingMachine()
     @ObservationIgnored private var tick: Timer?
     @ObservationIgnored private var recorder: MeetingRecorder?
+    /// The capture running since the current candidate formed, and what it
+    /// has held so far (D20). Nothing of it reaches a file before `record`.
+    @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
     @ObservationIgnored private var recordingMeeting: Meeting?
     @ObservationIgnored private var recordingOwner: Owner?
     @ObservationIgnored private var tapObjects: [AudioObjectID] = []
@@ -158,6 +161,10 @@ final class MeetingCoordinator {
 
     private func apply(_ effect: MeetingMachine.Effect) {
         switch effect {
+        case .beginPreRoll(let owner):
+            beginPreRoll(owner)
+        case .discardPreRoll:
+            discardPreRoll()
         case .showPrompt(let owner):
             guard settings.meetingAsk else { return }
             overlay.showMeeting(.meetingPrompt(app: owner))
@@ -179,6 +186,33 @@ final class MeetingCoordinator {
         }
     }
 
+    // MARK: Pre-roll (D20)
+
+    /// Captures the candidate's call into memory. Soft on failure: without
+    /// it the meeting simply starts at the click.
+    private func beginPreRoll(_ owner: Owner) {
+        discardPreRoll()
+        guard settings.meetingPreRoll, settings.meetingAsk else { return }
+        let objects = watch.holders.first { $0.owner == owner }?.objectIDs ?? []
+        guard !objects.isEmpty, let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID) else { return }
+        let held = PreRoll(owner: owner, seconds: Fixed.meetingPreRollSeconds, tap: true)
+        do {
+            preRoll = (held, try MeetingCapture(mic: mic, tapProcesses: objects, sink: held))
+            DebugLog.write("Meeting pre-roll started for \(owner.name)")
+        } catch {
+            Log.meetings.notice("Pre-roll not started: \(error.localizedDescription)")
+        }
+    }
+
+    /// Zeroes and frees the held audio and stops the capture.
+    private func discardPreRoll() {
+        guard let preRoll else { return }
+        self.preRoll = nil
+        preRoll.capture.stop()
+        preRoll.held.discard()
+        DebugLog.write("Meeting pre-roll discarded")
+    }
+
     // MARK: Recording
 
     private func startRecording(_ owner: Owner?) {
@@ -196,8 +230,17 @@ final class MeetingCoordinator {
             abandonRecording()
             return
         }
+        // The pre-roll's capture carries on into the recording when it is
+        // this call's; any other is thrown away.
+        var handOver: (capture: MeetingCapture, held: PreRoll)?
+        if let preRoll, let owner, preRoll.held.owner == owner {
+            handOver = (preRoll.capture, preRoll.held)
+            self.preRoll = nil
+        } else {
+            discardPreRoll()
+        }
         do {
-            let recorder = try MeetingRecorder(id: id, kind: kind, folder: MeetingFolder.staged(id), mic: mic)
+            let recorder = try MeetingRecorder(id: id, kind: kind, folder: MeetingFolder.staged(id), mic: handOver?.capture.mic ?? mic, preRoll: handOver)
             recorder.onLevels = { [weak self] mic, others in Task { @MainActor in self?.levels = (mic, others) } }
             recorder.onSilenceChanged = { [weak self] silent in Task { @MainActor in self?.silenceChanged(silent) } }
             recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
@@ -213,6 +256,8 @@ final class MeetingCoordinator {
         } catch {
             Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")
             DebugLog.write("Meeting recorder failed to start: \(error.localizedDescription)")
+            handOver?.capture.stop()
+            handOver?.held.discard()
             abandonRecording()
         }
     }
@@ -311,6 +356,7 @@ final class MeetingCoordinator {
     func neverAsk(_ owner: Owner) {
         guard owner.canNeverAsk, !settings.meetingNeverAsk.contains(owner.bundleID) else { return }
         settings.meetingNeverAsk.append(owner.bundleID)
+        if preRoll?.held.owner == owner { discardPreRoll() }
         if prompting == owner { send(.decline) }
         toast(.meetingNeverAsking(app: owner))
     }
@@ -347,6 +393,7 @@ final class MeetingCoordinator {
     /// Stops the meeting and waits, bounded, for the writers, so a quit
     /// mid-meeting keeps what was recorded and transcribes it on relaunch.
     func stopForQuit() {
+        discardPreRoll()
         guard let recorder, let meeting = recordingMeeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
@@ -541,6 +588,8 @@ final class MeetingCoordinator {
 
     private static func describe(_ effect: MeetingMachine.Effect) -> String {
         switch effect {
+        case .beginPreRoll(let o): "beginPreRoll(\(o.name))"
+        case .discardPreRoll: "discardPreRoll"
         case .showPrompt(let o): "showPrompt(\(o.name))"
         case .hidePrompt: "hidePrompt"
         case .showResumed(let o): "showResumed(\(o.name))"

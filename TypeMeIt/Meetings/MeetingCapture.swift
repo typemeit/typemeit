@@ -339,6 +339,20 @@ final class MeetingCapture: @unchecked Sendable {
         return 1e9 * Double(info.denom) / Double(info.numer)
     }()
 
+    static func hostTicks(seconds: Double) -> UInt64 {
+        UInt64(max(0, seconds) * hostTicksPerSecond)
+    }
+
+    /// Runs `first` on the drain queue and then points the capture at
+    /// `sink`, so nothing the capture delivers falls between the two.
+    func handOver<T>(to sink: MeetingCaptureSink, first: () -> T) -> T {
+        drainQueue.sync {
+            let result = first()
+            self.sink = sink
+            return result
+        }
+    }
+
     static func seconds(fromHostTime from: UInt64, to: UInt64) -> Double {
         to > from ? Double(to - from) / hostTicksPerSecond : 0
     }

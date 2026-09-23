@@ -70,7 +70,7 @@ struct MeetingMachineTests {
         var s = S()
         s.openCall(output: false)
         let out = s.ticks(1, 91)
-        #expect(out == [])
+        #expect(out == [.discardPreRoll])
         #expect(s.count(.showPrompt(S.slack)) == 0)
     }
 
@@ -155,7 +155,7 @@ struct MeetingMachineTests {
         var s = S()
         s.openCall()
         s.ticks(1, 13)
-        #expect(s.at(14, .decline) == [.hidePrompt])
+        #expect(s.at(14, .decline) == [.hidePrompt, .discardPreRoll])
         #expect(s.state == .declined(owner: S.slack))
         s.at(20, S.holders([]))
         #expect(s.state == .paused(owner: S.slack, since: s.t0 + .seconds(20), before: .declined))
@@ -224,7 +224,7 @@ struct MeetingMachineTests {
         var s = S()
         s.openCall()
         s.ticks(1, 13)
-        #expect(s.at(14, S.holders([])) == [.hidePrompt])
+        #expect(s.at(14, S.holders([])) == [.hidePrompt, .discardPreRoll])
         s.ticks(14, 18)
         #expect(s.at(19, S.holders([(S.slack, input: true, output: true)])) == [.showPrompt(S.slack)])
         #expect(s.at(20, .record(S.slack)) == [.hidePrompt, .startRecording(S.slack)])
@@ -253,7 +253,7 @@ struct MeetingMachineTests {
         s.openCall()
         s.ticks(1, 13)
         let out = s.at(14, S.holders([(S.slack, input: true, output: true), (S.chrome, input: true, output: true)]))
-        #expect(out == [.hidePrompt])
+        #expect(out == [.hidePrompt, .discardPreRoll, .beginPreRoll(S.chrome)])
         #expect(s.state == .candidate(owner: S.chrome, since: s.t0 + .seconds(14), bothSince: s.t0 + .seconds(14)))
     }
 
@@ -312,7 +312,7 @@ struct MeetingMachineTests {
         var s = S()
         s.openCall()
         s.ticks(1, 13)
-        #expect(s.at(14, .room) == [.hidePrompt, .startRecording(nil)])
+        #expect(s.at(14, .room) == [.hidePrompt, .discardPreRoll, .startRecording(nil)])
     }
 
     @Test func aShortCallIsDroppedAndALongerOneKept() {
@@ -338,7 +338,7 @@ struct MeetingMachineTests {
         var s = S()
         s.openCall()
         s.ticks(1, 13)
-        #expect(s.at(14, .willSleep) == [.hidePrompt])
+        #expect(s.at(14, .willSleep) == [.hidePrompt, .discardPreRoll])
         #expect(s.state == .idle)
     }
 
@@ -385,5 +385,35 @@ struct MeetingMachineTests {
         s.at(4, S.holders([(S.slack, input: true, output: false)]))
         s.at(5, S.holders([(S.slack, input: true, output: false), (S.chrome, input: true, output: true)]))
         #expect(s.state == .candidate(owner: S.chrome, since: s.t0 + .seconds(5), bothSince: s.t0 + .seconds(5)))
+    }
+
+    // MARK: Pre-roll (D20)
+
+    @Test func aCandidateBeginsThePreRoll() {
+        var s = S()
+        s.at(0, S.holders([]))
+        #expect(s.at(1, S.holders([(S.slack, input: true, output: true)])) == [.beginPreRoll(S.slack)])
+    }
+
+    @Test func theCandidateLapsingDiscardsIt() {
+        var s = S()
+        s.openCall(output: false)
+        s.ticks(1, 90)
+        #expect(s.ticks(91, 91) == [.discardPreRoll])
+    }
+
+    @Test func inputDroppingBeforeThePromptDiscardsIt() {
+        var s = S()
+        s.openCall()
+        #expect(s.at(5, S.holders([])) == [.discardPreRoll])
+    }
+
+    @Test func recordAfterThePreRollStartsTheRecordingForThatOwner() {
+        var s = S()
+        s.openCall()
+        s.ticks(1, 13)
+        #expect(s.at(14, .record(S.slack)) == [.hidePrompt, .startRecording(S.slack)])
+        #expect(s.count(.beginPreRoll(S.slack)) == 1)
+        #expect(s.count(.discardPreRoll) == 0)
     }
 }

@@ -141,6 +141,9 @@ final class Settings {
     /// Bundle ids of apps whose calls are never asked about. Only ever added
     /// to by the menu's explicit item, never inferred.
     var meetingNeverAsk: [String] { didSet { defaults.set(meetingNeverAsk, forKey: "meetingNeverAsk") } }
+    /// While a call is being asked about, hold its last two minutes in
+    /// memory so a meeting does not start at the click (D20).
+    var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
     /// Keeps a meeting's tracks as `.m4a` beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -194,6 +197,7 @@ final class Settings {
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
         meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
+        meetingPreRoll = bool("meetingPreRoll", true)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -289,6 +293,8 @@ enum Fixed {
     static let meetingQuitWaitSeconds = 2
     /// Fits the 4,096-token window beside the title instructions.
     static let meetingTitleSourceWords = 700
+    /// Longer than a prompt is ever left unanswered; 15.4 MB for a call (D20).
+    static let meetingPreRollSeconds = 120
     /// The process-list listener fires several times per launch.
     static let meetingWatchDebounce: Duration = .milliseconds(250)
     /// The backstop the listeners need (docs/meetings.md 3.2).
