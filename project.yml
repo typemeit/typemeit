@@ -57,6 +57,11 @@ targets:
         product: TranscribeCpp
       - package: Sparkle
         product: Sparkle
+      # A build-order dependency only: typemeit-mcp is a command-line tool
+      # product, nothing to link against. It embeds and signs itself into
+      # this app's bundle via its own postBuildScripts step.
+      - target: typemeit-mcp
+        link: false
     info:
       path: TypeMeIt/Support/Info.plist
       properties:
@@ -153,10 +158,55 @@ targets:
         OTHER_LDFLAGS: "-lc++ -lz"
         CODE_SIGN_IDENTITY: "Apple Distribution"
         PROVISIONING_PROFILE_SPECIFIER: "it.typeme.typemeit AppStore"
+  # Command-line tool, docs/meetings.md 7.15: reads a published meetings
+  # folder over stdio JSON-RPC. Shares TypeMeIt/Meetings/Meeting.swift's
+  # source (an application target can't be imported as a library), with
+  # MCP/Shims.swift standing in for the app-only symbols that file
+  # references (Log, Fixed, AudioCapture) so it compiles standalone.
+  typemeit-mcp:
+    type: tool
+    platform: macOS
+    sources:
+      - path: MCP
+      - path: TypeMeIt/Meetings/Meeting.swift
+    postBuildScripts:
+      # docs/meetings.md 7.15: ships inside the app bundle at
+      # Contents/MacOS/typemeit-mcp, signed with the same identity. This is
+      # on typemeit-mcp itself, copying its own output, rather than a
+      # postBuildScript + explicit target dependency on TypeMeIt: the latter
+      # made Xcode's build system report a spurious "Cycle in dependencies
+      # between targets TypeMeIt and typemeit-mcp", but only under the test
+      # action (TypeMeIt also has to copy TypeMeIt.swiftmodule to the
+      # product dir there, for TypeMeItTests's `@testable import`). The
+      # TypeMeIt scheme still builds both targets in the same invocation, and
+      # this only needs Contents/MacOS to exist, not the app's own codesign
+      # step to have already run — that step doesn't reseal a loose binary
+      # dropped in Contents/MacOS, so either build order signs correctly.
+      - name: Embed into the app bundle
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          if [ "$CONFIGURATION" = "Debug" ]; then
+            APP_NAME="type me it dev.app"
+          else
+            APP_NAME="type me it.app"
+          fi
+          DEST_DIR="${TARGET_BUILD_DIR}/${APP_NAME}/Contents/MacOS"
+          mkdir -p "$DEST_DIR"
+          cp "${BUILT_PRODUCTS_DIR}/typemeit-mcp" "$DEST_DIR/typemeit-mcp"
+          codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:-$CODE_SIGN_IDENTITY}" --timestamp=none "$DEST_DIR/typemeit-mcp"
   TypeMeItTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [TypeMeItTests]
+    sources:
+      - TypeMeItTests
+      # MCPTests.swift exercises MCPTools/MCPServer directly; these two
+      # files are not otherwise part of any app-linked target, so they are
+      # added here to compile alongside the tests (docs/meetings.md 7.15).
+      # Guarded by `#if canImport(TypeMeIt)`, they use the real Meeting,
+      # Fixed and Log from the app module in this target, not MCP/Shims.swift.
+      - path: MCP/Protocol.swift
+      - path: MCP/Tools.swift
     dependencies:
       - target: TypeMeIt
     settings:
@@ -179,6 +229,7 @@ schemes:
     build:
       targets:
         TypeMeIt: all
+        typemeit-mcp: all
         TypeMeItTests: [test]
     run:
       config: Debug
