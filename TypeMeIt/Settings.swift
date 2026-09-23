@@ -144,6 +144,9 @@ final class Settings {
     /// While a call is being asked about, hold its last two minutes in
     /// memory so a meeting does not start at the click (D20).
     var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
+    /// Lets the bundled `typemeit-mcp` answer: other tools can list, search
+    /// and read published meetings (D22). The binary reads this key itself.
+    var meetingsMCP: Bool { didSet { defaults.set(meetingsMCP, forKey: "meetingsMCP") } }
     /// Keeps a meeting's tracks as `.m4a` beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -198,6 +201,7 @@ final class Settings {
         meetingAsk = bool("meetingAsk", true)
         meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
         meetingPreRoll = bool("meetingPreRoll", true)
+        meetingsMCP = bool("meetingsMCP", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }

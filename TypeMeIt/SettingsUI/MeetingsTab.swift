@@ -429,6 +429,17 @@ struct MeetingsTab: View {
                     Button("change") { chooseFolder() }.buttonStyle(InkButtonStyle())
                 }
             }
+            SettingsRow(label: "mcp", subtitle: "off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.",
+                        subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "let other tools read your meetings"))) {
+                HStack(spacing: 8) {
+                    Button("copy command") { Output.copyToClipboard("claude mcp add --scope user typemeit -- \"\(MeetingsTab.mcpBinary.path)\"") }
+                        .buttonStyle(InkButtonStyle())
+                    Button("copy for claude desktop") { Output.copyToClipboard(MeetingsTab.desktopEntry) }
+                        .buttonStyle(InkButtonStyle())
+                    Toggle("", isOn: $settings.meetingsMCP).toggleStyle(.switch).labelsHidden()
+                }
+                .disabled(MeetingsTab.translocated)
+            }
             SettingsRow(label: "system audio", last: true, subtitleView: AnyView(systemAudioLines)) {
                 HStack(spacing: 8) {
                     Text(systemAudioStatus).font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
@@ -465,6 +476,19 @@ struct MeetingsTab: View {
         panel.prompt = "Import"
         guard panel.runModal() == .OK else { return }
         coordinator.importRecordings(panel.urls)
+    }
+
+    /// The bundled binary, at this build's own path, so the dev app copies its own.
+    static let mcpBinary = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/typemeit-mcp")
+    /// Gatekeeper runs a quarantined app from a random path that is gone on
+    /// the next launch, so a command naming it would break (docs/meetings.md 7.15).
+    static let translocated = Bundle.main.bundlePath.contains("/AppTranslocation/")
+
+    /// The `mcpServers` entry for Claude Desktop's config file; we never edit that file ourselves.
+    static var desktopEntry: String {
+        let entry = ["mcpServers": ["typemeit": ["command": mcpBinary.path, "args": [String]()]]]
+        let data = (try? JSONSerialization.data(withJSONObject: entry, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])) ?? Data()
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// An open panel for directories; nothing is moved.
