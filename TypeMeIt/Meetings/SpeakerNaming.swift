@@ -31,6 +31,24 @@ struct MeetingNames: Codable, Equatable, Sendable {
     var captions: [Caption]?
 }
 
+extension MeetingNames {
+    /// How many other people a title spells out before `+N`.
+    static let titleNames = 2
+
+    /// `#design, Ana, Ben +2`: the channel, then the others' first names,
+    /// alphabetical, the user left out. Nil when nobody else was listed.
+    func title(excluding userName: String?) -> String? {
+        let user = userName?.lowercased()
+        let others = roster.filter { $0.lowercased() != user }
+        guard !others.isEmpty else { return nil }
+        let first = others.map { String($0.split(separator: " ").first ?? Substring($0)) }.sorted()
+        var names = first.prefix(MeetingNames.titleNames).joined(separator: ", ")
+        if first.count > MeetingNames.titleNames { names += " +\(first.count - MeetingNames.titleNames)" }
+        guard let channel, !channel.isEmpty else { return names }
+        return "\(channel.hasPrefix("#") ? channel : "#" + channel), \(names)"
+    }
+}
+
 /// Turns names read off the meeting window into names on speakers and
 /// paragraphs (docs/meetings.md 8.6). Pure: no accessibility, no DOM, no
 /// I/O — that reading happens elsewhere and hands its result in here.

@@ -223,4 +223,19 @@ struct SpeakerNamingTests {
             Meeting.Speaker(id: "s1", name: "Ana", isYou: false, talkMs: 20_000, nameSource: .speaking),
         ])
     }
+
+    @Test func theTitleIsTheChannelAndTheOthersFirstNames() {
+        let names = MeetingNames(source: .roster, roster: ["Max Mitchell", "Ana Lopez", "Ben Ode", "Cy Two", "Di Three"], channel: "design", spans: [], captions: nil)
+        #expect(names.title(excluding: "Max Mitchell") == "#design, Ana, Ben +2")
+    }
+
+    @Test func aOneToOneTitleIsTheOtherName() {
+        let names = MeetingNames(source: .roster, roster: ["Max Mitchell", "Ana Lopez"], channel: nil, spans: [], captions: nil)
+        #expect(names.title(excluding: "Max Mitchell") == "Ana")
+    }
+
+    @Test func noOtherNameIsNoTitle() {
+        let names = MeetingNames(source: .roster, roster: ["Max Mitchell"], channel: nil, spans: [], captions: nil)
+        #expect(names.title(excluding: "Max Mitchell") == nil)
+    }
 }

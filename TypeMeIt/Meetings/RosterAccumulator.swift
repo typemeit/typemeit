@@ -1,0 +1,78 @@
+import Foundation
+
+/// What one look at a meeting window found: who is listed, who is shown
+/// speaking, and the caption lines on screen.
+struct RosterReading: Equatable, Sendable {
+    var roster: [String] = []
+    var speaking: Set<String> = []
+    var captions: [Caption] = []
+    var channel: String?
+
+    struct Caption: Equatable, Sendable {
+        let name: String
+        let text: String
+    }
+}
+
+/// Turns a stream of readings, each stamped in meeting time, into the
+/// `MeetingNames` a meeting stores (docs/meetings.md 8.6). Pure.
+struct RosterAccumulator: Equatable {
+    private(set) var roster: [String] = []
+    private(set) var channel: String?
+    private(set) var spans: [MeetingNames.Span] = []
+    private(set) var captions: [MeetingNames.Caption] = []
+    /// Names shown speaking at the last reading, with when that began.
+    private var open: [String: Int] = [:]
+    /// A turn shorter than this is a backchannel, not a speaker.
+    let minimumSpanMs: Int
+
+    init(minimumSpanMs: Int) {
+        self.minimumSpanMs = minimumSpanMs
+    }
+
+    mutating func add(_ reading: RosterReading, atMs ms: Int) {
+        for name in reading.roster where !roster.contains(name) { roster.append(name) }
+        if let c = reading.channel { channel = c }
+
+        for name in reading.speaking where open[name] == nil { open[name] = ms }
+        for (name, start) in open where !reading.speaking.contains(name) {
+            close(name, from: start, to: ms)
+            open[name] = nil
+        }
+
+        // A caption line grows in place as the speaker goes on, so a line
+        // that extends the last one from the same name replaces it.
+        for line in reading.captions where !line.text.isEmpty {
+            if let i = captions.lastIndex(where: { $0.name == line.name }),
+               line.text.hasPrefix(captions[i].text) || captions[i].text.hasPrefix(line.text) {
+                if line.text.count > captions[i].text.count { captions[i].text = line.text }
+            } else if !captions.contains(where: { $0.name == line.name && $0.text == line.text }) {
+                captions.append(MeetingNames.Caption(name: line.name, startMs: ms, text: line.text))
+            }
+        }
+    }
+
+    private mutating func close(_ name: String, from start: Int, to end: Int) {
+        guard end - start >= minimumSpanMs else { return }
+        // Two turns of one name a poll apart are one turn.
+        if let i = spans.lastIndex(where: { $0.name == name }), start - spans[i].endMs <= minimumSpanMs {
+            spans[i].endMs = end
+        } else {
+            spans.append(MeetingNames.Span(name: name, startMs: start, endMs: end))
+        }
+    }
+
+    /// Closes every open turn at `ms` and says what was learned, best source
+    /// first; nil when nothing was read at all.
+    mutating func finish(atMs ms: Int) -> MeetingNames? {
+        for (name, start) in open { close(name, from: start, to: ms) }
+        open = [:]
+        spans.sort { $0.startMs < $1.startMs }
+        let source: MeetingNames.Source
+        if !captions.isEmpty { source = .captions }
+        else if !spans.isEmpty { source = .speaking }
+        else if !roster.isEmpty { source = .roster }
+        else { return nil }
+        return MeetingNames(source: source, roster: roster, channel: channel, spans: spans, captions: captions.isEmpty ? nil : captions)
+    }
+}

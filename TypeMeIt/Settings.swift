@@ -147,6 +147,9 @@ final class Settings {
     /// Lets the bundled `typemeit-mcp` answer: other tools can list, search
     /// and read published meetings (D22). The binary reads this key itself.
     var meetingsMCP: Bool { didSet { defaults.set(meetingsMCP, forKey: "meetingsMCP") } }
+    /// Reads who is in a Slack huddle or a Meet call, and who is talking,
+    /// from its window while it records (docs/meetings.md 8.6).
+    var rosterEnabled: Bool { didSet { defaults.set(rosterEnabled, forKey: "rosterEnabled") } }
     /// Keeps a meeting's tracks as `.m4a` beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -202,6 +205,7 @@ final class Settings {
         meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
+        rosterEnabled = bool("rosterEnabled", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -372,6 +376,9 @@ enum Fixed {
     /// The delay between a voice reaching the far-end track and the UI
     /// indicator lighting. 0 until S4 measures it (median of ten claps).
     static let meetingUILagMs = 0
+    /// How often the meeting window is read while recording: a turn shorter
+    /// than this is a backchannel, not a speaker (docs/meetings.md 7.8).
+    static let meetingSpeakingPollMs = 250
     /// Token containment between a caption line and a paragraph, as in the
     /// echo work.
     static let meetingCaptionMatch = 0.5

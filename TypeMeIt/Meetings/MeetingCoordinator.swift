@@ -46,6 +46,8 @@ final class MeetingCoordinator {
     @ObservationIgnored private var machine = MeetingMachine()
     @ObservationIgnored private var tick: Timer?
     @ObservationIgnored private var recorder: MeetingRecorder?
+    /// Reads names off the meeting's window while a call records (8.6).
+    @ObservationIgnored private var roster: Roster?
     /// The capture running since the current candidate formed, and what it
     /// has held so far (D20). Nothing of it reaches a file before `record`.
     @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
@@ -250,6 +252,14 @@ final class MeetingCoordinator {
             recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
             recorder.onFailed = { [weak self] _ in Task { @MainActor in self?.send(.stop) } }
             self.recorder = recorder
+            if let owner, settings.rosterEnabled, Sandbox.readsOtherApps {
+                // Meeting time from the recording's own clock, so names line up with words.
+                roster = Roster(owner: owner) { [weak recorder] in
+                    guard let first = recorder?.firstHostTime, first > 0 else { return nil }
+                    return Int(MeetingCapture.seconds(fromHostTime: first, to: mach_absolute_time()) * 1000)
+                }
+                roster?.start()
+            }
             recordingMeeting = recorder.meeting
             recordingOwner = owner
             shownSystemAudioOff = false
@@ -275,6 +285,8 @@ final class MeetingCoordinator {
     private func stopRecording() {
         silenceDeadline?.cancel()
         silenceDeadline = nil
+        lastNames = roster?.finish()
+        roster = nil
         guard let recorder else { send(.recorderEnded(recordedMs: 0)); return }
         self.recorder = nil
         Task.detached { [recorder] in
@@ -284,6 +296,7 @@ final class MeetingCoordinator {
     }
 
     private var lastResult: MeetingRecorder.Result?
+    private var lastNames: MeetingNames?
 
     private func recorderEnded(_ result: MeetingRecorder.Result) {
         lastResult = result
@@ -315,6 +328,8 @@ final class MeetingCoordinator {
         meeting.dictations = result.dictations
         meeting.bothSilentMs = result.bothSilentMs
         meeting.firstHostTime = result.firstHostTime
+        meeting.names = lastNames
+        lastNames = nil
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
         enqueue(meeting)
@@ -398,6 +413,8 @@ final class MeetingCoordinator {
     /// mid-meeting keeps what was recorded and transcribes it on relaunch.
     func stopForQuit() {
         discardPreRoll()
+        let names = roster?.finish()
+        roster = nil
         guard let recorder, let meeting = recordingMeeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
@@ -416,6 +433,7 @@ final class MeetingCoordinator {
             finished.dictations = result.dictations
             finished.bothSilentMs = result.bothSilentMs
             finished.firstHostTime = result.firstHostTime
+            finished.names = names
         }
         try? MeetingFolder.write(finished, to: MeetingFolder.staged(meeting.id))
         DebugLog.write("Meeting saved for quit: \(finished.durationMs) ms")

@@ -99,6 +99,19 @@ enum MeetingTranscriber {
                     meeting.speakers.append(Meeting.Speaker(id: id, name: defaultName(for: role), isYou: role == .mic, talkMs: 0))
                 }
             }
+            // Names from the meeting window, when it was read (8.6): the
+            // diarizer says how many and when, the meeting says who. Captions
+            // are theirs, not ours, and go once they have been used.
+            if let names = meeting.names {
+                let aligned = SpeakerNaming.align(
+                    speakers: meeting.speakers, segments: segments ?? [], paragraphs: meeting.paragraphs, names: names,
+                    userName: NSFullUserName(), lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
+                    minOverlapMs: Fixed.meetingNameMinOverlapSeconds * 1000, margin: Fixed.meetingNameMargin)
+                meeting.speakers = aligned.speakers
+                meeting.paragraphs = aligned.paragraphs
+                meeting.names?.captions = nil
+                DebugLog.write("Meeting names aligned from \(names.source.rawValue): \(counted(meeting.speakers.filter { $0.nameSource != nil }.count, "speaker")) named")
+            }
             for i in meeting.speakers.indices {
                 let id = meeting.speakers[i].id
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
@@ -109,7 +122,11 @@ enum MeetingTranscriber {
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
-            if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
+            // The title ladder (9.2): who was there, then what it was about, then the app.
+            if meeting.titleSource == .app, let title = meeting.names?.title(excluding: NSFullUserName()) {
+                meeting.title = title
+                meeting.titleSource = .roster
+            } else if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
                 meeting.title = title
                 meeting.titleSource = .generated
             }
