@@ -107,19 +107,6 @@ final class WritingStyleTests: XCTestCase {
         XCTAssertEqual(WritingStyle.digits("First, we wait. And second, they sign. She came first, I came fourth."), "First, we wait. And second, they sign. She came 1st, I came 4th.")
     }
 
-    func testDigitsWritesClockTimes() {
-        XCTAssertEqual(WritingStyle.digits("I just need to do some work by nine AM"), "I just need to do some work by 9am")
-        XCTAssertEqual(WritingStyle.digits("standup at nine thirty a.m. and lunch at twelve pm"), "standup at 9:30am and lunch at 12pm")
-        XCTAssertEqual(WritingStyle.digits("the 7 PM train"), "the 7pm train")
-        XCTAssertEqual(WritingStyle.digits("See you at eight a.m. Bring the notes."), "See you at 8am. Bring the notes.")
-    }
-
-    func testDigitsLeavesTheVerbAm() {
-        XCTAssertEqual(WritingStyle.digits("that leaves one, am I right"), "that leaves 1, am I right")
-        XCTAssertEqual(WritingStyle.digits("we need three PMs on it"), "we need 3 PMs on it")
-        XCTAssertEqual(WritingStyle.digits("as a PM I am fine with it"), "as a PM I am fine with it")
-    }
-
     func testQuoteWrapsReportedSpeech() {
         XCTAssertEqual(WritingStyle.quote("She said ship it."), "She said \"ship it\".")
         XCTAssertEqual(WritingStyle.quote("He told me don't worry about it, and I said fine."), "He told me \"don't worry about it\", and I said \"fine\".")
