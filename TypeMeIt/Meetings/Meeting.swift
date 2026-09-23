@@ -61,6 +61,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var name: String
         var isYou: Bool
         var talkMs: Int
+        /// How this speaker got its name (docs/meetings.md 8.6). Nil for a
+        /// speaker still labelled by number.
+        var nameSource: MeetingNames.Source? = nil
     }
 
     struct Transcription: Codable, Equatable, Sendable {
@@ -105,6 +108,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     var speakers: [Speaker]
     var transcription: Transcription
     var paragraphs: [Paragraph]
+    /// What the meeting itself showed about who is who (docs/meetings.md
+    /// 8.6). Nil until phase 2's naming runs.
+    var names: MeetingNames? = nil
 
     static let encoder: JSONEncoder = {
         let e = JSONEncoder()

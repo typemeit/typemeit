@@ -365,4 +365,14 @@ enum Fixed {
     /// Every WKWebView app shares this audio process, Safari included, so it
     /// is named `web content` and never put on the never-ask list.
     static let meetingWebContentBundleID = "com.apple.WebKit.GPU"
+    /// The delay between a voice reaching the far-end track and the UI
+    /// indicator lighting. 0 until S4 measures it (median of ten claps).
+    static let meetingUILagMs = 0
+    /// Token containment between a caption line and a paragraph, as in the
+    /// echo work.
+    static let meetingCaptionMatch = 0.5
+    /// Enough speech to tell two people apart.
+    static let meetingNameMinOverlapSeconds = 20
+    /// A name has to clearly win over the runner-up.
+    static let meetingNameMargin = 1.5
 }
