@@ -358,6 +358,10 @@ enum Fixed {
     /// 0.1 measures best on far-field meetings with rapid exchanges. S3
     /// (docs/meetings.md 6) picks between them; until it runs, the default.
     static let meetingDiarizerStepRatio = 0.2
+    /// S3, from humla (MIT) and measured here: see `Diarizer.configuration`.
+    static let meetingDiarizerThreshold = 0.5
+    static let meetingDiarizerMinOnSeconds = 1.0
+    static let meetingDiarizerMinOffSeconds = 0.5
     /// Every WKWebView app shares this audio process, Safari included, so it
     /// is named `web content` and never put on the never-ask list.
     static let meetingWebContentBundleID = "com.apple.WebKit.GPU"

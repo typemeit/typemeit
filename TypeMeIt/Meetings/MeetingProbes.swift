@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreAudio
+import FluidAudio
 import Foundation
 
 /// The spikes in docs/meetings.md section 6, as launch arguments on the dev
@@ -11,6 +12,7 @@ import Foundation
 ///     -recordRoom <s>                       record the room for <s> seconds through the whole pipeline (7.1)
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
+///     -diarizeFile <path>                   the file through FluidAudio's defaults and S3's starting values (S3)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -27,6 +29,7 @@ enum MeetingProbes {
         }
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
+        if let path = value(after: "-diarizeFile") { diarizeFile(URL(fileURLWithPath: path)) }
         if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
             DebugLog.enabled = true
             Task { @MainActor in
@@ -193,5 +196,25 @@ enum MeetingProbes {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) }
         }
         return result == KERN_SUCCESS ? Int(info.resident_size >> 20) : 0
+    }
+
+    // MARK: S3, diarizer settings
+
+    private static func diarizeFile(_ url: URL) {
+        DebugLog.enabled = true
+        let base = OfflineDiarizerConfig(segmentationStepRatio: Fixed.meetingDiarizerStepRatio)
+        let s3 = Diarizer.configuration
+        let s3Loose = OfflineDiarizerConfig(clusteringThreshold: 0.7, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+                                            segmentationMinDurationOn: 1.0, segmentationMinDurationOff: 0.5)
+        Task.detached {
+            do {
+                for (name, talk, took) in try await Diarizer.shared.compare(url: url, configurations: [("defaults", base), ("s3 0.5", s3), ("s3 0.7", s3Loose)]) {
+                    let shares = talk.sorted { $0.value > $1.value }.map { "\($0.value / 1000)s" }.joined(separator: " ")
+                    DebugLog.write("Meeting probe diarize \(name): \(counted(talk.count, "speaker")) [\(shares)] in \(took)")
+                }
+            } catch {
+                DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
+            }
+        }
     }
 }

@@ -14,7 +14,7 @@ actor Diarizer {
 
     /// FluidAudio's manager is not Sendable; it is used from one detached
     /// task at a time, serialised by this actor.
-    private struct Loaded: @unchecked Sendable { let manager: OfflineDiarizerManager }
+    private struct Loaded: @unchecked Sendable { let manager: OfflineDiarizerManager; let models: OfflineDiarizerModels }
     private var loaded: Loaded?
 
     enum Error: LocalizedError {
@@ -24,6 +24,16 @@ actor Diarizer {
 
     private init() {}
 
+    /// S3's starting values from michaelwilhelmsen/humla (MIT), measured
+    /// against FluidAudio's defaults on two real calls (docs/meetings.md S3):
+    /// the same speaker counts, a quiet speaker given more of their own
+    /// speech, and half the time. Threshold 0.5 against 0.6 (lower merges
+    /// sooner); a turn needs 1.0 s on so a "yeah" does not split a sentence
+    /// across speakers, and 0.5 s off so a breath does not end one.
+    static let configuration = OfflineDiarizerConfig(
+        clusteringThreshold: Fixed.meetingDiarizerThreshold, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+        segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)
+
     private func ensureLoaded() async throws -> Loaded {
         if let loaded { return loaded }
         guard DiarizerModelStore.isInstalled else { throw Error.notInstalled }
@@ -32,9 +42,9 @@ actor Diarizer {
         configuration.computeUnits = .cpuAndNeuralEngine
         let started = ContinuousClock.now
         let models = try await OfflineDiarizerModels.load(from: DiarizerModelStore.directory, configuration: configuration)
-        let manager = OfflineDiarizerManager(config: OfflineDiarizerConfig(segmentationStepRatio: Fixed.meetingDiarizerStepRatio))
+        let manager = OfflineDiarizerManager(config: Diarizer.configuration)
         manager.initialize(models: models)
-        let loaded = Loaded(manager: manager)
+        let loaded = Loaded(manager: manager, models: models)
         self.loaded = loaded
         Log.meetings.info("Speaker model loaded in \(ContinuousClock.now - started)")
         return loaded
@@ -52,6 +62,24 @@ actor Diarizer {
         }
         Log.meetings.info("Diarized \(url.lastPathComponent): \(counted(Set(segments.map(\.speaker)).count, "speaker")), \(counted(segments.count, "segment")) in \(ContinuousClock.now - started)")
         return (segments, result.speakerDatabase ?? [:])
+    }
+
+    /// S3's comparison: the same file through each named configuration,
+    /// on the loaded models. Speaker id to talk time in ms, per configuration.
+    func compare(url: URL, configurations: [(String, OfflineDiarizerConfig)]) async throws -> [(String, [String: Int], Duration)] {
+        let loaded = try await ensureLoaded()
+        var out: [(String, [String: Int], Duration)] = []
+        for (name, config) in configurations {
+            let manager = OfflineDiarizerManager(config: config)
+            manager.initialize(models: loaded.models)
+            let boxed = Loaded(manager: manager, models: loaded.models)
+            let started = ContinuousClock.now
+            let result = try await Task.detached { try await boxed.manager.process(url) }.value
+            var talk: [String: Int] = [:]
+            for s in result.segments { talk[s.speakerId, default: 0] += Int((s.endTimeSeconds - s.startTimeSeconds) * 1000) }
+            out.append((name, talk, ContinuousClock.now - started))
+        }
+        return out
     }
 
     /// The embedding of a one-speaker clip (16 kHz mono), or nil unless
