@@ -180,6 +180,11 @@ targets:
       - path: TypeMeIt/Meetings/Meeting.swift
       # Meeting.names is declared here.
       - path: TypeMeIt/Meetings/SpeakerNaming.swift
+    settings:
+      base:
+        # Its own products folder: in the app's, FluidAudio's modules sit
+        # beside it and the compiler goes looking for their C parts.
+        CONFIGURATION_BUILD_DIR: $(BUILD_DIR)/$(CONFIGURATION)/typemeit-mcp
     postBuildScripts:
       # docs/meetings.md 7.15: ships inside the app bundle at
       # Contents/MacOS/typemeit-mcp, signed with the same identity. This is
@@ -202,7 +207,7 @@ targets:
           else
             APP_NAME="type me it.app"
           fi
-          DEST_DIR="${TARGET_BUILD_DIR}/${APP_NAME}/Contents/MacOS"
+          DEST_DIR="${BUILD_DIR}/${CONFIGURATION}/${APP_NAME}/Contents/MacOS"
           mkdir -p "$DEST_DIR"
           cp "${BUILT_PRODUCTS_DIR}/typemeit-mcp" "$DEST_DIR/typemeit-mcp"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:-$CODE_SIGN_IDENTITY}" --timestamp=none "$DEST_DIR/typemeit-mcp"
