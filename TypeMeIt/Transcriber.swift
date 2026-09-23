@@ -81,6 +81,7 @@ actor Transcriber {
         session = s
         let backend = m.map { String(cString: transcribe_model_backend($0)) } ?? "?"
         Log.transcriber.info("Model loaded on \(backend) in \(ContinuousClock.now - started)")
+        DebugLog.write("Speech model loaded on \(backend) in \((ContinuousClock.now - started).milliseconds) ms")
     }
 
     private static func makeSession(on model: OpaquePointer?, abort flag: AbortFlag) throws -> OpaquePointer? {
@@ -202,6 +203,7 @@ actor Transcriber {
         try Transcriber.check(st)
         let text = String(cString: transcribe_full_text(s))
         Log.transcriber.info("Meeting chunk: \(pcm.count / 16000) s of audio in \(ContinuousClock.now - started)")
+        DebugLog.write("Meeting chunk: \(pcm.count / 16000) s of audio in \((ContinuousClock.now - started).milliseconds) ms")
         return Transcript(text: text, words: Transcriber.words(of: s))
     }
 
