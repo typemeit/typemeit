@@ -45,6 +45,10 @@ struct MeetingMachine: Equatable {
     }
 
     enum Effect: Equatable {
+        /// Capture into memory from the moment an owner is a candidate, so
+        /// a recording keeps the minute before the user said yes (D20);
+        /// `startRecording` for the same owner promotes it.
+        case beginPreRoll(Owner), discardPreRoll
         case showPrompt(Owner), hidePrompt, showResumed(Owner)
         case startRecording(Owner?), pauseRecording, resumeRecording, stopRecording
         case finished(keep: Bool)
@@ -119,13 +123,13 @@ struct MeetingMachine: Equatable {
         case .idle:
             guard let newest else { return [] }
             state = .candidate(owner: newest, since: now, bothSince: outputs.contains(newest) ? now : nil)
-            return []
+            return [.beginPreRoll(newest)]
         case .candidate(let owner, let since, let bothSince):
-            guard inputs.contains(owner) else { state = .idle; return [] }
+            guard inputs.contains(owner) else { state = .idle; return [.discardPreRoll] }
             // A later arrival with both flags outranks a candidate still waiting for output.
             if let newest, newest != owner, outputs.contains(newest), bothSince == nil {
                 state = .candidate(owner: newest, since: now, bothSince: now)
-                return []
+                return [.discardPreRoll, .beginPreRoll(newest)]
             }
             let both: Instant? = outputs.contains(owner) ? (bothSince ?? now) : nil
             state = .candidate(owner: owner, since: since, bothSince: both)
@@ -133,11 +137,11 @@ struct MeetingMachine: Equatable {
         case .prompting(let owner, _):
             if !inputs.contains(owner) {
                 state = .paused(owner: owner, since: now, before: .prompting)
-                return [.hidePrompt]
+                return [.hidePrompt, .discardPreRoll]
             }
             if let newest, newest != owner {
                 state = .candidate(owner: newest, since: now, bothSince: outputs.contains(newest) ? now : nil)
-                return [.hidePrompt]
+                return [.hidePrompt, .discardPreRoll, .beginPreRoll(newest)]
             }
             return []
         case .declined(let owner):
@@ -181,6 +185,7 @@ struct MeetingMachine: Equatable {
             if bothSince == nil, now - since >= rules.armTimeout {
                 armedOut.insert(owner)
                 state = .idle
+                return [.discardPreRoll]
             }
             return []
         case .recording(let owner, let since):
@@ -227,7 +232,7 @@ struct MeetingMachine: Equatable {
     private mutating func decline() -> [Effect] {
         guard case .prompting(let owner, _) = state else { return [] }
         state = .declined(owner: owner)
-        return [.hidePrompt]
+        return [.hidePrompt, .discardPreRoll]
     }
 
     private mutating func stop() -> [Effect] {
@@ -247,10 +252,12 @@ struct MeetingMachine: Equatable {
     /// recording; a call being asked about gives way to it.
     private mutating func room(now: Instant) -> [Effect] {
         switch state {
-        case .idle, .candidate, .declined:
+        case .idle, .declined:
             return start(nil, now: now)
+        case .candidate:
+            return [.discardPreRoll] + start(nil, now: now)
         case .prompting:
-            return [.hidePrompt] + start(nil, now: now)
+            return [.hidePrompt, .discardPreRoll] + start(nil, now: now)
         case .recording, .paused, .finishing:
             return []
         }
@@ -268,8 +275,11 @@ struct MeetingMachine: Equatable {
             return [.stopRecording]
         case .prompting:
             state = .idle
-            return [.hidePrompt]
-        case .candidate, .declined, .paused:
+            return [.hidePrompt, .discardPreRoll]
+        case .candidate:
+            state = .idle
+            return [.discardPreRoll]
+        case .declined, .paused:
             state = .idle
             return []
         }

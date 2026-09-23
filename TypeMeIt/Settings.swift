@@ -141,6 +141,9 @@ final class Settings {
     /// Bundle ids of apps whose calls are never asked about. Only ever added
     /// to by the menu's explicit item, never inferred.
     var meetingNeverAsk: [String] { didSet { defaults.set(meetingNeverAsk, forKey: "meetingNeverAsk") } }
+    /// While a call is being asked about, hold its last two minutes in
+    /// memory so a meeting does not start at the click (D20).
+    var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
     /// Keeps a meeting's tracks as `.m4a` beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -194,6 +197,7 @@ final class Settings {
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
         meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
+        meetingPreRoll = bool("meetingPreRoll", true)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -294,6 +298,8 @@ enum Fixed {
     /// Measured on an 11-minute call: the first 700 words titled it
     /// "Weekly Update Meeting", seven runs titled it after its lesson.
     static let meetingTitleSamples = 7
+    /// Longer than a prompt is ever left unanswered; 15.4 MB for a call (D20).
+    static let meetingPreRollSeconds = 120
     /// The process-list listener fires several times per launch.
     static let meetingWatchDebounce: Duration = .milliseconds(250)
     /// The backstop the listeners need (docs/meetings.md 3.2).
@@ -309,6 +315,24 @@ enum Fixed {
     static let meetingChunkOverlapSeconds = 2
     /// The seam is placed at the quietest point within this of the nominal cut.
     static let meetingChunkSearchSeconds = 5
+    /// A chunk with speech in it that comes back with no words is retried
+    /// once, trimmed and louder: Parakeet returns nothing on quiet speech.
+    /// Every value is r3dbars/transcripted's dictation recovery (MIT) on its
+    /// own runtime of the same model family (docs/meetings.md 7.10).
+    static let meetingQuietPeak: Float = 0.010
+    static let meetingQuietRMS: Float = 0.0015
+    /// A sample is active above this share of the chunk's peak, clamped.
+    static let meetingQuietActivityShare: Float = 0.08
+    static let meetingQuietActivityFloor: Float = 0.003
+    static let meetingQuietActivityCeiling: Float = 0.020
+    /// Speech is at least this share of samples active, and this much time of them.
+    static let meetingQuietActiveShare = 0.005
+    static let meetingQuietActiveSeconds = 0.2
+    /// The retry keeps this much either side of the first and last active sample.
+    static let meetingQuietPadSeconds = 0.25
+    /// And scales so the peak lands here, with the gain held to this range.
+    static let meetingQuietTargetPeak: Float = 0.45
+    static let meetingQuietGainRange: ClosedRange<Float> = 1...12
     /// Chosen, not measured: the pause between two thoughts. Raise if
     /// paragraphs fragment.
     static let meetingParagraphGapSeconds = 2

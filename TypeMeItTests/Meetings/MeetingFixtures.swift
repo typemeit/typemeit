@@ -25,9 +25,7 @@ enum MeetingFixtures {
                 role: .others, file: "others.m4a", frames: 2_076_000 * Meeting.framesPerMs,
                 gaps: [Meeting.Span(startMs: 1_840_000, endMs: 1_902_000)]),
         ],
-        audio: Meeting.Audio(
-            inputDevice: "MacBook Pro Microphone", outputDevice: "MacBook Pro Speakers",
-            outputTransport: "bltn", outputDataSource: "ispk"),
+        audio: Meeting.Audio(inputTransport: "bltn", outputTransport: "bltn", outputDataSource: "ispk"),
         echo: .affected,
         bothSilentMs: 0,
         dictations: [

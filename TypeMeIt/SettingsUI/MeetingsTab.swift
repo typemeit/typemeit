@@ -11,7 +11,8 @@ struct MeetingsTab: View {
     @State private var player = RecordingPlayer.shared
     @State private var appState = AppState.shared
     @State private var search = ""
-    @State private var expanded: Set<UUID> = []
+    /// The meeting shown as its own page, or nil for the list.
+    @State private var open: UUID?
     @State private var selected: Set<UUID> = []
     @State private var anchor: UUID?
     @State private var confirmDeleteAll = false
@@ -47,33 +48,42 @@ struct MeetingsTab: View {
     }
 
     var body: some View {
+        Group {
+            if let id = open, let m = store.meeting(id) {
+                page(m)
+            } else {
+                list
+            }
+        }
+        .onAppear(perform: reveal)
+        .onChange(of: appState.revealMeeting) { _, _ in reveal() }
+        .onChange(of: store.meetings.map(\.id)) { _, ids in if let id = open, !ids.contains(id) { open = nil } }
+    }
+
+    private var list: some View {
         VStack(spacing: 0) {
             topBar
             if coordinator.recording != nil || coordinator.transcribing != nil || diarizerBusy {
                 statusRow
                 RowRule()
             }
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
-                        if groups.isEmpty {
-                            Text(store.meetings.isEmpty ? "nothing yet" : "no matches")
-                                .foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: .infinity).padding(.vertical, 40)
-                        }
-                        ForEach(groups, id: \.title) { group in
-                            SettingsGroup(title: group.title) {
-                                LazyVStack(spacing: 0) {
-                                    ForEach(Array(group.meetings.enumerated()), id: \.element.id) { i, m in
-                                        row(m, last: i == group.meetings.count - 1).id(m.id)
-                                    }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    if groups.isEmpty {
+                        Text(store.meetings.isEmpty ? "nothing yet" : "no matches")
+                            .foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: .infinity).padding(.vertical, 40)
+                    }
+                    ForEach(groups, id: \.title) { group in
+                        SettingsGroup(title: group.title) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(group.meetings.enumerated()), id: \.element.id) { i, m in
+                                    row(m, last: i == group.meetings.count - 1).id(m.id)
                                 }
                             }
                         }
                     }
-                    .padding(.horizontal, 20).padding(.bottom, 20)
                 }
-                .onAppear { reveal(proxy) }
-                .onChange(of: appState.revealMeeting) { _, _ in reveal(proxy) }
+                .padding(.horizontal, 20).padding(.bottom, 20)
             }
             RowRule()
             footer
@@ -81,11 +91,50 @@ struct MeetingsTab: View {
         .onReceive(clock) { now = $0 }
     }
 
-    private func reveal(_ proxy: ScrollViewProxy) {
+    /// The pill's `show` opens the meeting it names.
+    private func reveal() {
         guard let id = appState.revealMeeting else { return }
         appState.revealMeeting = nil
-        expanded.insert(id)
-        withAnimation { proxy.scrollTo(id, anchor: .top) }
+        open = id
+    }
+
+    // MARK: A meeting's page
+
+    /// One meeting: a way back, its title and details, its actions, and the
+    /// whole transcript with room to read it.
+    private func page(_ m: Meeting) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Button { open = nil } label: {
+                    HStack(spacing: 5) {
+                        Image("akar-chevron-down").resizable().frame(width: 10, height: 10).rotationEffect(.degrees(90))
+                        Text("meetings")
+                    }
+                    .font(.system(size: 12).monospaced())
+                    .padding(.horizontal, 7).padding(.vertical, 4)
+                }
+                .buttonStyle(QuietButtonStyle())
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                actions(m)
+            }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
+            VStack(alignment: .leading, spacing: 6) {
+                title(m, size: 17)
+                HStack(spacing: 8) {
+                    Text(m.started.formatted(.dateTime.day().month(.wide).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)).lowercased())
+                        .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    telemetry(m)
+                }
+                chips(m)
+            }
+            .padding(.horizontal, 20).padding(.bottom, 14)
+            RowRule()
+            ScrollView {
+                transcript(m)
+                    .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
     }
 
     // MARK: Top
@@ -165,43 +214,51 @@ struct MeetingsTab: View {
                 Text(m.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                     .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2).frame(width: 44, alignment: .leading).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
-                    if renaming == m.id {
-                        TextField("", text: $renameText)
-                            .textFieldStyle(.plain).font(.system(size: 13))
-                            .onSubmit { store.rename(id: m.id, title: renameText); renaming = nil }
-                            .onExitCommand { renaming = nil }
-                    } else {
-                        Text(m.title).font(.system(size: 13))
-                    }
+                    title(m, size: 13)
                     telemetry(m)
                     chips(m)
-                    if expanded.contains(m.id) { transcript(m) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .onTapGesture { toggleExpanded(m.id) }
-                HStack(spacing: 4) {
-                    if !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
-                        let on = player.playing == m.id
-                        iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play") {
-                            player.toggle(id: m.id, urls: m.audioFiles.map { folder.appendingPathComponent($0) })
-                        }
-                    }
-                    iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
-                    if m.isDone, !m.audioFiles.isEmpty, !coordinator.liveIDs.contains(m.id) {
-                        iconButton("akar-arrow-cycle", "transcribe again") { coordinator.transcribeAgain(m.id) }
-                    }
-                    iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
-                    if let folder = store.folder(for: m.id) {
-                        iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
-                    }
-                    if !coordinator.liveIDs.contains(m.id) {
-                        iconButton("akar-trash-can", "delete") { store.delete(ids: [m.id]) }
-                    }
-                }
+                .onTapGesture { if renaming != m.id { open = m.id } }
+                actions(m)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             if !last { RowRule() }
+        }
+    }
+
+    @ViewBuilder
+    private func title(_ m: Meeting, size: CGFloat) -> some View {
+        if renaming == m.id {
+            TextField("", text: $renameText)
+                .textFieldStyle(.plain).font(.system(size: size))
+                .onSubmit { store.rename(id: m.id, title: renameText); renaming = nil }
+                .onExitCommand { renaming = nil }
+        } else {
+            Text(m.title).font(.system(size: size))
+        }
+    }
+
+    private func actions(_ m: Meeting) -> some View {
+        HStack(spacing: 4) {
+            if !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
+                let on = player.playing == m.id
+                iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play") {
+                    player.toggle(id: m.id, urls: m.audioFiles.map { folder.appendingPathComponent($0) })
+                }
+            }
+            iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
+            if m.isDone, !m.audioFiles.isEmpty, !coordinator.liveIDs.contains(m.id) {
+                iconButton("akar-arrow-cycle", "transcribe again") { coordinator.transcribeAgain(m.id) }
+            }
+            iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
+            if let folder = store.folder(for: m.id) {
+                iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
+            }
+            if !coordinator.liveIDs.contains(m.id) {
+                iconButton("akar-trash-can", "delete") { store.delete(ids: [m.id]) }
+            }
         }
     }
 
@@ -294,10 +351,6 @@ struct MeetingsTab: View {
             .buttonStyle(.plain)
             .help("rename")
         }
-    }
-
-    private func toggleExpanded(_ id: UUID) {
-        if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
     }
 
     private func select(_ id: UUID) {

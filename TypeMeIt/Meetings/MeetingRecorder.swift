@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import IOKit.pwr_mgt
 
 /// One meeting being recorded: a `MeetingCapture` feeding one or two
 /// `TrackWriter`s, with the silence monitor, the gaps, the dictation spans
@@ -24,7 +25,10 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     let kind: Kind
     let folder: URL
     /// The meeting as written at the start; the coordinator carries it on.
-    let meeting: Meeting
+    private(set) var meeting: Meeting
+    /// Host-time ticks from the capture's first callback to frame 0: the
+    /// pre-roll frames that were overwritten before the user said yes.
+    private var hostOffset: UInt64 = 0
 
     /// True once every track has stayed at the floor for
     /// `Fixed.meetingSilentSeconds`; false when signal returns.
@@ -47,9 +51,20 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     private var bothSilentFrames = 0
     private var lastDiskCheck = ContinuousClock.now
     private var stopped = false
+    /// Held from the first callback to `stop` (docs/meetings.md 7.6): a room
+    /// recorded with nobody touching the Mac would otherwise idle to sleep
+    /// mid-sentence. Never the display variant, so the screen still dims
+    /// and locks; held by this process, so every exit path releases it.
+    private var sleepAssertion: IOPMAssertionID?
+    /// Keeps the drain queue and the tick at full speed against App Nap.
+    private var activity: NSObjectProtocol?
+    private static let sleepReason = "type me it is recording a meeting"
     private static let diskCheckInterval: Duration = .seconds(60)
 
-    init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device) throws {
+    /// `preRoll` is the live capture and the audio held since the call
+    /// became a candidate (D20): the capture carries on into the tracks with
+    /// no gap at the seam, and the held audio is their first frames.
+    init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device, preRoll: (capture: MeetingCapture, held: PreRoll)? = nil) throws {
         self.kind = kind
         self.folder = folder
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -78,12 +93,33 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             audio: MeetingCapture.audioDescription(mic: mic), echo: .notMeasured, bothSilentMs: 0,
             dictations: [], speakers: speakers,
             transcription: Meeting.Transcription(state: .pending), paragraphs: [])
+        if let preRoll {
+            let ws = writers
+            // On the drain queue, so no live frame lands before the held ones.
+            let taken = preRoll.capture.handOver(to: self) {
+                let taken = preRoll.held.take()
+                for (role, writer) in ws {
+                    writer.append(role == .others ? (taken.others ?? [Float](repeating: 0, count: taken.mic.count)) : taken.mic)
+                }
+                return taken
+            }
+            capture = preRoll.capture
+            hostOffset = MeetingCapture.hostTicks(seconds: Double(taken.droppedFrames) / AudioCapture.targetFormat.sampleRate)
+            let heldMs = taken.mic.count / Meeting.framesPerMs
+            meeting.preRollMs = heldMs
+            meeting.started = Date().addingTimeInterval(-Double(heldMs) / 1000)
+            DebugLog.write("Meeting pre-roll kept: \(heldMs) ms before the click")
+        }
         try MeetingFolder.write(meeting, to: folder)
-        capture = try MeetingCapture(mic: mic, tapProcesses: processes, sink: self)
+        if preRoll == nil { capture = try MeetingCapture(mic: mic, tapProcesses: processes, sink: self) }
         DebugLog.write("Meeting recording started: \(meeting.kind.rawValue) \(meeting.title) in \(folder.lastPathComponent)")
     }
 
-    var firstHostTime: UInt64 { capture?.firstHostTime ?? 0 }
+    /// Host time of frame 0 of every track.
+    var firstHostTime: UInt64 {
+        let first = capture?.firstHostTime ?? 0
+        return first == 0 ? 0 : first + hostOffset
+    }
 
     func updateTap(processes: [AudioObjectID]) {
         capture?.updateTap(processes: processes)
@@ -127,6 +163,13 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
 
     func capture(_ capture: MeetingCapture, mic: [Float], others: [Float]?) {
         lock.lock()
+        if sleepAssertion == nil, !stopped {
+            var id = IOPMAssertionID(0)
+            if IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), MeetingRecorder.sleepReason as CFString, &id) == kIOReturnSuccess {
+                sleepAssertion = id
+            }
+            activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "recording a meeting")
+        }
         let isPaused = paused
         let ws = writers
         lock.unlock()
@@ -205,6 +248,8 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             paused = false
         }
         let ws = writers
+        if let id = sleepAssertion { IOPMAssertionRelease(id); sleepAssertion = nil }
+        if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
         lock.unlock()
         cap?.stop()
         // Resampling can leave the tracks a frame or two apart; the longer
@@ -227,6 +272,6 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         let gapMs = gaps.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
         if !alreadyStopped { DebugLog.write("Meeting recording stopped: \(durationMs) ms, \(counted(gaps.count, "gap")), \(counted(spans.count, "dictation"))") }
         return Result(tracks: tracks, peaks: peaks, dictations: spans, durationMs: durationMs, recordedMs: max(0, durationMs - gapMs),
-                      bothSilentMs: silentFrames / Meeting.framesPerMs, firstHostTime: cap?.firstHostTime ?? 0)
+                      bothSilentMs: silentFrames / Meeting.framesPerMs, firstHostTime: (cap?.firstHostTime ?? 0) == 0 ? 0 : cap!.firstHostTime + hostOffset)
     }
 }

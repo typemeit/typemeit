@@ -38,9 +38,9 @@ commit that was once on this branch is not part of the plan; see section 15.
 | Step | Delivers | Done when |
 | --- | --- | --- |
 | Spikes S1 to S3 | Measured answers to the unknowns in 3.5, written into this file | Every pass/fail line in section 6 is filled in |
-| Phase 1 | Slack huddles and Google Meet detected; one prompt; two tracks recorded on one clock; transcript with **You** and **Them**; a Meetings tab | The phase-1 verification list (7.13) passes on a real huddle and a real Meet call |
-| Phase 2 | The room, started by hand; far-end and room speakers numbered by diarization and renameable | 8.5 passes with three people on a call and six in a room |
-| Phase 3 | **You** recognised in a room by voice print; names recovered from the meeting window where the probe says they can be | 9.3 passes; anything the probe failed stays as numbers |
+| Phase 1 | Slack huddles and Google Meet detected; one prompt, with the two minutes before it kept; two tracks recorded on one clock; transcript with **You** and **Them**; a Meetings tab; import a recording | The phase-1 verification list (7.13) passes on a real huddle and a real Meet call |
+| Phase 2 | The room, started by hand; far-end and room speakers found by diarization and **named from the meeting** — captions, the speaking indicator, the roster — where S4 says each works, numbers where nothing does | 8.5 passes with three people on a call and six in a room |
+| Phase 3 | **You** recognised in a room by voice print | 9.3 passes; anything the probe failed stays as numbers |
 
 Each phase is shippable on its own. Phase 2 adds fields to phase 1's files and
 changes none. Inside phase 1 the build order (7.1) is settings, capture
@@ -159,6 +159,27 @@ change any of them; the default is what gets built.
 - **D18. No voice but the user's is ever stored, and the user's only opt-in
   (D15).** Far-end and room speaker embeddings exist for one transcription
   pass, in memory, and are never written to disk or to `meeting.json`.
+- **D20. A meeting keeps the minute before the user says yes.** Capture
+  starts when an owner becomes a candidate, into memory only. On `record`
+  the buffer becomes frame 0 of the tracks; on `decline`, on the candidate
+  lapsing, and on quit it is freed and nothing is written. Without it a
+  meeting starts at the click, which is after the part that says what the
+  meeting is about. The cost is that the microphone opens before consent —
+  visibly, since macOS lights its indicator — and the settings row says so.
+- **D21. A recording made elsewhere can be imported.** One file in, the same
+  pipeline, a meeting out. It covers what detection cannot see (a phone
+  call, a room recorded on a phone, a call the user declined) and it is how
+  S2 and S3 get an hour of real audio without staging a meeting.
+- **D22. Meetings are queryable over MCP, read-only, off by default.** A
+  stdio binary in the app bundle reads the published folders directly, so it
+  needs no port, no auth and no running app. It is the one path by which
+  meeting text can leave this Mac, so it is a switch the user throws and the
+  help says what it means.
+- **D23. Other people are named from the meeting, never from their voices.**
+  The meeting already tells the user who is there and who is talking; we
+  read that, per meeting, and throw it away with the meeting. There is no
+  store of other people's voices to match against (D18), so nothing
+  recognises Ana next week — the meeting names her again.
 - **D19. The other participants are not told.** The app announces nothing to
   the call. Recording someone may need their agreement where the user is;
   the Meetings tab footer says so in one line.
@@ -357,7 +378,7 @@ Sources: the macOS 27.0 SDK headers, `insidegui/AudioCap`,
 | Offline `transcribe_run` on a 120 s chunk is fast and memory-bounded; the seam WER cost is small; one run over an hour is not bounded | S2 |
 | FluidAudio's offline diarizer loads from a local directory with no network, builds in this Xcode project, and runs at 30x realtime or better (an hour in two minutes) | S3 |
 | WeSpeaker embeddings from kept dictations separate the user from other speakers at cosine distance 0.40 with a 0.10 margin | S3 |
-| Chromium exposes Meet's tiles, and Slack its huddle roster, in the accessibility tree once the activation attribute is set | S4 (phase 3) |
+| Chromium exposes Meet's tiles, and Slack its huddle roster, in the accessibility tree once the activation attribute is set; the speaking indicator and captions are readable there or through the page's DOM | S4 (phase 2) |
 | `AudioHardwareCreateProcessTap` works inside the App Sandbox | none; checked when a store target exists (section 10) |
 
 The probes behind the measured facts are in `docs/meetings-probes/`, each a
@@ -419,6 +440,9 @@ Rules for every task below:
 | `Meetings/MeetingCoordinator.swift` | `@MainActor` owner of the machine: feeds it watch updates and ticks, shows the prompt, starts and stops the recorder, hands finished meetings to the transcriber, exposes the busy state |
 | `Meetings/MeetingCapture.swift` | One private aggregate device (mic sub-device plus optional process tap), one IO proc, two ring buffers, the drain queue, device-change rebuilds |
 | `Meetings/AudioRing.swift` | A preallocated single-producer single-consumer Float32 ring |
+| `Meetings/PreRoll.swift` | One ring per track sized in seconds; `take()` drains oldest-first and frees; `discard()` zeroes and frees |
+| `MCP/main.swift`, `MCP/Protocol.swift`, `MCP/Tools.swift` | The `typemeit-mcp` target: JSON-RPC framing (pure), the four tools over the meetings folder (pure over a directory) |
+| `Meetings/MeetingImport.swift` | Any file `AVFoundation` can read to a 16 kHz mono `.caf` in a staged folder, plus the `Meeting` that describes it |
 | `Meetings/TrackWriter.swift` | Appends Float32 to a CAF file as Int16 with an open-ended data chunk; silence fill; peak tracking |
 | `Meetings/MeetingRecorder.swift` | Owns a `MeetingCapture` and one or two `TrackWriter`s; the silence monitor; gaps; dictation spans; levels |
 | `Meetings/Meeting.swift` | `Meeting` (Codable) and its parts |
@@ -433,7 +457,8 @@ Rules for every task below:
 | `Meetings/DiarizerModelStore.swift` (phase 2) | Download and pin the FluidAudio model archive, modelled on `ModelStore` |
 | `Meetings/Diarizer.swift` (phase 2) | FluidAudio offline pipeline behind two functions |
 | `Meetings/VoicePrint.swift` (phase 3) | The user's centroid; matching |
-| `Meetings/Roster.swift` (phase 3) | Names from the accessibility tree or the screen |
+| `Meetings/Roster.swift` (phase 2) | Names, speaking spans and caption lines from the accessibility tree, the Meet page over Apple Events, or the screen |
+| `Meetings/SpeakerNaming.swift` (phase 2) | Aligning those to diarized speakers (pure, 8.6) |
 | `SettingsUI/MeetingsTab.swift` | The tab |
 | `TypeMeItTests/Meetings/*Tests.swift` | One test file per pure type (section 12) |
 
@@ -506,7 +531,8 @@ against origin/main with nothing else built. S1's capture half needs 7.5's
 aggregate, `TrackWriter`'s CAF header and the `NSAudioCaptureUsageDescription`
 key from 7.12 (without the key the dev app never prompts and the tap stays
 silent), so it runs once those exist behind the dev launch argument in 7.1;
-S2 needs `ChunkCutter` from 7.10; S3 needs S1's `others.caf`. Only 7.2 to
+S2 needs `ChunkCutter` from 7.10 and 7.14's import for its hour of audio;
+S3 needs S1's `others.caf`. Only 7.2 to
 7.4, 7.7 and the tap in 7.5 wait for S1's result; the rest of phase 1 is
 built first, in the order 7.1 gives. Each spike opens with what it needs.
 
@@ -539,6 +565,11 @@ mid-run and open both files with `AVAudioFile`.
 Deny the grant first, and record what the tap delivered. Grant it from the
 prompt and record whether audio arrived without a relaunch. Revoke it in
 System Settings while running, re-grant, and record what macOS said.
+
+On AirPods as both default input and output, in a Slack huddle, run the
+capture twice — headset mic in the aggregate, then built-in — and ask the
+far end whether either run was audible to them. Log any `-10868`, route
+change or IO proc stall. This decides 7.5's call-on-Bluetooth rule.
 
 Record in this file:
 
@@ -600,7 +631,30 @@ directory in place.
 `-diarizeFile <path>`: run the offline pipeline with `computeUnits:
 .cpuAndNeuralEngine` on S1's `others.caf` from a three-person call at
 `stepRatio` 0.2 and 0.1, log segments, speaker count, wall time, and the
-`speakerDatabase` embedding per speaker. Then run the same pipeline over ten
+`speakerDatabase` embedding per speaker.
+
+Start from a shipping MIT app's `OfflineDiarizerConfig` rather than the
+defaults; it runs the same pipeline and its reasons are written down. Measure
+each against the defaults, do not adopt blind:
+
+- `clusteringThreshold` 0.5 against the 0.6 default. Higher stops merging
+  earlier and yields *more* speakers — the polarity 3.3 warns about, stated
+  the same way there.
+- `segmentationMinDurationOn` 1.0, up from 0.0. At the default the
+  segmentation model emits sub-second blips for backchannels ("yeah",
+  "right") inside a monologue, which split one sentence across three speaker
+  lines once words are aligned. Pyannote's paper recommends ≥1.0; FluidAudio's
+  source puts the cost at 1.4% DER, which buys a transcript a person can read.
+- `segmentationMinDurationOff` 0.5, up from 0.0, so a breath mid-sentence
+  does not end a turn.
+- Leave `excludeOverlap` and `exclusiveSegments` at their defaults. The second
+  is load-bearing for 8.3: non-overlapping output is what makes one word map
+  to exactly one speaker.
+- `withSpeakers(exactly:)` overrides VBx's automatic count. Without it VBx
+  picks its own, and on a conversation one person dominates it tends to pick
+  **1** — the failure that merges the quiet participant into the loud one.
+  Measure whether passing the count (8.6's roster, or "far end + 1" on a
+  1:1) is what fixes the three-speaker test. Then run the same pipeline over ten
 kept dictation recordings (one speaker each) and log the cosine distance of
 each embedding to the others and to the diarized speakers.
 
@@ -614,7 +668,7 @@ same holds for the user's embedding from the room recording. This is 9.1's
 rule, so a pass validates the shipped matcher. If the distance test fails,
 phase 3's voice print is dropped and rooms keep numbers only.
 
-### S4. Rosters in the accessibility tree (before phase 3)
+### S4. Names, speaking and captions from the meeting (before phase 2)
 
 Needs: nothing built.
 
@@ -629,8 +683,28 @@ Record: are participant names present as `AXTitle` or `AXDescription`, does
 anything change with the active speaker, does the tree survive a tab switch,
 and how much CPU the browser spent while the attribute was set.
 
-Pass: names present with the panel closed on at least one target. Otherwise
-phase 3 uses the screen (9.2) or nothing.
+Then the rest of what 8.6 reads:
+
+- **Speaking indicator.** With two people taking turns on a call, log what
+  in the tree changes as each speaks, and the lag from the far-end track's
+  onset to the change: clap on the far side, find the clap in `others.caf`,
+  subtract. Ten claps; the median is `meetingUILagMs`.
+- **Captions.** Turn captions on in Meet and in a huddle. Are caption lines
+  in the tree with a speaker name per line? Confirm from a second account
+  that turning captions on tells nobody else.
+- **The DOM route (Meet).** `-meetingProbeDOM`: with `Allow JavaScript from
+  Apple Events` on in Chrome and then Safari, find the Meet tab by host,
+  inject the observer script from 8.6, drain every 2 s for five minutes.
+  Record the Automation prompt's wording, which roles and `aria-label`s the
+  roster, speaking indicator and captions sit under, and whether the script
+  survives the tab being backgrounded and the people panel being closed.
+- CPU of the browser for each route over the five minutes.
+
+Record every answer per target and per app version.
+
+Pass, per target, per source: the source yields names with the people panel
+closed. 8.6 uses whatever passed, best first. A target where nothing passes
+gets numbers and the pick list, which is still a working phase 2.
 
 ## 7. Phase 1: calls
 
@@ -639,7 +713,7 @@ phase 3 uses the screen (9.2) or nothing.
 Build first, in this order: 7.8 (settings and constants), 7.5 (capture, no
 tap), 7.6 (the recorder), 7.9 (storage), 7.10 (transcription) and 7.11 (the
 tab, the settings group, and the menu items that do not depend on
-detection), driven by a dev-only launch argument `-recordRoom <seconds>`
+detection), driven by 7.14's import and a dev-only launch argument `-recordRoom <seconds>`
 that records the mic through `MeetingCapture` for that long into a staged
 folder and runs the whole end-of-meeting pipeline. That exercises every file
 but the watch, the machine, the coordinator and the tap without a second
@@ -784,18 +858,18 @@ Transitions:
 
 | From | On | To | Effects |
 | --- | --- | --- | --- |
-| idle | an owner's input turns on, not on `neverAsk` | candidate(owner, now, nil) | |
+| idle | an owner's input turns on, not on `neverAsk` | candidate(owner, now, nil) | beginPreRoll(owner) |
 | idle | record(owner) | recording(owner, now) | startRecording(owner) |
 | idle | room | recording(nil, now) | startRecording(nil) |
 | candidate(bothSince: nil) | owner output on | candidate(owner, since, now) | |
 | candidate | owner output off | candidate(owner, since, nil) | |
 | candidate | now − bothSince ≥ confirm | prompting(owner, now) | showPrompt |
-| candidate | owner input off | idle | |
-| candidate | now − since ≥ armTimeout with output never on | idle (no re-arm until input drops) | |
-| candidate | record(owner) | recording(owner, now) | startRecording(owner) |
-| prompting | record(owner) | recording(owner, now) | hidePrompt, startRecording(owner) |
-| prompting | decline | declined(owner) | hidePrompt |
-| prompting | owner input off | paused(owner, now, .prompting) | hidePrompt |
+| candidate | owner input off | idle | discardPreRoll |
+| candidate | now − since ≥ armTimeout with output never on | idle (no re-arm until input drops) | discardPreRoll |
+| candidate | record(owner) | recording(owner, now) | startRecording(owner), promoting the pre-roll |
+| prompting | record(owner) | recording(owner, now) | hidePrompt, startRecording(owner), promoting the pre-roll |
+| prompting | decline | declined(owner) | hidePrompt, discardPreRoll |
+| prompting | owner input off | paused(owner, now, .prompting) | hidePrompt, discardPreRoll |
 | declined | record(owner) | recording(owner, now) | startRecording(owner) |
 | declined | owner input off | paused(owner, now, .declined) | |
 | recording(owner) | owner input off | paused(owner, now, .recording) | pauseRecording |
@@ -869,7 +943,30 @@ var tapFormat: AudioStreamBasicDescription? { get }
 Geometry:
 
 - Mic device: `Settings.microphoneUID` resolved with `AudioCapture.deviceID(forUID:)`
-  (today `private`; make it internal), else the default input device.
+  (today `private`; make it internal), else the default input device —
+  except for Bluetooth, read from `kAudioDevicePropertyTransportType`
+  (`kAudioDeviceTransportTypeBluetooth`, `…BluetoothLE`):
+  - **A room never records a Bluetooth mic unless the user picked it.** With
+    no explicit `microphoneUID` and a Bluetooth default input, use the
+    built-in mic. An earbud is the wrong microphone for a room, and opening
+    it moves the headset from its music profile to its call profile, so
+    whatever the user is listening to drops to call quality for the length
+    of the meeting.
+  - **A call records the headset mic, pending S1.** The call app already
+    holds it (that is what made the candidate), so the headset is already
+    in its call profile and we change nothing the user can hear; and a mic
+    in the ear is the cleanest `You` track there is. A shipping Parakeet
+    notetaker defaults the other way — built-in whenever a Bluetooth headset
+    is both input and output — after contention with the call app's own
+    use of the headset. S1 runs that case on purpose; if the aggregate
+    glitches, fails to start or flips the route, the call takes the built-in
+    mic too and the row says so.
+  - Chosen once at start and pinned. A device rebuild (below) may fall back
+    to built-in once after a real Bluetooth outage; it never follows a
+    changing default for the rest of the meeting.
+  - Nothing ever writes the Mac-wide default input device. The aggregate
+    binds the device it wants; writing and restoring the default is how the
+    same app got route flip-flops, a slower start, and audible glitches.
 - Tap: `CATapDescription(monoMixdownOfProcesses: processes)` with a fresh
   UUID, `muteBehavior` left at its unmuted default, `privateTap = true`,
   `processRestoreEnabled = true`. Absent for the room.
@@ -965,6 +1062,16 @@ var onLevels: (@Sendable (_ mic: Float, _ others: Float?) -> Void)?   // 10 Hz, 
   `bothSilent` to the machine when it fires. A room shows no pill, since
   there is no tap to blame. A far end at the floor while the mic is alive
   means everyone else is muted, and nothing is said.
+- Sleep. Hold `kIOPMAssertionTypePreventUserIdleSystemSleep` (never the
+  display variant: the screen should still dim and lock) from the first
+  capture callback to `stop()`, named "type me it is recording a meeting".
+  Taken on the first callback rather than on `init` so a denied grant does
+  not hold the machine awake for nothing, and held by our own process, so
+  the OS releases it on every exit path including `_exit(0)` and `kill -9`.
+  This matters for a room, not a call: a call's own app already holds an
+  assertion, but a Mac recording a meeting from the table with nobody
+  touching it idles to sleep mid-sentence. `willSleep` then means the lid
+  closed or the user chose Sleep, which is still a finish (7.4).
 - Gaps: `pause()` records the frame index; `resume()` records the end. Both
   tracks receive zeros for the gap. A capture rebuild reports its gap the
   same way. Every gap goes into `tracks[].gaps`.
@@ -989,6 +1096,45 @@ from `Pipeline.start()`):
   cloud leaves. `hidePrompt` clears both the shown prompt and the parked one.
 - `showResumed`: `.meetingResumed(app:)`, whose `stop` sends `stop` to the
   machine. It is a toast, not a question: the recording has already resumed.
+
+**Pre-roll (D20).** Consent arrives `meetingConfirmSeconds` (12 s) plus a
+human's reaction time after the meeting started, and that is the part of a
+meeting that says what it is about. So the coordinator starts capturing at
+`candidate`, into memory, and only writes on `record`:
+
+- `PreRoll` holds one `AudioRing` per track sized `Fixed.meetingPreRollSeconds`
+  (120) at 16 kHz mono Float32: 7.7 MB a track, 15.4 MB for a call. It
+  overwrites oldest-first and never allocates after `init`.
+- `candidate` gains the effect `beginPreRoll(owner)`: build a `MeetingCapture`
+  exactly as `startRecording` would, with a sink that writes into the rings
+  instead of the writers. Two things can fail softly — without the tap grant
+  the far-end ring is absent and the mic is still buffered; a capture that
+  throws leaves `preRoll = nil` and the meeting simply starts at the click.
+- `record` hands the live capture to `MeetingRecorder` rather than building a
+  second one, so there is no gap at the seam. The recorder opens the tracks,
+  writes each ring's contents first through the same `TrackWriter`, then
+  continues live. Frame 0 is the oldest pre-roll frame and `firstHostTime` is
+  that frame's host time, so 5.4's clock, `dictations[]` and the gap
+  bookkeeping all keep working unchanged. `preRollMs` goes in `meeting.json`.
+- `decline`, `neverAsk`, the candidate lapsing at `armTimeout`, input
+  dropping, and `stopForQuit` all call `discard()`, which zeroes the buffers
+  before freeing them. Nothing reaches a file, and no buffer outlives the
+  candidate that made it.
+- A room is started by hand and has no candidate, so it has no pre-roll.
+  There is no always-on buffer: the app holds audio only while another app
+  is in a call with the mic and the output both live.
+- `Settings.meetingPreRoll`, default on, and `Settings.meetingAsk == false`
+  suppresses the pre-roll with the prompt.
+- Tests (`PreRollTests`): a ring that wrapped yields the newest 120 s
+  oldest-first; consent after 30 s yields 30 s; `discard` leaves nothing
+  readable; a mic-only pre-roll on a call promotes with the far-end track
+  starting at the seam and its pre-roll span zero-filled.
+
+The honest cost: the microphone opens before the user has agreed to anything,
+which macOS shows in the menu bar and in Control Center. That is the right
+way round — the indicator is true — but it is a change in what the app does
+while idle, so the settings row says it plainly (section 11) and turning the
+prompt off turns it off.
 - Exposes `detected: Owner?` (level: any holder with input and output, for
   the menu), `prompting: Owner?`, `recording: (kind, started)?`,
   `levels: (mic: Float, others: Float?)` (from `MeetingRecorder.onLevels`,
@@ -1043,10 +1189,12 @@ verified in S1).
 | `meetingNeverAsk` | [String] bundle ids | [] | main tab: `never ask for` chips, hidden when empty |
 | `meetingKeepAudio` | Bool | true | Meetings tab footer: `keep the audio` |
 | `meetingLimit` | Int | 0 (everything) | Meetings tab footer: `keep` picker like History's |
+| `meetingsMCP` | Bool | false | Meetings tab footer: `mcp` (7.15) |
 | `meetingsFolder` | URL? | nil (= `Store.directory/Meetings`) | Meetings tab footer: `meetings folder` |
 | `recordRoomShortcut` | KeyCombo? | nil | main tab, phase 2 |
 | `voicePrintEnabled` | Bool | false | main tab, phase 3 |
-| `rosterEnabled` | Bool | false | main tab, phase 3 |
+| `rosterEnabled` | Bool | false | main tab, phase 2: names from the meeting's window (8.6, 9.2) |
+| `rosterFromPage` | Bool | false | main tab, phase 2: the Meet DOM route (8.6), asks for Automation |
 
 `Fixed`, each with its source in a comment:
 
@@ -1062,9 +1210,17 @@ verified in S1).
 | `meetingSilenceFloor` | 0.001 (−60 dBFS) | same |
 | `meetingBothSilentEndSeconds` | 600 | an idle call; also a forgotten room recording |
 | `meetingRebuildAttempts`, `meetingRebuildIntervalSeconds` | 3, 1 | one rebuild usually suffices; three a second apart cover a slow USB re-enumeration |
+| `meetingMCPBudgetBytes` | 24 576 | one meeting's text in a reply without crowding a client's window (7.15) |
+| `meetingPreRollSeconds` | 120 | longer than a prompt is ever left unanswered; 15.4 MB for a call (D20) |
 | `meetingQuitWaitSeconds` | 2 | the writers flush in milliseconds; two seconds bounds a stuck disk |
 | `meetingTitleSourceWords` | 700 | fits the 4,096-token window beside the instructions |
-| `meetingRosterPollMinutes` (phase 3) | 5 | people join in the first minutes |
+| `meetingRosterPollMinutes` (phase 2) | 5 | people join in the first minutes |
+| `meetingSpeakingPollMs` | 250 | a turn shorter than this is a backchannel, not a speaker |
+| `meetingDOMDrainSeconds` | 2 | the observer keeps its own timestamps, so draining is only bookkeeping |
+| `meetingUILagMs` | 0 until S4 | measured, median of ten claps |
+| `meetingCaptionMatch` | 0.5 | token containment, as in the echo work |
+| `meetingNameMinOverlapSeconds` | 20 | enough speech to tell two people apart |
+| `meetingNameMargin` | 1.5 | a name has to clearly win |
 | `meetingWatchDebounce` | 250 ms | the list listener fires several times per launch |
 | `meetingWatchPollSeconds` | 1 | the backstop the listeners need |
 | `meetingRingSeconds` | 4 | chosen, not measured: forty drain periods of headroom; raise if `AudioRing` reports overruns |
@@ -1121,7 +1277,8 @@ writing through `AVAudioFile` 1 s at a time (`RecordingArchive.write` is
 whole-array and stays for dictations), at `Fixed.meetingAudioBitrate`
 (32 000; the dictation archive's 16 kbps is tuned for one close speaker, a
 far-end mix gets twice that). The `.caf` is deleted only after the `.m4a`
-reopens with a frame count within one buffer of the source. With
+reopens with a frame count within one buffer of the source *and* its last
+second decodes. A header can claim the right length over a truncated tail. With
 `Settings.meetingKeepAudio` off, the `.caf` files are deleted after
 transcription and no `.m4a` is written.
 
@@ -1287,7 +1444,14 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
 `.notMeasured`; the mic envelope copied into the far end 50 ms later →
 `.affected`; two independent noise envelopes → `.clean`.
 
-`MeetingTranscriber` (enum with one entry point, run in a detached task):
+`MeetingTranscriber` (enum with one entry point, run in a detached task,
+inside `ProcessInfo.processInfo.beginActivity(options: .userInitiated,
+reason: "transcribing a meeting")`, ended on every exit path. A menu-bar
+accessory doing a minute of CPU work in the background is the textbook App
+Nap case, and a napped transcription finishes whenever macOS gets round to
+it. The recorder holds the same activity for the length of a meeting; the
+IOPM assertion (7.6) is what names the reason in `pmset -g assertions`, this
+is what keeps the drain queue and the tick at full speed.)
 
 1. If `ModelStore.isInstalled` is false, stay `pending`, save and return;
    `MeetingStore` re-queues every `pending` meeting when the install
@@ -1295,7 +1459,11 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
 2. For each track: read the `.caf` once to compute the 100 ms peak envelope
    (for `ChunkCutter`) and the 10 ms RMS envelope (for the echo detector),
    cut with `ChunkCutter`, then for each chunk not yet in `done` read only
-   that chunk's samples, call `await Transcriber.shared.transcribeMeetingChunk(chunk)`,
+   that chunk's samples. A chunk whose peak envelope never rises above
+   `Fixed.meetingSilenceFloor` is marked done and skipped without a model
+   call: a call where the far end stays muted is 40 minutes of silence that
+   would otherwise be decoded a chunk at a time, and the envelope needed to
+   tell is already in hand from this same pass. Otherwise call `await Transcriber.shared.transcribeMeetingChunk(chunk)`,
    offset every word by the chunk's start, stitch with `ChunkStitch.append`,
    append the words to a per-track scratch file (`words-mic.json`,
    `words-others.json`, a `TrackWords`) and bump `done`, saving
@@ -1303,8 +1471,18 @@ tests come with it; ours (`EchoBleedDetectorTests`): two silent envelopes →
    `TRANSCRIBE_ERR_OOM` (`Transcriber.Error.status(code, _)`) is halved and
    retried once; if a half fails again, or the status is anything else
    (`TRANSCRIBE_ERR_BACKEND` is not retryable), its span is marked
-   `[unreadable]` and the loop continues. Report progress as chunks done
-   over chunks total across tracks.
+   `[unreadable]` and the loop continues. A chunk with speech in it that
+   comes back with no words is retried once, trimmed and louder: Parakeet
+   returns nothing on quiet speech rather than something wrong, and a room
+   track's far side of the table or a far end with low gain is exactly
+   that. "Speech in it" is peak ≥ 0.010, RMS ≥ 0.0015, ≥ 0.5% of samples
+   above the activity threshold (8% of peak, clamped to 0.003…0.020) and
+   ≥ 0.2 s of them. The retry trims to the first and last active sample
+   with 0.25 s either side and scales so the peak is 0.45, gain clamped to
+   1…12. All of it is the shipping notetaker's dictation recovery on its
+   own runtime of the same model family; S2 confirms it on ours by feeding
+   a chunk at −30 dB. Report progress as chunks done over chunks total
+   across tracks.
 3. Echo: for a call, run `EchoBleedDetector` over the two RMS envelopes from
    step 2 and store the verdict in `echo`.
 4. `TranscriptMerge.paragraphs(tracks: [TrackWords], segments: [SpeakerSegment]?, dictations: [Span], gap: Duration) -> [Paragraph]`
@@ -1424,9 +1602,11 @@ as orange mark plus dot. `AppState.meeting` is set by the coordinator.
   tab's `system audio` row offers `test` and `system settings`.
 - `SecureInput.systemAudioSettingsURL` as in 7.7.
 - `MissingPermission` is not extended: there is nothing public to poll.
-- No new entitlement, so the release script's entitlement check (3.4) is
-  untouched. If a build ever fails it, something other than this feature
-  added an entitlement.
+- One new entitlement, and only for 8.6's DOM route:
+  `com.apple.security.automation.apple-events`, with
+  `NSAppleEventsUsageDescription` (section 11). The release script's
+  entitlement check (3.4) gains exactly that one; anything else it finds is
+  still a failure. Phase 1 ships without it.
 
 ### 7.13 Verification
 
@@ -1474,6 +1654,20 @@ On a real machine, each of these, with debug logs on and the log read afterwards
 - Quit the app mid-meeting: the meeting is saved with what was recorded and
   transcribed on relaunch. `kill -9` mid-meeting: the same.
 - Quit mid-transcription: relaunch resumes at the next chunk.
+- Join a call, say a sentence, wait for the prompt, then record: the sentence
+  is in the transcript, `preRollMs` is set, and word timestamps still line up
+  with the audio.
+- Decline instead: nothing is written, and the staged folder never appears.
+- Leave the prompt unanswered until the candidate lapses: same.
+- Import a 30-minute recording: a meeting appears, transcribes and publishes
+  like any other, and re-importing the same file makes a second meeting
+  rather than overwriting the first.
+- Add the MCP binary to a client with the setting off: it connects, lists its
+  tools, and every call says where the switch is. Turn it on: the same client
+  lists, searches and reads without restarting the app, and with the app
+  quit.
+- Point the meetings folder somewhere else: the binary follows the setting,
+  and a path argument aimed outside it is refused.
 - A Sparkle update becomes ready mid-meeting: the app does not relaunch until
   the meeting is done.
 - Rename to `#design/ops: Q3 · 🎉`: the folder name is legal, opens from the
@@ -1481,6 +1675,142 @@ On a real machine, each of these, with debug logs on and the log read afterwards
 - Delete a meeting: it is in the Trash. Delete all: the folder is empty.
 - `keep` set to its smallest option with more meetings than that: the oldest
   go to the Trash and the disk line drops.
+
+### 7.14 Importing a recording (D21)
+
+One file in, the same pipeline, a meeting out. Built early, because S2 and S3
+need an hour of real audio and this is how they get it without staging a
+meeting with three people in it.
+
+`MeetingImport.run(url:) async throws -> Meeting`:
+
+1. Read with `AVAudioFile`; if that refuses the container (a `.mp4`, a
+   `.mov`), fall back to `AVAssetReader` over the asset's first audio track.
+   No audio track at all throws `MeetingImport.Error.noAudio`.
+2. Convert to 16 kHz mono Float32 with `AVAudioConverter`, mixing every
+   channel down, in blocks, and write through the existing `TrackWriter` to
+   `room.caf` in a staged folder (7.9). Memory stays at one block; a
+   four-hour file is bounded by disk, and the same
+   `Fixed.meetingMinimumFreeBytes` check applies.
+3. Write `meeting.json` with `kind: room` (one track, so speakers come from
+   diarization and never from a channel split), `source: imported`,
+   `importedFrom` the basename only — never the path, which carries the
+   user's home directory and often a client's name — `started` from the
+   file's `creationDate` when it has one, else now, and
+   `transcription.state = pending`.
+4. Hand it to `MeetingTranscriber`, which runs unchanged from step 1, and to
+   `MeetingStore`.
+
+Entry points: `import…` in the Meetings tab, an `NSOpenPanel` filtered to
+`UTType.audio` and `UTType.movie`; and a drop on the tab's list. Several
+files selected at once import one at a time, since they share the one model.
+The title is the file's basename, renameable like any other. The row shows
+`imported` where a call shows its app.
+
+Two honest limits, both stated in the tab rather than discovered: the model
+is English, so another language returns confident nonsense; and an imported
+file has no mic/far-end split, so phase 1 labels everyone `Speaker 1` until
+phase 2's diarizer is installed, and `You` only from phase 3's voice print.
+
+Tests (`MeetingImportTests`): a short `.m4a` fixture, an `.mp4` with one
+audio track, a stereo file (both channels present in the mono output), a
+file with no audio track, and a name that needs sanitising (7.9).
+
+### 7.15 Querying meetings over MCP (D22)
+
+A meeting is worth more if the tools the user already works in can read it.
+The storage decision makes this cheap: a published meeting is a folder with
+`transcript.md` (YAML front matter plus text) and `meeting.json`, so a reader
+needs no database, no IPC and no running app.
+
+`typemeit-mcp`, a second `project.yml` target (`type: tool`, macOS), built
+into `Contents/MacOS/typemeit-mcp` of the same bundle, signed with the same
+identity, sharing `Meetings/Meeting.swift` and `MeetingFolder.swift` through
+a small source list rather than a copy:
+
+- **stdio, never a port.** JSON-RPC over stdin and stdout, launched by the
+  client. Nothing listens, so there is no auth to design, nothing another
+  local process can connect to, and nothing a web page can reach. It works
+  with the app closed, which is most of the time.
+- Methods: `initialize` (echo the client's protocol version; pin the exact
+  string against the current MCP spec when it is built, not from memory),
+  `tools/list`, `tools/call`, and the matching notifications. Roughly 200
+  lines of framing; no SDK dependency.
+- **Read-only, and it never writes anywhere.** No delete, no rename, no
+  re-transcribe. Writes would need the app running to keep the UI honest;
+  section 10 has them.
+- **Off unless the user turns it on.** The binary cannot be stopped from
+  being launched, so the switch lives in the binary: it reads
+  `UserDefaults(suiteName:)` for the bundle id of the `.app` it is inside
+  (derived from its own path, so the dev build reads
+  `it.typeme.typemeit.dev`), and with `meetingsMCP` false every tool returns
+  one error telling the user where the setting is. Default false.
+- **Scope.** Only `Settings.meetingsFolder ?? Store.directory/Meetings`, its
+  own published folders, and only `transcript.md`, `meeting.json` and the
+  folder names. It resolves every path and refuses anything that lands
+  outside, symlinks included. It never reads the audio, the history, the
+  dictation archive or the voice print.
+
+Tools:
+
+| Tool | Arguments | Returns |
+| --- | --- | --- |
+| `list_meetings` | `from`, `to` (dates), `app`, `kind`, `speaker`, `limit` (default 40) | One row per meeting from the front matter only: id, title, started, duration, kind, app, speakers, folder |
+| `get_meeting` | `id`, `part` (default 1) | `transcript.md`, whole when it fits `Fixed.meetingMCPBudgetBytes` (24 KB), else that part and a count of the rest |
+| `search_meetings` | `query`, `limit` (default 20) | Case- and diacritic-insensitive literal matches, each with the meeting, the speaker, the timestamp and the paragraph it sits in |
+| `meeting_stats` | `from`, `to` | Count, total duration, talk time by speaker |
+
+`list_meetings` reads front matter only, so a library of a few hundred
+meetings lists without touching the text; `search_meetings` reads the bodies
+and caches by modification date. No embeddings, no index: a client that can
+query five times and read the plausible answers does better with repeated
+literal search than with one vector guess, and this way there is no model, no
+key and no cost.
+
+**Transcript text is data, never instruction.** Every tool result says so on
+the way out, and a transcript is wrapped as quoted content rather than
+inlined bare. A meeting contains other people's speech, and the client
+holding these tools usually also holds a shell and an editor, so it is a
+better injection target than anything else this app produces. `get_meeting`
+and `search_meetings` carry a one-line reminder in the result itself, not
+only in the tool description, since the description is far away by the time
+the text arrives.
+
+**No keyword-extracted "decisions" or "action items".** A shipping notetaker
+writes those into every transcript's front matter from cue lists ("let's",
+"have to", "we decided") so rollup tools cover every meeting. Rejected here:
+conversation is full of "let's" and "have to" that commit nobody to
+anything, and once a guess sits in front matter a client reads it as a
+fact. The client holding `get_meeting` extracts decisions better than a cue
+list, and asks for exactly the window it wants with `list_meetings`.
+
+**Errors are content.** A missing folder, an unreadable file or a bad
+argument returns an error result; the process stays up. It never traps, and
+it never prints anything but JSON-RPC to stdout (diagnostics go to stderr).
+
+Setting up: the Meetings tab footer gains an `mcp` row with the toggle and a
+`copy command` button that puts
+`claude mcp add --scope user typemeit -- "<path to the binary>"` on the
+clipboard, using this build's own path, so the dev app copies its own. A
+second button, `copy for claude desktop`, copies the `mcpServers` entry for
+`~/Library/Application Support/Claude/claude_desktop_config.json`; we do not
+edit another app's config file ourselves in this plan (section 10). When the
+app is running translocated (its bundle path is under `AppTranslocation`,
+which Gatekeeper does to a quarantined app launched from where it was
+downloaded) both buttons are disabled and the row says to move the app to
+Applications first: the path they would copy is random and gone on the next
+launch. The
+help line says what it means — that the meetings become readable by whatever
+model that tool uses, which for most clients is not on this Mac. It is the
+one place this app sends meeting text off the machine, and it only does it
+because the user asked.
+
+Tests (`MCPTests`, pure over a fixture folder of three meetings): framing of
+a request and response pair; `list_meetings` filters by date, app and
+speaker; `get_meeting` budget split and reassembly; `search_meetings` finds a
+word across two meetings with the right speaker and timestamp; a path
+argument pointing outside the folder is refused; every tool with the setting
+off returns the same error.
 
 ## 8. Phase 2: the room, and speakers
 
@@ -1568,6 +1898,16 @@ On a real machine, each of these, with debug logs on and the log read afterwards
   word's speaker. Tests: a word between two segments, a word before the first
   segment, overlapping segments (the one whose centre is nearer wins).
 - `transcription.diarizer` records the pipeline name and version.
+- **The mic track stays `you` even when two people share it.** Two of us
+  round one laptop is an ordinary call, and the mic is then two voices under
+  one label. Accepted for now rather than solved: diarizing the mic track as
+  well costs a second run, and on a speakers call its bleed makes the result
+  worse than the label it would replace. Section 10 carries it. What must not
+  happen is the inverse — a stray far-end chunk (a notification chime during
+  an in-person meeting) routing a room down the call path and collapsing
+  everyone in it to `You`. The room is chosen by the user, never inferred
+  from the presence of far-end audio, so this is a property to keep, not a
+  fix to make.
 - The diarizer failing keeps the transcript with `Them` (or `Room`) and logs;
   it does not fail the meeting.
 - On `echo == .affected`, mic-side audio is never used for speaker
@@ -1588,6 +1928,16 @@ in phase 2.
   speakers, no merge into four; the transcript has the room's words.
 - Rename `Speaker 2` to `Ana`: the row, the expanded transcript and
   `transcript.md` all say Ana.
+- Three-person Meet with captions on: all three far-end speakers named, and
+  a two-minute sample checked by ear against the captions. Captions off,
+  indicator only: the same, or numbers where the margin was not met — never
+  a wrong name with no source recorded.
+- A huddle collapsed to the mini window: names still arrive, or the row says
+  the source it fell back to.
+- Two colleagues on one Meet tile from one room: one tile, two voices; both
+  stay numbers.
+- Turn off `Allow JavaScript from Apple Events` mid-meeting: the DOM route
+  stops, the meeting falls back to the tree, nothing fails.
 - Pull the diarizer archive mid-download: the row says so and offers retry;
   meetings still transcribe with `Them`.
 - Press the room shortcut while a call records: nothing changes. Join a
@@ -1595,7 +1945,100 @@ in phase 2.
 - Leave a room recording running in an empty room: it ends after ten
   minutes at the floor, with no pill, and is kept.
 
-## 9. Phase 3: names
+### 8.6 Names from the meeting (D23)
+
+Speakers are named by what the meeting itself shows the user — who is in it,
+who is talking, and in captions who said which words — never by recognising
+anyone's voice across meetings. The diarizer still finds *how many* people
+and *when* each spoke; the meeting supplies *who*. Everything here is per
+meeting and dies with it.
+
+**Sources, per target, in the order tried.** S4 decides which work; each
+failing drops to the next, and the last resort is numbers.
+
+| Source | Meet (Chrome, Safari) | Slack huddle | Gives | Costs |
+| --- | --- | --- | --- | --- |
+| Captions | yes | yes | name *and* the words | captions on, for this user only (S4 confirms nobody else is told) |
+| Speaking indicator | yes | yes | name and when | nothing new |
+| Roster | yes | yes | names only | nothing new |
+| Screen OCR (9.2) | roster only | roster only | names only | Screen Recording |
+
+**Two ways in.** Both read what is already on the user's screen; neither
+clicks, types or changes the page.
+
+- **The accessibility tree** of the web content — the route 9.2 already
+  describes, extended from the roster to the speaking indicator and the
+  caption region. No new permission. Works for Slack (Electron) and for
+  Chrome.
+- **The page's DOM, through Apple Events** — Meet only, and the real "DOM
+  analysis" route. Chrome and Safari both run JavaScript in a tab when asked
+  over Apple Events, *if* the user has turned on `Allow JavaScript from Apple
+  Events` (Chrome: View → Developer; Safari: Develop menu). `Roster.fromDOM`
+  finds the tab by URL host `meet.google.com` — never "the active tab" — and
+  injects one script that installs a `MutationObserver` over the participant
+  tiles, the speaking indicator and the caption region, buffering
+  `{name, event, text?, t: Date.now()}` in a page variable. A second call
+  every `Fixed.meetingDOMDrainSeconds` (2) drains the buffer. Page time
+  converts to host time through a wall-clock/host-clock pair taken at each
+  drain, so events keep their own timestamps rather than our polling
+  interval's. The script only reads. It anchors on roles, `aria-label`s and
+  data attributes, never on Meet's generated class names, and lives in one
+  file with the date it was observed working.
+
+  Costs, said plainly in the setting: a developer toggle in the browser, the
+  Automation prompt the first time (`NSAppleEventsUsageDescription`), and
+  one new entitlement, `com.apple.security.automation.apple-events`, which
+  the release script's entitlement check (3.4) has to be told about. That
+  is why it is its own toggle, off by default, and not part of the roster
+  setting.
+
+**What gets stored:** `names: { source, roster: [String], channel: String?,
+spans: [{ name, startMs, endMs }], captions: [{ name, startMs, text }]? }`
+in `meeting.json`, all in track time via `firstHostTime` (5.4). Captions are
+kept only until alignment has run, then dropped: they are Google's or
+Slack's transcript of the same words, and ours is the one we keep.
+
+**Alignment** (`SpeakerNaming.align`, pure — this is the part that turns
+names on a screen into names on paragraphs):
+
+1. Shift every UI span earlier by `Fixed.meetingUILagMs`, the delay between
+   a voice reaching the far-end track and the indicator lighting, measured
+   in S4. Until measured it is 0 and alignment still works, just less
+   sharply at turn boundaries.
+2. **With captions:** each far-end paragraph takes the name on the caption
+   lines that overlap it in time *and* share its words — token containment
+   of at least `Fixed.meetingCaptionMatch` (0.5), the same measure as the
+   echo work, because caption text and ours are two ASR outputs of one
+   audio. Diarization becomes the fallback for paragraphs no caption
+   matches, not the source of the names.
+3. **With speaking spans only:** build the overlap matrix, milliseconds of
+   each diarized speaker's segments against each name's spans. Assign
+   one-to-one, largest overlap first. A pair is accepted when the overlap is
+   at least `Fixed.meetingNameMinOverlapSeconds` (20) *and* at least
+   `Fixed.meetingNameMargin` (1.5) times that speaker's next-best name. Two
+   names that only ever overlap one speaker — two people in one meeting
+   room on one Meet tile — both stay unassigned rather than one winning by
+   noise.
+4. **Roster only:** names are offered in the rename field (8.4) as a pick
+   list; nothing is assigned, except the 1:1 case, where the one other name
+   is `Them`.
+5. The user's own name — the tile Meet marks as the user, else
+   `NSFullUserName()` — is removed before any of this: the mic track is
+   already **You**.
+6. Record `names.source` per speaker (`captions`, `speaking`, `roster`,
+   `user`), so the transcript can say how sure it is and a wrong name is
+   traceable to the rung that produced it.
+
+A rename by the user always wins and is never overwritten by a later
+re-run.
+
+Tests (`SpeakerNamingTests`): three diarized speakers against three names'
+spans with 400 ms lag; one speaker who never shows as speaking stays a
+number; two names on one speaker stay unassigned; captions override a
+diarizer that merged two people; the user's name is never assigned to the
+far end; a user rename survives re-alignment.
+
+## 9. Phase 3: You in a room
 
 ### 9.1 You, in a room
 
@@ -1624,9 +2067,11 @@ stored at `Store.directory/voiceprint.json`):
   label it `You (echo)`, log it, and leave the echo verdict to the detector.
 - Test the matcher with synthetic unit vectors.
 
-### 9.2 Names from the meeting window
+### 9.2 Reading the meeting window (the mechanics behind 8.6)
 
-Gated by `Settings.rosterEnabled` and by S4's result, per target:
+8.6 decides what the names mean; this is how the accessibility and screen
+routes read them. Gated by `Settings.rosterEnabled` and by S4's result, per
+target:
 
 - Accessibility route (no new permission; skipped when
   `Sandbox.readsOtherApps` is false): at record time and every
@@ -1635,7 +2080,9 @@ Gated by `Settings.rosterEnabled` and by S4's result, per target:
   (`NSRunningApplication` for the owner's bundle id, never the audio
   helper's pid), sets `AXManualAccessibility` (Electron) or
   `AXEnhancedUserInterface` (Chrome, then waits 3 s), walks the
-  `AXWebArea`s, collects the strings S4 identified as participant names, and
+  `AXWebArea`s, collects the strings S4 identified as participant names —
+  and, where S4 found them, the speaking indicator and the caption lines,
+  polled every `Fixed.meetingSpeakingPollMs` (250) while recording — and
   clears the attribute when the meeting ends. App-specific paths live in one
   table in `Roster.swift` with the app version they were observed on. The
   cost is the browser running in screen-reader mode for the meeting, which
@@ -1651,9 +2098,8 @@ Gated by `Settings.rosterEnabled` and by S4's result, per target:
 - Store `roster: { channel: String?, names: [String] }` in `meeting.json`.
   Title ladder: `#channel, Ana +2` (first names, alphabetical, at most two
   spelled out, the user's own name excluded when it matches
-  `NSFullUserName()`) → generated → app. Speaker labels stay numbers unless a
-  roster of exactly one other name exists on a call, in which case `Them`
-  takes that name.
+  `NSFullUserName()`) → generated → app. Speaker labels come from 8.6's
+  alignment.
 
 ### 9.3 Verification
 
@@ -1675,9 +2121,15 @@ Not in this plan, written down so they are not re-derived:
 - Echo removal. Voice-processing I/O would have to run on a separate
   engine, ducks every other app's output (the far end included, before or
   after the tap, unknown) and cannot be scoped away from a dictation taken
-  on the same node; text dedup deletes the user's own sentences in
+  on the same node. A shipping MIT notetaker settled the first half of that
+  unknown the expensive way: the unit takes the device in *both* directions,
+  and the user stops being able to hear the person they are talking to. Its
+  source carries the finding as a comment next to the call it does not make; text dedup deletes the user's own sentences in
   meeting-transcriber's measurements and ships off by default there. The
   detector in D14 is the whole answer until someone measures one of these.
+- Diarizing the mic track on a call, so two people at one laptop are two
+  speakers rather than one `You` (8.3). Gated on echo: worth it on
+  headphones, probably harmful on speakers.
 - Power assertions as a second detection channel; the calendar as an end
   signal.
 - Native apps' accessibility trees (Zoom, Teams).
@@ -1688,15 +2140,33 @@ Not in this plan, written down so they are not re-derived:
   built it lives under `Store.directory`, never in a published folder, behind
   a setting, and `deleteAllHistory()` deletes it (D18). CAM++ as a dedicated
   embedding model if the pipeline's embeddings prove weak.
+- One-click `connect` for MCP clients: merging our entry into Claude
+  Desktop's, Cursor's and Codex's own config files, with a backup when the
+  file is not valid JSON, and `claude mcp add` run for the user. Worth it once
+  the copy buttons show people use this; it means writing other apps' files.
+- A browser extension for Meet: the DOM without the developer toggle, at
+  the price of a second shipping surface and a store review.
+- Listen-only calls. A webinar or an all-hands joined muted may never open
+  the mic, so the candidate never forms. Output alone is a usable signal
+  only for a native conferencing app — Slack's own process, never a browser,
+  whose output is YouTube as often as Meet — and needs a longer sustain than
+  input so a notification sound does not count.
+- MCP writes — rename a speaker, retranscribe, delete. They need the app
+  running to keep the tab honest, so the binary would become a pump to a Unix
+  socket in `Store.directory` and fall back to read-only when the app is
+  closed (7.15). Still no port.
 - Streaming dictation.
-- A store build. Whether a process tap can be created inside the App
-  Sandbox is unverified; if it cannot, the store build hides meetings behind
+- A store build. It would also take the MCP binary with it: a sandboxed
+  helper reaches a user-chosen folder only through a bookmark the app holds,
+  which a separately launched process does not have. Whether a process tap
+  can be created inside the App Sandbox is unverified; if it cannot, the store build hides meetings behind
   `Sandbox.isActive` the way it hides insights.
 
 ## 11. Copy
 
 | Where | String |
 | --- | --- |
+| Info.plist `NSAppleEventsUsageDescription` | `type me it reads who is in a meet call from the page. it never changes the page.` |
 | Info.plist `NSAudioCaptureUsageDescription` | `type me it records the other side of a call when you ask it to record a meeting.` |
 | Info.plist folder keys (Documents, Desktop, Downloads, removable and network volumes) | `type me it keeps your meetings in the folder you chose.` |
 | Pill prompt | `record this meeting?` · `record` · cross help `Not now` |
@@ -1710,14 +2180,17 @@ Not in this plan, written down so they are not re-derived:
 | Menu | `Record This Meeting` · `Don't Ask for Slack Again` · `Record the Room` · `Recording this meeting · 12m` · `Stop Recording Meeting` · `Transcribing meeting · 40%` · `View Meetings…` |
 | Sidebar, page title | `meetings` |
 | Tab count | `counted(n, "meeting")` |
+| Tab buttons | `import…` (help `transcribe a recording`) |
 | Tab status | `recording · 12m` · `stop` · `transcribing · 40%` · `downloading the speaker model · 40%` |
-| Row line 2 | `45m · counted(n, "speaker") · slack` |
+| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` |
 | Row chips | `only your side` · `on speakers` · `transcription failed` · `retry` · `waiting for the speech model` · `download` · `add speakers` · `meetings folder unavailable` · `change` |
 | Row button help | `play` · `stop` · `copy the transcript` · `rename` · `show in finder` · `delete` |
 | Empty | `nothing yet` · `no matches` |
+| Import | `english only` · `no audio in that file` |
+| Footer row `mcp` | `let other tools read your meetings` · `copy command` · help `off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.` · error returned when off: `meetings mcp is off. turn it on in type me it settings.` |
 | Delete all | `Delete all N meetings?` (counted) · `Delete All` · `This cannot be undone.` |
 | Footer rows | `keep` (`the last 50 meetings` … `everything · never delete`) · `keep the audio` (`deleted along with the meeting`) · `meetings folder` (`show`, `change`) · `system audio` (`not tested` / `working` / `silent`, `test`, `quit and reopen after granting`, `the other people on a call are not told you are recording.`) · `meetings folder` subtitle `unavailable` / ` · icloud drive` · `meetings use 2.3 GB` |
-| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. nothing is recorded until you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
+| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the meeting` (help `reads who is in the meeting and who is talking from its window. nothing is sent anywhere.`) · `read the meet page` (help `needs "allow javascript from apple events" in your browser. only reads the page.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
 | Speakers | `You` · `Them` · `Room` · `Speaker 1` · `You (echo)` |
 | Default titles | app name · `web content` · `Room` · `meeting` |
 | About row | `speakers: pyannote community-1, wespeaker and vbx (but speech@fit), converted to core ml by fluid inference · cc-by-4.0`, the licence linked to creativecommons.org/licenses/by/4.0 |
@@ -1741,6 +2214,10 @@ file each under `TypeMeItTests/Meetings/`:
 | `ChunkStitchTests` | 7.10 |
 | `TranscriptMergeTests` | 7.10 and 8.3 |
 | `EchoBleedDetectorTests` | 7.10: silence, a delayed copy, independent noise |
+| `PreRollTests` | 7.7: a wrapped ring drains oldest-first; a short pre-roll; `discard` leaves nothing readable |
+| `MeetingImportTests` | 7.14 |
+| `MCPTests` | 7.15 |
+| `SpeakerNamingTests` | 8.6 |
 | `VoicePrintTests` | matcher threshold and margin on unit vectors |
 
 Assertions compare whole values or snapshot the whole rendered file; no
@@ -1784,6 +2261,29 @@ substring checks.
   aggregate: with it the device does not start until the tap delivers
   audio, so a room (no tap), a denied grant or a silent far end would hold
   the mic track back, breaking D13 and the clock in 5.4.
+- Meet's class names are generated and change with deploys. The DOM script
+  and the accessibility paths anchor on roles, `aria-label`s and data
+  attributes, carry the date they were last seen working, and fail to the
+  next source rather than to a wrong name.
+- `AXEnhancedUserInterface` on Chrome is screen-reader mode for the whole
+  browser, and some window managers misbehave while it is set. Set it at
+  record, clear it at the end, and never leave it set across a crash: launch
+  recovery clears it if `meeting.json` says it was set.
+- Zoom starts its own voice processing on the mic when a call begins. Open
+  that mic first and Zoom's processing can land on our capture too, which
+  is why another notetaker watches for Zoom *running*, not for it taking
+  the mic. Not a launch target; it is why "Zoom works for free" needs its
+  own run before anyone says so.
+- The pre-roll opens the microphone at `candidate`, so the menu-bar
+  indicator lights before the user has agreed to anything, and our own
+  process appears in the process list holding input. The watch already
+  excludes both bundle ids by prefix, so this cannot make the app its own
+  candidate — but that exclusion becomes load-bearing rather than tidy.
+- Audio device names are user-authored and routinely carry a real person's
+  name ("Michael's AirPods Pro"). Nothing persists one: not `meeting.json`,
+  not the transcript's front matter, not a log line. They may be shown live
+  (a picker, a warning that names the device it cannot hear) and nowhere
+  else. Today no field holds one; this is here so none is added.
 - Spotlight does not index `~/Library/Application Support`. The folder
   setting exists for that; a folder in `~/Documents` may be synced by iCloud.
 - FluidAudio's offline pipeline needs a different model set from the
@@ -1804,6 +2304,8 @@ lifted.
 | Repo | Licence | Take |
 | --- | --- | --- |
 | `pasrom/meeting-transcriber` | MIT, active (177 stars) | `EchoBleedDetector` (constants, `Result` and `analyse`, fed envelopes; 7.10), `SilentRecordingMonitor` (the 90 s both-channels rule), `SpeakerMatcher` (0.40 / 0.10 defaults), `DualSourceRecorder.resolveTapPIDs` (tap the whole app), `MicInputDetector` (the FaceTime and WebKit.GPU facts), `AppTapSession` (teardown order), `DiarizationProcess.mergeDualSourceSegments` (the merge, written here in Swift of our own) |
+| `r3dbars/transcripted` | MIT, active | The nearest neighbour: dictation *and* meetings, Parakeet (through FluidAudio's Core ML build, not transcribe.cpp), Markdown files, an MCP helper. Taken: the Bluetooth mic rule and its S1 test (7.5), the empty-chunk gain retry and its thresholds (7.10), App Nap during transcription, the decodable-tail check on transcode, the Zoom voice-processing trap, the translocation check and Claude Desktop entry (7.15). Declined, with reasons: keyword-cue decisions in front matter (7.15), a stored database of other people's voices (D18), capturing everything the Mac plays for the far end — they do it both ways, a whole-display ScreenCaptureKit filter and a global Core Audio tap that excludes only themselves. Either API can be scoped to one app; we scope the tap to the meeting app's processes (7.5), and prefer the tap to ScreenCaptureKit for the grant it needs — system audio only, not Screen Recording — and because it takes the process objects 7.2 already resolves |
+| `michaelwilhelmsen/humla` | MIT, active | `OfflineDiarizerConfig` starting values and the reasons for each (S3), `withSpeakers(exactly:)` against VBx's dominant-speaker under-count, and the voice-processing-I/O finding in section 10. Ships the same FluidAudio pipeline this plan picks, so its tuning is measured on our problem, not an adjacent one |
 | `insidegui/AudioCap` | BSD-2-Clause, last push 2025-08 | Tap and aggregate-device geometry, tap format read. Keep its copyright notice where code is lifted |
 | `FluidInference/FluidAudio` | Apache-2.0 (library); pyannote/WeSpeaker weights CC-BY-4.0 | A dependency, not lifted code. Attribute in the about row |
 | `brendanbank/atrium-pa-mac` | BSD-2-Clause | The 45 s / 2 min / 90 s starting values and the zero-buffer warning |

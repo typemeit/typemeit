@@ -399,7 +399,7 @@ struct MainSettingsTab: View {
                     }
                 }
                 SettingsGroup(title: "meetings") {
-                    SettingsRow(label: "record meetings", subtitle: "a call is detected when another app opens the microphone. nothing is recorded until you say record.") {
+                    SettingsRow(label: "record meetings", subtitle: "a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.") {
                         Picker("", selection: Binding(get: { settings.meetingAsk }, set: { settings.meetingAsk = $0 })) {
                             Text("ask").tag(true)
                             Text("never").tag(false)
