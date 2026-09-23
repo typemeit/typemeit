@@ -68,7 +68,6 @@ struct OnboardingView: View {
         .tint(DesignTokens.Colors.ink)
         .animation(.easeOut(duration: DesignTokens.Duration.n2), value: step)
         .onReceive(poll) { _ in refresh() }
-        .onAppear { if step == .model, modelStore.state == .missing { modelStore.download() } }
         .onChange(of: canContinue) { _, ok in if ok { advanceWhenSettled() } }
     }
 
@@ -85,7 +84,7 @@ struct OnboardingView: View {
 
     private var body_: String {
         switch step {
-        case .model: "hold the fn key, speak, let go. your words are transcribed on this mac by parakeet, about 700 mb downloaded once, tidied up by apple intelligence, and typed where your cursor is. nothing leaves your computer."
+        case .model: "hold the fn key, speak, let go. your words are transcribed on this mac by parakeet, tidied up by apple intelligence, and typed where your cursor is. nothing leaves your computer."
         case .microphone: "type me it needs the microphone."
         case .accessibility: "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
         case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
@@ -102,7 +101,7 @@ struct OnboardingView: View {
                 case .installed:
                     SettingsRow(label: "parakeet 0.6b", last: true) { Status("installed", done: true) }
                 case .downloading(let received, let total):
-                    SettingsRow(label: "parakeet 0.6b", subtitle: "\(bytes(received)) of \(bytes(total))") {
+                    SettingsRow(label: "parakeet 0.6b", subtitle: modelStore.reconnecting ? "reconnecting…" : "\(bytes(received)) of \(bytes(total))") {
                         Button("cancel") { modelStore.cancel() }.buttonStyle(InkButtonStyle())
                     }
                     InkProgress(value: Double(received) / Double(max(total, 1)))
@@ -114,7 +113,7 @@ struct OnboardingView: View {
                         Button("retry") { modelStore.download() }.buttonStyle(InkButtonStyle(primary: true))
                     }
                 case .missing:
-                    SettingsRow(label: "parakeet 0.6b", last: true) {
+                    SettingsRow(label: "parakeet 0.6b", subtitle: "\(bytes(ModelStore.expectedBytes)), downloaded once", last: true) {
                         Button("download") { modelStore.download() }.buttonStyle(InkButtonStyle(primary: true))
                     }
                 }
@@ -254,7 +253,6 @@ struct OnboardingView: View {
     private func advance() {
         if step == .tryIt { finished(); return }
         let next = Step(rawValue: step.rawValue + 1) ?? .tryIt
-        if next == .model, modelStore.state == .missing { modelStore.download() }
         if next == .tryIt { startRunning() }
         move(to: next)
     }
