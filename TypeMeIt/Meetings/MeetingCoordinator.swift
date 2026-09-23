@@ -191,7 +191,7 @@ final class MeetingCoordinator {
         } else {
             kind = .room
         }
-        guard let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID) else {
+        guard let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID, room: owner == nil) else {
             Log.meetings.error("No microphone to record the meeting with")
             abandonRecording()
             return

@@ -304,6 +304,24 @@ enum Fixed {
     static let meetingChunkOverlapSeconds = 2
     /// The seam is placed at the quietest point within this of the nominal cut.
     static let meetingChunkSearchSeconds = 5
+    /// A chunk with speech in it that comes back with no words is retried
+    /// once, trimmed and louder: Parakeet returns nothing on quiet speech.
+    /// Every value is r3dbars/transcripted's dictation recovery (MIT) on its
+    /// own runtime of the same model family (docs/meetings.md 7.10).
+    static let meetingQuietPeak: Float = 0.010
+    static let meetingQuietRMS: Float = 0.0015
+    /// A sample is active above this share of the chunk's peak, clamped.
+    static let meetingQuietActivityShare: Float = 0.08
+    static let meetingQuietActivityFloor: Float = 0.003
+    static let meetingQuietActivityCeiling: Float = 0.020
+    /// Speech is at least this share of samples active, and this much time of them.
+    static let meetingQuietActiveShare = 0.005
+    static let meetingQuietActiveSeconds = 0.2
+    /// The retry keeps this much either side of the first and last active sample.
+    static let meetingQuietPadSeconds = 0.25
+    /// And scales so the peak lands here, with the gain held to this range.
+    static let meetingQuietTargetPeak: Float = 0.45
+    static let meetingQuietGainRange: ClosedRange<Float> = 1...12
     /// Chosen, not measured: the pause between two thoughts. Raise if
     /// paragraphs fragment.
     static let meetingParagraphGapSeconds = 2

@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import IOKit.pwr_mgt
 
 /// One meeting being recorded: a `MeetingCapture` feeding one or two
 /// `TrackWriter`s, with the silence monitor, the gaps, the dictation spans
@@ -47,6 +48,14 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     private var bothSilentFrames = 0
     private var lastDiskCheck = ContinuousClock.now
     private var stopped = false
+    /// Held from the first callback to `stop` (docs/meetings.md 7.6): a room
+    /// recorded with nobody touching the Mac would otherwise idle to sleep
+    /// mid-sentence. Never the display variant, so the screen still dims
+    /// and locks; held by this process, so every exit path releases it.
+    private var sleepAssertion: IOPMAssertionID?
+    /// Keeps the drain queue and the tick at full speed against App Nap.
+    private var activity: NSObjectProtocol?
+    private static let sleepReason = "type me it is recording a meeting"
     private static let diskCheckInterval: Duration = .seconds(60)
 
     init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device) throws {
@@ -127,6 +136,13 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
 
     func capture(_ capture: MeetingCapture, mic: [Float], others: [Float]?) {
         lock.lock()
+        if sleepAssertion == nil, !stopped {
+            var id = IOPMAssertionID(0)
+            if IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), MeetingRecorder.sleepReason as CFString, &id) == kIOReturnSuccess {
+                sleepAssertion = id
+            }
+            activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "recording a meeting")
+        }
         let isPaused = paused
         let ws = writers
         lock.unlock()
@@ -205,6 +221,8 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             paused = false
         }
         let ws = writers
+        if let id = sleepAssertion { IOPMAssertionRelease(id); sleepAssertion = nil }
+        if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
         lock.unlock()
         cap?.stop()
         // Resampling can leave the tracks a frame or two apart; the longer

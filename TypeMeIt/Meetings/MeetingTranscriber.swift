@@ -33,6 +33,9 @@ enum MeetingTranscriber {
             return meeting
         }
         let began = ContinuousClock.now
+        // A menu-bar accessory doing minutes of background work is what App Nap naps.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "transcribing a meeting")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         meeting.transcription.state = .running
         meeting.transcription.error = nil
         await save(meeting)
@@ -55,8 +58,16 @@ enum MeetingTranscriber {
                 let file = try AVAudioFile(forReading: url)
                 for (index, range) in cuts.enumerated() where index >= already {
                     if Task.isCancelled { throw Failure.cancelled }
-                    let chunk = try read(file, range: range)
-                    let transcribed = try await transcribe(chunk, range: range)
+                    // A chunk that never leaves the floor is done without a
+                    // model call: a muted far end is otherwise decoded a chunk at a time.
+                    let peakFrames = envelopes.peaks[(range.lowerBound / peakEnvelopeMs)..<min(envelopes.peaks.count, (range.upperBound + peakEnvelopeMs - 1) / peakEnvelopeMs)]
+                    let transcribed: [Transcriber.Word]
+                    if (peakFrames.max() ?? 0) < Fixed.meetingSilenceFloor {
+                        transcribed = []
+                    } else {
+                        let chunk = try read(file, range: range)
+                        transcribed = try await transcribeRetryingQuiet(chunk, range: range)
+                    }
                     words.words = ChunkStitch.append(transcribed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
                     try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
@@ -187,6 +198,17 @@ enum MeetingTranscriber {
             Log.meetings.error("Chunk at \(range.lowerBound) ms failed: \(error.localizedDescription)")
             return [unreadableWord(range)]
         }
+    }
+
+    /// A chunk with speech that came back empty is tried once more,
+    /// trimmed to its speech and louder.
+    private static func transcribeRetryingQuiet(_ chunk: [Float], range: Range<Int>) async throws -> [Transcriber.Word] {
+        let words = try await transcribe(chunk, range: range)
+        guard words.isEmpty, QuietSpeech.hasSpeech(chunk), let boosted = QuietSpeech.boosted(chunk) else { return words }
+        let start = range.lowerBound + boosted.offsetFrames / Meeting.framesPerMs
+        let retried = try await transcribe(boosted.pcm, range: start..<(start + boosted.pcm.count / Meeting.framesPerMs))
+        DebugLog.write("Meeting chunk at \(range.lowerBound) ms was empty; the louder retry gave \(counted(retried.count, "word"))")
+        return retried
     }
 
     private static func run(_ pcm: [Float], offsetMs: Int) async throws -> [Transcriber.Word] {

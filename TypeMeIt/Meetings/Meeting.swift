@@ -37,9 +37,10 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var peak: Float?
     }
 
+    /// The kind of devices in use, never their names: a device name is
+    /// user-authored and routinely a person's ("Michael's AirPods Pro").
     struct Audio: Codable, Equatable, Sendable {
-        var inputDevice: String?
-        var outputDevice: String?
+        var inputTransport: String?
         var outputTransport: String?
         var outputDataSource: String?
     }

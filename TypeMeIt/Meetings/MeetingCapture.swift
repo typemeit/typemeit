@@ -23,12 +23,17 @@ protocol MeetingCaptureSink: AnyObject {
 /// aggregate geometry after insidegui/AudioCap (BSD-2-Clause, copyright
 /// Guilherme Rambo) and pasrom/meeting-transcriber `AppTapSession` (MIT).
 final class MeetingCapture: @unchecked Sendable {
+    /// A device's name is shown live and never persisted or logged.
     struct Device: Equatable, Sendable {
         let uid: String
         let name: String
+        let bluetooth: Bool
     }
 
-    let mic: Device
+    /// Pinned at the start; changes only once, to the built-in mic, after a
+    /// Bluetooth mic goes away.
+    private(set) var mic: Device
+    private var fellBackToBuiltIn = false
     private(set) var tapProcesses: [AudioObjectID]?
     weak var sink: MeetingCaptureSink?
 
@@ -100,7 +105,7 @@ final class MeetingCapture: @unchecked Sendable {
         lock.unlock()
         installListeners()
         startDrain()
-        DebugLog.write("Meeting capture: mic \(mic.name), \(tapProcesses.map { "tap on \($0.count) process objects" } ?? "no tap"), \(built.rate) Hz, mic buffers \(built.micBuffers), tap buffer \(built.tapBuffer.map(String.init) ?? "-")")
+        DebugLog.write("Meeting capture: mic \(mic.bluetooth ? "bluetooth" : "wired or built-in"), \(tapProcesses.map { "tap on \($0.count) process objects" } ?? "no tap"), \(built.rate) Hz, mic buffers \(built.micBuffers), tap buffer \(built.tapBuffer.map(String.init) ?? "-")")
     }
 
     deinit { stop() }
@@ -133,21 +138,41 @@ final class MeetingCapture: @unchecked Sendable {
 
     static func device(_ id: AudioDeviceID) -> Device? {
         guard let uid = string(id, kAudioDevicePropertyDeviceUID), let name = string(id, kAudioDevicePropertyDeviceNameCFString) else { return nil }
-        return Device(uid: uid, name: name)
+        let transport: UInt32 = property(id, kAudioDevicePropertyTransportType, 0) ?? 0
+        return Device(uid: uid, name: name, bluetooth: transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE)
     }
 
-    /// The microphone to record: the settings' choice when it is present,
-    /// else the default input device.
-    static func microphone(preferredUID: String?) -> Device? {
+    /// The built-in microphone, if the Mac has one.
+    static func builtInMicrophone() -> Device? {
+        var address = address(kAudioHardwarePropertyDevices)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return nil }
+        var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids) == noErr else { return nil }
+        return ids.first { id in
+            property(id, kAudioDevicePropertyTransportType, UInt32(0)) == kAudioDeviceTransportTypeBuiltIn
+                && inputStreams(of: id).contains { $0 > 0 }
+        }.flatMap(device)
+    }
+
+    /// The microphone to record, chosen once at the start and pinned
+    /// (docs/meetings.md 7.5): the settings' choice when it is present;
+    /// else the default input, except that a room never records a
+    /// Bluetooth mic the user did not pick, since opening it drops whatever
+    /// the headset is playing to call quality. A call keeps the headset: the
+    /// call app already holds it. Nothing here writes the Mac-wide default.
+    static func microphone(preferredUID: String?, room: Bool = false) -> Device? {
         if let preferredUID, let id = AudioCapture.deviceID(forUID: preferredUID), let device = device(id) { return device }
-        return defaultDevice(input: true).flatMap(device)
+        guard let fallback = defaultDevice(input: true).flatMap(device) else { return builtInMicrophone() }
+        if room, fallback.bluetooth, let builtIn = builtInMicrophone() { return builtIn }
+        return fallback
     }
 
-    /// What `meeting.json` records about the devices in use.
+    /// What `meeting.json` records about the devices in use: their kinds, never their names.
     static func audioDescription(mic: Device) -> Meeting.Audio {
-        var audio = Meeting.Audio(inputDevice: mic.name)
+        var audio = Meeting.Audio()
+        if let id = AudioCapture.deviceID(forUID: mic.uid), let transport: UInt32 = property(id, kAudioDevicePropertyTransportType, 0) { audio.inputTransport = fourCC(transport) }
         guard let output = defaultDevice(input: false) else { return audio }
-        audio.outputDevice = device(output)?.name
         if let transport: UInt32 = property(output, kAudioDevicePropertyTransportType, 0) { audio.outputTransport = fourCC(transport) }
         if let source: UInt32 = property(output, kAudioDevicePropertyDataSource, scope: kAudioObjectPropertyScopeOutput, 0) { audio.outputDataSource = fourCC(source) }
         return audio
@@ -419,6 +444,11 @@ final class MeetingCapture: @unchecked Sendable {
         lock.lock()
         let old = producer
         producer = nil
+        if mic.bluetooth, !fellBackToBuiltIn, AudioCapture.deviceID(forUID: mic.uid) == nil, let builtIn = MeetingCapture.builtInMicrophone() {
+            fellBackToBuiltIn = true
+            mic = builtIn
+            DebugLog.write("Meeting capture: the bluetooth mic went away; recording the built-in mic")
+        }
         lock.unlock()
         if let old { tearDown(old) }
         var built: Producer?

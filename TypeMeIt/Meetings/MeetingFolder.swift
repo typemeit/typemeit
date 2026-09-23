@@ -262,7 +262,13 @@ extension MeetingFolder {
                 try output.write(from: buffer)
             }
         }
+        // A header can claim the right length over a truncated tail, so the
+        // last second has to decode too.
         let written = try AVAudioFile(forReading: destination)
-        return abs(written.length - input.length) <= AVAudioFramePosition(frames)
+        guard abs(written.length - input.length) <= AVAudioFramePosition(frames) else { return false }
+        guard let tail = AVAudioPCMBuffer(pcmFormat: written.processingFormat, frameCapacity: frames) else { return false }
+        written.framePosition = max(0, written.length - AVAudioFramePosition(frames))
+        try written.read(into: tail, frameCount: frames)
+        return tail.frameLength > 0
     }
 }
