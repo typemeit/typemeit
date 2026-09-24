@@ -30,8 +30,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     struct Track: Codable, Equatable, Sendable {
         enum Role: String, Codable, Sendable { case mic, others, room }
         var role: Role
-        /// The file name inside the meeting folder: `.caf` while recording
-        /// and transcribing, `.m4a` once transcoded.
+        /// The file name inside the meeting folder: `mic.caf` (16-bit PCM)
+        /// while recording and transcribing, `mic.opus.caf` once
+        /// transcoded; meetings from before Opus keep `mic.m4a`.
         var file: String
         var frames: Int
         /// Stretches of zeros: a drop and rejoin, or a device rebuild.
@@ -171,8 +172,12 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         return peak < Fixed.meetingSilenceFloor
     }
 
-    /// The tracks that have a playable `.m4a`, in file order.
-    var audioFiles: [String] { tracks.map(\.file).filter { $0.hasSuffix(".m4a") } }
+    /// What a kept track is transcoded to, beside the raw `<role>.caf`.
+    static let keptAudioSuffix = ".opus.caf"
+
+    /// The kept, compressed tracks, in file order: Opus, or AAC from
+    /// meetings recorded before it.
+    var audioFiles: [String] { tracks.map(\.file).filter { $0.hasSuffix(Meeting.keptAudioSuffix) || $0.hasSuffix(".m4a") } }
 
     /// The transcript as plain text, one paragraph per speaker turn.
     var transcriptText: String {

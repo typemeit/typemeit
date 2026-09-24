@@ -150,7 +150,7 @@ final class Settings {
     /// Reads who is in a Slack huddle or a Meet call, and who is talking,
     /// from its window while it records (docs/meetings.md 8.6).
     var rosterEnabled: Bool { didSet { defaults.set(rosterEnabled, forKey: "rosterEnabled") } }
-    /// Keeps a meeting's tracks as `.m4a` beside its transcript.
+    /// Keeps a meeting's tracks, compressed, beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
     var meetingLimit: Int { didSet { defaults.set(meetingLimit, forKey: "meetingLimit") } }
@@ -351,9 +351,12 @@ enum Fixed {
     static let meetingFolderNameMax = 200
     /// Two raw tracks are 230 MB an hour.
     static let meetingMinimumFreeBytes: Int64 = 500 << 20
-    /// The dictation archive's 16 kbps is tuned for one close speaker; a
-    /// far-end mix gets twice that.
-    static let meetingAudioBitrate = 32_000
+    /// Opus at 16 kbps, which averages about 7 kbps on speech with pauses.
+    /// Measured 24 September 2026 on ten minutes of a call's far end: it
+    /// changed 1.7% of the transcript's words against the uncompressed
+    /// track, the same as AAC at 32 kbps (1.5%) at a quarter of the size;
+    /// AAC at 16 kbps changed 4.9%, Opus at 12 kbps 3.6%.
+    static let meetingAudioBitrate = 16_000
     /// Daemons that hold the mic for an app with no process of its own
     /// (docs/meetings.md 3.2: FaceTime's input belongs to avconferenced).
     static let meetingDaemonNames: [String: String] = [

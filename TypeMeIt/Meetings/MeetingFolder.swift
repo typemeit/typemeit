@@ -245,11 +245,10 @@ extension MeetingFolder {
         let input = try AVAudioFile(forReading: source)
         let format = input.processingFormat
         let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVFormatIDKey: kAudioFormatOpus,
             AVSampleRateKey: format.sampleRate,
             AVNumberOfChannelsKey: format.channelCount,
             AVEncoderBitRateKey: Fixed.meetingAudioBitrate,
-            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue,
         ]
         try? FileManager.default.removeItem(at: destination)
         let frames = AVAudioFrameCount(format.sampleRate)

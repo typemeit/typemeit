@@ -313,27 +313,27 @@ enum MeetingTranscriber {
 
     // MARK: After the words
 
-    /// Each `.caf` becomes an `.m4a`, deleted only once the copy reopens
-    /// with the right length. With the audio setting off the tracks are
-    /// deleted and no `.m4a` is written.
+    /// Each raw `<role>.caf` becomes `<role>.opus.caf`, and is deleted only
+    /// once the copy reopens with the right length. With the audio setting
+    /// off the tracks are deleted and nothing is written.
     private static func transcode(_ meeting: Meeting, in folder: URL) async -> Meeting {
         var meeting = meeting
         let keep = await MainActor.run { Settings.shared.meetingKeepAudio }
         for i in meeting.tracks.indices {
             let caf = folder.appendingPathComponent(meeting.tracks[i].file)
-            guard caf.pathExtension == "caf" else { continue }
+            guard meeting.tracks[i].file == "\(meeting.tracks[i].role.rawValue).caf" else { continue }
             if !keep {
                 try? FileManager.default.removeItem(at: caf)
                 continue
             }
-            let m4a = caf.deletingPathExtension().appendingPathExtension("m4a")
+            let kept = folder.appendingPathComponent(meeting.tracks[i].role.rawValue + Meeting.keptAudioSuffix)
             do {
-                guard try MeetingFolder.transcode(from: caf, to: m4a) else {
-                    Log.meetings.error("Transcoded \(m4a.lastPathComponent) came back short; keeping the CAF")
+                guard try MeetingFolder.transcode(from: caf, to: kept) else {
+                    Log.meetings.error("Transcoded \(kept.lastPathComponent) came back short; keeping the CAF")
                     continue
                 }
                 try FileManager.default.removeItem(at: caf)
-                meeting.tracks[i].file = m4a.lastPathComponent
+                meeting.tracks[i].file = kept.lastPathComponent
             } catch {
                 Log.meetings.error("Could not transcode \(caf.lastPathComponent): \(error.localizedDescription)")
             }

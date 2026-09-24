@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import TypeMeIt
@@ -103,5 +104,21 @@ struct MeetingFolderTests {
 
         let withDuration = MeetingFolder.name(started: Self.jan15Noon, zone: Self.utc, duration: .seconds(480), title: "Standup", existing: [])
         #expect(MeetingFolder.titlePart(of: withDuration) == "Standup")
+    }
+
+    @Test func keptAudioIsOpusOfTheSameLength() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let raw = dir.appendingPathComponent("mic.caf"), kept = dir.appendingPathComponent("mic" + Meeting.keptAudioSuffix)
+        let writer = try TrackWriter(url: raw)
+        let frames = 3 * Int(AudioCapture.targetFormat.sampleRate)
+        writer.append((0..<frames).map { Float(sin(Double($0) * 0.05)) * 0.3 })
+        _ = writer.finish()
+
+        #expect(try MeetingFolder.transcode(from: raw, to: kept))
+        let file = try AVAudioFile(forReading: kept)
+        #expect(file.fileFormat.streamDescription.pointee.mFormatID == kAudioFormatOpus)
+        #expect(file.length == AVAudioFramePosition(frames))
     }
 }
