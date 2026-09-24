@@ -319,7 +319,33 @@ final class InsightsTests: XCTestCase {
         ])
     }
 
-    func testTopAppsBreakTiesByNameAndCapAtEight() {
+    func testMeetingsCountAgainstTheirAppAndKeepTheStreak() {
+        var dictation = row(day(2026, 9, 1), "one two three")
+        dictation.appId = "com.tinyspeck.slackmacgap"
+        dictation.appName = "Slack"
+        let meetings = [
+            InsightMeeting(started: day(2026, 9, 2), appId: "com.tinyspeck.slackmacgap", appName: "Slack"),
+            InsightMeeting(started: day(2026, 9, 3), appId: "us.zoom.xos", appName: "zoom.us"),
+            InsightMeeting(started: day(2026, 9, 3), appId: nil, appName: nil),
+        ]
+        let stats = Insights.compute([dictation], meetings: meetings, now: day(2026, 9, 3), calendar: utc)
+
+        XCTAssertEqual(stats.topApps, [
+            AppUsage(name: "Slack", dictations: 1, words: 3, meetings: 1),
+            AppUsage(name: "zoom.us", dictations: 0, words: 0, meetings: 1),
+        ])
+        XCTAssertEqual(stats.totalApps, 2)
+        XCTAssertEqual(stats.totalWords, 3)
+        XCTAssertEqual(stats.totalDictations, 1)
+        XCTAssertEqual(stats.currentStreak, 3)
+        XCTAssertEqual(stats.activity, [
+            DayActivity(date: "2026-09-01", dictations: 1, words: 3),
+            DayActivity(date: "2026-09-02", dictations: 0, words: 0, meetings: 1),
+            DayActivity(date: "2026-09-03", dictations: 0, words: 0, meetings: 2),
+        ])
+    }
+
+    func testAppsBreakTiesByName() {
         let names = ["Zed", "Arc", "Mail", "Slack", "Notes", "Bear", "Craft", "Dia", "Orion", "Kitty"]
         var rows: [InsightRow] = []
         for name in names {
@@ -335,8 +361,7 @@ final class InsightsTests: XCTestCase {
 
         let stats = compute(rows, today: day(2026, 9, 3))
         XCTAssertEqual(stats.totalApps, 10)
-        XCTAssertEqual(stats.topApps.count, Insights.topApps)
-        XCTAssertEqual(stats.topApps.map(\.name), ["Orion", "Arc", "Bear", "Craft", "Dia", "Kitty", "Mail", "Notes"])
+        XCTAssertEqual(stats.topApps.map(\.name), ["Orion", "Arc", "Bear", "Craft", "Dia", "Kitty", "Mail", "Notes", "Slack", "Zed"])
         XCTAssertEqual(stats.topApps.first, AppUsage(name: "Orion", dictations: 2, words: 3))
     }
 

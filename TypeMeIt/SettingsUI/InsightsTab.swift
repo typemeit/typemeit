@@ -3,8 +3,8 @@ import SwiftUI
 struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var meetingStore = MeetingStore.shared
+    /// The where box's content at its own height, before the row sizes it.
     @State private var whereHeight: CGFloat = 0
-    @State private var appsHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
     /// The streak cell whose day is shown; a click on the box outside the
     /// cells lets it go.
@@ -16,6 +16,8 @@ struct InsightsTab: View {
                        postProcessRequested: $0.postProcessRequested, durationMs: $0.durationMs,
                        transcribeMs: $0.transcribeMs, postProcessMs: $0.postProcessMs,
                        dictionaryFixes: $0.dictionaryFixes, appId: $0.appId, appName: $0.appName, windowTitle: $0.windowTitle)
+        }, meetings: meetingStore.meetings.filter(\.isDone).map {
+            InsightMeeting(started: $0.started, appId: $0.app?.bundleId, appName: $0.app?.name)
         })
     }
 
@@ -39,17 +41,23 @@ struct InsightsTab: View {
                     statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                // Both boxes stand as tall as the taller one, so every app
-                // is a whole row with the same room above and below.
+                // The where box sets the row's height, rounded up to whole app
+                // rows, so the last app shown has the same room below it as
+                // the first has above; the rest of the apps scroll.
+                let rowBox = appsBoxHeight(covering: whereHeight)
                 HStack(alignment: .top, spacing: 12) {
-                    SettingsGroup(title: "where") { categories(s).frame(maxHeight: .infinity, alignment: .top) }
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: max(whereHeight, appsHeight))
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
-                    SettingsGroup(title: "apps · \(s.totalApps)") { topApps(s).frame(maxHeight: .infinity, alignment: .top) }
-                        .frame(width: 240)
-                        .frame(minHeight: max(whereHeight, appsHeight))
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { appsHeight = $0 }
+                    SettingsGroup(title: "where") {
+                        categories(s)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
+                            .frame(height: rowBox, alignment: .top)
+                    }
+                    .frame(maxWidth: .infinity)
+                    SettingsGroup(title: "apps · \(s.totalApps)") {
+                        ScrollView { topApps(s) }
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(height: rowBox)
+                    }
+                    .frame(width: 330)
                 }
                 SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
                     calendar(s)
@@ -250,26 +258,43 @@ struct InsightsTab: View {
         .padding(14)
     }
 
+    /// One app row, and the room above the first and below the last.
+    private static let appRowHeight: CGFloat = 26
+    private static let appsPadding: CGFloat = 8
+
+    /// The least height of whole app rows, with their padding, that is at
+    /// least `height`.
+    private func appsBoxHeight(covering height: CGFloat) -> CGFloat {
+        let rows = max(1, ((height - 2 * InsightsTab.appsPadding) / InsightsTab.appRowHeight).rounded(.up))
+        return 2 * InsightsTab.appsPadding + rows * InsightsTab.appRowHeight
+    }
+
     private func topApps(_ s: InsightsStats) -> some View {
         VStack(spacing: 0) {
-            if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).padding(.vertical, 8) }
+            if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).frame(height: InsightsTab.appRowHeight) }
             ForEach(s.topApps, id: \.name) { a in
-                HStack {
+                HStack(spacing: 10) {
                     Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
                     Spacer()
-                    Text(counted(a.words, "word")).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    Text(a.words > 0 ? counted(a.words, "word") : "").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    Text(a.meetings > 0 ? counted(a.meetings, "meeting") : "").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                        .frame(width: InsightsTab.meetingsColumnWidth, alignment: .trailing)
                 }
-                .padding(.vertical, 5)
+                .frame(height: InsightsTab.appRowHeight)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .padding(.horizontal, 14).padding(.vertical, InsightsTab.appsPadding)
     }
+
+    /// Fits `12 meetings` in the apps list.
+    private static let meetingsColumnWidth: CGFloat = 84
 
     private static let calendarWeeks = 16
 
     /// One cell a day for the last sixteen weeks, shaded by how many
-    /// dictations it saw. Clicking a cell puts its date and count where the
-    /// legend sits, so nothing moves.
+    /// dictations it saw; a day with only a meeting takes the lightest active
+    /// shade. Clicking a cell puts its date and counts where the legend sits,
+    /// so nothing moves.
     private func calendar(_ s: InsightsStats) -> some View {
         let byDate = Dictionary(uniqueKeysWithValues: s.activity.map { ($0.date, $0) })
         let cal = Calendar.current
@@ -286,8 +311,9 @@ struct InsightsTab: View {
                             let date = cal.date(byAdding: .day, value: w * 7 + d, to: start)!
                             let key = f.string(from: date)
                             let n = byDate[key]?.dictations ?? 0
+                            let met = (byDate[key]?.meetings ?? 0) > 0
                             Rectangle()
-                                .fill(DesignTokens.Colors.ink.opacity(n == 0 ? 0.08 : 0.3 + 0.7 * Double(n) / Double(maxCount)))
+                                .fill(DesignTokens.Colors.ink.opacity(n == 0 ? (met ? 0.3 : 0.08) : 0.3 + 0.7 * Double(n) / Double(maxCount)))
                                 .frame(width: 11, height: 11)
                                 .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: selectedDay == key ? 1 : 0))
                                 .onTapGesture { selectedDay = selectedDay == key ? nil : key }
@@ -312,13 +338,15 @@ struct InsightsTab: View {
         .onTapGesture { selectedDay = nil }
     }
 
-    /// `thu 12 sep · 14 dictations · 1,203 words`, or `thu 12 sep · nothing`.
+    /// `thu 12 sep · 14 dictations · 1,203 words · 2 meetings`, or `thu 12 sep · nothing`.
     static func dayCaption(_ key: String, _ day: DayActivity?) -> String {
         let iso = DateFormatter(); iso.dateFormat = "yyyy-MM-dd"
         let shown = DateFormatter(); shown.dateFormat = "EEE d MMM"
         let date = iso.date(from: key).map { shown.string(from: $0).lowercased() } ?? key
-        guard let day, day.dictations > 0 else { return "\(date) · nothing" }
-        let dictations = day.dictations == 1 ? "1 dictation" : "\(day.dictations.formatted()) dictations"
-        return "\(date) · \(dictations) · \(day.words.formatted()) words"
+        guard let day, day.dictations > 0 || day.meetings > 0 else { return "\(date) · nothing" }
+        var parts = [date]
+        if day.dictations > 0 { parts += [counted(day.dictations, "dictation"), counted(day.words, "word")] }
+        if day.meetings > 0 { parts.append(counted(day.meetings, "meeting")) }
+        return parts.joined(separator: " · ")
     }
 }
