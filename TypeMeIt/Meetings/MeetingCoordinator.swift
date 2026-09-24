@@ -330,6 +330,12 @@ final class MeetingCoordinator {
         meeting.firstHostTime = result.firstHostTime
         meeting.names = lastNames
         lastNames = nil
+        // A rejoin of a call recorded minutes ago joins that meeting when it
+        // reaches the queue, instead of standing as a second one.
+        if let earlier = MeetingMerge.previous(of: meeting, among: store.meetings, window: TimeInterval(Fixed.meetingRejoinMergeMinutes * 60)) {
+            meeting.continues = earlier.id
+            DebugLog.write("Meeting \(meeting.id) is a rejoin of \(earlier.id); joining them")
+        }
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
         enqueue(meeting)
@@ -523,9 +529,28 @@ final class MeetingCoordinator {
 
     private func pump() {
         guard transcribeTask == nil, !transcribeQueue.isEmpty else { return }
-        let meeting = transcribeQueue.removeFirst()
+        var meeting = transcribeQueue.removeFirst()
         queued = transcribeQueue.map(\.id)
         guard let folder = store.folder(for: meeting.id) else { pump(); return }
+        // The queue is serial, so the meeting a rejoin continues has
+        // finished its own pass by now.
+        if let id = meeting.continues {
+            if let earlier = store.meeting(id), let earlierFolder = store.folder(for: id), !liveIDs.contains(id) {
+                transcribing = Transcribing(id: id, fraction: 0)
+                transcribeTask = Task.detached { [meeting, folder] in
+                    let joined = await MeetingCoordinator.join(earlier, in: earlierFolder, meeting, in: folder)
+                    var alone = meeting
+                    alone.continues = nil
+                    let result = await MeetingTranscriber.run(joined ?? alone, folder: joined == nil ? folder : earlierFolder) { fraction in
+                        Task { @MainActor in MeetingCoordinator.shared.transcribing?.fraction = fraction }
+                    }
+                    await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
+                }
+                return
+            }
+            meeting.continues = nil
+            store.save(meeting)
+        }
         transcribing = Transcribing(id: meeting.id, fraction: 0)
         transcribeTask = Task.detached { [meeting, folder] in
             let result = await MeetingTranscriber.run(meeting, folder: folder) { fraction in
@@ -535,6 +560,32 @@ final class MeetingCoordinator {
             }
             await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
         }
+    }
+
+    /// Joins `later` onto `earlier` on disk and in the store, and deletes
+    /// `later`. Nil, with `later` left to stand alone, if the audio could
+    /// not be joined.
+    nonisolated private static func join(_ earlier: Meeting, in earlierFolder: URL, _ later: Meeting, in laterFolder: URL) async -> Meeting? {
+        let gap = MeetingMerge.gapMs(earlier, later)
+        var joined = MeetingMerge.joined(earlier, later, gapMs: gap)
+        do {
+            let written = try MeetingMerge.joinAudio(earlier, in: earlierFolder, later, in: laterFolder, gapMs: gap)
+            for i in joined.tracks.indices {
+                if let w = written[joined.tracks[i].role] { joined.tracks[i].frames = w.frames; joined.tracks[i].peak = w.peak }
+            }
+            joined.durationMs = (joined.tracks.map(\.frames).max() ?? 0) / Meeting.framesPerMs
+        } catch {
+            Log.meetings.error("Could not join the rejoined call: \(error.localizedDescription)")
+            DebugLog.write("Meeting join failed, keeping it separate: \(error.localizedDescription)")
+            return nil
+        }
+        await MainActor.run {
+            MeetingStore.shared.save(joined)
+            MeetingStore.shared.drop(later.id)
+            try? FileManager.default.removeItem(at: laterFolder)
+        }
+        DebugLog.write("Meeting joined: \(later.id) onto \(earlier.id) after \(gap) ms, now \(joined.durationMs) ms")
+        return joined
     }
 
     private func transcribed(_ meeting: Meeting) {

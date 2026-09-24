@@ -29,6 +29,10 @@ struct MeetingNames: Codable, Equatable, Sendable {
     var channel: String?
     var spans: [Span]
     var captions: [Caption]?
+    /// Which call this was, when the window said: the Meet code
+    /// (`abc-defg-hij`) or the huddle's channel. The key a rejoin is
+    /// matched on (`MeetingMerge`).
+    var call: String? = nil
 }
 
 extension MeetingNames {

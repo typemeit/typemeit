@@ -280,6 +280,9 @@ enum Fixed {
     static let meetingResumeSeconds = 30
     /// atrium, applied to recorded audio: a shorter call is not kept.
     static let meetingMinimumSeconds = 90
+    /// A call recorded again within this long of its last recording ending
+    /// joins that meeting instead of starting a new one.
+    static let meetingRejoinMergeMinutes = 15
     /// An app that never releases the mic.
     static let meetingSessionCapSeconds = 4 * 60 * 60
     /// meeting-transcriber `SilentRecordingMonitor`: every track at the floor

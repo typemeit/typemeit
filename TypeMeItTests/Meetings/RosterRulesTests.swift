@@ -80,4 +80,11 @@ struct RosterRulesTests {
         #expect(RosterRules.Meet.isName("Ana Lopez"))
         #expect(!RosterRules.Meet.isName("one two three four five six"))
     }
+
+    @Test func theMeetCodeComesFromTheAddressPath() {
+        #expect(RosterRules.Meet.code(inPath: "/abc-defg-hij") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(inPath: "/abc-defg-hij/extra") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(inPath: "/landing") == nil)
+        #expect(RosterRules.Meet.code(inPath: "/") == nil)
+    }
 }

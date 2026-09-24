@@ -117,6 +117,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// A few sentences from the on-device model, for the meeting's page.
     /// Not rendered into `transcript.md` and never returned by the MCP.
     var summary: String? = nil
+    /// The meeting this recording is a rejoin of: it is joined onto that
+    /// one before transcription and then deleted (`MeetingMerge`).
+    var continues: UUID? = nil
     /// Nil for a meeting this app recorded.
     var source: Source? = nil
     /// The imported file's basename only, never its path (docs/meetings.md 7.14).

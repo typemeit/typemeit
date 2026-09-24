@@ -74,9 +74,10 @@ final class Roster: @unchecked Sendable {
 
     private func poll() {
         guard let ms = now() else { return }
-        let nodes = Roster.meetingNodes(pid: pid, target: target)
+        let (nodes, code) = Roster.meetingNodes(pid: pid, target: target)
         guard !nodes.isEmpty else { return }
-        let reading = RosterRules.read(nodes, target: target)
+        var reading = RosterRules.read(nodes, target: target)
+        reading.call = code ?? reading.channel
         lock.lock()
         accumulator.add(reading, atMs: ms)
         lastMs = ms
@@ -102,20 +103,24 @@ final class Roster: @unchecked Sendable {
     /// The meeting's part of the app: for Meet, the web area of the tab on
     /// meet.google.com; for Slack, every window, since a huddle can sit in
     /// the main window as well as its own, walked no deeper than its tiles.
-    static func meetingNodes(pid: pid_t, target: Target) -> [AXNode] {
+    /// Also the Meet code from the tab's address, for Meet.
+    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], meetCode: String?) {
         let app = AXUIElementCreateApplication(pid)
         var nodes: [AXNode] = []
+        var code: String?
         for window in children(app, kAXWindowsAttribute) {
             switch target {
             case .slackHuddle:
                 walk(window, depth: 0, maxDepth: slackDepthLimit, into: &nodes)
             case .meet:
-                for area in webAreas(under: window) where url(of: area)?.host == "meet.google.com" {
+                for area in webAreas(under: window) {
+                    guard let address = url(of: area), address.host == "meet.google.com" else { continue }
+                    code = code ?? RosterRules.Meet.code(inPath: address.path)
                     walk(area, depth: 0, maxDepth: depthLimit, into: &nodes)
                 }
             }
         }
-        return nodes
+        return (nodes, code)
     }
 
     private static let nodeLimit = 20_000

@@ -7,6 +7,8 @@ struct RosterReading: Equatable, Sendable {
     var speaking: Set<String> = []
     var captions: [Caption] = []
     var channel: String?
+    /// The Meet code or the huddle's channel.
+    var call: String?
 
     struct Caption: Equatable, Sendable {
         let name: String
@@ -19,6 +21,7 @@ struct RosterReading: Equatable, Sendable {
 struct RosterAccumulator: Equatable {
     private(set) var roster: [String] = []
     private(set) var channel: String?
+    private(set) var call: String?
     private(set) var spans: [MeetingNames.Span] = []
     private(set) var captions: [MeetingNames.Caption] = []
     /// Names shown speaking at the last reading, with when that began.
@@ -33,6 +36,7 @@ struct RosterAccumulator: Equatable {
     mutating func add(_ reading: RosterReading, atMs ms: Int) {
         for name in reading.roster where !roster.contains(name) { roster.append(name) }
         if let c = reading.channel { channel = c }
+        if let c = reading.call { call = c }
 
         for name in reading.speaking where open[name] == nil { open[name] = ms }
         for (name, start) in open where !reading.speaking.contains(name) {
@@ -73,6 +77,6 @@ struct RosterAccumulator: Equatable {
         else if !spans.isEmpty { source = .speaking }
         else if !roster.isEmpty { source = .roster }
         else { return nil }
-        return MeetingNames(source: source, roster: roster, channel: channel, spans: spans, captions: captions.isEmpty ? nil : captions)
+        return MeetingNames(source: source, roster: roster, channel: channel, spans: spans, captions: captions.isEmpty ? nil : captions, call: call)
     }
 }

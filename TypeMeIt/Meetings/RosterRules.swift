@@ -75,6 +75,14 @@ enum RosterRules {
         /// something else Meet declined to translate.
         static let nameMaxWords = 5
 
+        /// The meeting code from a Meet address's path, `/abc-defg-hij`.
+        static func code(inPath path: String) -> String? {
+            guard let first = path.split(separator: "/").first else { return nil }
+            let parts = first.split(separator: "-").map(\.count)
+            guard parts == [3, 4, 3], first.allSatisfy({ $0.isLowercase || $0 == "-" }) else { return nil }
+            return String(first)
+        }
+
         /// Meet's own meeting code (`abc-defg-hij`) is `notranslate` too.
         static func isName(_ text: String) -> Bool {
             let words = text.split(separator: " ")
