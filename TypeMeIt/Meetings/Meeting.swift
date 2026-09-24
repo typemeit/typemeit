@@ -114,6 +114,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// What the meeting itself showed about who is who (docs/meetings.md
     /// 8.6). Nil until phase 2's naming runs.
     var names: MeetingNames? = nil
+    /// A few sentences from the on-device model, for the meeting's page.
+    /// Not rendered into `transcript.md` and never returned by the MCP.
+    var summary: String? = nil
     /// Nil for a meeting this app recorded.
     var source: Source? = nil
     /// The imported file's basename only, never its path (docs/meetings.md 7.14).

@@ -493,6 +493,7 @@ final class MeetingCoordinator {
         meeting.transcription.error = nil
         meeting.transcription.done = [:]
         meeting.paragraphs = []
+        meeting.summary = nil
         // A generated title is generated again from the new words; a typed one stays.
         if meeting.titleSource == .generated {
             meeting.title = meeting.app?.name ?? "Room"
@@ -500,6 +501,24 @@ final class MeetingCoordinator {
         }
         store.save(meeting)
         enqueue(meeting)
+    }
+
+    /// Meetings whose summary is being written, for the page's placeholder.
+    private(set) var summarising: Set<UUID> = []
+
+    /// Writes the summary of a transcribed meeting that has none: one from
+    /// before summaries, or one the model declined last time.
+    func summarise(_ id: UUID) {
+        guard let meeting = store.meeting(id), meeting.isDone, meeting.summary == nil, !meeting.paragraphs.isEmpty,
+              !summarising.contains(id), !liveIDs.contains(id), transcribing?.id != id else { return }
+        summarising.insert(id)
+        Task {
+            let summary = await MeetingSummary.summarise(meeting)
+            summarising.remove(id)
+            guard let summary, var latest = store.meeting(id), latest.summary == nil else { return }
+            latest.summary = summary
+            store.save(latest)
+        }
     }
 
     private func pump() {

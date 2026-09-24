@@ -16,6 +16,7 @@ import Foundation
 ///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 ///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
+///     -summarise <meeting id>...            write each meeting's summary to the log, without saving it
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -41,6 +42,18 @@ enum MeetingProbes {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
                 MeetingCoordinator.shared.transcribeAgain(id)
+            }
+        }
+        if let i = args.firstIndex(of: "-summarise") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                for id in ids {
+                    guard let meeting = MeetingStore.shared.meeting(id) else { continue }
+                    let started = ContinuousClock.now
+                    let summary = await MeetingSummary.summarise(meeting)
+                    DebugLog.write("Meeting probe summary \(meeting.title) (\(MeetingSummary.parts(of: meeting, maxWords: Fixed.meetingSummaryChunkWords).count) parts, \(ContinuousClock.now - started)): \(summary ?? "none")")
+                }
             }
         }
         if let path = value(after: "-importFile") {

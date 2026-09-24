@@ -130,6 +130,7 @@ enum MeetingTranscriber {
                 meeting.title = title
                 meeting.titleSource = .generated
             }
+            if !meeting.paragraphs.isEmpty { meeting.summary = await MeetingSummary.summarise(meeting) }
             meeting = await transcode(meeting, in: folder)
             // Done last: the store publishes any done meeting it sees, and the
             // folder must not move while the transcode is still writing into it.

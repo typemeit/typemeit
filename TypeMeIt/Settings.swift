@@ -303,6 +303,9 @@ enum Fixed {
     /// Measured on an 11-minute call: the first 700 words titled it
     /// "Weekly Update Meeting", seven runs titled it after its lesson.
     static let meetingTitleSamples = 7
+    /// A summary part: about 2,000 tokens of transcript, leaving the rest of
+    /// the 4,096-token window for the instructions and the answer.
+    static let meetingSummaryChunkWords = 1500
     /// Longer than a prompt is ever left unanswered; 15.4 MB for a call (D20).
     static let meetingPreRollSeconds = 120
     /// The process-list listener fires several times per launch.

@@ -141,6 +141,7 @@ struct MeetingsTab: View {
                     telemetry(m)
                 }
                 chips(m)
+                summary(m)
             }
             .padding(.horizontal, 20).padding(.bottom, 14)
             if let urls = audioURLs(m) {
@@ -154,6 +155,18 @@ struct MeetingsTab: View {
         }
         // Playback belongs to the page: leaving it, or the tab, stops it.
         .onDisappear { if player.playing == m.id { player.stop() } }
+        .onAppear { coordinator.summarise(m.id) }
+    }
+
+    @ViewBuilder
+    private func summary(_ m: Meeting) -> some View {
+        if let text = m.summary {
+            Text(text).font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
+                .frame(maxWidth: 640, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled).padding(.top, 4)
+        } else if coordinator.summarising.contains(m.id) {
+            Text("summarising…").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink3).padding(.top, 4)
+        }
     }
 
     /// The meeting's tracks, when its audio was kept.
