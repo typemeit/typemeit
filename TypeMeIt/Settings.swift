@@ -147,9 +147,6 @@ final class Settings {
     /// Lets the bundled `typemeit-mcp` answer: other tools can list, search
     /// and read published meetings (D22). The binary reads this key itself.
     var meetingsMCP: Bool { didSet { defaults.set(meetingsMCP, forKey: "meetingsMCP") } }
-    /// Reads who is in a Slack huddle or a Meet call, and who is talking,
-    /// from its window while it records (docs/meetings.md 8.6).
-    var rosterEnabled: Bool { didSet { defaults.set(rosterEnabled, forKey: "rosterEnabled") } }
     /// Keeps a meeting's tracks, compressed, beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -203,7 +200,6 @@ final class Settings {
         meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
-        rosterEnabled = bool("rosterEnabled", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }

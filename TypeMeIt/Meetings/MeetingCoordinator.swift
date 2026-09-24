@@ -252,7 +252,9 @@ final class MeetingCoordinator {
             recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
             recorder.onFailed = { [weak self] _ in Task { @MainActor in self?.send(.stop) } }
             self.recorder = recorder
-            if let owner, settings.rosterEnabled, Sandbox.readsOtherApps {
+            // Names come from the call's own window whenever a build can read
+            // other apps; a sandboxed one cannot (docs/meetings.md 8.6).
+            if let owner, Sandbox.readsOtherApps {
                 // Meeting time from the recording's own clock, so names line up with words.
                 roster = Roster(owner: owner) { [weak recorder] in
                     guard let first = recorder?.firstHostTime, first > 0 else { return nil }

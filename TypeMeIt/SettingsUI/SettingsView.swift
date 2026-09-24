@@ -426,11 +426,6 @@ struct MainSettingsTab: View {
                             .frame(maxWidth: 360, alignment: .trailing)
                         }
                     }
-                    if Sandbox.readsOtherApps {
-                        SettingsRow(label: "names from the meeting", subtitle: "reads who is in the meeting and who is talking from its window. nothing is sent anywhere.") {
-                            Toggle("", isOn: $settings.rosterEnabled).toggleStyle(.switch).labelsHidden()
-                        }
-                    }
                     SettingsRow(label: "record the room", last: true) {
                         ShortcutRecorder(combo: $settings.recordRoomShortcut)
                     }
