@@ -154,8 +154,6 @@ final class Settings {
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
     var meetingLimit: Int { didSet { defaults.set(meetingLimit, forKey: "meetingLimit") } }
-    /// Where transcribed meetings are published. Nil is `Store.directory/Meetings`.
-    var meetingsFolder: URL? { didSet { defaults.set(meetingsFolder?.path, forKey: "meetingsFolder") } }
     /// Starts and stops a room recording. Nil means no shortcut.
     var recordRoomShortcut: KeyCombo? {
         didSet { defaults.set(recordRoomShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "recordRoomShortcut") }
@@ -208,7 +206,6 @@ final class Settings {
         rosterEnabled = bool("rosterEnabled", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
-        meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
         recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         debugLogs = bool("debugLogs", false)
         DebugLog.enabled = debugLogs

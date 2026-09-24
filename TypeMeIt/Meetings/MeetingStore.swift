@@ -22,7 +22,7 @@ final class MeetingStore {
     @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
     @ObservationIgnored private var watchedPath: String?
 
-    var publishedRoot: URL { Settings.shared.meetingsFolder ?? MeetingFolder.defaultPublishedRoot }
+    var publishedRoot: URL { MeetingFolder.defaultPublishedRoot }
 
     private init() {
         reload()
@@ -34,11 +34,11 @@ final class MeetingStore {
 
     // MARK: Reading
 
-    /// Re-reads both roots. Called at launch, when the published folder
-    /// changes on disk, and when the setting moves it.
+    /// Re-reads both roots. Called at launch and when the published folder
+    /// changes on disk.
     func reload() {
         let root = publishedRoot
-        folderAvailable = FileManager.default.fileExists(atPath: root.path) || (MeetingFolder.parentResolves(root) && Settings.shared.meetingsFolder == nil)
+        folderAvailable = FileManager.default.fileExists(atPath: root.path) || MeetingFolder.parentResolves(root)
         var found: [(URL, Meeting)] = MeetingFolder.meetings(under: MeetingFolder.stagingRoot)
         if folderAvailable { found += MeetingFolder.meetings(under: root) }
         var byId: [UUID: (URL, Meeting)] = [:]

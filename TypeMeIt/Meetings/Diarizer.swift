@@ -65,19 +65,20 @@ actor Diarizer {
     }
 
     /// S3's comparison: the same file through each named configuration,
-    /// on the loaded models. Speaker id to talk time in ms, per configuration.
-    func compare(url: URL, configurations: [(String, OfflineDiarizerConfig)]) async throws -> [(String, [String: Int], Duration)] {
+    /// on the loaded models, with each run's segments and speaker embeddings.
+    func compare(url: URL, configurations: [(String, OfflineDiarizerConfig)]) async throws -> [(name: String, segments: [SpeakerSegment], embeddings: [String: [Float]], took: Duration)] {
         let loaded = try await ensureLoaded()
-        var out: [(String, [String: Int], Duration)] = []
+        var out: [(name: String, segments: [SpeakerSegment], embeddings: [String: [Float]], took: Duration)] = []
         for (name, config) in configurations {
             let manager = OfflineDiarizerManager(config: config)
             manager.initialize(models: loaded.models)
             let boxed = Loaded(manager: manager, models: loaded.models)
             let started = ContinuousClock.now
             let result = try await Task.detached { try await boxed.manager.process(url) }.value
-            var talk: [String: Int] = [:]
-            for s in result.segments { talk[s.speakerId, default: 0] += Int((s.endTimeSeconds - s.startTimeSeconds) * 1000) }
-            out.append((name, talk, ContinuousClock.now - started))
+            let segments = result.segments.map {
+                SpeakerSegment(speaker: $0.speakerId, startMs: Int($0.startTimeSeconds * 1000), endMs: Int($0.endTimeSeconds * 1000))
+            }
+            out.append((name, segments, result.speakerDatabase ?? [:], ContinuousClock.now - started))
         }
         return out
     }

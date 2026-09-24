@@ -127,6 +127,8 @@ struct MeetingsTab: View {
                 }
                 .buttonStyle(QuietButtonStyle())
                 .keyboardShortcut(.cancelAction)
+                // The chevron lines up with the title; the hover wash reaches past it.
+                .padding(.leading, -7)
                 Spacer()
                 actions(m, play: false)
             }
@@ -150,6 +152,8 @@ struct MeetingsTab: View {
                     .padding(.horizontal, 20).padding(.vertical, 16)
             }
         }
+        // Playback belongs to the page: leaving it, or the tab, stops it.
+        .onDisappear { if player.playing == m.id { player.stop() } }
     }
 
     /// The meeting's tracks, when its audio was kept.
@@ -167,6 +171,7 @@ struct MeetingsTab: View {
             iconButton(running ? "akar-pause" : "akar-play", running ? "pause" : "play") {
                 if running { player.pause() } else { player.play(id: m.id, urls: urls) }
             }
+            .padding(.leading, -5)
             TimelineView(.periodic(from: .now, by: 0.25)) { _ in
                 let at = loaded ? player.currentTime : 0
                 HStack(spacing: 10) {
@@ -342,13 +347,12 @@ struct MeetingsTab: View {
         let waitingForModel = m.transcription.state == .pending && !ModelStore.isInstalled
         let folderMissing = !m.published && m.isDone && !store.folderAvailable
         let canAddSpeakers = m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
-        if m.onlyYourSide || m.echo == .affected || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers {
+        if m.onlyYourSide || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers {
             HStack(spacing: 6) {
                 if canAddSpeakers {
                     Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle())
                 }
                 if m.onlyYourSide { chip("only your side") }
-                if m.echo == .affected { chip("on speakers") }
                 if m.transcription.state == .failed {
                     chip("transcription failed")
                     Button("retry") { coordinator.retry(m.id) }.buttonStyle(InkButtonStyle())
@@ -357,10 +361,7 @@ struct MeetingsTab: View {
                     chip("waiting for the speech model")
                     Button("download") { ModelStore.shared.download() }.buttonStyle(InkButtonStyle())
                 }
-                if folderMissing {
-                    chip("meetings folder unavailable")
-                    Button("change") { chooseFolder() }.buttonStyle(InkButtonStyle())
-                }
+                if folderMissing { chip("meetings folder unavailable") }
             }
         }
     }
@@ -443,7 +444,7 @@ struct MeetingsTab: View {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var path = root.path
         if path.hasPrefix(home) { path = "~" + path.dropFirst(home.count) }
-        return MeetingFolder.isInICloudDrive(root) ? path + " · icloud drive" : path
+        return path
     }
 
     private var systemAudioStatus: String {
@@ -467,14 +468,10 @@ struct MeetingsTab: View {
                 Toggle("", isOn: $settings.meetingKeepAudio).toggleStyle(.switch).labelsHidden()
             }
             SettingsRow(label: "meetings folder", subtitleView: AnyView(Text(folderSubtitle))) {
-                HStack(spacing: 8) {
-                    Button("show") { NSWorkspace.shared.activateFileViewerSelecting([store.publishedRoot]) }.buttonStyle(InkButtonStyle())
-                        .disabled(!store.folderAvailable)
-                    Button("change") { chooseFolder() }.buttonStyle(InkButtonStyle())
-                }
+                Button("open") { NSWorkspace.shared.open(store.publishedRoot) }.buttonStyle(InkButtonStyle())
+                    .disabled(!store.folderAvailable)
             }
-            SettingsRow(label: "mcp", subtitle: "off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.",
-                        subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "let other tools read your meetings"))) {
+            SettingsRow(label: "mcp", subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "lets assistants, including cloud ones, read your meetings"))) {
                 HStack(spacing: 8) {
                     Button("copy command") { Output.copyToClipboard("claude mcp add --scope user typemeit -- \"\(MeetingsTab.mcpBinary.path)\"") }
                         .buttonStyle(InkButtonStyle())
@@ -508,7 +505,7 @@ struct MeetingsTab: View {
     @ViewBuilder private var systemAudioLines: some View {
         VStack(alignment: .leading, spacing: 2) {
             if coordinator.systemAudioTest == .silent { Text("quit and reopen after granting") }
-            Text("the other people on a call are not told you are recording.")
+            Text("plays a short sound to check type me it can hear other apps")
         }
     }
 
@@ -534,24 +531,8 @@ struct MeetingsTab: View {
         let data = (try? JSONSerialization.data(withJSONObject: entry, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return String(decoding: data, as: UTF8.self)
     }
-
-    /// An open panel for directories; nothing is moved.
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = store.publishedRoot
-        panel.prompt = "Choose"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.meetingsFolder = url == MeetingFolder.defaultPublishedRoot ? nil : url
-        store.reload()
-        store.republishPending()
-    }
 }
 
-/// A level meter: a hairline bar filled with ink to the level.
 /// A thin line filled to where playback is; a click or a drag moves it,
 /// and the player is told once, when the pointer lifts.
 private struct Scrubber: View {
@@ -581,6 +562,7 @@ private struct Scrubber: View {
     }
 }
 
+/// A level meter: a hairline bar filled with ink to the level.
 private struct Meter: View {
     let level: Float
 

@@ -13,7 +13,7 @@ import Foundation
 ///     -recordRoom <s>                       record the room for <s> seconds through the whole pipeline (7.1)
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
-///     -diarizeFile <path>                   the file through FluidAudio's defaults and S3's starting values (S3)
+///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 ///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
 @MainActor
@@ -32,7 +32,9 @@ enum MeetingProbes {
         }
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
-        if let path = value(after: "-diarizeFile") { diarizeFile(URL(fileURLWithPath: path)) }
+        if let i = args.firstIndex(of: "-diarizeFile") {
+            diarizeFiles(args[(i + 1)...].prefix { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) })
+        }
         if let bundle = value(after: "-meetingProbeAX") { probeAccessibility(bundleID: bundle, seconds: value(after: "-meetingProbeAX", 2).flatMap(Int.init) ?? 30) }
         if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
             DebugLog.enabled = true
@@ -211,21 +213,36 @@ enum MeetingProbes {
 
     // MARK: S3, diarizer settings
 
-    private static func diarizeFile(_ url: URL) {
+    /// Every file through each clustering threshold and VBx `Fb`, the
+    /// segmentation settings as shipped, written raw and after
+    /// `SpeakerMerge` so a script can score them against reference labels.
+    private static func diarizeFiles(_ urls: [URL]) {
         DebugLog.enabled = true
-        let base = OfflineDiarizerConfig(segmentationStepRatio: Fixed.meetingDiarizerStepRatio)
-        let s3 = Diarizer.configuration
-        let s3Loose = OfflineDiarizerConfig(clusteringThreshold: 0.7, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
-                                            segmentationMinDurationOn: 1.0, segmentationMinDurationOff: 0.5)
-        Task.detached {
-            do {
-                for (name, talk, took) in try await Diarizer.shared.compare(url: url, configurations: [("defaults", base), ("s3 0.5", s3), ("s3 0.7", s3Loose)]) {
-                    let shares = talk.sorted { $0.value > $1.value }.map { "\($0.value / 1000)s" }.joined(separator: " ")
-                    DebugLog.write("Meeting probe diarize \(name): \(counted(talk.count, "speaker")) [\(shares)] in \(took)")
-                }
-            } catch {
-                DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
+        var configurations: [(String, OfflineDiarizerConfig)] = []
+        for threshold in [0.3, 0.4, 0.5, 0.6, 0.7] {
+            for fb in [0.8, 0.4] {
+                configurations.append(("t\(threshold) fb\(fb)", OfflineDiarizerConfig(
+                    clusteringThreshold: threshold, Fb: fb, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+                    segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)))
             }
+        }
+        Task.detached {
+            for url in urls {
+                do {
+                    var out: [String: [String: [SpeakerSegment]]] = [:]
+                    for run in try await Diarizer.shared.compare(url: url, configurations: configurations) {
+                        let merged = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+                        out[run.name] = ["raw": run.segments, "merged": merged]
+                        DebugLog.write("Meeting probe diarize \(url.lastPathComponent) \(run.name): \(counted(Set(run.segments.map(\.speaker)).count, "speaker")), merged \(Set(merged.map(\.speaker)).count), in \(run.took)")
+                    }
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    let name = url.deletingPathExtension().lastPathComponent + "-" + url.deletingLastPathComponent().lastPathComponent.prefix(15).replacingOccurrences(of: " ", with: "_")
+                    try JSONEncoder().encode(out).write(to: directory.appendingPathComponent("diarize-\(name).json"))
+                } catch {
+                    DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
+                }
+            }
+            DebugLog.write("Meeting probe diarize: done")
         }
     }
 
