@@ -216,6 +216,7 @@ final class Pipeline {
         let entryId = UUID()
         MeetingCoordinator.shared.dictationEnded(hostTime: stoppedAt, historyId: entryId)
         let recordingFile = settings.keepRecordings && settings.historyLimit >= 0 ? RecordingArchive.save(pcm, id: entryId) : nil
+        VoicePrintKeeper.shared.dictated(pcm)
         phase = .transcribing
         shortcuts.setPhase(.transcribing)
         overlay.show(.transcribing)

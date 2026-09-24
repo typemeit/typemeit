@@ -377,7 +377,7 @@ Sources: the macOS 27.0 SDK headers, `insidegui/AudioCap`,
 | A CAF written with a `-1` data chunk size opens in `AVAudioFile` after a `kill -9` | S1 |
 | Offline `transcribe_run` on a 120 s chunk is fast and memory-bounded; the seam WER cost is small; one run over an hour is not bounded | S2 |
 | FluidAudio's offline diarizer loads from a local directory with no network, builds in this Xcode project, and runs at 30x realtime or better (an hour in two minutes) | S3 |
-| WeSpeaker embeddings from kept dictations separate the user from other speakers at cosine distance 0.40 with a 0.10 margin | S3 |
+| WeSpeaker embeddings from kept dictations separate the user from other speakers at cosine distance 0.40 with a 0.10 margin | S3: fail at 0.40, which matched nobody. Measured 24 September 2026 with a print from 50 dictations: the user's speaker on the 47-minute call at 0.57, every other speaker in five recordings at 0.72 or more; on the 11-minute call, where the mic heard the laptop speakers, the user was at 0.89. Paragraph by paragraph the two overlap (user median 0.58, others 0.80). One positive example; a room recording with the user in it is still owed |
 | Chromium exposes Meet's tiles, and Slack its huddle roster, in the accessibility tree once the activation attribute is set; the speaking indicator and captions are readable there or through the page's DOM | S4 (phase 2) |
 | `AudioHardwareCreateProcessTap` works inside the App Sandbox | none; checked when a store target exists (section 10) |
 
@@ -1237,7 +1237,7 @@ verified in S1).
 | `meetingDiarizerStepRatio` (phase 2) | S3 | FluidAudio: 0.2 default, 0.1 for meetings |
 | `meetingVoicePrintTargetSamples`, `meetingVoicePrintMinimumSamples` (phase 3) | 50, 10 | chosen, not measured: ten dictations is a day of use; S3 revises both |
 | `meetingVoicePrintMinimumClipSeconds` (phase 3) | 5 | FluidAudio's documented minimum for a usable embedding |
-| `meetingVoicePrintDistance`, `meetingVoicePrintMargin` (phase 3) | 0.40, 0.10 until S3 | meeting-transcriber `SpeakerMatcher` |
+| `meetingVoicePrintDistance`, `meetingVoicePrintMargin` (phase 3) | 0.65, 0.10 | S3 (`-voicePrintProbe`); 0.40 was meeting-transcriber `SpeakerMatcher`'s |
 
 Echo detector constants are the lifted file's own.
 
@@ -2060,10 +2060,9 @@ stored at `Store.directory/voiceprint.json`):
   `voicePrintEnabled = false`.
 - Matching, in `TranscriptMerge`'s caller: for a room with a usable print,
   the speaker whose embedding has cosine distance to the centroid below
-  `Fixed.meetingVoicePrintDistance` (0.40) and at least `Fixed.meetingVoicePrintMargin`
-  (0.10) nearer than the runner-up is renamed `You`. Both numbers are
-  meeting-transcriber's `SpeakerMatcher` defaults (MIT); S3 replaces them
-  with measured ones. For a call, a far-end speaker that matches is echo;
+  `Fixed.meetingVoicePrintDistance` (0.65) and at least `Fixed.meetingVoicePrintMargin`
+  (0.10) nearer than the runner-up is renamed `You`. S3 measured both;
+  meeting-transcriber's `SpeakerMatcher` default of 0.40 (MIT) matched nobody. For a call, a far-end speaker that matches is echo;
   label it `You (echo)`, log it, and leave the echo verdict to the detector.
 - Test the matcher with synthetic unit vectors.
 

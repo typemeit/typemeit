@@ -278,6 +278,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observePipeline()
         previewToastIfAsked()
         MeetingProbes.runIfAsked()
+        // Turned on by a build that quit before the first clip was folded in.
+        if Settings.shared.voicePrintEnabled, VoicePrintKeeper.shared.count == 0 { VoicePrintKeeper.shared.start() }
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let owner = SecureInput.owner

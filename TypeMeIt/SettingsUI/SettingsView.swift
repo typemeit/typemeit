@@ -371,6 +371,16 @@ struct MainSettingsTab: View {
         return "reads a few pixels under the cloud - needs screen recording permissions"
     }
 
+    /// While the print is too small to use, the row says how many more
+    /// dictations it needs.
+    private var voicePrintSubtitle: String {
+        let count = VoicePrintKeeper.shared.count
+        if settings.voicePrintEnabled, count < Fixed.meetingVoicePrintMinimumSamples {
+            return "needs \(counted(Fixed.meetingVoicePrintMinimumSamples - count, "more dictation")) of \(Fixed.meetingVoicePrintMinimumClipSeconds) seconds or more"
+        }
+        return "finds you in a room, from your dictations. deleting your history deletes it."
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -430,6 +440,9 @@ struct MainSettingsTab: View {
                         SettingsRow(label: "names from the meeting", subtitle: "reads who is in the meeting and who is talking from its window. nothing is sent anywhere.") {
                             Toggle("", isOn: $settings.rosterEnabled).toggleStyle(.switch).labelsHidden()
                         }
+                    }
+                    SettingsRow(label: "recognise my voice", subtitle: voicePrintSubtitle) {
+                        Toggle("", isOn: $settings.voicePrintEnabled).toggleStyle(.switch).labelsHidden()
                     }
                     SettingsRow(label: "record the room", last: true) {
                         ShortcutRecorder(combo: $settings.recordRoomShortcut)

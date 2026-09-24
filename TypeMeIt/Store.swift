@@ -142,6 +142,8 @@ final class Store {
     func deleteAllHistory() {
         history.removeAll()
         RecordingArchive.deleteAll()
+        Settings.shared.voicePrintEnabled = false
+        VoicePrintKeeper.shared.delete()
         save(history, to: historyURL)
     }
 
