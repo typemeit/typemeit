@@ -189,7 +189,8 @@ enum MeetingTranscriber {
         // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
         let segments: [SpeakerSegment]
         do {
-            segments = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file)).segments
+            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file))
+            segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
         } catch {
             Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
             DebugLog.write("Meeting diarization failed: \(error.localizedDescription)")

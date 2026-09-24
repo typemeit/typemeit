@@ -56,6 +56,15 @@ enum EchoBleedDetector {
     /// Below this a track carries no signal, and a dead channel cannot bleed
     /// anywhere.
     static let silenceFloorDBFS = -70.0
+    /// A window is scored only when the far end speaks in at least this
+    /// share of its frames, a frame counting as speech above
+    /// `activeFrameLevel` (-40 dBFS): a window where the far end is quiet
+    /// has nothing to bleed, and counting it dilutes the share. Measured on
+    /// a 24 September 2026 Slack call on laptop speakers where the far end
+    /// spoke a quarter of the time: 14% of all windows, just under the
+    /// threshold and marked clean, but 28% of the windows it spoke in.
+    static let activeFrameLevel = 0.01
+    static let minActiveShare = 0.1
 
     /// One window's measurement. The lag is what separates real bleed from a
     /// coincidence: bleed peaks at a stable lag near the true echo delay,
@@ -127,7 +136,9 @@ enum EchoBleedDetector {
         let maxLag = Int(maxLagSeconds / frameSeconds)
         let scores = (0 ..< windows).compactMap { w -> WindowScore? in
             let range = (w * framesPerWindow) ..< ((w + 1) * framesPerWindow)
-            guard let peak = peakCorrelation(mic[range], others[range], maxLag: maxLag, centre: 0) else { return nil }
+            let active = others[range].count { $0 > activeFrameLevel }
+            guard Double(active) >= minActiveShare * Double(range.count),
+                  let peak = peakCorrelation(mic[range], others[range], maxLag: maxLag, centre: 0) else { return nil }
             return WindowScore(correlation: peak.correlation, lagSeconds: Double(peak.lag) * frameSeconds)
         }
         guard !scores.isEmpty else { return nil }

@@ -128,7 +128,7 @@ struct MeetingsTab: View {
                 .buttonStyle(QuietButtonStyle())
                 .keyboardShortcut(.cancelAction)
                 Spacer()
-                actions(m)
+                actions(m, play: false)
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
             VStack(alignment: .leading, spacing: 6) {
@@ -141,10 +141,43 @@ struct MeetingsTab: View {
                 chips(m)
             }
             .padding(.horizontal, 20).padding(.bottom, 14)
+            if let urls = audioURLs(m) {
+                playerBar(m, urls: urls).padding(.horizontal, 20).padding(.bottom, 12)
+            }
             RowRule()
             ScrollView {
                 transcript(m)
                     .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
+    }
+
+    /// The meeting's tracks, when its audio was kept.
+    private func audioURLs(_ m: Meeting) -> [URL]? {
+        guard !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) else { return nil }
+        return m.audioFiles.map { folder.appendingPathComponent($0) }
+    }
+
+    /// Play or pause, where it is, a bar to click or drag along, and the length.
+    private func playerBar(_ m: Meeting, urls: [URL]) -> some View {
+        let loaded = player.playing == m.id
+        let running = loaded && !player.paused
+        let total = loaded ? player.duration : m.duration.timeInterval
+        return HStack(spacing: 10) {
+            iconButton(running ? "akar-pause" : "akar-play", running ? "pause" : "play") {
+                if running { player.pause() } else { player.play(id: m.id, urls: urls) }
+            }
+            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                let at = loaded ? player.currentTime : 0
+                HStack(spacing: 10) {
+                    Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
+                    Scrubber(fraction: total > 0 ? at / total : 0) { fraction in
+                        if loaded { player.seek(to: fraction * total) } else { player.play(id: m.id, urls: urls, from: fraction * total) }
+                    }
+                    Text(TranscriptRender.timestamp(ms: Int(total * 1000)))
+                }
+                .font(.system(size: 11).monospaced().monospacedDigit())
+                .foregroundStyle(DesignTokens.Colors.ink2)
             }
         }
     }
@@ -262,9 +295,10 @@ struct MeetingsTab: View {
         }
     }
 
-    private func actions(_ m: Meeting) -> some View {
+    /// `play` is off on the meeting's own page, which has the player bar.
+    private func actions(_ m: Meeting, play: Bool = true) -> some View {
         HStack(spacing: 4) {
-            if !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
+            if play, !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
                 let on = player.playing == m.id
                 iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play") {
                     player.toggle(id: m.id, urls: m.audioFiles.map { folder.appendingPathComponent($0) })
@@ -347,7 +381,17 @@ struct MeetingsTab: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 0) {
                         speakerLabel(p.speaker, in: m)
-                        Text(" · \(TranscriptRender.timestamp(ms: p.startMs))")
+                        Text(" · ")
+                        if let urls = audioURLs(m) {
+                            Button { player.play(id: m.id, urls: urls, from: Double(p.startMs) / 1000) } label: {
+                                Text(TranscriptRender.timestamp(ms: p.startMs)).underline(true, color: DesignTokens.Colors.inkA20)
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { $0 ? NSCursor.pointingHand.push() : NSCursor.pop() }
+                            .help("play from here")
+                        } else {
+                            Text(TranscriptRender.timestamp(ms: p.startMs))
+                        }
                     }
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
                     Text(p.text).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).textSelection(.enabled)
@@ -508,6 +552,35 @@ struct MeetingsTab: View {
 }
 
 /// A level meter: a hairline bar filled with ink to the level.
+/// A thin line filled to where playback is; a click or a drag moves it,
+/// and the player is told once, when the pointer lifts.
+private struct Scrubber: View {
+    let fraction: Double
+    let seek: (Double) -> Void
+    @State private var dragging: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let shown = min(max(dragging ?? fraction, 0), 1)
+            ZStack(alignment: .leading) {
+                Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: 2)
+                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * shown, height: 2)
+                Circle().fill(DesignTokens.Colors.ink).frame(width: 8, height: 8)
+                    .offset(x: geo.size.width * shown - 4)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { dragging = min(max($0.location.x / max(geo.size.width, 1), 0), 1) }
+                .onEnded { _ in
+                    if let dragging { seek(dragging) }
+                    dragging = nil
+                })
+        }
+        .frame(height: 14)
+    }
+}
+
 private struct Meter: View {
     let level: Float
 

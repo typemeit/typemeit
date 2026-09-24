@@ -370,6 +370,12 @@ enum Fixed {
     static let meetingDiarizerThreshold = 0.5
     static let meetingDiarizerMinOnSeconds = 1.0
     static let meetingDiarizerMinOffSeconds = 0.5
+    /// A diarized speaker with less talk than this is folded into the
+    /// nearest voice. The 24 September Slack call's one far-end person came
+    /// out as two, one of them 4 s. On the two earlier calls, where
+    /// AssemblyAI found 3 and 4 far-end speakers to our 5 and 5, the
+    /// smallest were 8 s and 2 s; folding them gives 4 and 4.
+    static let meetingMinimumSpeakerSeconds = 10
     /// Every WKWebView app shares this audio process, Safari included, so it
     /// is named `web content` and never put on the never-ask list.
     static let meetingWebContentBundleID = "com.apple.WebKit.GPU"
