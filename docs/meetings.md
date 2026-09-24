@@ -1345,7 +1345,7 @@ never read:
 title: "Slack"
 kind: call
 started: "2026-09-19 14:30 +01:00"
-duration: 35m
+duration: 34:36
 app: "Slack"
 speakers: ["You", "Them"]
 echo: affected

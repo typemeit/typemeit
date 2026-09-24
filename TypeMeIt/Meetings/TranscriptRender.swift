@@ -38,7 +38,7 @@ enum TranscriptRender {
             "title: \(quoted(meeting.title))",
             "kind: \(meeting.kind.rawValue)",
             "started: \(quoted(startedLine(meeting)))",
-            "duration: \(MeetingFolder.durationLabel(meeting.duration))",
+            "duration: \(timestamp(ms: meeting.durationMs))",
         ]
         if let app = meeting.app {
             frontMatter.append("app: \(quoted(app.name))")
