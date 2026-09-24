@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InsightsTab: View {
     @State private var store = Store.shared
+    @State private var meetingStore = MeetingStore.shared
     @State private var whereHeight: CGFloat = 0
     @State private var appsHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
@@ -28,8 +29,8 @@ struct InsightsTab: View {
 
     var body: some View {
         let s = stats
-        // The page fits, and an outer scroll fought the apps list's own, so
-        // the scroll view only sizes the content and never moves.
+        let m = MeetingInsights.compute(meetingStore.meetings)
+        // Scrolls only when the window is too short for the page.
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 12) {
@@ -57,10 +58,34 @@ struct InsightsTab: View {
                     SettingsGroup(title: "length") { length(s) }
                     SettingsGroup(title: "speed") { speed(s) }
                 }
+                meetings(m)
             }
             .padding(20)
         }
-        .scrollDisabled(true)
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// Time in meetings, your share of the talk on calls, and how long one runs.
+    private func meetings(_ m: MeetingStats) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("meetings").font(DesignTokens.Fonts.label.weight(.regular).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+            HStack(alignment: .top, spacing: 12) {
+                statCard("in meetings", m.meetings == 0 ? "–" : InsightsTab.span(m.totalMs),
+                         m.meetings == 0 ? "nothing yet" : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
+                statCard("you talked", m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
+                         m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
+                statCard("typical meeting", m.medianMs.map { MeetingFolder.durationLabel(.milliseconds($0)) } ?? "–",
+                         typicalCaption(m))
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// `longest 47m · most on slack`.
+    private func typicalCaption(_ m: MeetingStats) -> String {
+        guard let longest = m.longestMs else { return "nothing yet" }
+        let most = m.topApp.map { " · most on \($0.lowercased())" } ?? ""
+        return "longest \(MeetingFolder.durationLabel(.milliseconds(longest)))" + most
     }
 
     private func monthCaption(_ s: InsightsStats) -> String {
