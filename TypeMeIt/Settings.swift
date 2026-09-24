@@ -150,15 +150,6 @@ final class Settings {
     /// Reads who is in a Slack huddle or a Meet call, and who is talking,
     /// from its window while it records (docs/meetings.md 8.6).
     var rosterEnabled: Bool { didSet { defaults.set(rosterEnabled, forKey: "rosterEnabled") } }
-    /// Finds the user among a room's speakers by a print of their voice,
-    /// built from their dictations (docs/meetings.md D15, 9.1). Off deletes it.
-    var voicePrintEnabled: Bool {
-        didSet {
-            defaults.set(voicePrintEnabled, forKey: "voicePrintEnabled")
-            guard voicePrintEnabled != oldValue else { return }
-            if voicePrintEnabled { VoicePrintKeeper.shared.start() } else { VoicePrintKeeper.shared.delete() }
-        }
-    }
     /// Keeps a meeting's tracks as `.m4a` beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
     /// How many meetings to keep; 0 keeps everything.
@@ -215,7 +206,6 @@ final class Settings {
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
         rosterEnabled = bool("rosterEnabled", false)
-        voicePrintEnabled = bool("voicePrintEnabled", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -396,16 +386,4 @@ enum Fixed {
     static let meetingNameMinOverlapSeconds = 20
     /// A name has to clearly win over the runner-up.
     static let meetingNameMargin = 1.5
-    /// The voice print's size: fifty dictations is the target, ten is about
-    /// a day of use, and a clip under five seconds gives FluidAudio too
-    /// little for a usable embedding.
-    static let meetingVoicePrintTargetSamples = 50
-    static let meetingVoicePrintMinimumSamples = 10
-    static let meetingVoicePrintMinimumClipSeconds = 5
-    /// Measured 24 September 2026 (S3, `-voicePrintProbe`): a print from 50
-    /// dictations put the user's speaker on a 47-minute call at 0.57 and
-    /// every other speaker in five recordings at 0.72 or more. The 0.40 the
-    /// spec started from matched nobody.
-    static let meetingVoicePrintDistance: Float = 0.65
-    static let meetingVoicePrintMargin: Float = 0.10
 }

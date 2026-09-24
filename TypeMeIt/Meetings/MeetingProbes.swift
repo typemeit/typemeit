@@ -14,7 +14,6 @@ import Foundation
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
 ///     -diarizeFile <path>                   the file through FluidAudio's defaults and S3's starting values (S3)
-///     -voicePrintProbe                      the user's print from kept dictations against every recorded meeting's speakers (S3)
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 ///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
 @MainActor
@@ -34,7 +33,6 @@ enum MeetingProbes {
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
         if let path = value(after: "-diarizeFile") { diarizeFile(URL(fileURLWithPath: path)) }
-        if args.contains("-voicePrintProbe") { voicePrintProbe() }
         if let bundle = value(after: "-meetingProbeAX") { probeAccessibility(bundleID: bundle, seconds: value(after: "-meetingProbeAX", 2).flatMap(Int.init) ?? 30) }
         if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
             DebugLog.enabled = true
@@ -228,101 +226,6 @@ enum MeetingProbes {
             } catch {
                 DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
             }
-        }
-    }
-
-    // MARK: S3, the voice print distance test
-
-    /// Builds a centroid from the newest 50 kept dictations of 5 s or more,
-    /// then logs the cosine distance to it of the next 50 (the user, held
-    /// out) and of every speaker the diarizer finds on every track of every
-    /// recorded meeting: on a call the mic track is the user and the far
-    /// end is not.
-    private static func voicePrintProbe() {
-        DebugLog.enabled = true
-        Task.detached {
-            func pcm(_ url: URL) -> [Float]? {
-                guard let file = try? AVAudioFile(forReading: url),
-                      let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
-                      (try? file.read(into: buffer)) != nil, let data = buffer.floatChannelData?[0] else { return nil }
-                return Array(UnsafeBufferPointer(start: data, count: Int(buffer.frameLength)))
-            }
-            func distance(_ a: [Float], _ b: [Float]) -> Float {
-                var dot: Float = 0, na: Float = 0, nb: Float = 0
-                for i in a.indices { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
-                return 1 - dot / (na.squareRoot() * nb.squareRoot())
-            }
-            let rate = Int(AudioCapture.targetFormat.sampleRate)
-            let files = ((try? FileManager.default.contentsOfDirectory(at: RecordingArchive.directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
-                .sorted { ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > ((try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
-            var prints: [[Float]] = []
-            var skipped = 0
-            for url in files where prints.count < 100 {
-                guard let audio = pcm(url), audio.count >= 5 * rate else { continue }
-                if let e = try? await Diarizer.shared.embedding(of: audio) { prints.append(e) } else { skipped += 1 }
-            }
-            guard prints.count >= 20 else { DebugLog.write("Voice print probe: only \(prints.count) usable dictations"); return }
-            let enrol = Array(prints.prefix(prints.count / 2)), held = Array(prints.suffix(prints.count - prints.count / 2))
-            var centroid = [Float](repeating: 0, count: enrol[0].count)
-            for e in enrol { for i in e.indices { centroid[i] += e[i] } }
-            let held_ = held.map { distance($0, centroid) }.sorted()
-            DebugLog.write("Voice print probe: \(enrol.count) enrolled, \(skipped) clips not one speaker; held-out dictations min \(held_.first!) median \(held_[held_.count / 2]) max \(held_.last!)")
-
-            let meetings = ((try? FileManager.default.contentsOfDirectory(at: MeetingFolder.defaultPublishedRoot, includingPropertiesForKeys: nil)) ?? [])
-                .filter { !["probe", ".in-progress"].contains($0.lastPathComponent) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
-
-            // Clip by clip, as a dictation is: every paragraph of 5 s or more
-            // on a call, cut from its own track. The user's are the mic's.
-            var clips: [(speaker: String, meeting: String, e: [Float])] = []
-            for folder in meetings {
-                guard let meeting = MeetingFolder.read(folder), meeting.kind == .call else { continue }
-                for track in meeting.tracks {
-                    guard let file = try? AVAudioFile(forReading: folder.appendingPathComponent(track.file)) else { continue }
-                    for p in meeting.paragraphs where p.endMs - p.startMs >= 5000 && (p.speaker == Meeting.Speaker.you) == (track.role == .mic) {
-                        let start = AVAudioFramePosition(p.startMs * Meeting.framesPerMs)
-                        let count = AVAudioFrameCount(min(p.endMs - p.startMs, 15_000) * Meeting.framesPerMs)
-                        file.framePosition = start
-                        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: count), (try? file.read(into: buffer, frameCount: count)) != nil,
-                              let data = buffer.floatChannelData?[0] else { continue }
-                        let audio = Array(UnsafeBufferPointer(start: data, count: Int(buffer.frameLength)))
-                        if let e = try? await Diarizer.shared.embedding(of: audio) { clips.append((p.speaker, String(folder.lastPathComponent.prefix(15)), e)) }
-                    }
-                }
-            }
-            func summary(_ ds: [Float]) -> String {
-                let d = ds.sorted()
-                return d.isEmpty ? "none" : "n=\(d.count) min \(String(format: "%.2f", d.first!)) median \(String(format: "%.2f", d[d.count / 2])) max \(String(format: "%.2f", d.last!))"
-            }
-            let mine = clips.filter { $0.speaker == Meeting.Speaker.you }, theirs = clips.filter { $0.speaker != Meeting.Speaker.you }
-            DebugLog.write("Voice print probe clips, dictation print: you \(summary(mine.map { distance($0.e, centroid) })) | others \(summary(theirs.map { distance($0.e, centroid) }))")
-            // A print from the user's call audio instead: the first call's mic
-            // clips, tested on the other call.
-            let meetingNames = Array(Set(clips.map(\.meeting))).sorted()
-            if meetingNames.count >= 2 {
-                for (train, test) in [(meetingNames[0], meetingNames[1]), (meetingNames[1], meetingNames[0])] {
-                    let enrolClips = mine.filter { $0.meeting == train }
-                    guard !enrolClips.isEmpty else { continue }
-                    var c = [Float](repeating: 0, count: enrolClips[0].e.count)
-                    for e in enrolClips { for i in e.e.indices { c[i] += e.e[i] } }
-                    DebugLog.write("Voice print probe clips, print from \(train) mic (\(enrolClips.count)) on \(test): you \(summary(mine.filter { $0.meeting == test }.map { distance($0.e, c) })) | others \(summary(theirs.filter { $0.meeting == test }.map { distance($0.e, c) })) | dictations \(summary(held.map { distance($0, c) }))")
-                }
-            }
-            for (speaker, group) in Dictionary(grouping: theirs, by: { "\($0.meeting) \($0.speaker)" }).sorted(by: { $0.key < $1.key }) {
-                DebugLog.write("Voice print probe clips: \(speaker) \(summary(group.map { distance($0.e, centroid) }))")
-            }
-
-            for folder in meetings {
-                for track in ["mic", "others", "room"] {
-                    guard let url = ["m4a", "caf"].map({ folder.appendingPathComponent("\(track).\($0)") }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) else { continue }
-                    guard let (segments, embeddings) = try? await Diarizer.shared.run(url: url) else { continue }
-                    var talk: [String: Int] = [:]
-                    for s in segments { talk[s.speaker, default: 0] += s.endMs - s.startMs }
-                    let lines = embeddings.map { (id: $0.key, d: distance($0.value, centroid), s: (talk[$0.key] ?? 0) / 1000) }
-                        .sorted { $0.s > $1.s }.map { "\($0.id) \($0.s)s d=\(String(format: "%.3f", $0.d))" }
-                    DebugLog.write("Voice print probe: \(folder.lastPathComponent) \(track): \(lines.joined(separator: ", "))")
-                }
-            }
-            DebugLog.write("Voice print probe: done")
         }
     }
 

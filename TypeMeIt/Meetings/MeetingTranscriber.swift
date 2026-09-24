@@ -188,9 +188,8 @@ enum MeetingTranscriber {
         }
         // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
         let segments: [SpeakerSegment]
-        let embeddings: [String: [Float]]
         do {
-            (segments, embeddings) = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file))
+            segments = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file)).segments
         } catch {
             Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
             DebugLog.write("Meeting diarization failed: \(error.localizedDescription)")
@@ -201,41 +200,20 @@ enum MeetingTranscriber {
         for segment in segments.sorted(by: { $0.startMs < $1.startMs }) where !order.contains(segment.speaker) { order.append(segment.speaker) }
         guard !order.isEmpty else { return nil }
         let previous = meeting.speakers
-        meeting.speakers = meeting.speakers.filter { $0.id == Meeting.Speaker.you }
+        meeting.speakers = meeting.speakers.filter { $0.isYou }
         if meeting.kind == .call, order.count == 1 {
             let them = Meeting.Speaker.them
             meeting.speakers.append(Meeting.Speaker(id: them, name: previous.first { $0.id == them }?.name ?? defaultName(for: .others), isYou: false, talkMs: 0))
             return nil
         }
         let ids = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, "s\($0 + 1)") })
-        let voice = yourVoice(among: embeddings)
         for (i, original) in order.enumerated() {
             let id = ids[original]!
-            // Only a name the user typed survives a new pass; the rest are
-            // found again.
-            let typed = previous.first { $0.id == id && $0.nameSource == .user }
-            var speaker = Meeting.Speaker(id: id, name: typed?.name ?? "Speaker \(i + 1)", isYou: false, talkMs: 0, nameSource: typed?.nameSource)
-            if original == voice {
-                // In a room it is the user; on a call's far end it is the
-                // user heard back through someone's speakers (9.1).
-                if role == .room { speaker.isYou = true }
-                if typed == nil { speaker.name = role == .room ? defaultName(for: .mic) : "\(defaultName(for: .mic)) (echo)" }
-                DebugLog.write("Meeting speakers: \(speaker.name) found by voice print on the \(role.rawValue) track")
-            }
-            meeting.speakers.append(speaker)
+            let name = previous.first { $0.id == id }?.name ?? "Speaker \(i + 1)"
+            meeting.speakers.append(Meeting.Speaker(id: id, name: name, isYou: false, talkMs: 0))
         }
         DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track")
         return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
-    }
-
-    /// The diarizer's id for the speaker whose voice matches the user's
-    /// print, when the print is on and has enough dictations in it (9.1).
-    private static func yourVoice(among embeddings: [String: [Float]]) -> String? {
-        guard let print = VoicePrint.usable(), !embeddings.isEmpty else { return nil }
-        let match = VoicePrint.match(embeddings, print: print.centroid, distance: Fixed.meetingVoicePrintDistance, margin: Fixed.meetingVoicePrintMargin)
-        let nearest = embeddings.values.map { VoicePrint.distance($0, print.centroid) }.min() ?? 1
-        DebugLog.write("Meeting voice print: nearest speaker at \(String(format: "%.2f", nearest)), \(match == nil ? "no match" : "matched")")
-        return match
     }
 
     // MARK: Audio
