@@ -1893,6 +1893,20 @@ off returns the same error.
   match in the same pass and discarded with it; `meeting.json` never carries
   one (D18). On a call, when the far end has one speaker, the label stays
   `Them`.
+- **The call's window sets the count (`SpeakerCount`).** A far-end talker is
+  a name 8.6 read as speaking while the far-end track had at least 10 s of
+  words inside its spans, and more there than on the mic. That leaves out
+  the user under whatever name the call shows them by, and a tile lit by
+  noise. With any talkers the diarizer is told `withSpeakers(exactly:)`
+  their number, and a far end left as one voice takes the one talker's
+  name. With none, the roster minus the user caps it
+  (`withSpeakers(max:)`); the roster never sets an exact count, since it
+  lists silent listeners too. Measured on 24 September (`-diarizeCounts`):
+  told the right count, the diarizer matched its own; told one too many, it
+  split the Slack call's one far-end voice into 87 s and 37 s, and cut
+  agreement with AssemblyAI on the 0831 room from 87% to 69%. A tile shared
+  by two people (a meeting room on one laptop) is counted as one, and they
+  merge.
 - `TranscriptMerge` assigns each far-end word to the segment containing its
   midpoint; if none, to the nearest segment within 1 s; else to the previous
   word's speaker. Tests: a word between two segments, a word before the first

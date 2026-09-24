@@ -50,13 +50,28 @@ actor Diarizer {
         return loaded
     }
 
+    /// The shipped settings, told how many speakers when the call said.
+    static func configuration(for count: SpeakerCount?) -> OfflineDiarizerConfig {
+        switch count {
+        case .exactly(let n): configuration.withSpeakers(exactly: n)
+        case .atMost(let n): configuration.withSpeakers(max: n)
+        case nil: configuration
+        }
+    }
+
     /// Who spoke when on one track. The embeddings are the run's
     /// `speakerDatabase`, one per speaker, returned in memory for the
     /// caller's matching and never stored (D18).
-    func run(url: URL) async throws -> (segments: [SpeakerSegment], embeddings: [String: [Float]]) {
-        let loaded = try await ensureLoaded()
+    func run(url: URL, count: SpeakerCount? = nil) async throws -> (segments: [SpeakerSegment], embeddings: [String: [Float]]) {
+        var loaded = try await ensureLoaded()
+        if count != nil {
+            let manager = OfflineDiarizerManager(config: Diarizer.configuration(for: count))
+            manager.initialize(models: loaded.models)
+            loaded = Loaded(manager: manager, models: loaded.models)
+        }
         let started = ContinuousClock.now
-        let result = try await Task.detached { try await loaded.manager.process(url) }.value
+        let run = loaded
+        let result = try await Task.detached { try await run.manager.process(url) }.value
         let segments = result.segments.map {
             SpeakerSegment(speaker: $0.speakerId, startMs: Int($0.startTimeSeconds * 1000), endMs: Int($0.endTimeSeconds * 1000))
         }

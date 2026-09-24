@@ -14,6 +14,7 @@ import Foundation
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
 ///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
+///     -diarizeCounts <path>...              each file left to count its speakers, then told 1…6; segments to probe/counts-<name>.json
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 ///     -summarise <meeting id>...            write each meeting's summary to the log, without saving it
 @MainActor
@@ -34,6 +35,9 @@ enum MeetingProbes {
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
         if let i = args.firstIndex(of: "-diarizeFile") {
             diarizeFiles(args[(i + 1)...].prefix { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) })
+        }
+        if let i = args.firstIndex(of: "-diarizeCounts") {
+            diarizeFiles(args[(i + 1)...].prefix { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) }, configurations: countSweep, output: "counts")
         }
         if let bundle = value(after: "-meetingProbeAX") { probeAccessibility(bundleID: bundle, seconds: value(after: "-meetingProbeAX", 2).flatMap(Int.init) ?? 30) }
         if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
@@ -221,8 +225,7 @@ enum MeetingProbes {
     /// Every file through each clustering threshold and VBx `Fb`, the
     /// segmentation settings as shipped, written raw and after
     /// `SpeakerMerge` so a script can score them against reference labels.
-    private static func diarizeFiles(_ urls: [URL]) {
-        DebugLog.enabled = true
+    private static var thresholdSweep: [(String, OfflineDiarizerConfig)] {
         var configurations: [(String, OfflineDiarizerConfig)] = []
         for threshold in [0.3, 0.4, 0.5, 0.6, 0.7] {
             for fb in [0.8, 0.4] {
@@ -231,6 +234,16 @@ enum MeetingProbes {
                     segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)))
             }
         }
+        return configurations
+    }
+
+    /// The shipped settings left to count, then told each count from one to six.
+    private static var countSweep: [(String, OfflineDiarizerConfig)] {
+        [("auto", Diarizer.configuration)] + (1...6).map { ("exactly \($0)", Diarizer.configuration.withSpeakers(exactly: $0)) }
+    }
+
+    private static func diarizeFiles(_ urls: [URL], configurations: [(String, OfflineDiarizerConfig)] = thresholdSweep, output: String = "diarize") {
+        DebugLog.enabled = true
         Task.detached {
             for url in urls {
                 do {
@@ -242,7 +255,7 @@ enum MeetingProbes {
                     }
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                     let name = url.deletingPathExtension().lastPathComponent + "-" + url.deletingLastPathComponent().lastPathComponent.prefix(15).replacingOccurrences(of: " ", with: "_")
-                    try JSONEncoder().encode(out).write(to: directory.appendingPathComponent("diarize-\(name).json"))
+                    try JSONEncoder().encode(out).write(to: directory.appendingPathComponent("\(output)-\(name).json"))
                 } catch {
                     DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
                 }

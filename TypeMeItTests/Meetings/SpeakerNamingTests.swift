@@ -200,6 +200,37 @@ struct SpeakerNamingTests {
         ])
     }
 
+    @Test func aOneVoiceFarEndTakesTheOneNameShownTalking() {
+        let them = Meeting.Speaker(id: Meeting.Speaker.them, name: "Them", isYou: false, talkMs: 30_000)
+        // The diarizer left one voice, so there are no segments to overlap.
+        let names = MeetingNames(source: .speaking, roster: ["Ana", "Ben"], channel: nil, spans: [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 30_000),
+        ], captions: nil)
+
+        let result = SpeakerNaming.align(
+            speakers: [Self.you, them], segments: [], paragraphs: [], names: names, talkers: ["Ana"], userName: nil,
+            lagMs: 0, captionMatch: 0.5, minOverlapMs: 20_000, margin: 1.5)
+
+        #expect(result.speakers == [
+            Self.you,
+            Meeting.Speaker(id: Meeting.Speaker.them, name: "Ana", isYou: false, talkMs: 30_000, nameSource: .speaking),
+        ])
+    }
+
+    @Test func aOneVoiceFarEndWithTwoPeopleShownTalkingStaysThem() {
+        let them = Meeting.Speaker(id: Meeting.Speaker.them, name: "Them", isYou: false, talkMs: 60_000)
+        let names = MeetingNames(source: .speaking, roster: ["Ana", "Ben"], channel: nil, spans: [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 30_000),
+            MeetingNames.Span(name: "Ben", startMs: 30_000, endMs: 60_000),
+        ], captions: nil)
+
+        let result = SpeakerNaming.align(
+            speakers: [Self.you, them], segments: [], paragraphs: [], names: names, talkers: ["Ana", "Ben"], userName: nil,
+            lagMs: 0, captionMatch: 0.5, minOverlapMs: 20_000, margin: 1.5)
+
+        #expect(result.speakers == [Self.you, them])
+    }
+
     @Test func lagShiftsASpanAcrossTheMinimumOverlapBoundary() {
         let speakers = [
             Self.you,

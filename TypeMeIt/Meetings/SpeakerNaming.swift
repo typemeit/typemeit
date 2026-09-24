@@ -59,13 +59,15 @@ extension MeetingNames {
 enum SpeakerNaming {
     /// Steps 1-6 of 8.6. `segments` are the diarizer's speaker segments
     /// (8.3); `names` is what was read off the meeting window for this
-    /// meeting. `userName` is the resolved name of the user, if known — the
-    /// tile the meeting marks as the user, or `NSFullUserName()`.
+    /// meeting; `talkers` are `SpeakerCount.farEndTalkers`. `userName` is
+    /// the resolved name of the user, if known — the tile the meeting marks
+    /// as the user, or `NSFullUserName()`.
     static func align(
         speakers: [Meeting.Speaker],
         segments: [SpeakerSegment],
         paragraphs: [Meeting.Paragraph],
         names: MeetingNames,
+        talkers: [String] = [],
         userName: String?,
         lagMs: Int,
         captionMatch: Double,
@@ -84,10 +86,15 @@ enum SpeakerNaming {
         case .captions:
             return alignCaptions(speakers: speakers, paragraphs: paragraphs, captions: captions, captionMatch: captionMatch)
         case .speaking:
+            // A far end the diarizer left as one voice has no segments to
+            // overlap: it takes the one name shown talking there.
+            if segments.isEmpty, talkers.count == 1 {
+                return (naming(speakers, talkers[0], source: .speaking), paragraphs)
+            }
             let renamed = alignSpeaking(speakers: speakers, segments: segments, spans: spans, minOverlapMs: minOverlapMs, margin: margin)
             return (renamed, paragraphs)
         case .roster:
-            return (alignRoster(speakers: speakers, roster: roster), paragraphs)
+            return (roster.count == 1 ? naming(speakers, roster[0], source: .roster) : speakers, paragraphs)
         case .user:
             return (speakers, paragraphs)
         }
@@ -253,26 +260,26 @@ enum SpeakerNaming {
         return result
     }
 
-    // MARK: Roster only (step 4)
+    // MARK: One name, one voice (step 4)
 
-    /// Nothing is assigned from a roster alone, except the 1:1 case: exactly
-    /// one other name and exactly one far-end speaker not already renamed
-    /// by the user, where that speaker takes the name.
-    private static func alignRoster(speakers: [Meeting.Speaker], roster: [String]) -> [Meeting.Speaker] {
+    /// The one far-end speaker not already renamed by the user takes the
+    /// name; with more than one, nothing is assigned. A roster alone names
+    /// only this 1:1 case.
+    private static func naming(_ speakers: [Meeting.Speaker], _ name: String, source: MeetingNames.Source) -> [Meeting.Speaker] {
         let candidates = speakers.filter { !$0.isYou && $0.nameSource != .user }
-        guard roster.count == 1, candidates.count == 1, let target = candidates.first else { return speakers }
+        guard candidates.count == 1, let target = candidates.first else { return speakers }
         return speakers.map { speaker in
             guard speaker.id == target.id else { return speaker }
             var updated = speaker
-            updated.name = roster[0]
-            updated.nameSource = .roster
+            updated.name = name
+            updated.nameSource = source
             return updated
         }
     }
 
     // MARK: The user's own name (step 5)
 
-    private static func isUser(_ name: String, userName: String?) -> Bool {
+    static func isUser(_ name: String, userName: String?) -> Bool {
         guard let userName, !userName.isEmpty else { return false }
         return name.caseInsensitiveCompare(userName) == .orderedSame
     }

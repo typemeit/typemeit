@@ -88,7 +88,16 @@ enum MeetingTranscriber {
                 }
             }
 
-            let segments = await speakers(of: &meeting, in: folder)
+            // The far-end people the window showed talking (8.3): how many
+            // the diarizer is told, and the name a one-voice far end takes.
+            let talkers = meeting.names.map { names in
+                SpeakerCount.farEndTalkers(
+                    spans: names.spans, farEnd: trackWords.first { $0.role == Meeting.Speaker.them }?.words ?? [],
+                    mic: trackWords.first { $0.role == Meeting.Speaker.you }?.words ?? [],
+                    lagMs: Fixed.meetingUILagMs, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+            } ?? []
+            let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: NSFullUserName()) }
+            let segments = await speakers(of: &meeting, in: folder, count: count)
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
             meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
             // A word the segments did not reach keeps its track's label; that
@@ -105,7 +114,7 @@ enum MeetingTranscriber {
             if let names = meeting.names {
                 let aligned = SpeakerNaming.align(
                     speakers: meeting.speakers, segments: segments ?? [], paragraphs: meeting.paragraphs, names: names,
-                    userName: NSFullUserName(), lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
+                    talkers: talkers, userName: NSFullUserName(), lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
                     minOverlapMs: Fixed.meetingNameMinOverlapSeconds * 1000, margin: Fixed.meetingNameMargin)
                 meeting.speakers = aligned.speakers
                 meeting.paragraphs = aligned.paragraphs
@@ -180,7 +189,8 @@ enum MeetingTranscriber {
     /// end has one speaker stays `Them`. Without the model the meeting
     /// transcribes as before, and the download starts for the next one.
     /// The diarizer failing keeps the transcript with `Them` or `Room`.
-    private static func speakers(of meeting: inout Meeting, in folder: URL) async -> [SpeakerSegment]? {
+    /// `count` is what the call's window said about its far end.
+    private static func speakers(of meeting: inout Meeting, in folder: URL, count: SpeakerCount?) async -> [SpeakerSegment]? {
         let role: Meeting.Track.Role = meeting.kind == .call ? .others : .room
         guard let track = meeting.tracks.first(where: { $0.role == role }) else { return nil }
         guard DiarizerModelStore.isInstalled else {
@@ -190,7 +200,7 @@ enum MeetingTranscriber {
         // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
         let segments: [SpeakerSegment]
         do {
-            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file))
+            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: count)
             segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
         } catch {
             Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
@@ -206,6 +216,7 @@ enum MeetingTranscriber {
         if meeting.kind == .call, order.count == 1 {
             let them = Meeting.Speaker.them
             meeting.speakers.append(Meeting.Speaker(id: them, name: previous.first { $0.id == them }?.name ?? defaultName(for: .others), isYou: false, talkMs: 0))
+            DebugLog.write("Meeting speakers: 1 on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
             return nil
         }
         let ids = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, "s\($0 + 1)") })
@@ -214,7 +225,7 @@ enum MeetingTranscriber {
             let name = previous.first { $0.id == id }?.name ?? "Speaker \(i + 1)"
             meeting.speakers.append(Meeting.Speaker(id: id, name: name, isYou: false, talkMs: 0))
         }
-        DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track")
+        DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
         return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
     }
 
