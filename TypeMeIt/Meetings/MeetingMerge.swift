@@ -14,10 +14,10 @@ enum MeetingMerge {
     /// app that ended within `window` before `new` started, whose call key
     /// does not contradict `new`'s, and whose audio was kept. Pure.
     static func previous(of new: Meeting, among meetings: [Meeting], window: TimeInterval) -> Meeting? {
-        guard new.kind == .call, new.source == nil, let app = new.app else { return nil }
+        guard new.kind == .call, let app = new.app else { return nil }
         return meetings
             .filter { m in
-                guard m.id != new.id, m.kind == .call, m.source == nil, m.app?.bundleId == app.bundleId, m.continues == nil,
+                guard m.id != new.id, m.kind == .call, m.app?.bundleId == app.bundleId, m.continues == nil,
                       !m.tracks.isEmpty, m.transcription.state == .done ? !m.audioFiles.isEmpty : true else { return false }
                 if let a = m.names?.call, let b = new.names?.call, a != b { return false }
                 let gap = new.started.timeIntervalSince(end(of: m))

@@ -15,7 +15,6 @@ import Foundation
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
 ///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
-///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
 ///     -summarise <meeting id>...            write each meeting's summary to the log, without saving it
 @MainActor
 enum MeetingProbes {
@@ -54,13 +53,6 @@ enum MeetingProbes {
                     let summary = await MeetingSummary.summarise(meeting)
                     DebugLog.write("Meeting probe summary \(meeting.title) (\(MeetingSummary.parts(of: meeting, maxWords: Fixed.meetingSummaryChunkWords).count) parts, \(ContinuousClock.now - started)): \(summary ?? "none")")
                 }
-            }
-        }
-        if let path = value(after: "-importFile") {
-            DebugLog.enabled = true
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(2))
-                MeetingCoordinator.shared.importRecordings([URL(fileURLWithPath: path)])
             }
         }
     }

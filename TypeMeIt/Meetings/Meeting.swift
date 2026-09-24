@@ -13,9 +13,6 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     enum Kind: String, Codable, Sendable { case call, room }
     enum TitleSource: String, Codable, Sendable { case app, user, generated, roster }
     enum Echo: String, Codable, Sendable { case notMeasured, clean, affected }
-    /// Nil means recorded by this app; `imported` is a file brought in from
-    /// elsewhere (docs/meetings.md D21).
-    enum Source: String, Codable, Sendable { case recorded, imported }
 
     struct App: Codable, Equatable, Sendable {
         var bundleId: String
@@ -121,10 +118,6 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// The meeting this recording is a rejoin of: it is joined onto that
     /// one before transcription and then deleted (`MeetingMerge`).
     var continues: UUID? = nil
-    /// Nil for a meeting this app recorded.
-    var source: Source? = nil
-    /// The imported file's basename only, never its path (docs/meetings.md 7.14).
-    var importedFrom: String? = nil
 
     static let encoder: JSONEncoder = {
         let e = JSONEncoder()

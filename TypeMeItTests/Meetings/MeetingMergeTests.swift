@@ -59,13 +59,6 @@ struct MeetingMergeTests {
         #expect(MeetingMerge.previous(of: later, among: [earlier, later], window: window) == nil)
     }
 
-    @Test func anImportIsNeverJoined() {
-        let earlier = call(0, seconds: 600)
-        var later = call(660, seconds: 300)
-        later.source = .imported
-        #expect(MeetingMerge.previous(of: later, among: [earlier, later], window: window) == nil)
-    }
-
     @Test func theJoinedMeetingPutsTheLaterOneAfterTheGap() {
         let earlier = call(0, seconds: 600)
         var later = call(660, seconds: 300, call: "abc-defg-hij")
