@@ -40,6 +40,7 @@ private struct SquareButtonLabel: View {
     var body: some View {
         configuration.label
             .labelStyle(SquareButtonLabelStyle())
+            .environment(\.squareLabelLift, Square.drop(lowercase: true, size: size))
             .font(Square.mono(size))
             .lineLimit(1)
             .centredLowercase(size: size)
@@ -100,8 +101,8 @@ private struct SquareButtonLabelStyle: LabelStyle {
     }
 }
 
-/// A square icon button: ink-2, and under the pointer ink inside a dashed
-/// ink-2 edge; held, an ink-a08 wash. Disabled fades to 40%.
+/// A square icon button: ink-2, and under the pointer ink on an ink-a08
+/// square; held, ink-a12. Disabled fades to 40%.
 struct SquareIconButtonStyle: ButtonStyle {
     var side: CGFloat = 26
 
@@ -125,8 +126,7 @@ private struct SquareIconButtonBody: View {
         configuration.label
             .foregroundStyle(foreground)
             .frame(width: side, height: side)
-            .background(Rectangle().fill(down ? (onSlab ? DesignTokens.Colors.onSlab.opacity(0.16) : DesignTokens.Colors.inkA08) : .clear))
-            .overlay(Rectangle().strokeBorder(hot ? edge : .clear, style: SquareEdge.style(dashed: true)))
+            .background(Rectangle().fill(wash))
             .opacity(enabled ? 1 : 0.4)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
@@ -137,7 +137,10 @@ private struct SquareIconButtonBody: View {
         return hot ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2
     }
 
-    private var edge: Color { onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink2 }
+    private var wash: Color {
+        if onSlab { return down ? DesignTokens.Colors.onSlab.opacity(0.24) : hot ? DesignTokens.Colors.onSlab.opacity(0.16) : .clear }
+        return down ? DesignTokens.Colors.inkA12 : hot ? DesignTokens.Colors.inkA08 : .clear
+    }
 }
 
 #if DEBUG
@@ -205,6 +208,124 @@ struct SquareIconButtonSpecimen: View {
     }
 }
 
+/// Ways a text button could answer the pointer instead of the dashed edge,
+/// to choose between: each draws an outlined and a primary button at rest,
+/// under the pointer and held. The rest column answers the pointer live.
+struct SquareButtonHoverSpecimen: View {
+    var body: some View {
+        SquareSpecimen {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 0) {
+                    Text("").frame(width: 120, alignment: .leading)
+                    ForEach(SquarePose.allCases, id: \.self) { pose in
+                        Text(pose.name).frame(width: 150, alignment: .leading)
+                    }
+                }
+                .font(Square.mono(11))
+                .foregroundStyle(DesignTokens.Colors.ink3)
+                ForEach(HoverOption.allCases, id: \.self) { option in
+                    HStack(spacing: 0) {
+                        Text(option.rawValue)
+                            .font(Square.mono(11))
+                            .foregroundStyle(DesignTokens.Colors.ink2)
+                            .frame(width: 120, alignment: .leading)
+                        ForEach(SquarePose.allCases, id: \.self) { pose in
+                            HStack(spacing: 10) {
+                                Button("show") {}.buttonStyle(HoverOptionStyle(option: option))
+                                Button("stop") {}.buttonStyle(HoverOptionStyle(option: option, primary: true))
+                            }
+                            .environment(\.squarePose, pose)
+                            .frame(width: 150, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum HoverOption: String, CaseIterable {
+    case dashes = "dashed edge"
+    case wash = "grey wash"
+    case fill = "fill"
+    case shadow = "hard shadow"
+    case thick = "thick edge"
+    case underline = "underline"
+}
+
+private struct HoverOptionStyle: ButtonStyle {
+    let option: HoverOption
+    var primary = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverOptionLabel(configuration: configuration, option: option, primary: primary)
+    }
+}
+
+private struct HoverOptionLabel: View {
+    let configuration: ButtonStyleConfiguration
+    let option: HoverOption
+    let primary: Bool
+    @Environment(\.squarePose) private var pose
+    @State private var hovering = false
+
+    private var hot: Bool { pose.hot(hovering) }
+    private var down: Bool { pose.down(configuration.isPressed) }
+    /// The hard shadow's reach, and how far a held button travels onto it.
+    private static let shadowOffset: CGFloat = 2
+
+    var body: some View {
+        configuration.label
+            .font(Square.mono(Square.controlSize))
+            .centredLowercase()
+            .underline(option == .underline && hot && !down, color: foreground)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 10)
+            .frame(height: SquareButtonStyle.height)
+            .background(Rectangle().fill(fill))
+            .overlay(Rectangle().strokeBorder(edge, style: StrokeStyle(lineWidth: edgeWidth, dash: option == .dashes && hot ? SquareEdge.dash : [])))
+            .overlay { if option == .thick, primary, hot, !down { Rectangle().stroke(DesignTokens.Colors.ink, lineWidth: 2).padding(-3) } }
+            .offset(x: travel, y: travel)
+            .background { if option == .shadow, hot, !down { Rectangle().fill(DesignTokens.Colors.ink).offset(x: Self.shadowOffset, y: Self.shadowOffset) } }
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+    }
+
+    private var travel: CGFloat { option == .shadow && down ? Self.shadowOffset : 0 }
+
+    private var foreground: Color {
+        if option == .fill, hot || down { return primary ? DesignTokens.Colors.ink : DesignTokens.Colors.onSlab }
+        return primary ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink
+    }
+
+    private var fill: Color {
+        switch option {
+        case .dashes, .underline, .thick:
+            if primary { return down ? DesignTokens.Colors.inkA64 : DesignTokens.Colors.slab }
+            return down ? DesignTokens.Colors.inkA08 : .clear
+        case .wash:
+            if primary { return down ? DesignTokens.Colors.inkA64 : hot ? DesignTokens.Colors.inkA88 : DesignTokens.Colors.slab }
+            return down ? DesignTokens.Colors.inkA12 : hot ? DesignTokens.Colors.inkA08 : .clear
+        case .fill:
+            if primary { return down ? DesignTokens.Colors.inkA08 : hot ? DesignTokens.Colors.paper : DesignTokens.Colors.slab }
+            return down ? DesignTokens.Colors.inkA64 : hot ? DesignTokens.Colors.slab : .clear
+        case .shadow:
+            return primary ? DesignTokens.Colors.slab : DesignTokens.Colors.paper
+        }
+    }
+
+    private var edge: Color {
+        switch option {
+        case .dashes: return primary ? (hot ? DesignTokens.Colors.onSlab : .clear) : DesignTokens.Colors.ink
+        case .fill: return primary ? (hot || down ? DesignTokens.Colors.ink : .clear) : DesignTokens.Colors.ink
+        default: return primary ? .clear : DesignTokens.Colors.ink
+        }
+    }
+
+    private var edgeWidth: CGFloat { option == .thick && !primary && hot ? 2 : DesignTokens.hairline }
+}
+
 #Preview("button") { SquareButtonSpecimen() }
 #Preview("icon button") { SquareIconButtonSpecimen() }
+#Preview("button hovers") { SquareButtonHoverSpecimen() }
 #endif

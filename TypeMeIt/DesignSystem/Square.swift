@@ -11,6 +11,10 @@ enum Square {
 
     static func sans(_ size: CGFloat) -> Font { .system(size: size) }
 
+    /// The same two faces for AppKit, for the fields.
+    static func appKitMono(_ size: CGFloat) -> NSFont { .monospacedSystemFont(ofSize: size, weight: .regular) }
+    static func appKitSans(_ size: CGFloat) -> NSFont { .systemFont(ofSize: size) }
+
     /// The label size on every control: buttons, segments, menus, keys, chips.
     static let controlSize: CGFloat = 12
 
@@ -30,10 +34,13 @@ enum Square {
     }
 }
 
-/// An akar icon from the asset catalog, in the current foreground.
+/// An akar icon from the asset catalog, in the current foreground. Inside a
+/// button's label it drops back by the lift the label's letters were given,
+/// so it sits on the button's true centre.
 struct SquareIcon: View {
     let name: String
     var size: CGFloat
+    @Environment(\.squareLabelLift) private var lift
 
     init(_ name: String, size: CGFloat = 16) {
         self.name = name
@@ -41,7 +48,7 @@ struct SquareIcon: View {
     }
 
     var body: some View {
-        Image(name).resizable().frame(width: size, height: size)
+        Image(name).resizable().frame(width: size, height: size).offset(y: lift)
     }
 }
 
@@ -81,6 +88,8 @@ extension EnvironmentValues {
     /// Set by a slab surface (a failed prompt, the live band) so the parts on
     /// it invert: buttons fill with on-slab and crosses turn on-slab.
     @Entry var squareOnSlab = false
+    /// How far a button lifted its label to centre its lowercase letters.
+    @Entry var squareLabelLift: CGFloat = 0
 }
 
 extension View {

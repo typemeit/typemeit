@@ -112,17 +112,15 @@ private struct SquareWhenPreset: View {
 private struct SquareTimeField: View {
     let placeholder: String
     @Binding var text: String
-    @FocusState private var focused: Bool
+    @State private var focused = false
 
     var body: some View {
-        TextField(placeholder, text: $text)
-            .textFieldStyle(.plain)
-            .font(Square.mono(11))
-            .foregroundStyle(DesignTokens.Colors.ink)
-            .focused($focused)
+        SquareTextInput(placeholder: placeholder, text: $text, font: Square.appKitMono(11), focused: $focused)
             .padding(.horizontal, 6)
             .frame(width: 58, height: 24)
             .overlay(Rectangle().strokeBorder(focused ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
     }
 }
 

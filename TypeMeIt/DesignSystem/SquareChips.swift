@@ -118,24 +118,18 @@ struct SquareField: View {
     @Binding var text: String
     var icon: String?
     var onSubmit: () -> Void = {}
-    @FocusState private var focused: Bool
+    @State private var focused = false
 
     var body: some View {
         HStack(spacing: 8) {
             if let icon { SquareIcon(icon, size: 13).foregroundStyle(DesignTokens.Colors.ink3) }
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(Square.sans(13))
-                .foregroundStyle(DesignTokens.Colors.ink)
-                .focused($focused)
-                .onSubmit(onSubmit)
+            SquareTextInput(placeholder: placeholder, text: $text, font: Square.appKitSans(13), focused: $focused, onSubmit: onSubmit)
         }
         .padding(.horizontal, 9)
         .frame(height: 28)
         .overlay(Rectangle().strokeBorder(focused ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
-        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: focused)
     }
 }
 

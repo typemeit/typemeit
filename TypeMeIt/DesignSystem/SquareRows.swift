@@ -201,15 +201,20 @@ struct SquareListRow: View {
     }
 }
 
-/// The row for what records now: the slab, a pulsing dot, where, and the time
-/// so far.
+/// The row for what records now: the slab, when it started, where, and the
+/// time so far.
 struct SquareLiveRow: View {
+    let started: String
     let label: String
     let time: String
 
     var body: some View {
         HStack(spacing: 16) {
-            SquareLiveDot().frame(width: 48, alignment: .leading)
+            Text(started)
+                .font(Square.mono(11))
+                .monospacedDigit()
+                .opacity(0.72)
+                .frame(width: 48, alignment: .leading)
             Text(label).font(Square.mono(12)).frame(maxWidth: .infinity, alignment: .leading)
             Text(time).font(Square.mono(12)).monospacedDigit()
         }
@@ -243,8 +248,8 @@ struct SquareDayHeader: View {
 }
 
 /// A meeting recording now, across the top of the meetings page: the slab,
-/// a pulsing dot, where it is, how loud each side is, the time so far, and
-/// stop. It names no one.
+/// where it is, how loud each side is, the time so far, and stop. It names no
+/// one.
 struct SquareLiveBand: View {
     let place: String
     let time: String
@@ -255,7 +260,6 @@ struct SquareLiveBand: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            SquareLiveDot(side: 9)
             Text("recording · \(place)").font(Square.mono(12))
             Spacer()
             level("you", you)
@@ -276,15 +280,6 @@ struct SquareLiveBand: View {
             Text(side).font(Square.mono(11)).opacity(0.7)
             SquareBar(fraction: value, width: 70, height: 4, track: DesignTokens.Colors.onSlab.opacity(0.2), fill: DesignTokens.Colors.onSlab)
         }
-    }
-}
-
-/// A square dot that pulses, for what is live.
-struct SquareLiveDot: View {
-    var side: CGFloat = 8
-
-    var body: some View {
-        Rectangle().frame(width: side, height: side).modifier(LivePulse())
     }
 }
 
@@ -383,7 +378,9 @@ struct SquareGroupSpecimen: View {
                 }
                 SquareGroup(title: "clean-up", summary: "on · reads the screen · 3 of 5 styles", open: .constant(false)) { EmptyView() }
             }
-            .frame(width: 700)
+            // Hung from the top at the height of both groups open, so opening
+            // one moves only what is under it, as on the page.
+            .frame(width: 700, height: 340, alignment: .top)
             .toggleStyle(SquareSwitchStyle())
             .labelsHidden()
         }
@@ -400,7 +397,7 @@ struct SquareListRowSpecimen: View {
                 SquareListRow(time: "10:21", title: "pricing page review", detail: "11m")
                 SquareListRow(time: "10:21", title: "pricing page review", detail: "11m").environment(\.squarePose, .hover)
                 SquareListRow(time: "10:21", title: "pricing page review", detail: "11m", selected: true)
-                SquareLiveRow(label: "recording · slack huddle", time: "12:04")
+                SquareLiveRow(started: "10:48", label: "recording · slack huddle", time: "12:04")
                 SquareListRow(time: "09:02", title: "select box, under the pointer", detail: "4m", picked: $picked)
                     .environment(\.squarePose, .hover)
                 SquareListRow(time: "08:47", title: "select box, picked", detail: "2m", picked: .constant(true), picking: true)
@@ -424,7 +421,6 @@ struct SquareStatusSpecimen: View {
                 SquareSpinner()
                 Text("checking the last 10 dictations").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink)
             }
-            SquareSpecimenLine(name: "live") { SquareLiveDot().foregroundStyle(DesignTokens.Colors.ink) }
         }
     }
 }

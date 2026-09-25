@@ -135,6 +135,7 @@ struct SquareGallery: View {
             ("weight", AnyView(SquareWeightSpecimen())),
             ("cloud palette", AnyView(SquareCloudPaletteSpecimen())),
             ("button", AnyView(SquareButtonSpecimen())),
+            ("button hovers", AnyView(SquareButtonHoverSpecimen())),
             ("icon button", AnyView(SquareIconButtonSpecimen())),
             ("switch", AnyView(SquareSwitchSpecimen())),
             ("tick", AnyView(SquareTickSpecimen())),
