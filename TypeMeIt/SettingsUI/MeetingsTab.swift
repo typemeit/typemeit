@@ -306,9 +306,6 @@ struct MeetingsTab: View {
                 }
             }
             iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
-            if m.isDone, !m.audioFiles.isEmpty, !coordinator.liveIDs.contains(m.id) {
-                iconButton("akar-arrow-cycle", "transcribe again") { coordinator.transcribeAgain(m.id) }
-            }
             iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
             if let folder = store.folder(for: m.id) {
                 iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
