@@ -57,8 +57,8 @@ struct SquareSidebar<Page: Hashable>: View {
         .buttonStyle(SquareIconButtonStyle(side: SquareSidebarLayout.cloud + 2 * SquareSidebarLayout.cloudWash))
         .help(label)
         .accessibilityLabel(label)
-        .padding(.leading, SquareSidebarLayout.markInset - SquareSidebarLayout.cloudWash)
-        .padding(.bottom, SquareSidebarLayout.cloudWash * 3)
+        .padding(.leading, SquareSidebarLayout.cloudReach - SquareSidebarLayout.cloudWash)
+        .padding(.bottom, SquareSidebarLayout.cloudReach)
     }
 }
 
@@ -70,9 +70,12 @@ enum SquareSidebarLayout {
     /// left for the two to line up.
     static let markInset: CGFloat = itemInset - 3
     static let icon: CGFloat = 16
-    /// The cloud at the foot, the mark's size, lined up under it. A resting
-    /// puff shows in about half the cell it is drawn for.
+    /// The cloud at the foot, the mark's size, under it. A resting puff
+    /// shows in about half the cell it is drawn for.
     static let cloud: CGFloat = 32
+    /// How far a loud cloud billows past its cell; the foot keeps that much
+    /// room so the window's edge never cuts it.
+    static var cloudReach: CGFloat { cloud / 2 }
     /// How far the pointer's grey square reaches round the cloud.
     static let cloudWash: CGFloat = 4
 }
