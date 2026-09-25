@@ -83,7 +83,6 @@ private struct SquareTick: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
             .accessibilityRepresentation {
                 Toggle(isOn: configuration.$isOn) { configuration.label }
             }
