@@ -39,6 +39,11 @@ struct MeetingsTab: View {
         Group {
             if let id = open, let meeting = store.meeting(id) {
                 MeetingPage(meeting: meeting) { open = nil }
+            } else if store.meetings.isEmpty, coordinator.recording == nil {
+                VStack(spacing: 0) {
+                    SquarePageHeader(title: "meetings")
+                    MeetingsFirstRun(record: { coordinator.recordRoom() }, showSettings: showSettings)
+                }
             } else {
                 list
             }
@@ -627,5 +632,61 @@ private struct WhoMenu: View {
             .frame(width: WhoMenu.width)
         }
         .fixedSize()
+    }
+}
+
+/// The page before the first meeting: what a call brings up, and the room
+/// recorded by hand, with its shortcut once one is set.
+private struct MeetingsFirstRun: View {
+    let record: () -> Void
+    let showSettings: () -> Void
+    @State private var settings = Settings.shared
+
+    private static let width: CGFloat = 680
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 34) {
+            Text("nothing recorded yet")
+                .font(Square.mono(30))
+                .tracking(-0.6)
+                .foregroundStyle(DesignTokens.Colors.ink)
+            HStack(alignment: .top, spacing: 40) {
+                card("01", "on a call") {
+                    // What a call brings up, to look at rather than click.
+                    SquarePrompt(mark: .app("s"), message: Text("record this meeting?"), dismiss: "not now") {
+                        Button("record") {}.buttonStyle(SquareButtonStyle(kind: .primary))
+                    }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
+                card("02", "in a room") {
+                    HStack(spacing: 12) {
+                        Button("record the room", action: record).buttonStyle(SquareButtonStyle(kind: .primary))
+                        if let combo = settings.recordRoomShortcut {
+                            HStack(spacing: 4) { ForEach(combo.caps, id: \.self) { SquareKeycap($0) } }
+                        } else {
+                            SquareLink(title: "set a shortcut", color: DesignTokens.Colors.ink2, action: showSettings)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(width: MeetingsFirstRun.width, alignment: .leading)
+        .padding(.horizontal, 60)
+        .padding(.bottom, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func card(_ number: String, _ title: String, @ViewBuilder _ content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(number).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3)
+                Text(title).font(Square.mono(16)).foregroundStyle(DesignTokens.Colors.ink)
+            }
+            content()
+        }
+        .padding(.top, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
     }
 }
