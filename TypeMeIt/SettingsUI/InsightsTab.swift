@@ -16,7 +16,7 @@ struct InsightsTab: View {
                        postProcessRequested: $0.postProcessRequested, durationMs: $0.durationMs,
                        transcribeMs: $0.transcribeMs, postProcessMs: $0.postProcessMs,
                        dictionaryFixes: $0.dictionaryFixes, appId: $0.appId, appName: $0.appName, windowTitle: $0.windowTitle)
-        }, meetings: meetingStore.meetings.filter(\.isDone).map {
+        }, meetings: meetingStore.meetings.filter { $0.isDone && $0.recordedHere }.map {
             InsightMeeting(started: $0.started, appId: $0.app?.bundleId, appName: $0.app?.name)
         })
     }

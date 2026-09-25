@@ -1,7 +1,7 @@
 import Foundation
 
-/// The meetings part of the insights page, from the transcribed meetings.
-/// Pure: the meetings and the clock are passed in.
+/// The meetings part of the insights page, from the transcribed meetings
+/// recorded on this Mac. Pure: the meetings and the clock are passed in.
 struct MeetingStats: Equatable, Sendable {
     var meetings: Int
     var meetingsThisMonth: Int
@@ -18,7 +18,7 @@ struct MeetingStats: Equatable, Sendable {
 
 enum MeetingInsights {
     static func compute(_ all: [Meeting], now: Date = Date(), calendar: Calendar = .current) -> MeetingStats {
-        let meetings = all.filter(\.isDone)
+        let meetings = all.filter { $0.isDone && $0.recordedHere }
         let thisMonth = meetings.filter { calendar.isDate($0.started, equalTo: now, toGranularity: .month) }
         let calls = meetings.filter { $0.kind == .call }
         let lengths = meetings.map(\.durationMs).sorted()

@@ -269,6 +269,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateNow
     }
 
+    /// A `.tmi` file opened from Finder, Mail or a message (docs/meetings.md
+    /// 7.16): added to the meetings and shown. At launch this runs before
+    /// `applicationDidFinishLaunching`, so it reads the settings itself,
+    /// which is what turns the debug log on, and what it shows waits a turn.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        _ = Settings.shared
+        for url in urls where url.pathExtension.caseInsensitiveCompare(MeetingShare.fileExtension) == .orderedSame {
+            do {
+                let id = try MeetingStore.shared.receive(url)
+                Task { @MainActor in self.showReceived(id) }
+            } catch {
+                Log.meetings.error("Could not open \(url.lastPathComponent): \(error.localizedDescription)")
+                Task { @MainActor in self.showUnreadable(error) }
+            }
+        }
+    }
+
+    /// Onboarding and the gate keep the front; the meeting waits in the tab.
+    private func showReceived(_ id: UUID) {
+        AppState.shared.settingsTab = .meetings
+        AppState.shared.revealMeeting = id
+        guard onboardingWindow?.isVisible != true, gateWindow?.isVisible != true else { return }
+        NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+    }
+
+    private func showUnreadable(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Can't open this meeting"
+        alert.informativeText = (error as? MeetingShare.ReadError) == .newerVersion
+            ? "It's from a newer version of type me it. Update, then open it again."
+            : "The file isn't a type me it meeting."
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if onboardingWindow?.isVisible == true {
             onboardingWindow?.makeKeyAndOrderFront(nil)

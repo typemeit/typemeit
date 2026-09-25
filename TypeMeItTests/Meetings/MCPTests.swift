@@ -273,6 +273,19 @@ struct MCPTests {
             talkBySpeaker: ["You": "28m", "Them": "23m", "Ana": "13m"]))
     }
 
+    @Test func meetingStatsLeavesOutAMeetingSomeoneShared() throws {
+        let root = try writeFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var shared = slackMeeting()
+        shared.id = UUID()
+        shared.sharedBy = "Ellen"
+        try MeetingFolder.write(shared, to: root.appendingPathComponent("Shared Meeting", isDirectory: true))
+        let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
+        #expect(stats == MCPTools.Stats(
+            count: 2, totalDuration: "1h5m",
+            talkBySpeaker: ["You": "28m", "Them": "23m", "Ana": "13m"]))
+    }
+
     // MARK: the switch
 
     @Test func everyToolReturnsTheSameErrorWhenTheSwitchIsOff() throws {

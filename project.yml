@@ -87,6 +87,22 @@ targets:
         NSNetworkVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
+        # A meeting shared as a .tmi file (docs/meetings.md 7.16). Markdown
+        # and plain text underneath, so TextEdit and Quick Look read it; a
+        # double-click opens it here. The store build leaves it out until
+        # it has meetings.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: it.typeme.meeting
+            UTTypeDescription: type me it meeting
+            UTTypeConformsTo: [net.daringfireball.markdown, public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [tmi]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: type me it meeting
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [it.typeme.meeting]
+            CFBundleTypeIconSystemGenerated: 1
         SUFeedURL: https://github.com/typemeit/typemeit/releases/latest/download/appcast.xml
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 3600

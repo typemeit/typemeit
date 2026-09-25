@@ -156,8 +156,11 @@ enum MCPTools {
 
     // MARK: meeting_stats
 
+    /// Over meetings recorded here: one opened from someone's `.tmi` file is
+    /// not the user's time, and its talk times are estimates (docs/meetings.md 7.16).
     static func meetingStats(root: URL, from: Date? = nil, to: Date? = nil) -> Stats {
         let filtered = meetings(under: root).filter { entry in
+            guard entry.meeting.recordedHere else { return false }
             if let from, entry.meeting.started < from { return false }
             if let to, entry.meeting.started > to { return false }
             return true

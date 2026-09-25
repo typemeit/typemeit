@@ -22,6 +22,8 @@ struct MeetingsTab: View {
     /// The speaker label being renamed: meeting id and speaker id.
     @State private var renamingSpeaker: (meeting: UUID, speaker: String)?
     @State private var speakerName = ""
+    /// The `.tmi` file the share menu is showing, and the meeting whose button it is under.
+    @State private var sharing: (meeting: UUID, file: URL)?
     /// Re-reads the clock for the recording row's elapsed time.
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var now = Date()
@@ -306,6 +308,9 @@ struct MeetingsTab: View {
                 }
             }
             iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
+            if m.isDone, !m.paragraphs.isEmpty, !coordinator.liveIDs.contains(m.id) {
+                shareButton(m)
+            }
             iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
             if let folder = store.folder(for: m.id) {
                 iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
@@ -316,7 +321,18 @@ struct MeetingsTab: View {
         }
     }
 
-    /// `45m · 2 speakers · slack`.
+    /// The share menu under the button; the button can also be dragged,
+    /// which drops the `.tmi` file into a message or a folder
+    /// (docs/meetings.md 7.16).
+    private func shareButton(_ m: Meeting) -> some View {
+        iconButton("akar-share-box", "share") {
+            if let file = store.shareFile(m.id) { sharing = (m.id, file) }
+        }
+        .background(SharePicker(file: sharing?.meeting == m.id ? sharing?.file : nil) { sharing = nil })
+        .onDrag { store.shareFile(m.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
+    }
+
+    /// `45m · 2 speakers · slack`, and `· from ellen` on one someone shared.
     private func telemetry(_ m: Meeting) -> some View {
         HStack(spacing: 0) {
             Text(MeetingFolder.durationLabel(m.duration))
@@ -325,6 +341,10 @@ struct MeetingsTab: View {
             if let app = m.app {
                 Text(" · ")
                 Text(app.name.lowercased())
+            }
+            if let from = m.sharedBy, !from.isEmpty {
+                Text(" · ")
+                Text("from \(from.lowercased())")
             }
         }
         .font(.system(size: 10, design: .monospaced))
@@ -549,6 +569,30 @@ private struct Scrubber: View {
                 })
         }
         .frame(height: 14)
+    }
+}
+
+/// The system share menu, shown once under the view this sits behind when
+/// it is given a file; `done` clears the file so the next click shows it again.
+private struct SharePicker: NSViewRepresentable {
+    let file: URL?
+    let done: () -> Void
+
+    final class Coordinator { var shown = false }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        guard let file else { context.coordinator.shown = false; return }
+        guard !context.coordinator.shown else { return }
+        context.coordinator.shown = true
+        // Out of the update pass: the menu runs its own tracking loop.
+        Task { @MainActor in
+            NSSharingServicePicker(items: [file]).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+            done()
+        }
     }
 }
 
