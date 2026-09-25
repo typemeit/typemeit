@@ -59,6 +59,21 @@ struct EchoFoldTests {
         #expect(result == EchoFold.Result(mic: mic, others: others, droppedFromMic: 0, droppedFromOthers: 0))
     }
 
+    @Test func oneMispairedWordDoesNotMakeARunTheUsers() {
+        // 25 September, 7:48: the mic's echo "so it's it's" paired its first
+        // "it's" with the far end's, 140 ms ahead; "so" was 100 ms behind.
+        let mic = [
+            Transcriber.Word(text: "so", confidence: 1, start: .milliseconds(468_860), end: .milliseconds(469_000)),
+            Transcriber.Word(text: "it's", confidence: 1, start: .milliseconds(469_020), end: .milliseconds(469_160)),
+        ]
+        let others = [
+            Transcriber.Word(text: "So", confidence: 1, start: .milliseconds(468_760), end: .milliseconds(468_900)),
+            Transcriber.Word(text: "it's", confidence: 1, start: .milliseconds(469_160), end: .milliseconds(469_300)),
+        ]
+        let result = EchoFold.fold(mic: mic, others: others, micEnvelope: [], othersEnvelope: [], envelopeHz: 100)
+        #expect(result == EchoFold.Result(mic: [], others: others, droppedFromMic: 2, droppedFromOthers: 0))
+    }
+
     /// The far end's level, a rise and fall every 300 ms, and the mic
     /// hearing it at `gain` 20 ms later: an echo's envelope.
     private func echoing(gain: Float) -> (mic: [Float], others: [Float]) {

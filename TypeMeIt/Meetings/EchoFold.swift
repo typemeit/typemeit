@@ -17,8 +17,10 @@ enum EchoFold {
     static let minimumRun = 2
     /// The far end's voice reached the mic 0 to 60 ms after the far-end
     /// track had it (median 20 ms over 33 runs on the 25 September call);
-    /// the user's voice came back 140 ms after the mic had it. A run whose
-    /// mic copy leads by more than this is the user's.
+    /// the user's voice came back 140 ms after the mic had it. A run is the
+    /// user's only when every word of it has the mic copy ahead by more than
+    /// this: taking the middle word let one mispaired word decide, and
+    /// deleted a far-end "So it's" from its own track on a 29-minute call.
     static let returnedVoiceMs = 100
 
     /// What the runs miss: a word or three of the far end left on the mic,
@@ -54,8 +56,8 @@ enum EchoFold {
         var dropMic: Set<Int> = []
         var dropOthers: Set<Int> = []
         for run in runs(of: pairs) {
-            let micLeads = run.map { others[$0.others].start.milliseconds - mic[$0.mic].start.milliseconds }.sorted()
-            if micLeads[micLeads.count / 2] > returnedVoiceMs {
+            let micLeads = run.map { others[$0.others].start.milliseconds - mic[$0.mic].start.milliseconds }
+            if micLeads.allSatisfy({ $0 > returnedVoiceMs }) {
                 for pair in run { dropOthers.insert(pair.others) }
             } else {
                 for pair in run { dropMic.insert(pair.mic) }
