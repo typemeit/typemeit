@@ -140,9 +140,16 @@ change any of them; the default is what gets built.
   An affected meeting is marked `echo: affected` and its row says `on
   speakers`. On such a meeting, and only there, a run of two or more
   identical words at the same instant on both tracks (within 400 ms; the
-  tracks share a clock, 5.4) is one utterance heard twice, and the copy on
-  the track that is quieter over that run, the one that came through a
-  speaker, is dropped (`EchoFold`). A lone shared word is left alone.
+  tracks share a clock, 5.4) is one utterance heard twice, and the later
+  copy is dropped (`EchoFold`): the far end's voice reaches the mic just
+  after the far-end track has it, and the user's comes back from the far
+  end a round trip after the mic. A lone shared word is left alone. What
+  the runs miss, far-end speech the mic's transcript turned into other
+  words, is found by level: the echo's lag and loudness are read from the
+  two tracks every 5 s (`EchoLag`), since the lag jumps mid-call by up to
+  90 ms, and a stretch of mic words whose level follows the far end's at
+  that lag while the far end speaks goes, unless the mic is three times
+  louder than the echo alone would make it.
   Voice-processing I/O and text-only dedup are out (section 10): the first
   ducks the far end, the second cannot tell an echo from a coincidence
   without the clock.
@@ -452,7 +459,8 @@ Rules for every task below:
 | `Meetings/ChunkCutter.swift` | Cut points for a long track from its peak envelope (pure) |
 | `Meetings/TranscriptMerge.swift` | Words from one or two tracks plus speaker segments plus dictation spans to paragraphs (pure) |
 | `Meetings/EchoBleedDetector.swift` | Lifted from meeting-transcriber (MIT): envelope cross-correlation verdict (pure) |
-| `Meetings/EchoFold.swift` | On an affected call, drops the quieter copy of a run of words both tracks share at the same instant (pure) |
+| `Meetings/EchoFold.swift` | On an affected call, drops the later copy of a run of words both tracks share at the same instant, and far-end speech left on the mic (pure) |
+| `Meetings/EchoLag.swift` | The echo's lag and loudness through a call, read from the two tracks' envelopes (pure) |
 | `Meetings/MeetingTranscriber.swift` | The end-of-meeting pipeline: read tracks, chunk, transcribe, (phase 2) diarize, echo, merge, write, transcode, publish |
 | `Meetings/DiarizerModelStore.swift` (phase 2) | Download and pin the FluidAudio model archive, modelled on `ModelStore` |
 | `Meetings/Diarizer.swift` (phase 2) | FluidAudio offline pipeline behind two functions |
