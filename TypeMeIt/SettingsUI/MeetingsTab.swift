@@ -1,93 +1,55 @@
 import AppKit
-import Combine
 import SwiftUI
 
-/// The meetings page (docs/meetings.md 7.11): the list by day, with what
-/// is live above it.
+/// The meetings page (docs/meetings.md 7.11): every meeting by day, filtered
+/// by where, who and when, with what records now in a band above. A row says
+/// how its transcription stands; a click opens the meeting's own page.
 struct MeetingsTab: View {
+    /// Shows the settings group that holds the meeting settings.
+    var showSettings: () -> Void = {}
     @State private var store = MeetingStore.shared
     @State private var coordinator = MeetingCoordinator.shared
-    @State private var player = RecordingPlayer.shared
+    @State private var settings = Settings.shared
     @State private var appState = AppState.shared
+    @State private var diarizer = DiarizerModelStore.shared
     @State private var search = ""
-    /// The meeting shown as its own page, or nil for the list.
-    @State private var open: UUID?
+    /// The where filter: an app's name, or a channel.
+    @State private var place: String?
+    /// The who filter: meetings with everyone in it.
+    @State private var people: Set<String> = []
+    @State private var when = SquareWhen.any
+    @State private var from = ""
+    @State private var to = ""
+    @State private var whereOpen = false
+    @State private var whoOpen = false
+    @State private var whenOpen = false
     @State private var selected: Set<UUID> = []
+    /// The row a range is measured from: the last one whose box was clicked.
     @State private var anchor: UUID?
     @State private var confirmDeleteAll = false
-    @State private var renaming: UUID?
-    @State private var renameText = ""
-    @State private var diarizer = DiarizerModelStore.shared
-    /// The speaker label being renamed: meeting id and speaker id.
-    @State private var renamingSpeaker: (meeting: UUID, speaker: String)?
-    @State private var speakerName = ""
-    /// The `.tmi` file the share menu is showing, and the meeting whose button it is under.
-    @State private var sharing: (meeting: UUID, file: URL)?
-    /// Re-reads the clock for the recording row's elapsed time.
+    /// Meetings whose stop was clicked, until their transcription lets go.
+    @State private var stopping: Set<UUID> = []
+    /// The meeting shown as its own page, or nil for the list.
+    @State private var open: UUID?
+    /// Re-reads the clock for the recording band's time.
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var now = Date()
 
-    private var filtered: [Meeting] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return store.meetings }
-        return store.meetings.filter { m in
-            m.title.lowercased().contains(q) || m.speakers.contains { $0.name.lowercased().contains(q) } || m.paragraphs.contains { $0.text.lowercased().contains(q) }
-        }
-    }
-
-    private var groups: [(title: String, meetings: [Meeting])] {
-        let cal = Calendar.current
-        var out: [(String, [Meeting])] = []
-        for m in filtered {
-            let title: String
-            if cal.isDateInToday(m.started) { title = "today" }
-            else if cal.isDateInYesterday(m.started) { title = "yesterday" }
-            else { title = m.started.formatted(.dateTime.day().month(.wide)).lowercased() }
-            if let last = out.last, last.0 == title { out[out.count - 1].1.append(m) } else { out.append((title, [m])) }
-        }
-        return out
-    }
-
     var body: some View {
         Group {
-            if let id = open, let m = store.meeting(id) {
-                page(m)
+            if let id = open, let meeting = store.meeting(id) {
+                MeetingPage(meeting: meeting) { open = nil }
             } else {
                 list
             }
         }
         .onAppear(perform: reveal)
         .onChange(of: appState.revealMeeting) { _, _ in reveal() }
-        .onChange(of: store.meetings.map(\.id)) { _, ids in if let id = open, !ids.contains(id) { open = nil } }
-    }
-
-    private var list: some View {
-        VStack(spacing: 0) {
-            topBar
-            if coordinator.recording != nil || coordinator.transcribing != nil || diarizerBusy {
-                statusRow
-                RowRule()
-            }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    if groups.isEmpty {
-                        Text(store.meetings.isEmpty ? "nothing yet" : "no matches")
-                            .foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: .infinity).padding(.vertical, 40)
-                    }
-                    ForEach(groups, id: \.title) { group in
-                        SettingsGroup(title: group.title) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(group.meetings.enumerated()), id: \.element.id) { i, m in
-                                    row(m, last: i == group.meetings.count - 1).id(m.id)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 20)
-            }
+        .onChange(of: store.meetings.map(\.id)) { _, ids in
+            if let id = open, !ids.contains(id) { open = nil }
+            selected.formIntersection(ids)
         }
-        .onReceive(clock) { now = $0 }
+        .onChange(of: coordinator.transcribing?.id) { _, running in stopping = stopping.filter { $0 == running } }
     }
 
     /// The pill's `show` opens the meeting it names.
@@ -97,341 +59,294 @@ struct MeetingsTab: View {
         open = id
     }
 
-    // MARK: A meeting's page
+    private var list: some View {
+        let rows = filtered
+        return VStack(alignment: .leading, spacing: 0) {
+            SquarePageHeader(title: "meetings", count: counted(store.meetings.count, "meeting"), status: status,
+                             linkTitle: "meeting settings", onLink: showSettings)
+            toolbar(shown: rows.count)
+            if let live = coordinator.recording { liveBand(live) }
+            modelStatus
+            if store.meetings.isEmpty {
+                message { Text("nothing yet") }
+            } else if rows.isEmpty {
+                message {
+                    HStack(spacing: 6) {
+                        Text("no meetings match ·")
+                        SquareLink(title: "clear the filters", size: 12, color: DesignTokens.Colors.ink2, action: clearFilters)
+                    }
+                }
+            } else {
+                MeetingColumns.head.padding(.horizontal, MeetingColumns.page)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(MeetingsTab.lines(rows)) { line in
+                            switch line {
+                            case .day(_, let day, let date, let total):
+                                MeetingDayRow(day: day, date: date, total: total)
+                            case .row(let meeting):
+                                MeetingRow(meeting: meeting, picked: picked(meeting.id), picking: !selected.isEmpty,
+                                           stopping: stopping.contains(meeting.id),
+                                           open: { open = meeting.id },
+                                           stop: {
+                                               stopping.insert(meeting.id)
+                                               coordinator.stopTranscribing(meeting.id)
+                                           })
+                            }
+                        }
+                    }
+                    .padding(.horizontal, MeetingColumns.page)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+        .onReceive(clock) { now = $0 }
+    }
 
-    /// One meeting: a way back, its title and details, its actions, and the
-    /// whole transcript with room to read it.
-    private func page(_ m: Meeting) -> some View {
+    private func message(@ViewBuilder _ text: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Button { open = nil } label: {
-                    HStack(spacing: 5) {
-                        Image("akar-chevron-down").resizable().frame(width: 10, height: 10).rotationEffect(.degrees(90))
-                        Text("meetings")
-                    }
-                    .font(.system(size: 12).monospaced())
-                    .padding(.horizontal, 7).padding(.vertical, 4)
-                }
-                .buttonStyle(QuietButtonStyle())
-                .keyboardShortcut(.cancelAction)
-                // The chevron lines up with the title; the hover wash reaches past it.
-                .padding(.leading, -7)
-                Spacer()
-                actions(m, play: false)
-            }
-            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
-            VStack(alignment: .leading, spacing: 6) {
-                title(m, size: 17)
-                HStack(spacing: 8) {
-                    Text(m.started.formatted(.dateTime.day().month(.wide).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)).lowercased())
-                        .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                    telemetry(m)
-                }
-                chips(m)
-                summary(m)
-            }
-            .padding(.horizontal, 20).padding(.bottom, 14)
-            if let urls = audioURLs(m) {
-                playerBar(m, urls: urls).padding(.horizontal, 20).padding(.bottom, 12)
-            }
-            RowRule()
-            ScrollView {
-                transcript(m)
-                    .padding(.horizontal, 20).padding(.vertical, 16)
-            }
-        }
-        // Playback belongs to the page: leaving it, or the tab, stops it.
-        .onDisappear { if player.playing == m.id { player.stop() } }
-        .onAppear { coordinator.summarise(m.id) }
-    }
-
-    @ViewBuilder
-    private func summary(_ m: Meeting) -> some View {
-        if let text = m.summary {
-            // Never fixedSize: the split view measures its columns at almost
-            // no width, and a summary held to its height there made the window
-            // 13 pt tall per character, 27,978 pt for one of 2,085, past what
-            // can be drawn, so the window stayed blank.
-            Text(text).font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
-                .frame(maxWidth: 640, alignment: .leading)
-                .textSelection(.enabled).padding(.top, 4)
-        } else if coordinator.summarising.contains(m.id) {
-            Text("summarising…").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink3).padding(.top, 4)
-        }
-    }
-
-    /// The meeting's tracks, when its audio was kept.
-    private func audioURLs(_ m: Meeting) -> [URL]? {
-        guard !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) else { return nil }
-        return m.audioFiles.map { folder.appendingPathComponent($0) }
-    }
-
-    /// Play or pause, where it is, a bar to click or drag along, and the length.
-    private func playerBar(_ m: Meeting, urls: [URL]) -> some View {
-        let loaded = player.playing == m.id
-        let running = loaded && !player.paused
-        let total = loaded ? player.duration : m.duration.timeInterval
-        return HStack(spacing: 10) {
-            iconButton(running ? "akar-pause" : "akar-play", running ? "pause" : "play") {
-                if running { player.pause() } else { player.play(id: m.id, urls: urls) }
-            }
-            .padding(.leading, -5)
-            // Ticks only while playing: each tick lays the page out again.
-            TimelineView(.animation(minimumInterval: 0.25, paused: !running)) { _ in
-                let at = loaded ? player.currentTime : 0
-                HStack(spacing: 10) {
-                    Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
-                    Scrubber(fraction: total > 0 ? at / total : 0) { fraction in
-                        if loaded { player.seek(to: fraction * total) } else { player.play(id: m.id, urls: urls, from: fraction * total) }
-                    }
-                    Text(TranscriptRender.timestamp(ms: Int(total * 1000)))
-                }
-                .font(.system(size: 11).monospaced().monospacedDigit())
+            text()
+                .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
-            }
+                .padding(.top, 40)
+                .padding(.leading, MeetingColumns.page + MeetingColumns.lead)
+            Spacer(minLength: 0)
         }
     }
 
-    // MARK: Top
+    /// Whether calls are asked about, and what the meetings take up.
+    private var status: String {
+        let asks = settings.meetingAsk ? "asks when a call starts" : "never asks"
+        guard let usage = store.diskUsage else { return asks }
+        return "\(asks) · \(ByteCountFormatter.string(fromByteCount: usage, countStyle: .file).lowercased())"
+    }
 
-    private var topBar: some View {
+    private func toolbar(shown: Int) -> some View {
         HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Image("akar-search").resizable().frame(width: 13, height: 13).foregroundStyle(DesignTokens.Colors.ink3)
-                TextField("search", text: $search).textFieldStyle(.plain)
+            SquareField(placeholder: "search", text: $search, icon: "akar-search").frame(width: 220)
+            SquareFilter(label: place ?? "where", active: place != nil, clear: { place = nil }, open: $whereOpen) {
+                let items = whereItems
+                SquareMenuList(items: items.map(\.item), minWidth: 232) { i in
+                    place = items[i].value
+                    whereOpen = false
+                }
             }
-            .padding(.horizontal, 8).frame(height: 26)
-            .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
-            .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
+            SquareFilter(label: people.isEmpty ? "who" : people.sorted().joined(separator: ", "), active: !people.isEmpty,
+                         clear: { people = [] }, open: $whoOpen) {
+                WhoMenu(people: $people, counts: personCounts)
+            }
+            SquareFilter(label: whenLabel, icon: "akar-clock", active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+                SquareWhenPicker(when: $when, from: $from, to: $to)
+            }
+            Spacer(minLength: 0)
+            if filtering, !store.meetings.isEmpty {
+                Text("\(shown.formatted()) of \(store.meetings.count.formatted())")
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                Button("clear", action: clearFilters).buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
+            }
             if !selected.isEmpty {
-                Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
-                    .buttonStyle(InkButtonStyle())
+                Button("delete \(selected.count)") {
+                    store.delete(ids: selected.subtracting(coordinator.liveIDs))
+                    selected = []
+                }
+                .buttonStyle(SquareButtonStyle())
             }
-            Button("delete all") { confirmDeleteAll = true }
-                .buttonStyle(InkButtonStyle())
+            Button { confirmDeleteAll.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
+                .buttonStyle(SquareIconButtonStyle())
                 .disabled(store.meetings.isEmpty)
-                .confirmationDialog("Delete all \(counted(store.meetings.count, "meeting"))?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
-                    Button("Delete All", role: .destructive) { store.deleteAll(); selected = [] }
-                } message: { Text("This cannot be undone.") }
+                .help("delete all")
+                .accessibilityLabel("delete all")
+                .squarePopover(isPresented: $confirmDeleteAll, edge: .trailing) {
+                    SquareConfirm(title: "delete all \(counted(store.meetings.count, "meeting"))?", detail: "this cannot be undone.") {
+                        Button("cancel") { confirmDeleteAll = false }.buttonStyle(SquareButtonStyle())
+                        Button("delete all") {
+                            store.deleteAll()
+                            selected = []
+                            confirmDeleteAll = false
+                        }
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
+                    }
+                }
         }
-        .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 18)
+        .padding(.top, 16)
+        .padding(.horizontal, MeetingColumns.page)
+        .padding(.bottom, 14)
     }
 
-    /// What is live: the recording with its meters and stop, or the
-    /// transcription with its progress.
-    @ViewBuilder private var statusRow: some View {
-        HStack(spacing: 12) {
-            if let live = coordinator.recording {
-                Text("recording · \(MeetingFolder.durationLabel(.seconds(max(0, now.timeIntervalSince(live.started)))))")
-                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                Meter(level: coordinator.levels.mic)
-                if let others = coordinator.levels.others { Meter(level: others) }
-                Spacer()
-                Button("stop") { coordinator.stopMeeting() }.buttonStyle(InkButtonStyle(primary: true))
-            } else if let t = coordinator.transcribing {
-                Text("transcribing · \(Int(t.fraction * 100))%")
-                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                InkProgress(value: t.fraction).frame(width: 160)
-                Spacer()
-            } else if case .downloading(let received, let total) = diarizer.state {
-                Text("downloading the speaker model · \(Int(Double(received) / Double(max(total, 1)) * 100))%")
-                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                InkProgress(value: Double(received) / Double(max(total, 1))).frame(width: 160)
-                Spacer()
-            } else if case .verifying = diarizer.state {
-                Text("checking the speaker model").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                Spacer()
-            } else if case .failed = diarizer.state {
-                Text("speaker model didn't download").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                Spacer()
-                Button("retry") { diarizer.download() }.buttonStyle(InkButtonStyle())
+    /// What records now: where, how loud each side is, the time so far, and
+    /// stop. It names no one.
+    private func liveBand(_ live: MeetingCoordinator.Live) -> some View {
+        SquareLiveBand(place: live.kind == .room ? "the room" : store.meeting(live.id)?.app?.name.lowercased() ?? "a call",
+                       time: SquareScrubber.clock(max(0, now.timeIntervalSince(live.started))),
+                       you: Double(coordinator.levels.mic),
+                       call: coordinator.levels.others.map(Double.init),
+                       stop: { coordinator.stopMeeting() })
+            .padding(.horizontal, MeetingColumns.page)
+            .padding(.bottom, 12)
+    }
+
+    /// The speaker model, while it downloads or when it could not.
+    @ViewBuilder private var modelStatus: some View {
+        switch diarizer.state {
+        case .downloading(let received, let total):
+            let fraction = Double(received) / Double(max(total, 1))
+            HStack(spacing: 12) {
+                Text("downloading the speaker model · \(Int(fraction * 100))%")
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                SquareBar(fraction: fraction)
+            }
+            .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+            .padding(.bottom, 12)
+        case .verifying:
+            Text("checking the speaker model")
+                .font(Square.mono(11))
+                .foregroundStyle(DesignTokens.Colors.ink2)
+                .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+                .padding(.bottom, 12)
+        case .failed:
+            HStack(spacing: 10) {
+                SquareFailure(text: "the speaker model didn't download")
+                Button("retry") { diarizer.download() }.buttonStyle(SquareButtonStyle(small: true))
+            }
+            .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+            .padding(.bottom, 12)
+        case .missing, .installed:
+            EmptyView()
+        }
+    }
+
+    // MARK: Filtering
+
+    private var filtering: Bool {
+        place != nil || !people.isEmpty || whenActive || !search.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func clearFilters() {
+        place = nil
+        people = []
+        when = .any
+        from = ""
+        to = ""
+        search = ""
+    }
+
+    private var filtered: [Meeting] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        let calendar = Calendar.current
+        let span = when.span(today: .now, calendar: calendar)
+        let window = TimeOfDayWindow(from: from, to: to)
+        return store.meetings.filter { m in
+            if let place, MeetingsTab.app(of: m) != place, MeetingsTab.channel(of: m) != place { return false }
+            if !people.isEmpty, !people.isSubset(of: Set(MeetingsTab.others(in: m))) { return false }
+            if let span {
+                let day = calendar.startOfDay(for: m.started)
+                if day < span.lowerBound || day > span.upperBound { return false }
+            }
+            if let window, !window.contains(m.started, calendar: calendar) { return false }
+            if !q.isEmpty {
+                let text = ([m.title, m.summary ?? ""] + m.speakers.map(\.name)).joined(separator: " ").lowercased()
+                if !text.contains(q), !m.paragraphs.contains(where: { $0.text.lowercased().contains(q) }) { return false }
+            }
+            return true
+        }
+    }
+
+    /// The meeting's app, as the list and the where filter name it.
+    static func app(of meeting: Meeting) -> String {
+        meeting.kind == .room ? "room" : meeting.app?.name.lowercased() ?? "call"
+    }
+
+    /// A huddle's channel, which the where filter lists under its app.
+    static func channel(of meeting: Meeting) -> String? { meeting.names?.channel }
+
+    /// Everyone in it but you, by the names they go by.
+    static func others(in meeting: Meeting) -> [String] {
+        meeting.speakers.filter { !$0.isYou }.map(\.name)
+    }
+
+    /// "Any app", then each app by how many meetings it had, its channels
+    /// under it.
+    private var whereItems: [(value: String?, item: SquareMenuList.Item)] {
+        var apps: [String: Int] = [:]
+        var channels: [String: [String: Int]] = [:]
+        for m in store.meetings {
+            let app = MeetingsTab.app(of: m)
+            apps[app, default: 0] += 1
+            if let channel = MeetingsTab.channel(of: m) { channels[app, default: [:]][channel, default: 0] += 1 }
+        }
+        var out: [(value: String?, item: SquareMenuList.Item)] = [
+            (nil, SquareMenuList.Item(label: "any app", checked: place == nil, count: store.meetings.count.formatted())),
+        ]
+        for (app, count) in apps.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }) {
+            out.append((app, SquareMenuList.Item(label: app, checked: place == app, count: count.formatted())))
+            for (channel, n) in (channels[app] ?? [:]).sorted(by: { $0.key < $1.key }) {
+                out.append((channel, SquareMenuList.Item(label: channel, checked: place == channel, count: n.formatted(), indent: true)))
             }
         }
-        .padding(.horizontal, 20).padding(.bottom, 14)
+        return out
     }
 
-    private var diarizerBusy: Bool {
-        switch diarizer.state {
-        case .downloading, .verifying, .failed: true
-        case .missing, .installed: false
+    /// Everyone met, by how many meetings they were in.
+    private var personCounts: [(name: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for m in store.meetings {
+            for name in Set(MeetingsTab.others(in: m)) { counts[name, default: 0] += 1 }
         }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
+    }
+
+    private var whenActive: Bool { when != .any || TimeOfDayWindow(from: from, to: to) != nil }
+
+    private var whenLabel: String {
+        let time = TimeOfDayWindow(from: from, to: to)?.label
+        guard when != .any else { return time ?? "when" }
+        return [when.label, time].compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: Rows
 
-    @ViewBuilder
-    private func row(_ m: Meeting, last: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                SelectBox(on: selected.contains(m.id)) { select(m.id) }
-                Text(m.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
-                    .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2).frame(width: 44, alignment: .leading).padding(.top, 2)
-                VStack(alignment: .leading, spacing: 4) {
-                    title(m, size: 13)
-                    telemetry(m)
-                    chips(m)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { if renaming != m.id { open = m.id } }
-                actions(m)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            if !last { RowRule() }
-        }
-    }
+    enum Line: Identifiable {
+        case day(id: Date, day: String, date: String, total: String)
+        case row(Meeting)
 
-    @ViewBuilder
-    private func title(_ m: Meeting, size: CGFloat) -> some View {
-        if renaming == m.id {
-            TextField("", text: $renameText)
-                .textFieldStyle(.plain).font(.system(size: size))
-                .onSubmit { store.rename(id: m.id, title: renameText); renaming = nil }
-                .onExitCommand { renaming = nil }
-        } else {
-            Text(m.title).font(.system(size: size))
-        }
-    }
-
-    /// `play` is off on the meeting's own page, which has the player bar.
-    private func actions(_ m: Meeting, play: Bool = true) -> some View {
-        HStack(spacing: 4) {
-            if play, !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
-                let on = player.playing == m.id
-                iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play") {
-                    player.toggle(id: m.id, urls: m.audioFiles.map { folder.appendingPathComponent($0) })
-                }
-            }
-            iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
-            if m.isDone, !m.paragraphs.isEmpty, !coordinator.liveIDs.contains(m.id) {
-                shareButton(m)
-            }
-            iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
-            if let folder = store.folder(for: m.id) {
-                iconButton("akar-arrow-forward-thick", "show in finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
-            }
-            if !coordinator.liveIDs.contains(m.id) {
-                iconButton("akar-trash-can", "delete") { store.delete(ids: [m.id]) }
+        var id: String {
+            switch self {
+            case .day(let id, _, _, _): "day-\(id.timeIntervalSinceReferenceDate)"
+            case .row(let meeting): meeting.id.uuidString
             }
         }
     }
 
-    /// The share menu under the button; the button can also be dragged,
-    /// which drops the `.tmi` file into a message or a folder
-    /// (docs/meetings.md 7.16).
-    private func shareButton(_ m: Meeting) -> some View {
-        iconButton("akar-share-box", "share") {
-            if let file = store.shareFile(m.id) { sharing = (m.id, file) }
+    /// The meetings under a line for each day, newest first, the day saying
+    /// how many there were and how long they ran.
+    static func lines(_ rows: [Meeting], calendar: Calendar = .current) -> [Line] {
+        var out: [Line] = []
+        var i = rows.startIndex
+        while i < rows.endIndex {
+            let day = calendar.startOfDay(for: rows[i].started)
+            var j = i
+            while j < rows.endIndex, calendar.isDate(rows[j].started, inSameDayAs: day) { j += 1 }
+            let same = rows[i..<j]
+            let ms = same.reduce(0) { $0 + $1.durationMs }
+            let label = HistoryTab.dayLabel(day, calendar: calendar)
+            out.append(.day(id: day, day: label.day, date: label.date,
+                            total: "\(counted(same.count, "meeting")) · \(MeetingsTab.length(ms))"))
+            out.append(contentsOf: same.map(Line.row))
+            i = j
         }
-        .background(SharePicker(file: sharing?.meeting == m.id ? sharing?.file : nil) { sharing = nil })
-        .onDrag { store.shareFile(m.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
+        return out
     }
 
-    /// `45m · 2 speakers · slack`, and `· from ellen` on one someone shared.
-    private func telemetry(_ m: Meeting) -> some View {
-        HStack(spacing: 0) {
-            Text(MeetingFolder.durationLabel(m.duration))
-            Text(" · ")
-            Text(counted(m.speakerCount, "speaker"))
-            if let app = m.app {
-                Text(" · ")
-                Text(app.name.lowercased())
-            }
-            if let from = m.sharedBy, !from.isEmpty {
-                Text(" · ")
-                Text("from \(from.lowercased())")
-            }
-        }
-        .font(.system(size: 10, design: .monospaced))
-        .foregroundStyle(DesignTokens.Colors.ink2)
-        .padding(.horizontal, 7).padding(.vertical, 3)
-        .background(Rectangle().fill(DesignTokens.Colors.inkA04))
+    /// "11m", or "1h 12m" past the hour.
+    static func length(_ ms: Int) -> String {
+        let minutes = Int((Double(ms) / 60_000).rounded())
+        return minutes >= 60 ? String(format: "%dh %02dm", minutes / 60, minutes % 60) : "\(minutes)m"
     }
 
-    @ViewBuilder
-    private func chips(_ m: Meeting) -> some View {
-        let waitingForModel = m.transcription.state == .pending && !ModelStore.isInstalled
-        let folderMissing = !m.published && m.isDone && !store.folderAvailable
-        let canAddSpeakers = m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
-        let putOff = !waitingForModel && coordinator.isWaiting(m.id)
-        if m.onlyYourSide || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers || putOff {
-            HStack(spacing: 6) {
-                if putOff {
-                    Button("transcribe") { if let latest = store.meeting(m.id) { coordinator.enqueue(latest) } }.buttonStyle(InkButtonStyle(primary: true))
-                }
-                if canAddSpeakers {
-                    Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle())
-                }
-                if m.onlyYourSide { chip("only your side") }
-                if m.transcription.state == .failed {
-                    chip("transcription failed")
-                    Button("retry") { coordinator.retry(m.id) }.buttonStyle(InkButtonStyle())
-                }
-                if waitingForModel {
-                    chip("waiting for the speech model")
-                    Button("download") { ModelStore.shared.download() }.buttonStyle(InkButtonStyle())
-                }
-                if folderMissing { chip("meetings folder unavailable") }
-            }
-        }
-    }
-
-    private func chip(_ text: String) -> some View {
-        Text(text).font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-            .padding(.horizontal, 5).padding(.vertical, 1).background(Rectangle().fill(DesignTokens.Colors.inkA08))
-    }
-
-    /// The paragraphs, each headed by its speaker and time.
-    /// Lazy: an hour's meeting is hundreds of selectable paragraphs, and only
-    /// those on screen need building.
-    private func transcript(_ m: Meeting) -> some View {
-        LazyVStack(alignment: .leading, spacing: 8) {
-            if m.paragraphs.isEmpty {
-                Text(m.transcription.state == .done ? "nothing was said" : "not transcribed yet")
-                    .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3)
-            }
-            ForEach(Array(m.paragraphs.enumerated()), id: \.offset) { _, p in
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 0) {
-                        speakerLabel(p.speaker, in: m)
-                        Text(" · ")
-                        if let urls = audioURLs(m) {
-                            Button { player.play(id: m.id, urls: urls, from: Double(p.startMs) / 1000) } label: {
-                                Text(TranscriptRender.timestamp(ms: p.startMs)).underline(true, color: DesignTokens.Colors.inkA20)
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { $0 ? NSCursor.pointingHand.push() : NSCursor.pop() }
-                            .help("play from here")
-                        } else {
-                            Text(TranscriptRender.timestamp(ms: p.startMs))
-                        }
-                    }
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
-                    Text(p.text).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).textSelection(.enabled)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Rectangle().fill(DesignTokens.Colors.inkA04))
-    }
-
-    /// A speaker's name; a click turns it into a field, return saves,
-    /// escape cancels (docs/meetings.md 8.4). Per meeting.
-    @ViewBuilder
-    private func speakerLabel(_ speaker: String, in m: Meeting) -> some View {
-        if let r = renamingSpeaker, r.meeting == m.id, r.speaker == speaker {
-            TextField("", text: $speakerName)
-                .textFieldStyle(.plain).font(.system(size: 10, design: .monospaced)).frame(width: 120)
-                .onSubmit { store.rename(speaker: speaker, to: speakerName, in: m.id); renamingSpeaker = nil }
-                .onExitCommand { renamingSpeaker = nil }
-        } else {
-            Button { speakerName = m.speakerName(speaker); renamingSpeaker = (m.id, speaker) } label: {
-                Text(m.speakerName(speaker)).bold()
-            }
-            .buttonStyle(.plain)
-            .help("rename")
-        }
+    private func picked(_ id: UUID) -> Binding<Bool> {
+        Binding(get: { selected.contains(id) }, set: { _ in select(id) })
     }
 
     private func select(_ id: UUID) {
@@ -439,81 +354,278 @@ struct MeetingsTab: View {
                                             anchor: anchor, in: filtered.map(\.id), selected: selected)
         anchor = id
     }
+}
 
-    private func iconButton(_ image: String, _ help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(image).resizable().frame(width: 14, height: 14)
+/// The list's columns: the select box, time, the meeting, who, where and
+/// its length. The head, the days and the rows share them.
+enum MeetingColumns {
+    static let page: CGFloat = 20
+    static let tick: CGFloat = 22
+    static let time: CGFloat = 60
+    static let who: CGFloat = 170
+    static let place: CGFloat = 80
+    static let length: CGFloat = 48
+    static let gap: CGFloat = 16
+    /// Between the select box and the row.
+    static let edge: CGFloat = 4
+    /// How far the columns sit inside the row's own edges.
+    static let inset: CGFloat = 8
+    static let trail: CGFloat = 12
+    /// Where the time column starts, from the list's edge.
+    static var lead: CGFloat { tick + edge + inset }
+
+    static var head: some View {
+        HStack(spacing: edge) {
+            Color.clear.frame(width: tick, height: 1)
+            HStack(spacing: gap) {
+                Text("time").frame(width: time, alignment: .leading)
+                Text("meeting").frame(maxWidth: .infinity, alignment: .leading)
+                Text("who").frame(width: who, alignment: .leading)
+                Text("where").frame(width: place, alignment: .leading)
+                Text("length").frame(width: length, alignment: .trailing)
+            }
+            .padding(.leading, inset)
+            .padding(.trailing, trail)
         }
-        .buttonStyle(QuietButtonStyle(side: 24))
-        .help(help)
+        .font(Square.mono(11))
+        .foregroundStyle(DesignTokens.Colors.ink3)
+        .padding(.bottom, 8)
     }
 }
 
-/// A thin line filled to where playback is; a click or a drag moves it,
-/// and the player is told once, when the pointer lifts.
-private struct Scrubber: View {
-    let fraction: Double
-    let seek: (Double) -> Void
-    @State private var dragging: Double?
+/// A day in the list: an ink rule, the day under the time, its date under
+/// the meetings, and how much it held under who, where and length.
+private struct MeetingDayRow: View {
+    let day: String
+    let date: String
+    let total: String
 
     var body: some View {
-        GeometryReader { geo in
-            let shown = min(max(dragging ?? fraction, 0), 1)
-            ZStack(alignment: .leading) {
-                Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: 2)
-                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * shown, height: 2)
-                Circle().fill(DesignTokens.Colors.ink).frame(width: 8, height: 8)
-                    .offset(x: geo.size.width * shown - 4)
+        HStack(spacing: MeetingColumns.edge) {
+            Color.clear.frame(width: MeetingColumns.tick, height: 1)
+            HStack(alignment: .firstTextBaseline, spacing: MeetingColumns.gap) {
+                // "yesterday" is wider than the time column; it runs into the gap.
+                Text(day)
+                    .font(Square.mono(12, weight: .medium))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .fixedSize()
+                    .frame(width: MeetingColumns.time, alignment: .leading)
+                Text(date)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(total)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: MeetingColumns.who + MeetingColumns.place + MeetingColumns.length + 2 * MeetingColumns.gap, alignment: .trailing)
             }
-            .frame(maxHeight: .infinity)
+            .padding(.leading, MeetingColumns.inset)
+            .padding(.trailing, MeetingColumns.trail)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+        }
+        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
+        .padding(.top, 6)
+    }
+}
+
+/// A meeting in the list: its select box under the pointer, when, its title
+/// over its summary or how its transcription stands, who was in it, where
+/// and how long. A click on the rest opens its page.
+private struct MeetingRow: View {
+    let meeting: Meeting
+    @Binding var picked: Bool
+    /// Something is picked, so every box shows.
+    let picking: Bool
+    /// Its stop was clicked and the transcription is letting go.
+    let stopping: Bool
+    let open: () -> Void
+    let stop: () -> Void
+    @State private var coordinator = MeetingCoordinator.shared
+    @State private var store = MeetingStore.shared
+    @State private var diarizer = DiarizerModelStore.shared
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: MeetingColumns.edge) {
+            Toggle("select", isOn: $picked)
+                .toggleStyle(SquareTickStyle(faint: true))
+                .labelsHidden()
+                .frame(width: MeetingColumns.tick)
+                .opacity(hovering || picking || picked ? 1 : 0)
+                .help(picked ? "deselect" : "select · shift-click for a range")
+            HStack(alignment: .center, spacing: MeetingColumns.gap) {
+                Text(meeting.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                    .font(Square.mono(12))
+                    .monospacedDigit()
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                    .frame(width: MeetingColumns.time, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(meeting.title)
+                        .font(Square.sans(13.5))
+                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .lineLimit(1)
+                    state
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(whoLine)
+                    .font(Square.sans(12))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                    .lineLimit(1)
+                    .frame(width: MeetingColumns.who, alignment: .leading)
+                Text(MeetingsTab.app(of: meeting))
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .lineLimit(1)
+                    .frame(width: MeetingColumns.place, alignment: .leading)
+                Text(MeetingsTab.length(meeting.durationMs))
+                    .font(Square.mono(12))
+                    .monospacedDigit()
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .frame(width: MeetingColumns.length, alignment: .trailing)
+            }
+            .padding(.leading, MeetingColumns.inset)
+            .padding(.trailing, MeetingColumns.trail)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { dragging = min(max($0.location.x / max(geo.size.width, 1), 0), 1) }
-                .onEnded { _ in
-                    if let dragging { seek(dragging) }
-                    dragging = nil
-                })
+            .onTapGesture(perform: open)
         }
-        .frame(height: 14)
+        .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
+        .overlay(alignment: .top) { SquareRule() }
+        .onHover { hovering = $0 }
+    }
+
+    /// Everyone else first, then you.
+    private var whoLine: String {
+        let others = MeetingsTab.others(in: meeting)
+        return (others + (meeting.speakers.contains(where: \.isYou) ? ["you"] : [])).joined(separator: ", ")
+    }
+
+    /// The summary, or while it transcribes how far it has got and a stop,
+    /// or what the meeting is waiting for.
+    @ViewBuilder private var state: some View {
+        if let run = coordinator.transcribing, run.id == meeting.id {
+            HStack(spacing: 10) {
+                Text(stopping ? "stopping…" : "transcribing · \(Int(run.fraction * 100))%")
+                    .font(Square.mono(11))
+                    .monospacedDigit()
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                SquareBar(fraction: run.fraction)
+                if !stopping { stopButton }
+            }
+        } else if coordinator.queued.contains(meeting.id) {
+            HStack(spacing: 10) {
+                Text("waiting to transcribe").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+                stopButton
+            }
+        } else if coordinator.summarising.contains(meeting.id) {
+            Text("summarising").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+        } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: diarizer) {
+            MeetingChips(meeting: meeting)
+        } else if let summary = meeting.summary, !summary.isEmpty {
+            Text(summary)
+                .font(Square.sans(12))
+                .foregroundStyle(DesignTokens.Colors.ink2)
+                .lineLimit(1)
+        }
+    }
+
+    /// A small cross in ink-3 that only shows an edge under the pointer.
+    private var stopButton: some View {
+        Button(action: stop) { SquareIcon("akar-cross", size: 7) }
+            .buttonStyle(SquareIconButtonStyle(side: 18))
+            .help("stop transcribing")
+            .accessibilityLabel("stop transcribing")
     }
 }
 
-/// The system share menu, shown once under the view this sits behind when
-/// it is given a file; `done` clears the file so the next click shows it again.
-private struct SharePicker: NSViewRepresentable {
-    let file: URL?
-    let done: () -> Void
-
-    final class Coordinator { var shown = false }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView { NSView() }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        guard let file else { context.coordinator.shown = false; return }
-        guard !context.coordinator.shown else { return }
-        context.coordinator.shown = true
-        // Out of the update pass: the menu runs its own tracking loop.
-        Task { @MainActor in
-            NSSharingServicePicker(items: [file]).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
-            done()
-        }
+/// What a finished or stalled meeting still needs, as the list and the page
+/// show it: transcribe one that was put off, add speakers, the failure and
+/// retry, the missing speech model, an unavailable folder.
+enum MeetingState {
+    @MainActor
+    static func hasChips(_ m: Meeting, coordinator: MeetingCoordinator, store: MeetingStore, diarizer: DiarizerModelStore) -> Bool {
+        waitingForModel(m) || coordinator.isWaiting(m.id) || canAddSpeakers(m, coordinator: coordinator, diarizer: diarizer)
+            || m.onlyYourSide || m.transcription.state == .failed || folderMissing(m, store: store)
     }
+
+    static func waitingForModel(_ m: Meeting) -> Bool { m.transcription.state == .pending && !ModelStore.isInstalled }
+
+    @MainActor
+    static func canAddSpeakers(_ m: Meeting, coordinator: MeetingCoordinator, diarizer: DiarizerModelStore) -> Bool {
+        m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
+    }
+
+    @MainActor
+    static func folderMissing(_ m: Meeting, store: MeetingStore) -> Bool { !m.published && m.isDone && !store.folderAvailable }
 }
 
-/// A level meter: a hairline bar filled with ink to the level.
-private struct Meter: View {
-    let level: Float
+/// A meeting's chips: plain facts in tags, a failure in full ink, and the
+/// one button each needs.
+struct MeetingChips: View {
+    let meeting: Meeting
+    @State private var coordinator = MeetingCoordinator.shared
+    @State private var store = MeetingStore.shared
+    @State private var diarizer = DiarizerModelStore.shared
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle().fill(DesignTokens.Colors.inkA08)
-                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * CGFloat(min(1, max(0, level))))
+        let m = meeting
+        let waitingForModel = MeetingState.waitingForModel(m)
+        HStack(spacing: 6) {
+            if !waitingForModel, coordinator.isWaiting(m.id) {
+                Button("transcribe") { if let latest = store.meeting(m.id) { coordinator.enqueue(latest) } }
+                    .buttonStyle(SquareButtonStyle(kind: .primary, small: true))
             }
+            if MeetingState.canAddSpeakers(m, coordinator: coordinator, diarizer: diarizer) {
+                Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(SquareButtonStyle(small: true))
+            }
+            if m.onlyYourSide { SquareTag(text: "only your side") }
+            if m.transcription.state == .failed {
+                SquareFailure(text: "transcription failed")
+                Button("retry") { coordinator.retry(m.id) }.buttonStyle(SquareButtonStyle(small: true))
+            }
+            if waitingForModel {
+                SquareTag(text: "waiting for the speech model")
+                Button("download") { ModelStore.shared.download() }.buttonStyle(SquareButtonStyle(small: true))
+            }
+            if MeetingState.folderMissing(m, store: store) { SquareTag(text: "meetings folder unavailable") }
         }
-        .frame(width: 80, height: 6)
-        .animation(.linear(duration: 0.1), value: level)
+    }
+}
+
+/// The who filter's menu: a field to find someone, everyone met with how
+/// many meetings they were in, ticked to narrow the list to meetings with
+/// all of them.
+private struct WhoMenu: View {
+    @Binding var people: Set<String>
+    let counts: [(name: String, count: Int)]
+    @State private var find = ""
+
+    private static let width: CGFloat = 232
+
+    var body: some View {
+        let shown = counts.filter { find.isEmpty || $0.name.localizedCaseInsensitiveContains(find) }
+        SquarePanel(padding: EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)) {
+            VStack(alignment: .leading, spacing: 0) {
+                SquareField(placeholder: "find someone", text: $find, icon: "akar-search")
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
+                SquareMenuLines(items: shown.map { SquareMenuList.Item(label: $0.name, checked: people.contains($0.name), count: $0.count.formatted()) }) { i in
+                    let name = shown[i].name
+                    if people.contains(name) { people.remove(name) } else { people.insert(name) }
+                }
+                Text("meetings with everyone you tick")
+                    .font(Square.sans(11.5))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
+            }
+            .frame(width: WhoMenu.width)
+        }
+        .fixedSize()
     }
 }

@@ -75,14 +75,12 @@ struct SettingsView: View {
         .safeAreaPadding(.top, SettingsView.markDrop)
     }
 
-    /// History draws its own, which its dictation page replaces.
+    /// History and meetings draw their own, which a dictation's or a
+    /// meeting's page replaces.
     @ViewBuilder private var header: some View {
         switch tab {
-        case .history:
+        case .history, .meetings:
             EmptyView()
-        case .meetings:
-            SquarePageHeader(title: tab.rawValue, count: counted(meetings.meetings.count, "meeting"),
-                             status: meetingsStatus, linkTitle: "meeting settings", onLink: { open(.meetings) })
         case .dictionary:
             SquarePageHeader(title: tab.rawValue, count: counted(settings.customWords.count, "word"), status: learnedStatus)
         case .insights, .settings:
@@ -94,7 +92,7 @@ struct SettingsView: View {
         switch tab {
         case .insights: InsightsTab()
         case .history: HistoryTab(showSettings: { open(.onThisMac) })
-        case .meetings: MeetingsTab()
+        case .meetings: MeetingsTab(showSettings: { open(.meetings) })
         case .dictionary: DictionaryTab()
         case .settings: OnePageSettings(open: $openSections, reveal: $reveal)
         }
@@ -112,13 +110,6 @@ struct SettingsView: View {
     /// The recording cloud in the colour the user chose, or the palette's grey.
     private var cloudTint: Color {
         settings.cloudColorEnabled ? Color(nsColor: settings.cloudColor.color) : SquareCloudPalette.grey
-    }
-
-    /// Whether calls are asked about, and what the meetings take up.
-    private var meetingsStatus: String {
-        let asks = settings.meetingAsk ? "asks when a call starts" : "never asks"
-        guard let usage = meetings.diskUsage else { return asks }
-        return "\(asks) · \(ByteCountFormatter.string(fromByteCount: usage, countStyle: .file).lowercased())"
     }
 
     private var learnedStatus: String? {

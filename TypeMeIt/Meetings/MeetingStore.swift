@@ -130,6 +130,19 @@ final class MeetingStore {
 
     /// Moves the folders to the Trash. A meeting being recorded or
     /// transcribed is left alone: its files are still being written.
+    /// Deletes a meeting's kept audio and keeps its transcript, leaving it as
+    /// a meeting whose audio was never kept.
+    func deleteAudio(_ id: UUID) {
+        guard var meeting = meeting(id), let folder = folders[id] else { return }
+        let kept = Set(meeting.audioFiles)
+        guard !kept.isEmpty else { return }
+        for i in meeting.tracks.indices where kept.contains(meeting.tracks[i].file) {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(meeting.tracks[i].file))
+            meeting.tracks[i].file = "\(meeting.tracks[i].role.rawValue).caf"
+        }
+        save(meeting)
+    }
+
     func delete(ids requested: Set<UUID>) {
         let ids = requested.subtracting(MeetingCoordinator.shared.liveIDs)
         guard !ids.isEmpty else { return }

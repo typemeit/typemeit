@@ -492,6 +492,18 @@ final class MeetingCoordinator {
         enqueue(meeting)
     }
 
+    /// Stops a meeting's transcription: a queued one leaves the queue, and a
+    /// running one stops after the chunk in hand and goes back to waiting,
+    /// its finished chunks kept for when it is transcribed again.
+    func stopTranscribing(_ id: UUID) {
+        if let i = transcribeQueue.firstIndex(where: { $0.id == id }) {
+            transcribeQueue.remove(at: i)
+            queued = transcribeQueue.map(\.id)
+        } else if transcribing?.id == id {
+            transcribeTask?.cancel()
+        }
+    }
+
     /// Meetings whose summary is being written, for the page's placeholder.
     private(set) var summarising: Set<UUID> = []
 
