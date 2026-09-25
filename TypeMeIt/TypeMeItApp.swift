@@ -237,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Settings.shared
         _ = Store.shared
-        applyDockIcon()
+        applyDevIcon()
         applyAppearance()
         // Clean-up is the only clean-up there is, so anything that stops the
         // model running stops the app: an ineligible Mac, Apple Intelligence
@@ -360,13 +360,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Info.plist launches the app as an agent; the Dock icon is opted into
-    /// here so the setting can flip it without a relaunch.
-    func applyDockIcon() {
-        NSApp.setActivationPolicy(Settings.shared.showDockIcon ? .regular : .accessory)
-        // The Dock caches an icon per bundle path, so a rebuilt dev app can
-        // keep showing the release icon it had before; setting the running
-        // app's own icon sidesteps the cache.
+    /// The Dock caches an icon per bundle path, so a rebuilt dev app can keep
+    /// showing the release icon it had before; setting the running app's own
+    /// icon sidesteps the cache.
+    private func applyDevIcon() {
         if Updates.isDevBuild, let url = Bundle.main.url(forResource: "AppIcon-Dev", withExtension: "icns"), let icon = NSImage(contentsOf: url) {
             NSApp.applicationIconImage = icon
         }

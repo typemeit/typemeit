@@ -496,9 +496,6 @@ struct MainSettingsTab: View {
                                 .disabled(Updates.isDevBuild)
                         }
                     }
-                    SettingsRow(label: "dock icon") {
-                        Toggle("", isOn: Binding(get: { settings.showDockIcon }, set: { settings.showDockIcon = $0; AppDelegate.shared?.applyDockIcon() })).toggleStyle(.switch).labelsHidden()
-                    }
                     SettingsRow(label: "appearance", subtitle: "both the app window and the cloud") {
                         Picker("", selection: Binding(get: { settings.appearance }, set: { settings.appearance = $0; AppDelegate.shared?.applyAppearance() })) {
                             ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }

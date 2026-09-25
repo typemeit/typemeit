@@ -97,7 +97,6 @@ final class Settings {
     /// dictation is in flight.
     var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
-    var showDockIcon: Bool { didSet { defaults.set(showDockIcon, forKey: "showDockIcon") } }
     var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: "appearance") } }
     /// Off, the cloud is white or dark grey with the appearance.
     var cloudColorEnabled: Bool { didSet { defaults.set(cloudColorEnabled, forKey: "cloudColorEnabled") } }
@@ -169,7 +168,6 @@ final class Settings {
         autoUpdate = bool("autoUpdate", true)
         askBeforeUpdating = bool("askBeforeUpdating", true)
         launchAtLogin = bool("launchAtLogin", true)
-        showDockIcon = bool("showDockIcon", true)
         appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
         cloudColorEnabled = bool("cloudColorEnabled", false)
         cloudColor = CloudColor(rawValue: d.string(forKey: "cloudColor") ?? "") ?? .coral
