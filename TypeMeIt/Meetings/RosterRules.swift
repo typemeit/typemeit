@@ -31,6 +31,11 @@ enum RosterRules {
         static let profilePrefix = "View "
         static let profileSuffix = "'s profile"
 
+        /// The huddle's channel, the first `#` word of a window's title.
+        static func channel(inTitle title: String) -> String? {
+            title.split(separator: " ").first { $0.hasPrefix("#") }.map(String.init)
+        }
+
         static func name(fromProfile text: String) -> String? {
             guard text.hasPrefix(profilePrefix), text.hasSuffix(profileSuffix) else { return nil }
             let name = String(text.dropFirst(profilePrefix.count).dropLast(profileSuffix.count))
@@ -41,7 +46,7 @@ enum RosterRules {
     static func slack(_ nodes: [AXNode]) -> RosterReading {
         var reading = RosterReading()
         for node in nodes where node.role == "AXWindow" {
-            if let channel = node.title?.split(separator: " ").first(where: { $0.hasPrefix("#") }) { reading.channel = String(channel) }
+            if let channel = node.title.flatMap(Slack.channel(inTitle:)) { reading.channel = channel }
         }
         for i in nodes.indices {
             guard let id = nodes[i].domIdentifier, id.hasPrefix(Slack.tilePrefix), !id.contains(Slack.tileDescriptionSuffix) else { continue }

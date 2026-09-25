@@ -392,6 +392,9 @@ enum Fixed {
     /// How often the meeting window is read while recording: a turn shorter
     /// than this is a backchannel, not a speaker (docs/meetings.md 7.8).
     static let meetingSpeakingPollMs = 250
+    /// How often the Meet code or the huddle's channel is read while
+    /// recording: it changes only when the call does.
+    static let meetingCallKeyPollSeconds = 5
     /// Token containment between a caption line and a paragraph, as in the
     /// echo work.
     static let meetingCaptionMatch = 0.5

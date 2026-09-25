@@ -1961,6 +1961,17 @@ in phase 2.
 
 ### 8.6 Names from the meeting (D23)
 
+**Off since 25 September.** The rules below were written from other
+projects' notes and never checked against a live call. On four calls on 24
+and 25 September they found no one in Slack or Meet, and once took Meet's
+"Pinned for yourself" for a person, which titled the meeting and named the
+far end. While recording, only the call key is read (the Meet code from the
+tab's address, the channel from a Slack window's title) for `MeetingMerge`.
+Dev builds write what the meeting window exposes early in each call to the
+probe folder: the whole tree 20 s in, then what changed at each 250 ms poll
+for 30 s. Names come back once rules written from those captures name the
+people on a real Slack huddle and a real Meet call correctly.
+
 Speakers are named by what the meeting itself shows the user — who is in it,
 who is talking, and in captions who said which words — never by recognising
 anyone's voice across meetings. The diarizer still finds *how many* people
