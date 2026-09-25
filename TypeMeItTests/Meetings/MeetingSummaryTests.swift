@@ -27,6 +27,17 @@ struct MeetingSummaryTests {
             == ["Ana: a b c", "Ana: d e f", "Ana: g"])
     }
 
+    @Test func aSummaryIsCutAfterItsFourthSentence() {
+        let text = "Ana opened. You agreed on the plan. Ben asked about e.g. dates. Cy will follow up. Then lunch. Then more."
+        #expect(MeetingSummary.firstSentences(text, max: 4) == "Ana opened. You agreed on the plan. Ben asked about e.g. dates. Cy will follow up.")
+        #expect(MeetingSummary.sentenceCount(text) == 6)
+    }
+
+    @Test func aShortSummaryIsLeftWhole() {
+        #expect(MeetingSummary.firstSentences("One. Two.", max: 4) == "One. Two.")
+        #expect(MeetingSummary.sentenceCount("One. Two.") == 2)
+    }
+
     @Test func noWordsIsNoParts() {
         #expect(MeetingSummary.parts(of: meeting([]), maxWords: 10).isEmpty)
     }
