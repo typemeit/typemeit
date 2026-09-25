@@ -44,10 +44,13 @@ struct KeepLimit {
 }
 
 /// Every setting on one page: each group one line saying what it is set to,
-/// opening in place to its rows, one group at a time. A blocked setting says
-/// why under its label, with the way to unblock it beside its switch.
+/// opening in place to its rows. Groups open and close on their own, so a
+/// click moves only what is under the group. A blocked setting says why
+/// under its label, with the way to unblock it beside its switch.
 struct OnePageSettings: View {
-    @Binding var open: SettingsSection?
+    @Binding var open: Set<SettingsSection>
+    /// A group a page's link asked for, scrolled to once.
+    @Binding var reveal: SettingsSection?
     @State private var settings = Settings.shared
     @State private var store = Store.shared
     @State private var meetings = MeetingStore.shared
@@ -79,7 +82,11 @@ struct OnePageSettings: View {
                 .padding(.bottom, 40)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .onAppear { if let open { proxy.scrollTo(open, anchor: .top) } }
+            .onAppear {
+                guard let reveal else { return }
+                proxy.scrollTo(reveal, anchor: .top)
+                self.reveal = nil
+            }
         }
         .onAppear { availability = PostProcessor.availability; devices = AudioCapture.inputDevices() }
         .onReceive(poll) { _ in
@@ -89,8 +96,8 @@ struct OnePageSettings: View {
     }
 
     private func binding(_ section: SettingsSection) -> Binding<Bool> {
-        Binding(get: { open == section }, set: { on in
-            if on { open = section } else if open == section { open = nil }
+        Binding(get: { open.contains(section) }, set: { on in
+            if on { open.insert(section) } else { open.remove(section) }
         })
     }
 

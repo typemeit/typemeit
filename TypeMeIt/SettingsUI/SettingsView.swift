@@ -25,8 +25,10 @@ enum SettingsTab: String, CaseIterable {
 /// title carries its count and state, and a link to its settings.
 struct SettingsView: View {
     @State private var tab = SettingsTab.available[0]
-    /// The settings page's open group, kept while other pages are shown.
-    @State private var section: SettingsSection?
+    /// The settings page's open groups, kept while other pages are shown.
+    @State private var openSections: Set<SettingsSection> = []
+    /// The group a page's link asked for, for the settings page to scroll to.
+    @State private var reveal: SettingsSection?
     @State private var appState = AppState.shared
     @State private var settings = Settings.shared
     @State private var store = Store.shared
@@ -94,7 +96,7 @@ struct SettingsView: View {
         case .history: HistoryTab()
         case .meetings: MeetingsTab()
         case .dictionary: DictionaryTab()
-        case .settings: OnePageSettings(open: $section)
+        case .settings: OnePageSettings(open: $openSections, reveal: $reveal)
         }
     }
 
@@ -124,9 +126,10 @@ struct SettingsView: View {
         return learned > 0 ? "\(learned) learned from corrections" : nil
     }
 
-    /// Shows the settings page with one group open.
+    /// Shows the settings page with the group open and in view.
     private func open(_ group: SettingsSection) {
-        section = group
+        openSections.insert(group)
+        reveal = group
         tab = .settings
     }
 
