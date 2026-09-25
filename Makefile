@@ -76,10 +76,12 @@ model-verify: $(GGUF)
 	echo "$$sha matches $(STORE)"
 
 # Verified first: uploading a file the app will reject wastes the upload and
-# leaves a release that cannot be installed.
+# leaves a release that cannot be installed. --latest=false because Sparkle's
+# feed and typeme.it/download resolve /releases/latest/download/: a model
+# release taking "Latest" breaks both until an app release follows.
 model-publish: model-verify
 	@command -v gh >/dev/null || { echo "gh is not installed" >&2; exit 1; }
-	gh release create $(TAG) \
+	gh release create $(TAG) --latest=false \
 	  --title "$(SLUG) $(QUANT)" \
 	  --notes "$(MODEL) converted and quantised to $(QUANT) with transcribe.cpp $(TRANSCRIBE). sha256 $(PINNED_SHA)" \
 	  $(GGUF)
@@ -135,9 +137,10 @@ diarizer-model-verify: $(DIARIZER_TAR)
 	fi; \
 	echo "$$sha matches $(DIARIZER_STORE)"
 
+# --latest=false for the reason model-publish gives.
 diarizer-model-publish: diarizer-model-verify
 	@command -v gh >/dev/null || { echo "gh is not installed" >&2; exit 1; }
-	gh release create $(DIARIZER_TAG) \
+	gh release create $(DIARIZER_TAG) --latest=false \
 	  --title "speaker-diarization-coreml $(shell echo $(DIARIZER_REVISION) | cut -c1-8)" \
 	  --notes "FluidInference/speaker-diarization-coreml at $(DIARIZER_REVISION): the offline diarizer's files (pyannote community-1 segmentation, WeSpeaker embeddings, PLDA), CC-BY-4.0, with the upstream NOTICE.md and LICENSE. sha256 $(DIARIZER_PINNED_SHA)" \
 	  $(DIARIZER_TAR)
