@@ -149,8 +149,12 @@ struct MeetingsTab: View {
     @ViewBuilder
     private func summary(_ m: Meeting) -> some View {
         if let text = m.summary {
+            // Never fixedSize: the split view measures its columns at almost
+            // no width, and a summary held to its height there made the window
+            // 13 pt tall per character, 27,978 pt for one of 2,085, past what
+            // can be drawn, so the window stayed blank.
             Text(text).font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
-                .frame(maxWidth: 640, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 640, alignment: .leading)
                 .textSelection(.enabled).padding(.top, 4)
         } else if coordinator.summarising.contains(m.id) {
             Text("summarising…").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink3).padding(.top, 4)
@@ -362,8 +366,8 @@ struct MeetingsTab: View {
     }
 
     /// The paragraphs, each headed by its speaker and time.
-    /// Lazy: built whole, the 408 selectable paragraphs of a 56-minute
-    /// meeting took longer to lay out than a frame, and the window stayed blank.
+    /// Lazy: an hour's meeting is hundreds of selectable paragraphs, and only
+    /// those on screen need building.
     private func transcript(_ m: Meeting) -> some View {
         LazyVStack(alignment: .leading, spacing: 8) {
             if m.paragraphs.isEmpty {

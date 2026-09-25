@@ -17,6 +17,7 @@ import Foundation
 ///     -diarizeCounts <path>...              each file left to count its speakers, then told 1…6; segments to probe/counts-<name>.json
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
 ///     -summarise <meeting id>...            write each meeting's summary to the log, without saving it
+///     -dumpMeetingPages <meeting id>...     open each meeting's page in settings and write a window dump (WindowDump)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -45,6 +46,21 @@ enum MeetingProbes {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
                 MeetingCoordinator.shared.transcribeAgain(id)
+            }
+        }
+        if let i = args.firstIndex(of: "-dumpMeetingPages") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                for id in ids {
+                    try? await Task.sleep(for: .seconds(3))
+                    AppState.shared.settingsTab = .meetings
+                    AppState.shared.revealMeeting = id
+                    NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+                    try? await Task.sleep(for: .seconds(4))
+                    DebugLog.write("Meeting probe page: \(id)")
+                    WindowDump.write()
+                }
             }
         }
         if let i = args.firstIndex(of: "-summarise") {

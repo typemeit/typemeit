@@ -176,6 +176,7 @@ struct MenuContent: View {
             Button("Capture Meet Window") { capture.start(.meet) }
             Button("Capture Slack Window") { capture.start(.slackHuddle) }
         }
+        Button("Dump Windows") { WindowDump.write() }
     }
 
     /// The meeting block (docs/meetings.md 7.11): the detected call's items
