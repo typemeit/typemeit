@@ -1,5 +1,13 @@
 # type me it
 
+## English only
+
+The app transcribes and cleans up English only; the speech model is English
+(docs/app-store.md). Don't build features or write eval cases for other
+languages. The clean-up prompt's keep-the-language rule stays anyway: removing
+it made the model contract and drop words in English transcripts (18 eval
+failures).
+
 ## Running a build locally
 
 Debug builds are a separate app, `type me it dev` (bundle id `it.typeme.typemeit.dev`),
