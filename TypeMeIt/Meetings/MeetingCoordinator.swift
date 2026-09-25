@@ -32,6 +32,9 @@ final class MeetingCoordinator {
     private(set) var detected: Owner?
     private(set) var prompting: Owner?
     private(set) var recording: Live?
+    /// Whole minutes the live recording has run. The menu redraws only when
+    /// state it reads changes, so the tick advances this for it.
+    private(set) var recordingMinutes = 0
     private(set) var levels: (mic: Float, others: Float?) = (0, nil)
     private(set) var transcribing: Transcribing?
     private(set) var systemAudioTest: SystemAudioTest = .notTested
@@ -158,6 +161,10 @@ final class MeetingCoordinator {
 
     private func ticked() {
         send(.tick(.now))
+        if let live = recording {
+            let minutes = Int(Date().timeIntervalSince(live.started)) / 60
+            if minutes != recordingMinutes { recordingMinutes = minutes }
+        }
         if store.meetings.contains(where: { $0.isDone && !$0.published }) { store.republishPending() }
     }
 
@@ -264,6 +271,7 @@ final class MeetingCoordinator {
             stoppedForDisk = false
             store.adopt(recorder.meeting, folder: recorder.folder)
             recording = Live(id: id, kind: recorder.meeting.kind, started: recorder.meeting.started)
+            recordingMinutes = 0
             AppState.shared.meeting = true
         } catch {
             Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")

@@ -170,7 +170,7 @@ struct MenuContent: View {
     /// while nothing records, the room while idle, and what is running.
     @ViewBuilder private var meetingItems: some View {
         if let live = meetings.recording {
-            Text("Recording this meeting · \(MenuContent.elapsed(since: live.started))").disabled(true)
+            Text("Recording this meeting · \(MeetingFolder.durationLabel(.seconds(meetings.recordingMinutes * 60)))").disabled(true)
             Button("Stop Recording Meeting") { meetings.stopMeeting() }
         } else {
             if let owner = meetings.detected {
@@ -185,11 +185,6 @@ struct MenuContent: View {
         if let t = meetings.transcribing {
             Text("Transcribing meeting · \(Int(t.fraction * 100))%").disabled(true)
         }
-    }
-
-    /// `12m`, `1h05m`.
-    static func elapsed(since start: Date) -> String {
-        MeetingFolder.durationLabel(.seconds(max(0, Date().timeIntervalSince(start))))
     }
 
     /// Italic through an attributed string: the menu turns a font modifier

@@ -83,12 +83,21 @@ enum RosterRules {
             return String(first)
         }
 
-        /// Meet's own meeting code (`abc-defg-hij`) is `notranslate` too.
+        /// The words a name may carry in lower case: "Ana de la Cruz".
+        static let nameParticles: Set<String> = ["de", "la", "le", "da", "di", "du", "del", "der", "den", "van", "von", "bin", "al"]
+
+        /// Meet's own meeting code (`abc-defg-hij`), its icons' labels
+        /// (`mic_off`, `call_end`) and some of its own words ("Pinned for
+        /// yourself", which titled a meeting on 25 September) are
+        /// `notranslate` too. Each word of a name starts with a capital, or
+        /// with a letter that has no case, the particles aside.
         static func isName(_ text: String) -> Bool {
             let words = text.split(separator: " ")
             guard !words.isEmpty, words.count <= nameMaxWords else { return false }
-            let code = text.split(separator: "-").map(\.count)
-            return !(code.count == 3 && text.allSatisfy { $0.isLowercase || $0 == "-" })
+            let capitalised = words.filter { $0.first.map { $0.isLetter && !$0.isLowercase } ?? false }
+            return !capitalised.isEmpty && words.allSatisfy { word in
+                capitalised.contains(word) || nameParticles.contains(word.lowercased())
+            }
         }
     }
 

@@ -75,8 +75,16 @@ struct RosterRulesTests {
         ])
     }
 
-    @Test func aMeetingCodeIsNotAName() {
+    @Test func meetsOwnWordsAreNotNames() {
         #expect(!RosterRules.Meet.isName("abc-defg-hij"))
+        #expect(!RosterRules.Meet.isName("mic_off"))
+        #expect(!RosterRules.Meet.isName("arrow_drop_down"))
+        #expect(!RosterRules.Meet.isName("Pinned for yourself"))
+        #expect(!RosterRules.Meet.isName("Turn on microphone"))
+        #expect(!RosterRules.Meet.isName("Max Mitchell (Presentation)"))
+        #expect(RosterRules.Meet.isName("Ana de la Cruz"))
+        #expect(RosterRules.Meet.isName("Jean-Luc O'Brien"))
+        #expect(RosterRules.Meet.isName("李明"))
         #expect(RosterRules.Meet.isName("Ana Lopez"))
         #expect(!RosterRules.Meet.isName("one two three four five six"))
     }
