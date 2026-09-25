@@ -492,9 +492,12 @@ struct MainSettingsTab: View {
                     ) {
                         updateStatus
                     }
-                    SettingsRow(label: "website", last: true) {
+                    SettingsRow(label: "website") {
                         InkLink(title: "typeme.it", url: Fixed.websiteURL)
                             .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                    }
+                    SettingsRow(label: "contact", last: true) {
+                        Button(Fixed.contactEmail) { NSWorkspace.shared.open(Fixed.contactURL) }.buttonStyle(InkButtonStyle())
                     }
                 }
             }
