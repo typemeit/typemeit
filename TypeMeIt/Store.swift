@@ -139,6 +139,14 @@ final class Store {
         save(history, to: historyURL)
     }
 
+    /// Deletes a dictation's audio and keeps its text.
+    func deleteAudio(id: UUID) {
+        guard let i = history.firstIndex(where: { $0.id == id }), let file = history[i].recordingFile else { return }
+        RecordingArchive.delete([file])
+        history[i].recordingFile = nil
+        save(history, to: historyURL)
+    }
+
     func deleteAllHistory() {
         history.removeAll()
         RecordingArchive.deleteAll()

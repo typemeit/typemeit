@@ -52,196 +52,242 @@ struct SelectBox: View {
     }
 }
 
+/// The time-of-day half of the when filter, "09:00" to "17:30", either end
+/// left open. A window that ends before it starts runs across midnight.
+struct TimeOfDayWindow {
+    let from: Int?
+    let to: Int?
+
+    /// Nil when neither end reads as a time.
+    init?(from: String, to: String) {
+        self.from = TimeOfDayWindow.minutes(from)
+        self.to = TimeOfDayWindow.minutes(to)
+        if self.from == nil, self.to == nil { return nil }
+    }
+
+    /// Minutes into the day of "HH:mm".
+    static func minutes(_ text: String) -> Int? {
+        let parts = text.split(separator: ":")
+        guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]), (0..<24).contains(h), (0..<60).contains(m) else { return nil }
+        return h * 60 + m
+    }
+
+    func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        let t = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        if let from, let to, from > to { return t >= from || t <= to }
+        if let from, t < from { return false }
+        if let to, t > to { return false }
+        return true
+    }
+
+    var label: String {
+        let text = { (m: Int) in String(format: "%02d:%02d", m / 60, m % 60) }
+        return "\(from.map(text) ?? "00:00")–\(to.map(text) ?? "23:59")"
+    }
+}
+
+/// History: every dictation by day, filtered by app, time and words. A row
+/// copies or deletes in place, and a click opens the dictation's own page.
 struct HistoryTab: View {
+    /// Shows the settings group that keeps history.
+    var showSettings: () -> Void = {}
     @State private var store = Store.shared
-    @State private var player = RecordingPlayer.shared
+    @State private var settings = Settings.shared
     @State private var search = ""
-    @State private var expanded: Set<UUID> = []
+    @State private var app: String?
+    @State private var when = SquareWhen.any
+    @State private var from = ""
+    @State private var to = ""
+    @State private var appOpen = false
+    @State private var whenOpen = false
     @State private var selected: Set<UUID> = []
     /// The row a range is measured from: the last one whose box was clicked.
     @State private var anchor: UUID?
     @State private var confirmDeleteAll = false
+    /// The row whose copy ran last, which shows a check for it.
+    @State private var copied: UUID?
+    /// The dictation shown as its own page, or nil for the list.
+    @State private var open: UUID?
+
+    var body: some View {
+        if let id = open, let entry = store.history.first(where: { $0.id == id }) {
+            DictationPage(entry: entry) { open = nil }
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
+        let rows = filtered
+        return VStack(alignment: .leading, spacing: 0) {
+            SquarePageHeader(title: "history", count: counted(store.history.count, "dictation"),
+                             status: KeepLimit.dictations.status(settings.historyLimit),
+                             linkTitle: "history settings", onLink: showSettings)
+            toolbar
+            if rows.isEmpty {
+                Text(store.history.isEmpty ? "nothing yet" : "no matches")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
+                    .padding(.top, 40)
+                    .padding(.leading, HistoryColumns.page + HistoryColumns.lead)
+                Spacer(minLength: 0)
+            } else {
+                HistoryColumns.head.padding(.horizontal, HistoryColumns.page)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(HistoryTab.lines(rows)) { line in
+                            switch line {
+                            case .day(_, let day, let date, let total):
+                                HistoryDayRow(day: day, date: date, total: total)
+                            case .row(let entry):
+                                HistoryRow(entry: entry, picked: picked(entry.id), picking: !selected.isEmpty, copied: copied == entry.id,
+                                           open: { open = entry.id },
+                                           copy: { Output.copyToClipboard(entry.displayText); copied = entry.id },
+                                           delete: { store.delete(id: entry.id); selected.remove(entry.id) })
+                            }
+                        }
+                    }
+                    .padding(.horizontal, HistoryColumns.page)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+        .onChange(of: store.history.map(\.id)) { _, ids in selected.formIntersection(ids) }
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: 8) {
+            SquareField(placeholder: "search", text: $search, icon: "akar-search").frame(width: 260)
+            SquareFilter(label: app ?? "app", active: app != nil, clear: { app = nil }, open: $appOpen) {
+                let items = appItems
+                SquareMenuList(items: items.map(\.item), minWidth: 232) { i in
+                    app = items[i].value
+                    appOpen = false
+                }
+            }
+            SquareFilter(label: whenLabel, icon: "akar-clock", active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+                SquareWhenPicker(when: $when, from: $from, to: $to)
+            }
+            Spacer(minLength: 0)
+            if !selected.isEmpty {
+                Button("delete \(selected.count)") {
+                    store.delete(ids: selected)
+                    selected = []
+                }
+                .buttonStyle(SquareButtonStyle())
+            }
+            Button { confirmDeleteAll.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
+                .buttonStyle(SquareIconButtonStyle())
+                .disabled(store.history.isEmpty)
+                .help("delete all")
+                .accessibilityLabel("delete all")
+                .squarePopover(isPresented: $confirmDeleteAll, edge: .trailing) {
+                    SquareConfirm(title: "delete all \(counted(store.history.count, "dictation"))?", detail: "this cannot be undone.") {
+                        Button("cancel") { confirmDeleteAll = false }.buttonStyle(SquareButtonStyle())
+                        Button("delete all") {
+                            store.deleteAllHistory()
+                            selected = []
+                            confirmDeleteAll = false
+                        }
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
+                    }
+                }
+        }
+        .padding(.top, 16)
+        .padding(.horizontal, HistoryColumns.page)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: Filtering
 
     private var filtered: [HistoryEntry] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        let all = store.history.reversed()
-        return q.isEmpty ? Array(all) : all.filter { $0.displayText.lowercased().contains(q) || $0.transcript.lowercased().contains(q) }
+        let calendar = Calendar.current
+        let span = when.span(today: .now, calendar: calendar)
+        let window = TimeOfDayWindow(from: from, to: to)
+        return store.history.reversed().filter { e in
+            if let app, HistoryTab.app(of: e) != app { return false }
+            if let span {
+                let day = calendar.startOfDay(for: e.timestamp)
+                if day < span.lowerBound || day > span.upperBound { return false }
+            }
+            if let window, !window.contains(e.timestamp, calendar: calendar) { return false }
+            if !q.isEmpty, !e.displayText.lowercased().contains(q), !e.transcript.lowercased().contains(q) { return false }
+            return true
+        }
     }
 
-    private var groups: [(title: String, entries: [HistoryEntry])] {
-        let cal = Calendar.current
-        var out: [(String, [HistoryEntry])] = []
-        for e in filtered {
-            let title: String
-            if cal.isDateInToday(e.timestamp) { title = "today" }
-            else if cal.isDateInYesterday(e.timestamp) { title = "yesterday" }
-            else { title = e.timestamp.formatted(.dateTime.day().month(.wide)).lowercased() }
-            if let last = out.last, last.0 == title { out[out.count - 1].1.append(e) } else { out.append((title, [e])) }
+    static func app(of entry: HistoryEntry) -> String { entry.appName?.lowercased() ?? "unknown" }
+
+    /// "Any app", then each app by how many dictations went to it.
+    private var appItems: [(value: String?, item: SquareMenuList.Item)] {
+        var counts: [String: Int] = [:]
+        for e in store.history { counts[HistoryTab.app(of: e), default: 0] += 1 }
+        let apps = counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+        return [(nil, SquareMenuList.Item(label: "any app", checked: app == nil, count: store.history.count.formatted()))]
+            + apps.map { (Optional($0.key), SquareMenuList.Item(label: $0.key, checked: app == $0.key, count: $0.value.formatted())) }
+    }
+
+    private var whenActive: Bool { when != .any || TimeOfDayWindow(from: from, to: to) != nil }
+
+    private var whenLabel: String {
+        let time = TimeOfDayWindow(from: from, to: to)?.label
+        guard when != .any else { return time ?? "when" }
+        return [when.label, time].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    // MARK: Rows
+
+    enum Line: Identifiable {
+        case day(id: Date, day: String, date: String, total: String)
+        case row(HistoryEntry)
+
+        var id: String {
+            switch self {
+            case .day(let id, _, _, _): "day-\(id.timeIntervalSinceReferenceDate)"
+            case .row(let entry): entry.id.uuidString
+            }
+        }
+    }
+
+    /// The rows under a line for each day, newest first, the day saying how
+    /// much it held.
+    static func lines(_ rows: [HistoryEntry], calendar: Calendar = .current) -> [Line] {
+        var out: [Line] = []
+        var i = rows.startIndex
+        while i < rows.endIndex {
+            let day = calendar.startOfDay(for: rows[i].timestamp)
+            var j = i
+            while j < rows.endIndex, calendar.isDate(rows[j].timestamp, inSameDayAs: day) { j += 1 }
+            let same = rows[i..<j]
+            let words = same.reduce(0) { $0 + HistoryTab.words(in: $1) }
+            let label = HistoryTab.dayLabel(day, calendar: calendar)
+            out.append(.day(id: day, day: label.day, date: label.date,
+                            total: "\(counted(same.count, "dictation")) · \(counted(words, "word"))"))
+            out.append(contentsOf: same.map(Line.row))
+            i = j
         }
         return out
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Image("akar-search").resizable().frame(width: 13, height: 13).foregroundStyle(DesignTokens.Colors.ink3)
-                    TextField("search", text: $search).textFieldStyle(.plain)
-                }
-                .padding(.horizontal, 8).frame(height: 26)
-                .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
-                .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
-                if !selected.isEmpty {
-                    Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
-                        .buttonStyle(InkButtonStyle())
-                }
-                Button("delete all") { confirmDeleteAll = true }
-                    .buttonStyle(InkButtonStyle())
-                    .disabled(store.history.isEmpty)
-                    .confirmationDialog("Delete all \(counted(store.history.count, "dictation"))?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
-                        Button("Delete All", role: .destructive) { store.deleteAllHistory(); selected = [] }
-                    } message: { Text("This cannot be undone.") }
-            }
-            .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 18)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    if groups.isEmpty {
-                        Text(store.history.isEmpty ? "nothing yet" : "no matches")
-                            .foregroundStyle(DesignTokens.Colors.ink2).frame(maxWidth: .infinity).padding(.vertical, 40)
-                    }
-                    ForEach(groups, id: \.title) { group in
-                        SettingsGroup(title: group.title) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(group.entries.enumerated()), id: \.element.id) { i, e in
-                                    row(e, last: i == group.entries.count - 1)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 20)
-            }
-        }
+    static func words(in entry: HistoryEntry) -> Int {
+        entry.displayText.split(whereSeparator: \.isWhitespace).count
     }
 
-    @ViewBuilder
-    private func row(_ e: HistoryEntry, last: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                selectToggle(e.id)
-                Text(e.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
-                    .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2).frame(width: 44, alignment: .leading).padding(.top, 2)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(e.displayText).font(.system(size: 13)).textSelection(.enabled)
-                    HStack(spacing: 6) {
-                        if e.edited != nil {
-                            Text("edited").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                                .padding(.horizontal, 5).padding(.vertical, 1).background(Rectangle().fill(DesignTokens.Colors.inkA08))
-                        }
-                        if let app = e.appName { Text(app.lowercased()).font(.system(size: 10)).foregroundStyle(DesignTokens.Colors.ink3) }
-                    }
-                    telemetry(e)
-                    if e.recordingFile != nil {
-                        stages(e)
-                    } else if expanded.contains(e.id) {
-                        stage("heard", heard: e.transcript, typed: e.displayText)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { toggleExpanded(e.id) }
-                HStack(spacing: 4) {
-                    if e.recordingFile != nil {
-                        let on = player.playing == e.id
-                        iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play the audio") { player.toggle(e) }
-                    }
-                    iconButton("akar-copy", "copy") { Output.copyToClipboard(e.displayText) }
-                    iconButton("akar-trash-can", "delete") { store.delete(id: e.id) }
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            if !last { RowRule() }
-        }
+    /// "today" over "thursday 24 september"; an older day by its weekday,
+    /// over its date.
+    static func dayLabel(_ day: Date, calendar: Calendar = .current) -> (day: String, date: String) {
+        let full = day.formatted(.dateTime.weekday(.wide).day().month(.wide)).lowercased()
+        if calendar.isDateInToday(day) { return ("today", full) }
+        if calendar.isDateInYesterday(day) { return ("yesterday", full) }
+        let sameYear = calendar.isDate(day, equalTo: .now, toGranularity: .year)
+        let date = sameYear ? day.formatted(.dateTime.day().month(.wide)) : day.formatted(.dateTime.day().month(.wide).year())
+        return (day.formatted(.dateTime.weekday(.wide)).lowercased(), date.lowercased())
     }
 
-    private func toggleExpanded(_ id: UUID) {
-        if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
-    }
-
-    /// An accordion under rows that kept their audio, so what the engine
-    /// heard can be checked against the recording and any word of it
-    /// corrected.
-    @ViewBuilder
-    private func stages(_ e: HistoryEntry) -> some View {
-        let open = expanded.contains(e.id)
-        VStack(alignment: .leading, spacing: 0) {
-            Button { toggleExpanded(e.id) } label: {
-                HStack(spacing: 5) {
-                    Image("akar-chevron-down").resizable().frame(width: 10, height: 10)
-                        .rotationEffect(.degrees(open ? 0 : -90))
-                    Text("heard")
-                    CharDelta(heard: e.transcript, typed: e.displayText)
-                }
-                .font(.system(size: 10).monospaced())
-                .padding(.horizontal, 7).padding(.vertical, 3)
-            }
-            .buttonStyle(QuietButtonStyle(radius: 0))
-            .help(open ? "hide what was heard" : "show what was heard before clean-up")
-            if open { stage(nil, heard: e.transcript, typed: e.displayText) }
-        }
-        .background(Rectangle().fill(DesignTokens.Colors.inkA04))
-        .animation(.easeOut(duration: 0.15), value: open)
-    }
-
-    private func stage(_ label: String?, heard: String, typed: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let label {
-                HStack(spacing: 5) {
-                    Text(label)
-                    CharDelta(heard: heard, typed: typed)
-                }
-                .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
-            }
-            TranscriptDiff(heard: heard, typed: typed)
-        }
-        .foregroundStyle(DesignTokens.Colors.ink2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Rectangle().fill(DesignTokens.Colors.inkA04))
-    }
-
-    /// Stage timings, monospaced and always visible.
-    @ViewBuilder
-    private func telemetry(_ e: HistoryEntry) -> some View {
-        HStack(spacing: 0) {
-            stat("asr", e.transcribeMs.map { "\($0)ms" } ?? "n/a")
-            if let ms = e.transcribeMs, let audio = e.durationMs, audio > 0 {
-                Text("  rtf=" + String(format: "%.2fx", Double(ms) / Double(audio)))
-            }
-            Text("  │  ")
-            stat("llm", e.postProcessRequested ? (e.postProcessMs.map { "\($0)ms" } ?? "n/a") : "off")
-            if e.postProcessRequested, e.postProcessMs != nil {
-                Text("  " + (e.postProcessed == nil ? "→fallback" : "→applied"))
-            }
-            Text("  │  ")
-            let total = (e.transcribeMs ?? 0) + (e.postProcessMs ?? 0)
-            stat("total", e.transcribeMs == nil ? "n/a" : "\(total)ms")
-        }
-        .font(.system(size: 10, design: .monospaced))
-        .foregroundStyle(DesignTokens.Colors.ink2)
-        .padding(.horizontal, 7).padding(.vertical, 3)
-        .background(Rectangle().fill(DesignTokens.Colors.inkA04))
-    }
-
-    private func stat(_ key: String, _ value: String) -> some View {
-        HStack(spacing: 0) {
-            Text(key + "=").foregroundStyle(DesignTokens.Colors.ink3)
-            Text(value)
-        }
-    }
-
-    private func selectToggle(_ id: UUID) -> some View {
-        SelectBox(on: selected.contains(id)) { select(id) }
+    private func picked(_ id: UUID) -> Binding<Bool> {
+        Binding(get: { selected.contains(id) }, set: { _ in select(id) })
     }
 
     private func select(_ id: UUID) {
@@ -251,196 +297,149 @@ struct HistoryTab: View {
                                             anchor: anchor, in: filtered.map(\.id), selected: selected)
         anchor = id
     }
+}
 
-    private func iconButton(_ image: String, _ help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(image).resizable().frame(width: 14, height: 14)
+/// History's columns: the select box, time, the dictation, its app and its
+/// words, and a copy and a delete at the end. The head, the days and the rows
+/// share them.
+enum HistoryColumns {
+    static let page: CGFloat = 20
+    static let tick: CGFloat = 22
+    static let time: CGFloat = 60
+    static let app: CGFloat = 116
+    static let words: CGFloat = 52
+    static let action: CGFloat = 26
+    static let gap: CGFloat = 16
+    /// Between the select box, the row and its two actions.
+    static let edge: CGFloat = 4
+    /// How far the columns sit inside the row's own left edge.
+    static let inset: CGFloat = 8
+    /// Where the time column starts, from the list's edge.
+    static var lead: CGFloat { tick + edge + inset }
+
+    static var head: some View {
+        HStack(spacing: edge) {
+            Color.clear.frame(width: tick, height: 1)
+            HStack(spacing: gap) {
+                Text("time").frame(width: time, alignment: .leading)
+                Text("dictation").frame(maxWidth: .infinity, alignment: .leading)
+                Text("app").frame(width: app, alignment: .leading)
+                Text("words").frame(width: words, alignment: .trailing)
+            }
+            .padding(.leading, inset)
+            Color.clear.frame(width: action * 2 + edge, height: 1)
         }
-        .buttonStyle(QuietButtonStyle(side: 24))
-        .help(help)
+        .font(Square.mono(11))
+        .foregroundStyle(DesignTokens.Colors.ink3)
+        .padding(.trailing, inset)
+        .padding(.bottom, 8)
     }
 }
 
-/// How many characters the clean-up put in and took out, `+12 −3`, in the
-/// diff colours, not counting spaces. Nothing when the text was left as heard.
-private struct CharDelta: View {
-    let heard: String
-    let typed: String
+/// A day in the list: an ink rule, the day under the time, its date under
+/// the dictations, and how much it held under the app and words.
+private struct HistoryDayRow: View {
+    let day: String
+    let date: String
+    let total: String
 
     var body: some View {
-        let diff = typed.filter { !$0.isWhitespace }.difference(from: heard.filter { !$0.isWhitespace })
-        let (added, removed) = (diff.insertions.count, diff.removals.count)
-        if added > 0 { Text("+\(added.formatted())").foregroundStyle(DesignTokens.Colors.diffAdd) }
-        if removed > 0 { Text("−\(removed.formatted())").foregroundStyle(DesignTokens.Colors.diffRemove) }
+        HStack(spacing: HistoryColumns.edge) {
+            Color.clear.frame(width: HistoryColumns.tick, height: 1)
+            HStack(alignment: .firstTextBaseline, spacing: HistoryColumns.gap) {
+                // "yesterday" is wider than the time column; it runs into the gap.
+                Text(day)
+                    .font(Square.mono(12, weight: .medium))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .fixedSize()
+                    .frame(width: HistoryColumns.time, alignment: .leading)
+                Text(date)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(total)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: HistoryColumns.app + HistoryColumns.gap + HistoryColumns.words, alignment: .trailing)
+            }
+            .padding(.leading, HistoryColumns.inset)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+            Color.clear.frame(width: HistoryColumns.action * 2 + HistoryColumns.edge, height: 1)
+        }
+        .padding(.trailing, HistoryColumns.inset)
+        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
+        .padding(.top, 6)
     }
 }
 
-/// What was heard against what was typed, a word at a time: words the
-/// clean-up dropped are struck through in red, the words it put in their
-/// place are green, and the rest reads as the transcript did. Every word
-/// is a button: a red run can be kept as heard, and any word can be given
-/// the spelling it should have had.
-private struct TranscriptDiff: View {
-    let heard: String
-    let typed: String
-
-    private enum Change { case same, added, removed }
-
-    var body: some View {
-        FlowLayout(spacing: 4) {
-            ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
-                switch run.change {
-                case .same:
-                    ForEach(Array(run.words.split(separator: " ").enumerated()), id: \.offset) { _, word in
-                        HeardRun(words: String(word), changed: false)
-                    }
-                case .added:
-                    ForEach(Array(run.words.split(separator: " ").enumerated()), id: \.offset) { _, word in
-                        Text(word).foregroundStyle(DesignTokens.Colors.diffAdd).fontWeight(.semibold)
-                    }
-                case .removed:
-                    HeardRun(words: run.words, changed: true)
-                }
-            }
-        }
-        .font(.system(size: 12))
-    }
-
-    private static func words(_ text: String) -> [String] {
-        text.split(whereSeparator: \.isWhitespace).map(String.init)
-    }
-
-    /// The two texts merged back into one reading order. Removals are offsets
-    /// into what was heard and insertions offsets into what was typed, so the
-    /// two walks advance together and every word lands once.
-    private var runs: [(change: Change, words: String)] {
-        let old = TranscriptDiff.words(heard)
-        let new = TranscriptDiff.words(typed)
-        var removed: Set<Int> = []
-        var inserted: [Int: String] = [:]
-        for change in new.difference(from: old) {
-            switch change {
-            case .remove(let offset, _, _): removed.insert(offset)
-            case .insert(let offset, let word, _): inserted[offset] = word
-            }
-        }
-        var out: [(change: Change, words: String)] = []
-        var o = 0, n = 0
-        while o < old.count || n < new.count {
-            if let word = inserted[n] { append(&out, .added, word); n += 1; continue }
-            if o < old.count, removed.contains(o) { append(&out, .removed, old[o]); o += 1; continue }
-            if o < old.count, n < new.count { append(&out, .same, new[n]); o += 1; n += 1; continue }
-            break
-        }
-        return out
-    }
-
-    /// Consecutive words of the same kind are one run, so a whole phrase is
-    /// struck through in one piece rather than word by word.
-    private func append(_ out: inout [(change: Change, words: String)], _ change: Change, _ word: String) {
-        if out.last?.change == change { out[out.count - 1].words += " " + word } else { out.append((change, word)) }
-    }
-}
-
-/// A run of the transcript, and where it stands with the custom words. The
-/// click opens the entries the settings field takes: a struck-through run
-/// can be kept as heard, and any run can name the spelling it should have
-/// been. A run already kept, or already a spelling of a custom word, offers
-/// to be forgotten instead; a struck-through one wears a check to say so.
-/// The standing is read from the custom words each time, so every row shows
-/// it and nothing is written to the history.
-private struct HeardRun: View {
-    let words: String
-    /// Struck through by the clean-up, as opposed to left as heard.
-    let changed: Bool
-    @State private var store = Store.shared
-    @State private var settings = Settings.shared
-    @State private var open = false
+/// A dictation in the list: its select box under the pointer, when, what was
+/// typed, where and how many words; copy and delete at the end. A click on
+/// the rest opens its page.
+private struct HistoryRow: View {
+    let entry: HistoryEntry
+    @Binding var picked: Bool
+    /// Something is picked, so every box shows.
+    let picking: Bool
+    let copied: Bool
+    let open: () -> Void
+    let copy: () -> Void
+    let delete: () -> Void
     @State private var hovering = false
 
-    private var term: String { HeardWord.term(for: words) }
-    private var standing: HeardWord.Standing {
-        HeardWord.standing(of: words, terms: store.terms(for: settings.customWords))
-    }
-
     var body: some View {
-        Button { open.toggle() } label: {
-            HStack(spacing: 3) {
-                if changed {
-                    Text(words).foregroundStyle(DesignTokens.Colors.diffRemove).strikethrough()
-                } else {
-                    Text(words).foregroundStyle(DesignTokens.Colors.ink2)
+        HStack(spacing: HistoryColumns.edge) {
+            Toggle("select", isOn: $picked)
+                .toggleStyle(SquareTickStyle(faint: true))
+                .labelsHidden()
+                .frame(width: HistoryColumns.tick)
+                .opacity(hovering || picking || picked ? 1 : 0)
+                .help(picked ? "deselect" : "select · shift-click for a range")
+            Button(action: open) {
+                HStack(alignment: .firstTextBaseline, spacing: HistoryColumns.gap) {
+                    Text(entry.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                        .font(Square.mono(12))
+                        .monospacedDigit()
+                        .foregroundStyle(DesignTokens.Colors.ink2)
+                        .frame(width: HistoryColumns.time, alignment: .leading)
+                    Text(entry.displayText)
+                        .font(Square.sans(13.5))
+                        .lineSpacing(2)
+                        .lineLimit(2)
+                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 6) {
+                        Text(HistoryTab.app(of: entry)).lineLimit(1)
+                        if entry.edited != nil { SquareTag(text: "edited") }
+                    }
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .frame(width: HistoryColumns.app, alignment: .leading)
+                    Text(HistoryTab.words(in: entry).formatted())
+                        .font(Square.mono(12))
+                        .monospacedDigit()
+                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .frame(width: HistoryColumns.words, alignment: .trailing)
                 }
-                if changed, standing != .unknown {
-                    Image("akar-check").resizable().frame(width: 8, height: 8).foregroundStyle(DesignTokens.Colors.ink2)
-                }
+                .padding(.leading, HistoryColumns.inset)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 2)
-            .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.sm)
-                .fill(hovering || open ? DesignTokens.Colors.inkA08 : .clear))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            Button(action: copy) { SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14) }
+                .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                .help("copy")
+                .accessibilityLabel("copy")
+            Button(action: delete) { SquareIcon("akar-trash-can", size: 14) }
+                .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                .help("delete")
+                .accessibilityLabel("delete")
         }
-        .buttonStyle(.plain)
+        .padding(.trailing, HistoryColumns.inset)
+        .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
+        .overlay(alignment: .top) { SquareRule() }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
-        .help(help)
-        .popover(isPresented: $open, arrowEdge: .bottom) {
-            HeardRunMenu(term: term, standing: standing, changed: changed, open: $open)
-        }
-    }
-
-    private var help: String {
-        switch standing {
-        case .unknown: return changed ? "keep “\(term)”, or say what it should be" : "say what it should be"
-        case .kept: return "in custom words"
-        case .heard(let word): return "heard as “\(term)” for \(word)"
-        }
-    }
-}
-
-private struct HeardRunMenu: View {
-    let term: String
-    let standing: HeardWord.Standing
-    let changed: Bool
-    @Binding var open: Bool
-    @State private var store = Store.shared
-    @State private var settings = Settings.shared
-    @State private var spelling = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            switch standing {
-            case .unknown:
-                if changed {
-                    Button("keep “\(term)”") { settings.addCustomWord(term); open = false }
-                        .buttonStyle(InkButtonStyle())
-                }
-                TextField("should be…", text: $spelling)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 200)
-                    .onSubmit(correct)
-            case .kept:
-                Button("forget “\(term)”") {
-                    store.forgetLearned(word: term)
-                    settings.removeCustomWord(term)
-                    open = false
-                }
-                .buttonStyle(InkButtonStyle())
-            case .heard(let word):
-                Button("forget “\(term) = \(word)”") { store.forgetAlias(heard: term, for: word); open = false }
-                    .buttonStyle(InkButtonStyle())
-            }
-        }
-        .padding(12)
-    }
-
-    /// The same entry as "heard = word" in settings: the spelling becomes a
-    /// custom word and the run a spelling the speech model produces for it.
-    private func correct() {
-        let w = spelling.trimmingCharacters(in: .whitespaces)
-        guard !w.isEmpty else { return }
-        settings.addCustomWord(w)
-        if w.caseInsensitiveCompare(term) != .orderedSame { store.addAlias(heard: term, for: w) }
-        open = false
     }
 }
