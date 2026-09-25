@@ -53,7 +53,7 @@ final class Pipeline {
         overlay.model.onOpenAccessibility = { NSWorkspace.shared.open(SecureInput.accessibilitySettingsURL) }
         overlay.model.onKeep = { [weak self] in self?.keepLearned() }
         overlay.model.onUndo = { [weak self] in self?.undoLearned() }
-        overlay.model.onOpenIntelligence = { [weak self] in
+        overlay.model.onOpenDictionary = { [weak self] in
             self?.keepLearned()
             AppState.shared.settingsTab = .dictionary
             NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)

@@ -60,58 +60,6 @@ struct InkButtonStyle: ButtonStyle {
     }
 }
 
-/// The design system's plain button: no outline and no fill of its own, an
-/// ink-a04 wash and full-strength ink under the pointer, a step darker while
-/// held. It is what `.btn-quiet` is on the web, and it is the style for every
-/// button that draws its own label — the icon buttons, the sidebar tabs, the
-/// crosses that dismiss things.
-struct QuietButtonStyle: ButtonStyle {
-    /// A square target for icon buttons, so a 10pt glyph still gets something
-    /// worth hovering. Nil leaves the label at the size it drew itself.
-    var side: CGFloat?
-    var radius: CGFloat = DesignTokens.Radius.sm
-    /// A selected button is inverted outright and stops answering the pointer,
-    /// being already the thing a click would ask for.
-    var selected = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        QuietButtonLabel(configuration: configuration, side: side, radius: radius, selected: selected)
-    }
-
-    private struct QuietButtonLabel: View {
-        let configuration: Configuration
-        let side: CGFloat?
-        let radius: CGFloat
-        let selected: Bool
-        @Environment(\.isEnabled) private var enabled
-        @State private var hovering = false
-        private var hot: Bool { hovering && enabled && !selected }
-
-        var body: some View {
-            configuration.label
-                .foregroundStyle(foreground)
-                .frame(width: side, height: side)
-                .background(RoundedRectangle(cornerRadius: radius).fill(background))
-                .contentShape(RoundedRectangle(cornerRadius: radius))
-                .onHover { hovering = $0 }
-                .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hot)
-        }
-
-        private var foreground: Color {
-            if selected { return DesignTokens.Colors.onSlab }
-            if !enabled { return DesignTokens.Colors.ink3 }
-            return hot ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2
-        }
-
-        private var background: Color {
-            if selected { return DesignTokens.Colors.slab }
-            guard enabled else { return .clear }
-            if configuration.isPressed { return DesignTokens.Colors.inkA08 }
-            return hot ? DesignTokens.Colors.inkA04 : .clear
-        }
-    }
-}
-
 /// A square inset list with an ink border and a mono title above it.
 struct SettingsGroup<Content: View>: View {
     var title: String?
