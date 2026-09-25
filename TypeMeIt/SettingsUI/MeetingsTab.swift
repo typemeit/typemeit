@@ -173,7 +173,8 @@ struct MeetingsTab: View {
                 if running { player.pause() } else { player.play(id: m.id, urls: urls) }
             }
             .padding(.leading, -5)
-            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            // Ticks only while playing: each tick lays the page out again.
+            TimelineView(.animation(minimumInterval: 0.25, paused: !running)) { _ in
                 let at = loaded ? player.currentTime : 0
                 HStack(spacing: 10) {
                     Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
@@ -361,8 +362,10 @@ struct MeetingsTab: View {
     }
 
     /// The paragraphs, each headed by its speaker and time.
+    /// Lazy: built whole, the 408 selectable paragraphs of a 56-minute
+    /// meeting took longer to lay out than a frame, and the window stayed blank.
     private func transcript(_ m: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        LazyVStack(alignment: .leading, spacing: 8) {
             if m.paragraphs.isEmpty {
                 Text(m.transcription.state == .done ? "nothing was said" : "not transcribed yet")
                     .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3)
