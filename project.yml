@@ -227,6 +227,29 @@ targets:
           mkdir -p "$DEST_DIR"
           cp "${BUILT_PRODUCTS_DIR}/typemeit-mcp" "$DEST_DIR/typemeit-mcp"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:-$CODE_SIGN_IDENTITY}" --timestamp=none "$DEST_DIR/typemeit-mcp"
+  # The design system on its own. Previews of its parts load here in seconds,
+  # where the app's target first loads everything the app links; running it
+  # opens every part in one window. Signed to run locally: it never ships.
+  DesignSystem:
+    type: application
+    platform: macOS
+    sources:
+      - DesignSystemGallery
+      - TypeMeIt/DesignSystem
+      - TypeMeIt/DesignTokens.swift
+      - TypeMeIt/CloudColor.swift
+      - TypeMeIt/KeyCombo.swift
+      - TypeMeIt/MenuBarIcon.swift
+      - TypeMeIt/Plural.swift
+      - TypeMeIt/Overlay/PuffView.swift
+      - TypeMeIt/Overlay/Puff.metal
+      - TypeMeIt/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.designsystem
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
   TypeMeItTests:
     type: bundle.unit-test
     platform: macOS
@@ -251,6 +274,12 @@ targets:
           TEST_HOST: "$(BUILT_PRODUCTS_DIR)/type me it dev.app/Contents/MacOS/type me it dev"
           BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
+  DesignSystem:
+    build:
+      targets:
+        DesignSystem: all
+    run:
+      config: Debug
   typemeit:
     build:
       targets:
