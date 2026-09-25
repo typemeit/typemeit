@@ -74,4 +74,22 @@ enum DesignTokens {
         static let n3: TimeInterval = 0.320
         static let n4: TimeInterval = 0.560
     }
+
+    enum Shadow {
+        struct Layer: Sendable {
+            let color: Color
+            let radius: CGFloat
+            let x: CGFloat
+            let y: CGFloat
+        }
+
+        static let liftLight: [Layer] = [
+            Layer(color: Color(.sRGB, red: 0.0392, green: 0.0392, blue: 0.0392, opacity: 0.18), radius: 12, x: 0, y: 10),
+            Layer(color: Color(.sRGB, red: 0.0392, green: 0.0392, blue: 0.0392, opacity: 0.12), radius: 3, x: 0, y: 2),
+        ]
+        static let liftDark: [Layer] = [
+            Layer(color: Color(.sRGB, red: 0.0000, green: 0.0000, blue: 0.0000, opacity: 0.70), radius: 14, x: 0, y: 10),
+            Layer(color: Color(.sRGB, red: 0.0000, green: 0.0000, blue: 0.0000, opacity: 0.50), radius: 4, x: 0, y: 2),
+        ]
+    }
 }

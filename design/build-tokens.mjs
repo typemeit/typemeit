@@ -96,6 +96,15 @@ const nsColor = (v) => {
 };
 const weightName = { 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' };
 const ms = (v) => (parseFloat(v) / 1000).toFixed(3);
+// A CSS box-shadow list as SwiftUI shadow layers: a SwiftUI radius is half the
+// CSS blur, and SwiftUI has no spread, so the spread is dropped.
+const shadowLayers = (css) =>
+  css.split(/,(?![^(]*\))/).map((layer) => {
+    const color = layer.match(/rgba?\([^)]*\)|#[0-9a-f]{6}/i)[0];
+    const [x, y, blur] = layer.replace(color, '').trim().split(/\s+/).map(parseFloat);
+    const [r, g, b, a] = rgba(color);
+    return `Layer(color: Color(.sRGB, red: ${r}, green: ${g}, blue: ${b}, opacity: ${a}), radius: ${blur / 2}, x: ${x}, y: ${y})`;
+  });
 
 const sw = [];
 sw.push(`// Generated from design/tokens.json by design/build-tokens.mjs. Do not edit.`);
@@ -139,6 +148,24 @@ sw.push(`    static let focusOffset: CGFloat = ${parseFloat(t.focus.offset)}`);
 sw.push(``);
 sw.push(`    enum Duration {`);
 for (const [k, v] of entries(t.motion.duration)) sw.push(`        static let ${ident(k)}: TimeInterval = ${ms(v)}`);
+sw.push(`    }`);
+sw.push(``);
+sw.push(`    enum Shadow {`);
+sw.push(`        struct Layer: Sendable {`);
+sw.push(`            let color: Color`);
+sw.push(`            let radius: CGFloat`);
+sw.push(`            let x: CGFloat`);
+sw.push(`            let y: CGFloat`);
+sw.push(`        }`);
+sw.push(``);
+for (const [k, v] of entries(t.shadow)) {
+  for (const scheme of ['light', 'dark']) {
+    const name = ident(`${k}-${scheme}`);
+    sw.push(`        static let ${name}: [Layer] = [`);
+    for (const layer of shadowLayers(v[scheme])) sw.push(`            ${layer},`);
+    sw.push(`        ]`);
+  }
+}
 sw.push(`    }`);
 sw.push(`}`);
 sw.push(``);

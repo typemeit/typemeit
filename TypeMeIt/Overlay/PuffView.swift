@@ -227,6 +227,17 @@ struct PuffView: View {
     }
 }
 
+extension PuffView {
+    /// The square to draw a puff in for its cloud to fill a cell of `side`
+    /// points, rather than rest a quarter of the way across it: the cloud
+    /// takes up about a third of the frame it is drawn in.
+    static func drawnSide(filling side: CGFloat) -> CGFloat { side / 0.32 }
+
+    /// Added to each clock along a row of puffs, so neighbours show different
+    /// smoke.
+    static let neighbourTimeOffset: Double = 7.3
+}
+
 #Preview("Breathing, dark") {
     PuffView()
         .frame(width: 240, height: 240)

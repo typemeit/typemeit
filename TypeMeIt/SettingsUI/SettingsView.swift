@@ -795,11 +795,8 @@ struct CloudColorPalette: View {
     @Binding var selection: CloudColor
     @State private var hovered: CloudColor?
 
-    /// The cell each puff sits in, and the larger square it is drawn in, so
-    /// the cloud fills the cell rather than resting a quarter of the way
-    /// across it.
+    /// The cell each puff sits in.
     private static let side: CGFloat = 64
-    private static let drawn: CGFloat = 200
 
     var body: some View {
         HStack(spacing: 0) {
@@ -809,8 +806,8 @@ struct CloudColorPalette: View {
                 // the way there, so the row answers before it is clicked.
                 let scale = on ? 1.5 : (hovered == c ? 1.25 : 1.0)
                 Button { selection = c } label: {
-                    PuffView(level: 0, tint: Color(nsColor: c.color), timeOffset: Double(i) * 7.3)
-                        .frame(width: CloudColorPalette.drawn, height: CloudColorPalette.drawn)
+                    PuffView(level: 0, tint: Color(nsColor: c.color), timeOffset: Double(i) * PuffView.neighbourTimeOffset)
+                        .frame(width: PuffView.drawnSide(filling: CloudColorPalette.side), height: PuffView.drawnSide(filling: CloudColorPalette.side))
                         .frame(width: CloudColorPalette.side, height: CloudColorPalette.side)
                         .scaleEffect(scale)
                         .animation(.easeOut(duration: 0.18), value: scale)
