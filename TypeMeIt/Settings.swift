@@ -347,8 +347,9 @@ enum Fixed {
     /// And scales so the peak lands here, with the gain held to this range.
     static let meetingQuietTargetPeak: Float = 0.45
     static let meetingQuietGainRange: ClosedRange<Float> = 1...12
-    /// Chosen, not measured: the pause between two thoughts. Raise if
-    /// paragraphs fragment.
+    /// A pause this long ends a speaker's turn, so whoever speaks after it
+    /// can start a paragraph of their own. A pause alone never starts one:
+    /// one speaker's paragraphs with nobody else's between them are joined.
     static let meetingParagraphGapSeconds = 2
     /// NAME_MAX is 255 bytes.
     static let meetingFolderNameMax = 200

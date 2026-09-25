@@ -60,7 +60,18 @@ enum TranscriptMerge {
                     text: words.map(\.text).joined(separator: " ")))
             }
         }
-        return paragraphs.sorted { $0.startMs < $1.startMs }
+        // A pause alone never starts a paragraph: one speaker's paragraphs
+        // with nobody else's between them are one.
+        var joined: [Meeting.Paragraph] = []
+        for paragraph in paragraphs.sorted(by: { $0.startMs < $1.startMs }) {
+            if let last = joined.last, last.speaker == paragraph.speaker {
+                joined[joined.count - 1] = Meeting.Paragraph(
+                    speaker: last.speaker, startMs: last.startMs, endMs: max(last.endMs, paragraph.endMs), text: last.text + " " + paragraph.text)
+            } else {
+                joined.append(paragraph)
+            }
+        }
+        return joined
     }
 
     /// One speaker's words as turns, split where a word starts more than
