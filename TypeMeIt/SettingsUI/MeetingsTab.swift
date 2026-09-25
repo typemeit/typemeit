@@ -338,8 +338,12 @@ struct MeetingsTab: View {
         let waitingForModel = m.transcription.state == .pending && !ModelStore.isInstalled
         let folderMissing = !m.published && m.isDone && !store.folderAvailable
         let canAddSpeakers = m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
-        if m.onlyYourSide || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers {
+        let putOff = !waitingForModel && coordinator.isWaiting(m.id)
+        if m.onlyYourSide || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers || putOff {
             HStack(spacing: 6) {
+                if putOff {
+                    Button("transcribe") { if let latest = store.meeting(m.id) { coordinator.enqueue(latest) } }.buttonStyle(InkButtonStyle(primary: true))
+                }
                 if canAddSpeakers {
                     Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle())
                 }
@@ -459,6 +463,9 @@ struct MeetingsTab: View {
             }
             SettingsRow(label: "keep the audio", subtitle: "deleted along with the meeting") {
                 Toggle("", isOn: $settings.meetingKeepAudio).toggleStyle(.switch).labelsHidden()
+            }
+            SettingsRow(label: "ask before transcribing", subtitle: "\(counted(Fixed.meetingTranscribeAskSeconds, "second")) to choose later") {
+                Toggle("", isOn: $settings.meetingAskBeforeTranscribing).toggleStyle(.switch).labelsHidden()
             }
             SettingsRow(label: "meetings folder", subtitleView: AnyView(Text(folderSubtitle))) {
                 Button("open") { NSWorkspace.shared.open(store.publishedRoot) }.buttonStyle(InkButtonStyle())

@@ -149,6 +149,8 @@ final class Settings {
     var meetingsMCP: Bool { didSet { defaults.set(meetingsMCP, forKey: "meetingsMCP") } }
     /// Keeps a meeting's tracks, compressed, beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
+    /// After a meeting, the pill offers okay and later before transcribing.
+    var meetingAskBeforeTranscribing: Bool { didSet { defaults.set(meetingAskBeforeTranscribing, forKey: "meetingAskBeforeTranscribing") } }
     /// How many meetings to keep; 0 keeps everything.
     var meetingLimit: Int { didSet { defaults.set(meetingLimit, forKey: "meetingLimit") } }
     /// Starts and stops a room recording. Nil means no shortcut.
@@ -201,6 +203,7 @@ final class Settings {
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
+        meetingAskBeforeTranscribing = bool("meetingAskBeforeTranscribing", false)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         debugLogs = bool("debugLogs", false)
@@ -307,6 +310,9 @@ enum Fixed {
     static let meetingSummaryChunkWords = 1500
     /// The owner's limit. Asked for two or three, the model gave one call 15.
     static let meetingSummaryMaxSentences = 4
+    /// How long the pill offers okay and later before a meeting is
+    /// transcribed, when asking is on. The owner's choice.
+    static let meetingTranscribeAskSeconds = 5
     /// Longer than a prompt is ever left unanswered; 15.4 MB for a call (D20).
     static let meetingPreRollSeconds = 120
     /// The process-list listener fires several times per launch.

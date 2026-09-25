@@ -65,7 +65,7 @@ struct PillView: View {
             Image(nsImage: PillView.icon(for: app)).resizable().frame(width: 18, height: 18)
         case .meetingSystemAudioOff:
             Image("akar-microphone").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink2)
-        case .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingFolderUnavailable:
+        case .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingFolderUnavailable:
             Image("akar-people-group").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink2)
         default:
             Color.clear.frame(width: 24, height: 24)
@@ -104,6 +104,8 @@ struct PillView: View {
             label("system audio is off")
         case .meetingSaved:
             label("meeting saved")
+        case .meetingTranscribeAsk:
+            label("transcribe now?")
         case .meetingFailed:
             label("meeting not transcribed")
         case .meetingDiskFull:
@@ -169,6 +171,11 @@ struct PillView: View {
             HStack(spacing: 6) {
                 Button("show") { model.onShowMeeting?(id) }.buttonStyle(InkButtonStyle(primary: true))
                 cross(help: "Dismiss") { model.onDismissMeeting?() }
+            }
+        case .meetingTranscribeAsk(let id):
+            HStack(spacing: 6) {
+                Button("later") { model.onTranscribeMeeting?(id, false) }.buttonStyle(InkButtonStyle())
+                Button("okay") { model.onTranscribeMeeting?(id, true) }.buttonStyle(InkButtonStyle(primary: true))
             }
         case .meetingFailed(let id):
             HStack(spacing: 6) {

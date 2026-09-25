@@ -129,6 +129,7 @@ final class MeetingCoordinator {
         model.onDeclineMeeting = { [weak self] in self?.decline() }
         model.onStopMeeting = { [weak self] in self?.dismissToast(); self?.stopMeeting() }
         model.onShowMeeting = { [weak self] id in self?.dismissToast(); self?.showTab(id) }
+        model.onTranscribeMeeting = { [weak self] id, now in self?.answerTranscribe(id, now: now) }
         model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
         model.onUndoNeverAsk = { [weak self] in self?.undoNeverAsk() }
         model.onDismissMeeting = { [weak self] in self?.dismissToast() }
@@ -344,7 +345,7 @@ final class MeetingCoordinator {
         }
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
-        enqueue(meeting)
+        if settings.meetingAskBeforeTranscribing, !stoppedForDisk { askBeforeTranscribing(meeting.id) } else { enqueue(meeting) }
     }
 
     private func silenceChanged(_ silent: Bool) {
@@ -654,6 +655,45 @@ final class MeetingCoordinator {
             guard !Task.isCancelled, let self else { return }
             self.overlay.hideMeeting(state)
         }
+    }
+
+    /// Settings.meetingAskBeforeTranscribing: the pill offers okay and later
+    /// for `Fixed.meetingTranscribeAskSeconds`, counting only while it shows
+    /// and is not hovered, and says okay itself when the time is up. A
+    /// meeting put off waits, pending, for its transcribe button or the
+    /// next launch.
+    private func askBeforeTranscribing(_ id: UUID) {
+        toastTask?.cancel()
+        let state = OverlayModel.State.meetingTranscribeAsk(id: id)
+        overlay.showMeeting(state)
+        toastTask = Task { [weak self] in
+            var remaining = Duration.seconds(Fixed.meetingTranscribeAskSeconds)
+            let step: Duration = .milliseconds(100)
+            while remaining > .zero {
+                try? await Task.sleep(for: step)
+                guard !Task.isCancelled, let self else { return }
+                if self.overlay.model.state == state, !self.overlay.model.toastPaused { remaining -= step }
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.answerTranscribe(id, now: true)
+        }
+    }
+
+    private func answerTranscribe(_ id: UUID, now: Bool) {
+        toastTask?.cancel()
+        overlay.hideMeeting(.meetingTranscribeAsk(id: id))
+        guard now, let meeting = store.meeting(id) else {
+            DebugLog.write("Meeting transcription later: \(id)")
+            return
+        }
+        enqueue(meeting)
+    }
+
+    /// A pending meeting nothing will transcribe until asked: put off from
+    /// the pill, and not queued or recording.
+    func isWaiting(_ id: UUID) -> Bool {
+        guard let meeting = store.meeting(id), meeting.transcription.state == .pending else { return false }
+        return !queued.contains(id) && transcribing?.id != id && !liveIDs.contains(id)
     }
 
     private func dismissToast() {
