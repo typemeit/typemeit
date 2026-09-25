@@ -50,6 +50,12 @@ struct RosterAccumulatorTests {
             captions: [MeetingNames.Caption(name: "Ana", startMs: 0, text: "so the plan is"), MeetingNames.Caption(name: "Ben", startMs: 1000, text: "right")]))
     }
 
+    @Test func aCallWithNoNamesStillKeepsItsKey() {
+        var a = RosterAccumulator(minimumSpanMs: 250)
+        a.add(RosterReading(call: "gzt-tyaf-sdy"), atMs: 0)
+        #expect(a.finish(atMs: 1000) == MeetingNames(source: .roster, roster: [], channel: nil, spans: [], captions: nil, call: "gzt-tyaf-sdy"))
+    }
+
     @Test func nothingReadIsNil() {
         var a = RosterAccumulator(minimumSpanMs: 250)
         a.add(reading(), atMs: 0)

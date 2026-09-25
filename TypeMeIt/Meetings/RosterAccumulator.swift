@@ -67,7 +67,10 @@ struct RosterAccumulator: Equatable {
     }
 
     /// Closes every open turn at `ms` and says what was learned, best source
-    /// first; nil when nothing was read at all.
+    /// first; nil when nothing was read at all. A window that named nobody
+    /// still says which call it was, so another call that follows within
+    /// minutes is not joined onto it (`MeetingMerge`): on 25 September a
+    /// Retro that yielded no names was joined to the next call.
     mutating func finish(atMs ms: Int) -> MeetingNames? {
         for (name, start) in open { close(name, from: start, to: ms) }
         open = [:]
@@ -75,7 +78,7 @@ struct RosterAccumulator: Equatable {
         let source: MeetingNames.Source
         if !captions.isEmpty { source = .captions }
         else if !spans.isEmpty { source = .speaking }
-        else if !roster.isEmpty { source = .roster }
+        else if !roster.isEmpty || call != nil || channel != nil { source = .roster }
         else { return nil }
         return MeetingNames(source: source, roster: roster, channel: channel, spans: spans, captions: captions.isEmpty ? nil : captions, call: call)
     }
