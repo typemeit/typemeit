@@ -440,6 +440,19 @@
     ]
   },
   {
+    "input": "In the ticket, can you explain that there w where to someone would find the existing taxonomy and the existing evals and stuff in Nokia?",
+    "wish": "The abandoned that there, the cut-off w and the stray to all dropped, leaving the question that was meant. The model turns the w into is (\"that there is where to someone\"), and rewording the false-starts rule does not change that, even with this sentence as its example.",
+    "expected": "In the ticket, can you explain where someone would find the existing taxonomy and the existing evals and stuff in Nokia?",
+    "customWords": [
+      "lottie.org",
+      "TypeForm",
+      "wisprflow",
+      "Notifi",
+      "granola",
+      "kinda"
+    ]
+  },
+  {
     "input": "we need one more chair and three more tables for the twenty people coming",
     "styles": [
       "digits"
