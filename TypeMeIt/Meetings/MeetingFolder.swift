@@ -181,6 +181,17 @@ extension MeetingFolder {
         try Data(TranscriptRender.markdown(meeting).utf8).write(to: folder.appendingPathComponent(transcriptFile), options: .atomic)
     }
 
+    /// Writes the meeting as a `.tmi` file (`MeetingShare`) into `directory`,
+    /// named like its folder, and returns the file.
+    nonisolated static func writeShare(_ meeting: Meeting, sender: String, into directory: URL) throws -> URL {
+        let folderName = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current,
+                                            duration: meeting.duration, title: meeting.title, existing: [])
+        let file = directory.appendingPathComponent(folderName).appendingPathExtension(MeetingShare.fileExtension)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(MeetingShare.markdown(meeting, sender: sender).utf8).write(to: file, options: .atomic)
+        return file
+    }
+
     nonisolated static func read(_ folder: URL) -> Meeting? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent(meetingFile)) else { return nil }
         return Meeting.decode(data)

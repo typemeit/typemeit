@@ -118,6 +118,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// The meeting this recording is a rejoin of: it is joined onto that
     /// one before transcription and then deleted (`MeetingMerge`).
     var continues: UUID? = nil
+    /// Who sent it, for a meeting opened from a `.tmi` file (`MeetingShare`);
+    /// empty when the file did not say. Nil for one recorded on this Mac.
+    var sharedBy: String? = nil
 
     static let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -157,6 +160,10 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     var duration: Duration { .milliseconds(durationMs) }
 
     var isDone: Bool { transcription.state == .done }
+
+    /// Recorded here rather than opened from someone's `.tmi` file: only
+    /// these count as the user's own time in meetings.
+    var recordedHere: Bool { sharedBy == nil }
 
     /// The others track never left the floor: the far end was silent, or
     /// the system-audio grant was missing (docs/meetings.md D13).

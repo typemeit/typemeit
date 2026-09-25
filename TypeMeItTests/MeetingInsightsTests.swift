@@ -37,6 +37,15 @@ struct MeetingInsightsTests {
             yourTalkMs: 1_320_000, callTalkMs: 2_430_000, medianMs: 11 * 60_000, longestMs: 47 * 60_000, topApp: "Slack"))
     }
 
+    @Test func aMeetingSomeoneSharedIsNotCounted() {
+        var shared = meeting("2026-09-21T16:00:00Z", minutes: 47, you: 900_000, them: 600_000)
+        shared.sharedBy = "Ellen"
+        let meetings = [meeting("2026-09-21T14:30:00Z", minutes: 11, you: 120_000, them: 360_000), shared]
+        #expect(MeetingInsights.compute(meetings, now: now, calendar: calendar) == MeetingStats(
+            meetings: 1, meetingsThisMonth: 1, totalMs: 11 * 60_000, thisMonthMs: 11 * 60_000,
+            yourTalkMs: 120_000, callTalkMs: 480_000, medianMs: 11 * 60_000, longestMs: 11 * 60_000, topApp: "Slack"))
+    }
+
     @Test func noMeetingsIsZeroes() {
         #expect(MeetingInsights.compute([], now: now, calendar: calendar) == MeetingStats(
             meetings: 0, meetingsThisMonth: 0, totalMs: 0, thisMonthMs: 0, yourTalkMs: 0, callTalkMs: 0, medianMs: nil, longestMs: nil, topApp: nil))

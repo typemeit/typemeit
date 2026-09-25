@@ -1812,6 +1812,74 @@ word across two meetings with the right speaker and timestamp; a path
 argument pointing outside the folder is refused; every tool with the setting
 off returns the same error.
 
+### 7.16 Sharing a meeting as a `.tmi` file
+
+A meeting leaves the Mac only as a file the user sends; type me it runs no
+server. The share button (`akar-share-box`, help `share`), on a done meeting
+with words, writes `<folder name>.tmi` into `$TMPDIR/Shared Meetings/<id>/`
+and opens the system share menu under itself: AirDrop, Mail, Messages.
+Dragged, the same button drops the file into a message or a folder.
+
+The file is `transcript.md`'s Markdown (7.9) with `echo` left out and three
+keys added: `from` (`NSFullUserName()`), `id` (the meeting's) and `format`
+(1). Under the front matter, `typeme.it` (`Fixed.websiteURL`'s host)
+sits on its own line for anyone who opens the file without the app; reading
+skips everything before the first heading. Strings are written in JSON's
+string syntax, which YAML reads as double-quoted strings, so a title with a
+quote or a line break stays on its line. The user's own speaker is written under the sender's name unless the
+user renamed it: in anyone else's copy, `You` is the wrong person. No audio,
+summary, dictations, device kinds or window names go in the file; the
+recipient's app writes its own summary when the page opens.
+
+```markdown
+---
+title: "Deploy sync"
+kind: call
+started: "2026-09-19 14:30 +01:00"
+duration: 34:36
+app: "Slack"
+speakers: ["Max Mitchell", "Them"]
+from: "Max Mitchell"
+id: 9F2C0000-0000-0000-0000-000000000000
+format: 1
+---
+
+typeme.it
+
+**Max Mitchell** · 0:14
+Morning. Shall we start with the deploy?
+```
+
+The type is `it.typeme.meeting`, extension `tmi`, conforming to
+`net.daringfireball.markdown` and `public.plain-text`, exported by the app
+with a document type of rank Owner and a system-generated icon
+(project.yml). Plain text is what lets TextEdit open it and Quick Look show
+it. The store build leaves the type out until it has meetings.
+
+A double-click reaches `AppDelegate.application(_:open:)`, which calls
+`MeetingStore.receive`. `MeetingShare.meeting(from:)` parses the file into a
+meeting written into the published folder like any other (7.9): `sharedBy`
+set, no tracks, transcribed and published. Speakers are numbered `s1…` in the
+order the file lists them, none `isYou`; a paragraph ends where the next
+starts. A meeting whose id is already in the store is shown, not added
+again. The settings window opens on it unless onboarding or the gate is up.
+A file that is not a meeting, or has a `format` above 1, gets an alert.
+
+A shared meeting's row says `from <name>`. It has no player or add
+speakers, since it has no audio. The insights and the MCP's
+`meeting_stats` leave it out: it is not the user's time in meetings, and its
+talk times are estimates.
+
+Tests (`MeetingShareTests`, pure but for one temporary directory): the
+example meeting's file, and its name beside a folder's; reading it
+back (id, start to the minute, the offset as the zone, numbered speakers,
+paragraph ends, `sharedBy`); a name the user gave themselves is kept; quotes
+and line breaks in a title and a speaker's name; a paragraph past an hour; a
+line that only looks like a heading stays words; CRLF line endings; a
+forwarded meeting names who forwarded it; plain Markdown, and front matter
+without an id, are not meetings; `format: 2` is refused. `MeetingInsightsTests`
+and `MCPTests`: a shared meeting is not counted.
+
 ## 8. Phase 2: the room, and speakers
 
 ### 8.1 The room
@@ -2208,9 +2276,10 @@ Not in this plan, written down so they are not re-derived:
 | Tab count | `counted(n, "meeting")` |
 | Tab buttons | `import…` (help `transcribe a recording`) |
 | Tab status | `recording · 12m` · `stop` · `transcribing · 40%` · `downloading the speaker model · 40%` |
-| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` |
+| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` · `from ellen` |
 | Row chips | `only your side` · `on speakers` · `transcription failed` · `retry` · `waiting for the speech model` · `download` · `add speakers` · `meetings folder unavailable` · `change` |
-| Row button help | `play` · `stop` · `copy the transcript` · `rename` · `show in finder` · `delete` |
+| Row button help | `play` · `stop` · `copy the transcript` · `share` · `rename` · `show in finder` · `delete` |
+| `.tmi` file | Finder kind `type me it meeting` · `typeme.it` under the front matter · alert `Can't open this meeting` · `It's from a newer version of type me it. Update, then open it again.` / `The file isn't a type me it meeting.` |
 | Empty | `nothing yet` · `no matches` |
 | Import | `english only` · `no audio in that file` |
 | Footer row `mcp` | `let other tools read your meetings` · `copy command` · help `off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.` · error returned when off: `meetings mcp is off. turn it on in type me it settings.` |
@@ -2243,6 +2312,7 @@ file each under `TypeMeItTests/Meetings/`:
 | `PreRollTests` | 7.7: a wrapped ring drains oldest-first; a short pre-roll; `discard` leaves nothing readable |
 | `MeetingImportTests` | 7.14 |
 | `MCPTests` | 7.15 |
+| `MeetingShareTests` | 7.16 |
 | `SpeakerNamingTests` | 8.6 |
 | `VoicePrintTests` | matcher threshold and margin on unit vectors |
 

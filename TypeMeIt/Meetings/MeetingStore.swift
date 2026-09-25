@@ -245,4 +245,39 @@ final class MeetingStore {
 
     /// The meetings waiting for the speech model to be installed.
     var pendingForModel: [Meeting] { meetings.filter { $0.transcription.state == .pending && !$0.published } }
+
+    // MARK: Sharing
+
+    /// The meeting as a `.tmi` file, written into a temporary folder of its
+    /// own for the share menu or a drag (docs/meetings.md 7.16). Nil when it
+    /// cannot be written.
+    func shareFile(_ id: UUID) -> URL? {
+        guard let meeting = meeting(id) else { return nil }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shared Meetings", isDirectory: true)
+            .appendingPathComponent(id.uuidString, isDirectory: true)
+        do {
+            return try MeetingFolder.writeShare(meeting, sender: NSFullUserName(), into: folder)
+        } catch {
+            Log.meetings.error("Could not write the meeting to share: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// A `.tmi` file opened from Finder, Mail or a message: written into the
+    /// published folder as a meeting without audio. A meeting with the same
+    /// id already here is left as it is, so opening a file twice adds
+    /// nothing. Returns the meeting's id.
+    func receive(_ file: URL) throws -> UUID {
+        let meeting = try MeetingShare.meeting(from: String(decoding: Data(contentsOf: file), as: UTF8.self))
+        guard self.meeting(meeting.id) == nil else { return meeting.id }
+        let root = publishedRoot
+        let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current,
+                                      duration: meeting.duration, title: meeting.title, existing: MeetingFolder.existingNames(under: root))
+        let folder = root.appendingPathComponent(name, isDirectory: true)
+        try MeetingFolder.write(meeting, to: folder)
+        adopt(meeting, folder: folder)
+        diskUsage = MeetingFolder.diskUsage(of: root)
+        DebugLog.write("Meeting received: \(name)")
+        return meeting.id
+    }
 }

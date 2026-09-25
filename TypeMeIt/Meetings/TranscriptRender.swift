@@ -10,13 +10,16 @@ enum TranscriptRender {
         return "\"\(escaped)\""
     }
 
-    private static func startedLine(_ meeting: Meeting) -> String {
+    /// The `started` line's format; `MeetingShare` reads it back.
+    static let startedFormat = "yyyy-MM-dd HH:mm xxx"
+
+    static func startedLine(_ meeting: Meeting) -> String {
         let zone = TimeZone(identifier: meeting.timeZone) ?? TimeZone(identifier: "UTC")!
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = zone
-        formatter.dateFormat = "yyyy-MM-dd HH:mm xxx"
+        formatter.dateFormat = startedFormat
         return formatter.string(from: meeting.started)
     }
 
@@ -48,11 +51,14 @@ enum TranscriptRender {
         frontMatter.append("echo: \(meeting.echo.rawValue)")
         frontMatter.append("---")
         frontMatter.append("")
+        return (frontMatter + [paragraphs(meeting)]).joined(separator: "\n") + "\n"
+    }
 
-        let paragraphs = meeting.paragraphs
+    /// One `**speaker** · timestamp` / text block per paragraph, blank-line
+    /// separated.
+    static func paragraphs(_ meeting: Meeting) -> String {
+        meeting.paragraphs
             .map { "**\(meeting.speakerName($0.speaker))** · \(timestamp(ms: $0.startMs))\n\($0.text)" }
             .joined(separator: "\n\n")
-
-        return (frontMatter + [paragraphs]).joined(separator: "\n") + "\n"
     }
 }
