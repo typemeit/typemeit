@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The sidebar: the cloud's mark, the pages as a flush list with the chosen
-/// one inverted across the column's full width, and at the foot "record the
-/// room", or, while a meeting records, the cloud pulsing beside stop.
+/// one inverted across the column's full width, and at the foot the cloud
+/// alone. At rest a click records the room; while a meeting records the
+/// cloud moves with the microphone and a click stops it.
 struct SquareSidebar<Page: Hashable>: View {
     struct Item {
         let page: Page
@@ -14,7 +15,9 @@ struct SquareSidebar<Page: Hashable>: View {
     @Binding var selection: Page
     /// Where and for how long, as "slack · 12:04", while a meeting records.
     var recording: String?
-    /// The cloud's colour, for the recording cloud.
+    /// The microphone's level while a meeting records, which the cloud moves with.
+    var level: Float = 0
+    /// The cloud's colour.
     var tint = Color(nsColor: CloudColor.sky.color)
     var record: () -> Void = {}
     var stop: () -> Void = {}
@@ -43,30 +46,19 @@ struct SquareSidebar<Page: Hashable>: View {
         .overlay(alignment: .trailing) { Rectangle().fill(DesignTokens.Colors.rule).frame(width: DesignTokens.hairline) }
     }
 
-    @ViewBuilder private var foot: some View {
-        if let recording {
-            HStack(spacing: 8) {
-                PuffView(level: 0, tint: tint)
-                    .frame(width: PuffView.drawnSide(filling: SquareSidebarLayout.puff * 2),
-                           height: PuffView.drawnSide(filling: SquareSidebarLayout.puff * 2))
-                    .frame(width: SquareSidebarLayout.puff, height: SquareSidebarLayout.puff)
-                    .modifier(LivePulse())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("recording").font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink)
-                    Text(recording).font(Square.mono(11)).monospacedDigit().foregroundStyle(DesignTokens.Colors.ink3)
-                }
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Button("stop", action: stop).buttonStyle(SquareButtonStyle(kind: .primary, small: true))
-            }
-            .padding(.horizontal, SquareSidebarLayout.puffInset)
-            .padding(.vertical, 14)
-            .overlay(alignment: .top) { SquareRule() }
-        } else {
-            SquareSidebarItem(title: "record the room", icon: "akar-microphone", selected: false, action: record)
-                .padding(.vertical, 8)
-                .overlay(alignment: .top) { SquareRule() }
+    private var foot: some View {
+        let label = recording.map { "stop recording · \($0)" } ?? "record the room"
+        return Button(action: recording == nil ? record : stop) {
+            PuffView(level: recording == nil ? 0 : level, tint: tint)
+                .frame(width: PuffView.drawnSide(filling: SquareSidebarLayout.cloud * 2),
+                       height: PuffView.drawnSide(filling: SquareSidebarLayout.cloud * 2))
+                .frame(width: SquareSidebarLayout.cloud, height: SquareSidebarLayout.cloud)
         }
+        .buttonStyle(SquareIconButtonStyle(side: SquareSidebarLayout.cloud + 2 * SquareSidebarLayout.cloudWash))
+        .help(label)
+        .accessibilityLabel(label)
+        .padding(.leading, SquareSidebarLayout.markInset - SquareSidebarLayout.cloudWash)
+        .padding(.bottom, SquareSidebarLayout.cloudWash * 3)
     }
 }
 
@@ -78,10 +70,11 @@ enum SquareSidebarLayout {
     /// left for the two to line up.
     static let markInset: CGFloat = itemInset - 3
     static let icon: CGFloat = 16
-    /// The recording cloud, centred on the icons' column. A resting puff
-    /// shows in about half the cell it is drawn for.
-    static let puff: CGFloat = 24
-    static let puffInset: CGFloat = itemInset - (puff - icon) / 2
+    /// The cloud at the foot, the mark's size, lined up under it. A resting
+    /// puff shows in about half the cell it is drawn for.
+    static let cloud: CGFloat = 32
+    /// How far the pointer's grey square reaches round the cloud.
+    static let cloudWash: CGFloat = 4
 }
 
 private struct SquareSidebarItem: View {
@@ -200,7 +193,7 @@ struct SquareSidebarSpecimen: View {
             HStack(alignment: .top, spacing: 24) {
                 SquareSidebar(items: specimenPages, selection: $page, recording: recording,
                               record: { recording = "room · 00:00" }, stop: { recording = nil })
-                SquareSidebar(items: specimenPages, selection: .constant(.meetings), recording: "slack · 12:04")
+                SquareSidebar(items: specimenPages, selection: .constant(.meetings), recording: "slack · 12:04", level: 0.6)
             }
             .frame(height: 400)
         }
