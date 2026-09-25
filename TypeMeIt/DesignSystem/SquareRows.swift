@@ -82,24 +82,21 @@ struct SquareRule: View {
 }
 
 /// A group on the one-page settings: one line with its name and what it is
-/// set to, and a + that turns to − as it opens, its rows dropping in under
-/// the summary. Still when reduce motion is on.
+/// set to, and a + that turns to − as it opens, its rows there at once under
+/// the summary.
 struct SquareGroup<Content: View>: View {
     let title: String
     let summary: String
     @Binding var open: Bool
     @ViewBuilder var content: Content
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static var inset: CGFloat { 4 }
     private static var titleWidth: CGFloat { 150 }
     private static var gap: CGFloat { 24 }
 
-    private var motion: Animation? { reduceMotion ? nil : .easeOut(duration: DesignTokens.Duration.n2) }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { withAnimation(motion) { open.toggle() } } label: {
+            Button { open.toggle() } label: {
                 HStack(spacing: SquareGroup.gap) {
                     Text(title)
                         .font(Square.mono(16))
@@ -125,16 +122,13 @@ struct SquareGroup<Content: View>: View {
                     .padding(.leading, SquareGroup.inset + SquareGroup.titleWidth + SquareGroup.gap)
                     .padding(.trailing, SquareGroup.inset)
                     .padding(.bottom, 22)
-                    .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: -6)))
             }
         }
-        .animation(motion, value: open)
         .overlay(alignment: .top) { SquareRule() }
     }
 }
 
-/// Two 12 pt bars; the upright one turns a quarter to lie flat as the group
-/// opens.
+/// Two 12 pt bars, a + that becomes a − as the group opens.
 private struct SquareGroupSign: View {
     let open: Bool
 
