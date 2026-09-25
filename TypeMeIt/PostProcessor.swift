@@ -24,7 +24,7 @@ actor PostProcessor {
     2. Fix spelling, capitalization, and punctuation errors
     3. Convert number words to digits (twenty-five → 25, ten percent → 10%)
     4. Write currency amounts with the symbol before the number (five dollars → $5, fifty pounds → £50, 3 euros → €3)
-    5. Replace spoken punctuation with symbols (period → ., comma → ,, question mark → ?)
+    5. Replace spoken punctuation with symbols (period → ., comma → ,, question mark → ?, exclamation point → !)
     6. Delete the filler sounds um, uh, er and ah wherever they occur, including in the middle of a sentence (second um call → Second, call). Keep every other word, including like.
     7. Remove false starts: a stranded single letter or word fragment the speaker abandoned before restarting (I don't f a little bit → a little bit)
     8. Keep the language of the transcript, with its accents (if it was French, keep it in French)

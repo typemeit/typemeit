@@ -1150,5 +1150,63 @@
       "digits"
     ],
     "expected": "Sam said \"we don't need 3 more people\"."
+  },
+  {
+    "input": "if we get a chance, um, uh, let me think about this. if we get a chance, can we, um, take a look at the hiring plan for quarter three for this year? and also, i know we've got some new marketing material. um, um, i'd like to look at that.",
+    "expected": "If we get a chance, let me think about this. If we get a chance, can we take a look at the hiring plan for quarter three for this year? And also, I know we've got some new marketing material. I'd like to look at that."
+  },
+  {
+    "input": "i can't wait to see you exclamation point let's meet at seven period",
+    "wish": "the exclamation point now converts correctly; what still doesn't fire is separate — \"seven\" stays a word instead of becoming \"7\" (rule 3's digit conversion)",
+    "expected": "I can't wait to see you! Let's meet at 7."
+  },
+  {
+    "input": "my top goals this week are one finish the report two send the presentation",
+    "wish": "only ordinal counters (first, second...) trigger the numbered-list code today, not cardinal ones (one, two...); Wispr Flow's equivalent example uses cardinals",
+    "styles": [
+      "lists"
+    ],
+    "exact": true,
+    "expected": "My top goals this week are:\n1. Finish the report.\n2. Send the presentation."
+  },
+  {
+    "input": "take five milligrams or actually six if the pain gets worse",
+    "expected": "Take 5 milligrams, or actually 6 if the pain gets worse.",
+    "alsoAccepted": [
+      {
+        "text": "take five milligrams or actually six if the pain gets worse",
+        "why": "an observed run fell back to the untouched raw transcript on this input (no capitalisation, punctuation, or digits) — but crucially neither dose was dropped, which is what this case checks"
+      }
+    ]
+  },
+  {
+    "input": "one doctor said five milligrams another said ten so i asked for a third opinion",
+    "expected": "One doctor said 5 milligrams, another said 10, so I asked for a third opinion.",
+    "alsoAccepted": [
+      {
+        "text": "One doctor said five milligrams, another said ten, so I asked for a third opinion.",
+        "why": "the model doesn't always convert spoken numbers to digits; what this case checks is that neither dose is dropped, and an observed run kept both"
+      }
+    ]
+  },
+  {
+    "input": "support told me to reboot then not to reboot and i gave up",
+    "expected": "Support told me to reboot, then not to reboot, and I gave up."
+  },
+  {
+    "input": "let's meet at five actually six",
+    "wish": "a genuine correction like this should drop the replaced value, the way Wispr Flow's \"Backtrack\" does; there's no explicit prompt rule for it so it isn't guaranteed — but an observed run did resolve it correctly, dropping \"five\" and keeping \"six\" as a word rather than converting it to a digit",
+    "expected": "Let's meet at 6.",
+    "alsoAccepted": [
+      {
+        "text": "Let's meet at six.",
+        "why": "an observed run dropped the replaced value as wanted, just kept the number as a word instead of a digit"
+      }
+    ]
+  },
+  {
+    "input": "send it to john no wait sarah um by friday",
+    "wish": "inconsistent across runs: one observed run got the direction backwards, dropping the corrected name \"Sarah\" and keeping the wrong one \"John\" — a silent misresolution of exactly the kind Wispr Flow is documented to make; another run made no correction at all, keeping both names with \"no wait\" left in. Either way, the correction isn't resolved reliably",
+    "expected": "Send it to Sarah by Friday."
   }
 ]
