@@ -29,20 +29,24 @@ struct AXNode: Equatable, Sendable {
 /// other projects' notes, not from Slack and Meet as they are: on four calls
 /// on 24 and 25 September it found no one, and once took Meet's "Pinned for
 /// yourself" for a person, which titled the meeting and named the far end.
-/// Dev builds keep what the window exposes early in each call, so the rules
-/// can be written from that before names come back.
+/// Dev builds capture what the window exposes from the menu
+/// (`WindowCapture`), so the rules can be written from that before names
+/// come back.
 final class Roster: @unchecked Sendable {
     enum Target: String, Sendable {
         case meet, slackHuddle
 
+        /// The Chromium browsers Meet is read from.
+        static let meetBrowsers: Set<String> = ["com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary", "company.thebrowser.Browser", "com.brave.Browser", "com.microsoft.edgemac"]
+        static let slack = "com.tinyspeck.slackmacgap"
+
         /// The meeting app's target, or nil when names cannot be read from it.
         static func of(_ owner: ProcessOwner.Owner) -> Target? {
-            switch owner.bundleID {
-            case "com.tinyspeck.slackmacgap": .slackHuddle
-            case "com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary", "company.thebrowser.Browser", "com.brave.Browser", "com.microsoft.edgemac": .meet
-            default: nil
-            }
+            if owner.bundleID == slack { return .slackHuddle }
+            return meetBrowsers.contains(owner.bundleID) ? .meet : nil
         }
+
+        var bundleIDs: Set<String> { self == .meet ? Target.meetBrowsers : [Target.slack] }
 
         /// Electron honours `AXManualAccessibility`; Chromium, `AXEnhancedUserInterface`.
         var activation: String { self == .slackHuddle ? "AXManualAccessibility" : "AXEnhancedUserInterface" }
@@ -75,7 +79,6 @@ final class Roster: @unchecked Sendable {
         timer.setEventHandler { @Sendable [weak self] in self?.poll() }
         timer.resume()
         self.timer = timer
-        if Updates.isDevBuild { startCapture() }
         DebugLog.write("Meeting call: reading the \(target.rawValue) window")
     }
 
@@ -92,11 +95,7 @@ final class Roster: @unchecked Sendable {
     func finish() -> MeetingNames? {
         timer?.cancel()
         timer = nil
-        queue.sync {
-            captureTimer?.cancel()
-            captureTimer = nil
-            writeCapture()
-        }
+        queue.sync {}
         AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), target.activation as CFString, kCFBooleanFalse)
         lock.lock()
         defer { lock.unlock() }
@@ -123,61 +122,6 @@ final class Roster: @unchecked Sendable {
     }
 
     // MARK: Capture (dev builds)
-
-    /// How far into a call the capture starts, once people have joined, and
-    /// how long it follows the window's changes after its full snapshot.
-    private static let captureAfterSeconds = 20
-    private static let captureSeconds = 30
-    private var captureTimer: DispatchSourceTimer?
-    private var captureLines: [String] = []
-    private var captureStartMs: Int?
-    private var previousLines: Set<String> = []
-
-    /// Every poll interval from `captureAfterSeconds` in: the whole meeting
-    /// window once, then the lines that appeared and went at each poll, which
-    /// is where a speaking indicator shows. Written to
-    /// `MeetingProbes.directory`; it holds whatever the window shows,
-    /// messages included, and stays on this Mac.
-    private func startCapture() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + .seconds(Roster.captureAfterSeconds), repeating: .milliseconds(Fixed.meetingSpeakingPollMs))
-        timer.setEventHandler { @Sendable [weak self] in self?.captureTick() }
-        timer.resume()
-        captureTimer = timer
-    }
-
-    private func captureTick() {
-        guard let ms = now() else { return }
-        let lines = Roster.windowLines(pid: pid, target: target)
-        let current = Set(lines)
-        if let start = captureStartMs {
-            let gone = previousLines.subtracting(current).sorted(), came = current.subtracting(previousLines).sorted()
-            if !gone.isEmpty || !came.isEmpty { captureLines += ["t=\(ms)"] + gone.map { "- " + $0 } + came.map { "+ " + $0 } }
-            if ms - start >= Roster.captureSeconds * 1000 {
-                captureTimer?.cancel()
-                captureTimer = nil
-                writeCapture()
-            }
-        } else {
-            captureStartMs = ms
-            captureLines = ["\(target.rawValue), meeting time \(ms) ms"] + lines
-        }
-        previousLines = current
-    }
-
-    private func writeCapture() {
-        guard !captureLines.isEmpty else { return }
-        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "")
-        let file = MeetingProbes.directory.appendingPathComponent("capture-\(target.rawValue)-\(stamp).txt")
-        do {
-            try FileManager.default.createDirectory(at: MeetingProbes.directory, withIntermediateDirectories: true)
-            try captureLines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
-            DebugLog.write("Meeting capture: \(counted(captureLines.count, "line")) to \(file.lastPathComponent)")
-        } catch {
-            DebugLog.write("Meeting capture: \(error.localizedDescription)")
-        }
-        captureLines = []
-    }
 
     /// Every window's title, and the elements of the meeting's part of the
     /// app one per line: for Meet, each web area on meet.google.com or in a

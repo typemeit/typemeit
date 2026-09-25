@@ -78,6 +78,7 @@ struct MenuContent: View {
     @State private var appState = AppState.shared
     @State private var store = Store.shared
     @State private var meetings = MeetingCoordinator.shared
+    @State private var capture = WindowCapture.shared
 
     /// The newest five with any text; a dictation that came out empty has
     /// nothing to copy.
@@ -138,6 +139,7 @@ struct MenuContent: View {
             Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
         }
         meetingItems
+        if Updates.isDevBuild { captureItems }
         Divider()
         if recentTranscripts.isEmpty {
             Text("No transcripts yet").disabled(true)
@@ -164,6 +166,16 @@ struct MenuContent: View {
         } label: { Text("View Meetings…") }
         Divider()
         Button("Quit type me it") { NSApp.terminate(nil) }.keyboardShortcut("q", modifiers: .command)
+    }
+
+    /// Dev builds: what a meeting window exposes, to write the name rules from.
+    @ViewBuilder private var captureItems: some View {
+        if let target = capture.running {
+            Text("Capturing the \(target == .meet ? "Meet" : "Slack") window…").disabled(true)
+        } else {
+            Button("Capture Meet Window") { capture.start(.meet) }
+            Button("Capture Slack Window") { capture.start(.slackHuddle) }
+        }
     }
 
     /// The meeting block (docs/meetings.md 7.11): the detected call's items
