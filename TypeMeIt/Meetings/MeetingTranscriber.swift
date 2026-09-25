@@ -22,10 +22,11 @@ enum MeetingTranscriber {
     }
 
     /// Runs steps 1 to 5 and the transcode on `meeting` in `folder`, saving
-    /// through the store as it goes. Returns the meeting `done`, `failed`,
-    /// or `pending` when the model is not installed or the task was
-    /// cancelled between chunks.
-    static func run(_ start: Meeting, folder: URL, progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
+    /// through `save` as it goes, the store unless a probe says otherwise.
+    /// Returns the meeting `done`, `failed`, or `pending` when the model is
+    /// not installed or the task was cancelled between chunks.
+    static func run(_ start: Meeting, folder: URL, save: @escaping @Sendable (Meeting) async -> Void = MeetingTranscriber.saveToStore,
+                    progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
         var meeting = start
         guard ModelStore.isInstalled else {
             meeting.transcription.state = .pending
@@ -162,7 +163,7 @@ enum MeetingTranscriber {
         return meeting
     }
 
-    private static func save(_ meeting: Meeting) async {
+    static func saveToStore(_ meeting: Meeting) async {
         await MainActor.run { MeetingStore.shared.save(meeting) }
     }
 

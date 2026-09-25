@@ -13,6 +13,7 @@ import Foundation
 ///     -recordRoom <s>                       record the room for <s> seconds through the whole pipeline (7.1)
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
 ///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
+///     -transcribeCopies <meeting id>...     the whole pass on a copy of each meeting, in probe/rerun-<time>/, keeping each track's words; the meetings stay as they are
 ///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
 ///     -diarizeCounts <path>...              each file left to count its speakers, then told 1…6; segments to probe/counts-<name>.json
 ///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
@@ -48,6 +49,18 @@ enum MeetingProbes {
                 MeetingCoordinator.shared.transcribeAgain(id)
             }
         }
+        if let i = args.firstIndex(of: "-transcribeCopies") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                DebugLog.write("Meeting probe copies: \(counted(ids.count, "meeting"))")
+                let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "")
+                let root = directory.appendingPathComponent("rerun-\(stamp)", isDirectory: true)
+                for id in ids { await transcribeCopy(id, into: root) }
+                DebugLog.write("Meeting probe copies: done, in \(root.lastPathComponent)")
+            }
+        }
         if let i = args.firstIndex(of: "-dumpMeetingPages") {
             let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
             DebugLog.enabled = true
@@ -75,6 +88,44 @@ enum MeetingProbes {
                 }
             }
         }
+    }
+
+    // MARK: The whole pass on a copy
+
+    /// A finished meeting's folder copied under `root` and transcribed there
+    /// from the first chunk, saved only to the copy.
+    private static func transcribeCopy(_ id: UUID, into root: URL) async {
+        guard var meeting = MeetingStore.shared.meeting(id), let folder = MeetingStore.shared.folder(for: id) else {
+            DebugLog.write("Meeting probe copy: no meeting \(id)")
+            return
+        }
+        let copy = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: folder, to: copy)
+        } catch {
+            DebugLog.write("Meeting probe copy: \(error.localizedDescription)")
+            return
+        }
+        meeting.transcription.done = [:]
+        meeting.paragraphs = []
+        meeting.summary = nil
+        // Each save follows a chunk, when the track's words file holds every
+        // word so far; kept under another name, since the pass deletes the
+        // file at the end, for trying the echo and merge steps against it.
+        let roles = meeting.tracks.map(\.role.rawValue)
+        let result = await MeetingTranscriber.run(meeting, folder: copy, save: { _ in
+            for role in roles {
+                guard let words = try? Data(contentsOf: copy.appendingPathComponent("words-\(role).json")) else { continue }
+                try? words.write(to: copy.appendingPathComponent("kept-words-\(role).json"), options: .atomic)
+            }
+        }) { _ in }
+        do {
+            try MeetingFolder.write(result, to: copy)
+        } catch {
+            DebugLog.write("Meeting probe copy: \(error.localizedDescription)")
+        }
+        DebugLog.write("Meeting probe copy: \(folder.lastPathComponent), \(counted(result.paragraphs.count, "paragraph")), \(result.transcription.state)")
     }
 
     // MARK: S1, detection
