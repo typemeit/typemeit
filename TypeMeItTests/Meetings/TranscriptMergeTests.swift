@@ -30,6 +30,37 @@ struct TranscriptMergeTests {
         ])
     }
 
+    /// Words every 400 ms, 300 ms long, from `fromMs` up to `toMs`.
+    private func run(_ prefix: String, fromMs: Int, toMs: Int) -> [Transcriber.Word] {
+        stride(from: fromMs, to: toMs, by: 400).enumerated().map { i, ms in
+            Transcriber.Word(text: "\(prefix)\(i)", confidence: 1, start: .milliseconds(ms), end: .milliseconds(ms + 300))
+        }
+    }
+
+    @Test func aTurnIsCutWhereTheOtherSpeakerCutsIn() {
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 6000))
+        let you = TrackWords(role: "you", words: run("a", fromMs: 3100, toMs: 4400))
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them", "you", "them"])
+        #expect(paragraphs.map(\.startMs) == [0, 3100, 3200])
+        #expect(paragraphs[0].text == "b0 b1 b2 b3 b4 b5 b6 b7")
+    }
+
+    @Test func aLastWordTheReplyRunsOverStaysInTheTurn() {
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 4000))
+        let you = TrackWords(role: "you", words: run("a", fromMs: 3500, toMs: 5000))
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them", "you"])
+    }
+
+    @Test func anUmOnItsOwnIsDroppedAndCutsNothing() {
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 6000))
+        let you = TrackWords(role: "you", words: [Transcriber.Word(text: "Um,", confidence: 1, start: .milliseconds(3100), end: .milliseconds(3300))])
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them"])
+        #expect(paragraphs[0].endMs == 5900)
+    }
+
     @Test func dictationRemovesAMicWord() {
         let you = TrackWords(role: "you", words: [
             Transcriber.Word(text: "hello", confidence: 1, start: .milliseconds(0), end: .milliseconds(500)),

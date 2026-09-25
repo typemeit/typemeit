@@ -319,6 +319,11 @@ enum Fixed {
     static let meetingDrainMs = 100
     /// S2 (docs/meetings.md 6): the longest stretch Parakeet is handed.
     static let meetingChunkSeconds = 120
+    /// Parakeet stretches a sentence's last word to its next token, across
+    /// any silence after it: up to 23 s on the 25 September call's far end,
+    /// where the median word is 80 ms and the mic's longest was 560 ms. A
+    /// stretched word would carry its paragraph over the other speaker.
+    static let meetingLongestWordMs = 1000
     static let meetingChunkOverlapSeconds = 2
     /// The seam is placed at the quietest point within this of the nominal cut.
     static let meetingChunkSearchSeconds = 5

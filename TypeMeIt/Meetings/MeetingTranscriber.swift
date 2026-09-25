@@ -68,7 +68,9 @@ enum MeetingTranscriber {
                         let chunk = try read(file, range: range)
                         transcribed = try await transcribeRetryingQuiet(chunk, range: range)
                     }
-                    words.words = ChunkStitch.append(transcribed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
+                    let longest = Duration.milliseconds(Fixed.meetingLongestWordMs)
+                    let trimmed = transcribed.map { Transcriber.Word(text: $0.text, confidence: $0.confidence, start: $0.start, end: min($0.end, $0.start + longest)) }
+                    words.words = ChunkStitch.append(trimmed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
                     try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1

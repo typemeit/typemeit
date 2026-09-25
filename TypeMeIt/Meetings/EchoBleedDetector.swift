@@ -157,7 +157,7 @@ enum EchoBleedDetector {
     /// Highest normalised correlation of `b` against `a` over the lag range,
     /// and the lag it peaked at. `nil` when either side is flat in this
     /// window, which carries no evidence either way.
-    private static func peakCorrelation(
+    static func peakCorrelation(
         _ a: ArraySlice<Double>,
         _ b: ArraySlice<Double>,
         maxLag: Int,
