@@ -53,7 +53,6 @@ struct SquareShortcutRecorder: View {
             Button { listening ? stop() : start() } label: { face }
                 .buttonStyle(.plain)
                 .onHover { hovering = $0 }
-                .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
                 .help(listening ? "esc to cancel, ⌫ to clear" : "click, then press the keys")
             if combo != nil, !listening {
                 Button { combo = nil } label: { SquareIcon("akar-cross", size: 8) }
@@ -69,18 +68,18 @@ struct SquareShortcutRecorder: View {
         if listening {
             prompt("press keys…")
                 .foregroundStyle(DesignTokens.Colors.ink)
-                // Listening keeps a dashed edge until a key lands, so the unset
-                // recorder's hover stays a solid edge to tell the two apart.
+                // Dashed until a key lands.
                 .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, style: SquareEdge.style(dashed: true)))
         } else if let combo {
             HStack(spacing: 4) { ForEach(combo.caps, id: \.self) { SquareKeycap($0) } }
         } else {
             // An empty outline reads as furniture, so the pointer brings it up
-            // to a real edge and full ink.
+            // to a real edge and full ink, casting a button's shadow.
             let hot = pose.hot(hovering)
             prompt("set shortcut")
                 .foregroundStyle(hot ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
                 .overlay(Rectangle().strokeBorder(hot ? DesignTokens.Colors.ink : DesignTokens.Colors.inkA20, lineWidth: DesignTokens.hairline))
+                .squarePress(hot: hot, down: false, shadow: DesignTokens.Colors.ink)
         }
     }
 

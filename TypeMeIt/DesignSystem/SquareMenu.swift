@@ -47,7 +47,6 @@ private struct SquareSegment: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 
@@ -58,8 +57,9 @@ private struct SquareSegment: View {
 }
 
 /// A square popup: the value and a chevron on the control rule. Under the
-/// pointer its edge turns to ink dashes, and while open to solid ink. A click
-/// opens its options on a panel under it, right edges lined up.
+/// pointer its edge goes to ink and casts a button's hard shadow; while open
+/// the edge stays ink. A click opens its options on a panel under it, right
+/// edges lined up.
 struct SquareMenu<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [Value]
@@ -82,7 +82,8 @@ struct SquareMenu<Value: Hashable>: View {
             .padding(.trailing, 7)
             .frame(height: 24)
             .overlay(Rectangle().strokeBorder(open || pose.hot(hovering) ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl,
-                                              style: SquareEdge.style(dashed: !open && pose.hot(hovering))))
+                                              lineWidth: DesignTokens.hairline))
+            .squarePress(hot: !open && pose.hot(hovering), down: false, shadow: DesignTokens.Colors.ink)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -52,9 +52,12 @@ struct SquareIcon: View {
     }
 }
 
-/// A part's hairline edge, and the dashes it turns to under the pointer.
+/// A part's hairline edge; dashed, it says a recorder is listening.
 enum SquareEdge {
     static let dash: [CGFloat] = [3, 2]
+    /// How far a button's hard shadow reaches under the pointer, and how far
+    /// the button travels onto it while held.
+    static let shadowDepth: CGFloat = 2
 
     static func style(dashed: Bool) -> StrokeStyle {
         StrokeStyle(lineWidth: DesignTokens.hairline, dash: dashed ? dash : [])
@@ -92,7 +95,28 @@ extension EnvironmentValues {
     @Entry var squareLabelLift: CGFloat = 0
 }
 
+/// The part of a hard shadow that shows from under a square: a strip down its
+/// right side and one along its bottom, drawn outside the square's bounds.
+struct SquareShadowShape: Shape {
+    var depth = SquareEdge.shadowDepth
+
+    func path(in rect: CGRect) -> Path {
+        Path { p in
+            p.addRect(CGRect(x: rect.maxX, y: rect.minY + depth, width: depth, height: rect.height))
+            p.addRect(CGRect(x: rect.minX + depth, y: rect.maxY, width: rect.width - depth, height: depth))
+        }
+    }
+}
+
 extension View {
+    /// A button's answer to the pointer: a hard shadow under it while hot,
+    /// and the button pressed down onto it while held. Neither moves what is
+    /// around it.
+    func squarePress(hot: Bool, down: Bool, shadow: Color) -> some View {
+        offset(x: down ? SquareEdge.shadowDepth : 0, y: down ? SquareEdge.shadowDepth : 0)
+            .background { if hot, !down { SquareShadowShape().fill(shadow) } }
+    }
+
     /// Lifts a boxed label so its letters, not its line, sit in the middle.
     func centredLetters(_ text: String, size: CGFloat = Square.controlSize) -> some View {
         offset(y: -Square.drop(of: text, size: size))

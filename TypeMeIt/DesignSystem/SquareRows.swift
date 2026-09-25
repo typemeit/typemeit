@@ -193,7 +193,6 @@ struct SquareListRow: View {
         .background(Rectangle().fill(selected ? DesignTokens.Colors.slab : (hot ? DesignTokens.Colors.inkA04 : .clear)))
         .overlay(alignment: .top) { SquareRule() }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hot)
     }
 
     private var meta: Color {

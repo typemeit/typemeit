@@ -2,11 +2,10 @@ import SwiftUI
 
 /// The square button: a mono label on an ink outline. Primary fills with the
 /// slab, quiet drops the outline, and disabled goes to ink-3 on a rule
-/// outline whatever its kind. Under the pointer every kind's edge turns to
-/// dashes: ink on an outlined or quiet button, on-slab inside a primary's
-/// fill. Held, an outlined button takes an ink-a08 wash and a primary one eases
-/// off its slab to ink-a64. On a slab surface every kind but quiet fills with
-/// on-slab instead.
+/// outline whatever its kind. Under the pointer every kind casts a hard
+/// shadow 2 pt down and to the right, a quiet one taking an ink edge to cast
+/// it from; held, the button presses down onto its shadow. On a slab surface
+/// every kind but quiet fills with on-slab, and casts an on-slab shadow.
 ///
 /// An icon goes in as a `Label`, with the icon a `SquareIcon` of 12.
 struct SquareButtonStyle: ButtonStyle {
@@ -48,7 +47,8 @@ private struct SquareButtonLabel: View {
             .padding(.horizontal, small ? 9 : 10)
             .frame(height: small ? SquareButtonStyle.smallHeight : SquareButtonStyle.height)
             .background(Rectangle().fill(background))
-            .overlay(Rectangle().strokeBorder(border, style: SquareEdge.style(dashed: hot)))
+            .overlay(Rectangle().strokeBorder(border, lineWidth: DesignTokens.hairline))
+            .squarePress(hot: hot, down: down, shadow: inverse || onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
     }
@@ -67,27 +67,19 @@ private struct SquareButtonLabel: View {
 
     private var background: Color {
         guard enabled else { return .clear }
-        if inverse {
-            // The primary's step, taken off on-slab instead of the slab.
-            return down ? DesignTokens.Colors.onSlab.opacity(0.64) : DesignTokens.Colors.onSlab
-        }
-        switch kind {
-        case .primary:
-            return down ? DesignTokens.Colors.inkA64 : DesignTokens.Colors.slab
-        case .outline, .quiet:
-            return down && !onSlab ? DesignTokens.Colors.inkA08 : .clear
-        }
+        if inverse { return DesignTokens.Colors.onSlab }
+        return kind == .primary ? DesignTokens.Colors.slab : .clear
     }
 
     private var border: Color {
         if !enabled { return kind == .quiet ? .clear : DesignTokens.Colors.rule }
-        if inverse { return hot ? DesignTokens.Colors.slab : .clear }
+        if inverse { return .clear }
         switch kind {
         case .outline: return DesignTokens.Colors.ink
-        case .primary: return hot ? DesignTokens.Colors.onSlab : .clear
+        case .primary: return .clear
         case .quiet:
-            guard hot else { return .clear }
-            return onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink2
+            guard hot || down else { return .clear }
+            return onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink
         }
     }
 }
@@ -208,124 +200,6 @@ struct SquareIconButtonSpecimen: View {
     }
 }
 
-/// Ways a text button could answer the pointer instead of the dashed edge,
-/// to choose between: each draws an outlined and a primary button at rest,
-/// under the pointer and held. The rest column answers the pointer live.
-struct SquareButtonHoverSpecimen: View {
-    var body: some View {
-        SquareSpecimen {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 0) {
-                    Text("").frame(width: 120, alignment: .leading)
-                    ForEach(SquarePose.allCases, id: \.self) { pose in
-                        Text(pose.name).frame(width: 150, alignment: .leading)
-                    }
-                }
-                .font(Square.mono(11))
-                .foregroundStyle(DesignTokens.Colors.ink3)
-                ForEach(HoverOption.allCases, id: \.self) { option in
-                    HStack(spacing: 0) {
-                        Text(option.rawValue)
-                            .font(Square.mono(11))
-                            .foregroundStyle(DesignTokens.Colors.ink2)
-                            .frame(width: 120, alignment: .leading)
-                        ForEach(SquarePose.allCases, id: \.self) { pose in
-                            HStack(spacing: 10) {
-                                Button("show") {}.buttonStyle(HoverOptionStyle(option: option))
-                                Button("stop") {}.buttonStyle(HoverOptionStyle(option: option, primary: true))
-                            }
-                            .environment(\.squarePose, pose)
-                            .frame(width: 150, alignment: .leading)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private enum HoverOption: String, CaseIterable {
-    case dashes = "dashed edge"
-    case wash = "grey wash"
-    case fill = "fill"
-    case shadow = "hard shadow"
-    case thick = "thick edge"
-    case underline = "underline"
-}
-
-private struct HoverOptionStyle: ButtonStyle {
-    let option: HoverOption
-    var primary = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        HoverOptionLabel(configuration: configuration, option: option, primary: primary)
-    }
-}
-
-private struct HoverOptionLabel: View {
-    let configuration: ButtonStyleConfiguration
-    let option: HoverOption
-    let primary: Bool
-    @Environment(\.squarePose) private var pose
-    @State private var hovering = false
-
-    private var hot: Bool { pose.hot(hovering) }
-    private var down: Bool { pose.down(configuration.isPressed) }
-    /// The hard shadow's reach, and how far a held button travels onto it.
-    private static let shadowOffset: CGFloat = 2
-
-    var body: some View {
-        configuration.label
-            .font(Square.mono(Square.controlSize))
-            .centredLowercase()
-            .underline(option == .underline && hot && !down, color: foreground)
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 10)
-            .frame(height: SquareButtonStyle.height)
-            .background(Rectangle().fill(fill))
-            .overlay(Rectangle().strokeBorder(edge, style: StrokeStyle(lineWidth: edgeWidth, dash: option == .dashes && hot ? SquareEdge.dash : [])))
-            .overlay { if option == .thick, primary, hot, !down { Rectangle().stroke(DesignTokens.Colors.ink, lineWidth: 2).padding(-3) } }
-            .offset(x: travel, y: travel)
-            .background { if option == .shadow, hot, !down { Rectangle().fill(DesignTokens.Colors.ink).offset(x: Self.shadowOffset, y: Self.shadowOffset) } }
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-    }
-
-    private var travel: CGFloat { option == .shadow && down ? Self.shadowOffset : 0 }
-
-    private var foreground: Color {
-        if option == .fill, hot || down { return primary ? DesignTokens.Colors.ink : DesignTokens.Colors.onSlab }
-        return primary ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink
-    }
-
-    private var fill: Color {
-        switch option {
-        case .dashes, .underline, .thick:
-            if primary { return down ? DesignTokens.Colors.inkA64 : DesignTokens.Colors.slab }
-            return down ? DesignTokens.Colors.inkA08 : .clear
-        case .wash:
-            if primary { return down ? DesignTokens.Colors.inkA64 : hot ? DesignTokens.Colors.inkA88 : DesignTokens.Colors.slab }
-            return down ? DesignTokens.Colors.inkA12 : hot ? DesignTokens.Colors.inkA08 : .clear
-        case .fill:
-            if primary { return down ? DesignTokens.Colors.inkA08 : hot ? DesignTokens.Colors.paper : DesignTokens.Colors.slab }
-            return down ? DesignTokens.Colors.inkA64 : hot ? DesignTokens.Colors.slab : .clear
-        case .shadow:
-            return primary ? DesignTokens.Colors.slab : DesignTokens.Colors.paper
-        }
-    }
-
-    private var edge: Color {
-        switch option {
-        case .dashes: return primary ? (hot ? DesignTokens.Colors.onSlab : .clear) : DesignTokens.Colors.ink
-        case .fill: return primary ? (hot || down ? DesignTokens.Colors.ink : .clear) : DesignTokens.Colors.ink
-        default: return primary ? .clear : DesignTokens.Colors.ink
-        }
-    }
-
-    private var edgeWidth: CGFloat { option == .thick && !primary && hot ? 2 : DesignTokens.hairline }
-}
-
 #Preview("button") { SquareButtonSpecimen() }
 #Preview("icon button") { SquareIconButtonSpecimen() }
-#Preview("button hovers") { SquareButtonHoverSpecimen() }
 #endif
