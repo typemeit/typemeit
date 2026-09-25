@@ -3,7 +3,9 @@ import CoreAudio
 import Foundation
 
 /// AVAudioEngine input, converted to 16 kHz mono Float32. The tap runs on the
-/// audio thread, so the buffer is guarded by a lock.
+/// audio thread, so the buffer is guarded by a lock. The engine is started,
+/// stopped and re-tapped on the main actor only: AVAudioEngine is not safe to
+/// drive from two threads at once.
 final class AudioCapture: @unchecked Sendable {
     static let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
 
@@ -28,9 +30,15 @@ final class AudioCapture: @unchecked Sendable {
         configObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
         ) { [weak self] _ in
-            guard let self else { return }
-            Log.audio.info("Audio engine configuration changed; restarting")
-            self.restartIfRunning()
+            // Posted on AVFAudio's own queue. The restart goes to the main
+            // actor, where start and stop run, without this queue waiting for
+            // it: a `queue: .main` observer would hold the poster until the
+            // block ran, while the main thread may be inside an engine call.
+            Task { @MainActor in
+                guard let self else { return }
+                Log.audio.info("Audio engine configuration changed; restarting")
+                self.restartIfRunning()
+            }
         }
     }
 
@@ -52,7 +60,7 @@ final class AudioCapture: @unchecked Sendable {
         return status == noErr && deviceID != 0 ? deviceID : nil
     }
 
-    private func applyInputDevice(uid: String?) {
+    @MainActor private func applyInputDevice(uid: String?) {
         guard let uid, var deviceID = AudioCapture.deviceID(forUID: uid), let unit = engine.inputNode.audioUnit else { return }
         let status = AudioUnitSetProperty(
             unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
@@ -62,7 +70,7 @@ final class AudioCapture: @unchecked Sendable {
 
     // MARK: Engine
 
-    private func ensureEngine(uid: String?) throws {
+    @MainActor private func ensureEngine(uid: String?) throws {
         guard !engineRunning else { return }
         applyInputDevice(uid: uid)
         let input = engine.inputNode
@@ -80,7 +88,7 @@ final class AudioCapture: @unchecked Sendable {
         engineRunning = true
     }
 
-    private func stopEngine() {
+    @MainActor private func stopEngine() {
         guard engineRunning else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -89,13 +97,13 @@ final class AudioCapture: @unchecked Sendable {
 
     private var lastUID: String?
 
-    private func restartIfRunning() {
+    @MainActor private func restartIfRunning() {
         guard engineRunning else { return }
         stopEngine()
         try? ensureEngine(uid: lastUID)
     }
 
-    func start(uid: String?) throws {
+    @MainActor func start(uid: String?) throws {
         lastUID = uid
         lock.lock()
         samples.removeAll(keepingCapacity: true)
@@ -107,7 +115,7 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     /// Returns 16 kHz mono Float32 samples.
-    func stop() -> [Float] {
+    @MainActor func stop() -> [Float] {
         lock.lock()
         recording = false
         let out = samples
@@ -117,7 +125,7 @@ final class AudioCapture: @unchecked Sendable {
         return out
     }
 
-    func cancel() {
+    @MainActor func cancel() {
         lock.lock()
         recording = false
         samples.removeAll(keepingCapacity: true)
