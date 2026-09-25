@@ -60,12 +60,13 @@ struct SettingsView: View {
     }
 
     private var sidebar: some View {
-        // Ticks only while a meeting records, for the clock under "recording".
+        // Ticks only while a meeting records, for the clock in the cloud's tooltip.
         TimelineView(.animation(minimumInterval: 1, paused: coordinator.recording == nil)) { context in
             SquareSidebar(
                 items: SettingsTab.available.map { SquareSidebar.Item(page: $0, title: $0.rawValue, icon: $0.icon) },
                 selection: $tab,
                 recording: recordingLabel(at: context.date),
+                level: coordinator.levels.mic,
                 tint: cloudTint,
                 record: { coordinator.recordRoom() },
                 stop: { coordinator.stopMeeting() }

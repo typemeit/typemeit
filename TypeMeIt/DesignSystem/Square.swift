@@ -166,25 +166,6 @@ struct SquarePanel<Content: View>: View {
     }
 }
 
-/// Opacity pulsing between full and a quarter, for what is live: the
-/// recording dot and the recording cloud. Still when reduce motion is on.
-struct LivePulse: ViewModifier {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private static let period: TimeInterval = 1.6
-
-    func body(content: Content) -> some View {
-        if reduceMotion {
-            content
-        } else {
-            content.phaseAnimator([1.0, 0.25]) { view, opacity in
-                view.opacity(opacity)
-            } animation: { _ in
-                .easeInOut(duration: LivePulse.period / 2)
-            }
-        }
-    }
-}
-
 #if DEBUG
 extension SquarePose: CaseIterable {
     var name: String {
