@@ -55,7 +55,7 @@ final class Pipeline {
         overlay.model.onUndo = { [weak self] in self?.undoLearned() }
         overlay.model.onOpenIntelligence = { [weak self] in
             self?.keepLearned()
-            AppState.shared.settingsTab = .intelligence
+            AppState.shared.settingsTab = .dictionary
             NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
         }
         overlay.model.onInstall = { [weak self] in self?.toastTask?.cancel(); self?.overlay.hide(); Updates.shared.install() }

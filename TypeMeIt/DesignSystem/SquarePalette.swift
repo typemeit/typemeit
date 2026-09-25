@@ -33,7 +33,7 @@ struct SquareCloudPalette: View {
     private static var matchSide: CGFloat { cell / 2 }
     /// "Grey" is the plain cloud, drawn in a grey that shows on paper and on
     /// dark.
-    private static let grey = Color(white: 0.61)
+    static let grey = Color(white: 0.61)
     /// The two halves of "match what is behind it": the cloud on something
     /// light, and on something dark.
     private static let onLight = Color(white: 0.24)

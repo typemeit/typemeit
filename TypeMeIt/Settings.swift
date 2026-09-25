@@ -105,6 +105,25 @@ final class Settings {
     /// The cloud samples the screen under it and goes white or dark against
     /// it. Needs Screen Recording; without the grant the appearance decides.
     var cloudMatchesBackdrop: Bool { didSet { defaults.set(cloudMatchesBackdrop, forKey: "cloudMatchesBackdrop") } }
+    /// The cloud's colour as the settings offer it, one choice over the three
+    /// values above. The overlay reads those.
+    var cloudChoice: CloudChoice {
+        get { cloudColorEnabled ? .colour(cloudColor) : cloudMatchesBackdrop ? .matchBehind : .grey }
+        set {
+            switch newValue {
+            case .grey:
+                cloudColorEnabled = false
+                cloudMatchesBackdrop = false
+            case .matchBehind:
+                cloudColorEnabled = false
+                cloudMatchesBackdrop = true
+            case .colour(let c):
+                cloudColorEnabled = true
+                cloudColor = c
+                cloudMatchesBackdrop = false
+            }
+        }
+    }
     /// The clean-up model is told the names and terms visible in the window
     /// being dictated into. Needs Screen Recording.
     var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
@@ -163,7 +182,7 @@ final class Settings {
         appendTrailingSpace = bool("appendTrailingSpace", true)
         autoSubmit = bool("autoSubmit", false)
         autoSubmitKey = AutoSubmitKey(rawValue: d.string(forKey: "autoSubmitKey") ?? "") ?? .enter
-        historyLimit = d.object(forKey: "historyLimit") == nil ? 500 : d.integer(forKey: "historyLimit")
+        historyLimit = d.object(forKey: "historyLimit") == nil ? 0 : d.integer(forKey: "historyLimit")
         keepRecordings = bool("keepRecordings", Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
         autoUpdate = bool("autoUpdate", true)
         askBeforeUpdating = bool("askBeforeUpdating", true)

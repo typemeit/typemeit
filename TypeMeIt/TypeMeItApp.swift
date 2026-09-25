@@ -16,11 +16,14 @@ struct TypeMeItApp: App {
         }
         .menuBarExtraStyle(.menu)
 
+        // No title bar: the sidebar runs to the window's top edge, its
+        // buttons over it, as on the design canvas.
         Window("settings", id: "settings") {
             SettingsView()
         }
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 640, height: 520)
+        .defaultSize(width: 1100, height: 760)
     }
 }
 

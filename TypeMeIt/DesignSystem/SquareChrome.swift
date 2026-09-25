@@ -40,7 +40,7 @@ struct SquareSidebar<Page: Hashable>: View {
         .frame(width: SquareSidebarLayout.width)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(DesignTokens.Colors.paper)
-        .overlay(alignment: .trailing) { Rectangle().fill(DesignTokens.Colors.rule).frame(width: DesignTokens.hairline) }
+        .overlay(alignment: .trailing) { Rectangle().fill(DesignTokens.Colors.rule).frame(width: DesignTokens.hairline).ignoresSafeArea() }
     }
 
     @ViewBuilder private var foot: some View {
