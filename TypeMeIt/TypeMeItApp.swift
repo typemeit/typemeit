@@ -89,22 +89,23 @@ struct MenuContent: View {
         if let owner = appState.secureInputOwner {
             if owner.isLoginWindow {
                 Text("secure input is stuck on from the lock screen")
-                Text("type me it will not be functioning properly. lock and unlock the mac to clear it.")
+                Text("esc, space and the copy shortcut don't work. lock and unlock the mac to clear it.")
             } else {
-                Text("secure input is on in \(owner.name) - shortcuts might not work as expected")
+                Text("secure input is on in \(owner.name)")
+                Text("esc, space and the copy shortcut don't work until it's off.")
             }
             Divider()
         }
         if let missing = appState.missingPermission {
             Text("\(missing.name) permission is off")
-            Text("\(missing.consequence) until it is turned back on for type me it.")
+            Text("\(missing.consequence) until you turn it back on.")
             Button("Open \(missing.name.capitalized) Settings") { NSWorkspace.shared.open(missing.settingsURL) }
             Divider()
         }
         switch appState.modelUnavailable {
         case .appleIntelligenceNotEnabled:
             Text("apple intelligence is off")
-            Text("transcripts are typed without clean-up until it is turned back on.")
+            Text("transcripts are typed without clean-up until you turn it back on.")
             Button("Open Apple Intelligence Settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }
             Divider()
         case .modelNotReady:

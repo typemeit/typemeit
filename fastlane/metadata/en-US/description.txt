@@ -1,9 +1,7 @@
 hold fn, speak, let go.
-typed wherever the cursor is.
+it types wherever the cursor is.
 
-transcribed on this mac by parakeet.
-tidied by apple intelligence.
+parakeet transcribes your speech on this mac and apple intelligence tidies it up.
 nothing leaves the computer.
 
-insights.
-cloud customisation.
+insights on your dictation, and a cloud you can customise.

@@ -84,11 +84,11 @@ struct OnboardingView: View {
 
     private var body_: String {
         switch step {
-        case .model: "hold the fn key, speak, let go. your words are transcribed on this mac by parakeet, tidied up by apple intelligence, and typed where your cursor is. nothing leaves your computer."
+        case .model: "hold the fn key, speak, let go. parakeet transcribes your words on this mac, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
         case .microphone: "type me it needs the microphone."
         case .accessibility: "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
         case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
-        case .cleanup: "apple intelligence tidies your words on this mac - optional."
+        case .cleanup: "apple intelligence tidies your words on this mac."
         case .tryIt: "hold fn and say something. let go when you are done."
         }
     }
@@ -214,7 +214,7 @@ struct OnboardingView: View {
     private func permissionRow(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL, last: Bool) -> some View {
         let current = step
         let viaSettings = needsSettings.contains(current)
-        return SettingsRow(label: label, subtitle: viaSettings && !granted ? "macos did not ask, so you might need to turn it on in system settings" : nil, last: last) {
+        return SettingsRow(label: label, subtitle: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil, last: last) {
             if granted {
                 Status("granted", done: true)
             } else if viaSettings {

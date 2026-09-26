@@ -100,6 +100,7 @@ def generate(chats, prompt, out_path):
 
 
 if __name__ == "__main__":
+    os.makedirs(OUT, exist_ok=True)
     chats = [
         "Reply to Sam about pricing",
         "Trip to Lisbon in October",
