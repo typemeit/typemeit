@@ -16,11 +16,14 @@ struct TypeMeItApp: App {
         }
         .menuBarExtraStyle(.menu)
 
+        // No title bar: the sidebar runs to the window's top edge, its
+        // buttons over it, as on the design canvas.
         Window("settings", id: "settings") {
             SettingsView()
         }
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 640, height: 520)
+        .defaultSize(width: 1100, height: 760)
     }
 }
 
@@ -186,11 +189,8 @@ struct MenuContent: View {
             Text("Recording this meeting · \(MeetingFolder.durationLabel(.seconds(meetings.recordingMinutes * 60)))").disabled(true)
             Button("Stop Recording Meeting") { meetings.stopMeeting() }
         } else {
-            if let owner = meetings.detected {
+            if meetings.detected != nil {
                 Button("Record This Meeting") { meetings.recordDetected() }
-                if owner.canNeverAsk, !Settings.shared.meetingNeverAsk.contains(owner.bundleID) {
-                    Button("Don't Ask for \(owner.name) Again") { meetings.neverAsk(owner) }
-                }
             }
             Button("Record the Room") { meetings.recordRoom() }
                 .disabled(!appState.ready)
@@ -237,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Settings.shared
         _ = Store.shared
-        applyDockIcon()
+        applyDevIcon()
         applyAppearance()
         // Clean-up is the only clean-up there is, so anything that stops the
         // model running stops the app: an ineligible Mac, Apple Intelligence
@@ -360,13 +360,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Info.plist launches the app as an agent; the Dock icon is opted into
-    /// here so the setting can flip it without a relaunch.
-    func applyDockIcon() {
-        NSApp.setActivationPolicy(Settings.shared.showDockIcon ? .regular : .accessory)
-        // The Dock caches an icon per bundle path, so a rebuilt dev app can
-        // keep showing the release icon it had before; setting the running
-        // app's own icon sidesteps the cache.
+    /// The Dock caches an icon per bundle path, so a rebuilt dev app can keep
+    /// showing the release icon it had before; setting the running app's own
+    /// icon sidesteps the cache.
+    private func applyDevIcon() {
         if Updates.isDevBuild, let url = Bundle.main.url(forResource: "AppIcon-Dev", withExtension: "icns"), let icon = NSImage(contentsOf: url) {
             NSApp.applicationIconImage = icon
         }

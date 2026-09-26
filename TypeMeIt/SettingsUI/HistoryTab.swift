@@ -54,7 +54,6 @@ struct SelectBox: View {
 
 struct HistoryTab: View {
     @State private var store = Store.shared
-    @State private var settings = Settings.shared
     @State private var player = RecordingPlayer.shared
     @State private var search = ""
     @State private var expanded: Set<UUID> = []
@@ -92,8 +91,6 @@ struct HistoryTab: View {
                 .padding(.horizontal, 8).frame(height: 26)
                 .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
-                Text(counted(store.history.count, "dictation"))
-                    .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
                 if !selected.isEmpty {
                     Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                         .buttonStyle(InkButtonStyle())
@@ -124,21 +121,6 @@ struct HistoryTab: View {
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
             }
-            RowRule()
-            VStack(spacing: 0) {
-                SettingsRow(label: "keep") {
-                    Picker("", selection: Binding(get: { settings.historyLimit }, set: { settings.historyLimit = $0; store.prune(limit: $0) })) {
-                        ForEach([100, 250, 500, 1000, 2000, 5000], id: \.self) { Text("the last \($0) dictations").tag($0) }
-                        Text("everything · never delete").tag(0)
-                        Text("nothing · never keep").tag(-1)
-                    }.labelsHidden().fixedSize()
-                }
-                SettingsRow(label: "keep the audio", subtitle: "deleted along with the dictation", last: true) {
-                    Toggle("", isOn: $settings.keepRecordings).toggleStyle(.switch).labelsHidden()
-                        .disabled(settings.historyLimit < 0)
-                }
-            }
-            .padding(.horizontal, 8).padding(.vertical, 2)
         }
     }
 

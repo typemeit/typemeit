@@ -162,10 +162,6 @@ enum ProcessOwner {
         let name: String
         /// The app bundle, nil for a daemon.
         let appURL: URL?
-
-        /// Shared web content (Safari and every WKWebView app) is never put
-        /// on the never-ask list: one cross would silence every web app.
-        var canNeverAsk: Bool { bundleID != Fixed.meetingWebContentBundleID }
     }
 
     struct RunningApp: Equatable, Sendable {

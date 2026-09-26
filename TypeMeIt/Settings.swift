@@ -97,15 +97,29 @@ final class Settings {
     /// dictation is in flight.
     var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
-    var showDockIcon: Bool { didSet { defaults.set(showDockIcon, forKey: "showDockIcon") } }
     var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: "appearance") } }
-    /// Off, the cloud is white or dark grey with the appearance.
+    /// Off, the cloud is dynamic: white or black against what is behind it.
     var cloudColorEnabled: Bool { didSet { defaults.set(cloudColorEnabled, forKey: "cloudColorEnabled") } }
     var cloudColor: CloudColor { didSet { defaults.set(cloudColor.rawValue, forKey: "cloudColor") } }
     var cloudPosition: CloudPosition { didSet { defaults.set(cloudPosition.rawValue, forKey: "cloudPosition") } }
-    /// The cloud samples the screen under it and goes white or dark against
-    /// it. Needs Screen Recording; without the grant the appearance decides.
-    var cloudMatchesBackdrop: Bool { didSet { defaults.set(cloudMatchesBackdrop, forKey: "cloudMatchesBackdrop") } }
+    /// A cloud with no colour of its own samples the screen under it and goes
+    /// white or black against it. Needs Screen Recording; without the grant
+    /// the appearance decides.
+    var cloudMatchesBackdrop: Bool { !cloudColorEnabled }
+    /// The cloud's colour as the settings offer it, one choice over the
+    /// switch and colour above. The overlay reads those.
+    var cloudChoice: CloudChoice {
+        get { cloudColorEnabled ? .colour(cloudColor) : .dynamic }
+        set {
+            switch newValue {
+            case .dynamic:
+                cloudColorEnabled = false
+            case .colour(let c):
+                cloudColorEnabled = true
+                cloudColor = c
+            }
+        }
+    }
     /// The clean-up model is told the names and terms visible in the window
     /// being dictated into. Needs Screen Recording.
     var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
@@ -119,9 +133,6 @@ final class Settings {
     /// Ask to record when another app opens the microphone. Off, the menu
     /// item is the only way to record a call.
     var meetingAsk: Bool { didSet { defaults.set(meetingAsk, forKey: "meetingAsk") } }
-    /// Bundle ids of apps whose calls are never asked about. Only ever added
-    /// to by the menu's explicit item, never inferred.
-    var meetingNeverAsk: [String] { didSet { defaults.set(meetingNeverAsk, forKey: "meetingNeverAsk") } }
     /// While a call is being asked about, hold its last two minutes in
     /// memory so a meeting does not start at the click (D20).
     var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
@@ -164,23 +175,20 @@ final class Settings {
         appendTrailingSpace = bool("appendTrailingSpace", true)
         autoSubmit = bool("autoSubmit", false)
         autoSubmitKey = AutoSubmitKey(rawValue: d.string(forKey: "autoSubmitKey") ?? "") ?? .enter
-        historyLimit = d.object(forKey: "historyLimit") == nil ? 500 : d.integer(forKey: "historyLimit")
+        historyLimit = d.object(forKey: "historyLimit") == nil ? 0 : d.integer(forKey: "historyLimit")
         keepRecordings = bool("keepRecordings", Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
         autoUpdate = bool("autoUpdate", true)
         askBeforeUpdating = bool("askBeforeUpdating", true)
         launchAtLogin = bool("launchAtLogin", true)
-        showDockIcon = bool("showDockIcon", true)
         appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
         cloudColorEnabled = bool("cloudColorEnabled", false)
         cloudColor = CloudColor(rawValue: d.string(forKey: "cloudColor") ?? "") ?? .coral
         cloudPosition = CloudPosition(rawValue: d.string(forKey: "cloudPosition") ?? "") ?? .centre
-        cloudMatchesBackdrop = bool("cloudMatchesBackdrop", false)
         screenContextEnabled = bool("screenContextEnabled", false)
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
-        meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
@@ -195,7 +203,7 @@ final class Settings {
     func addCustomWord(_ word: String) {
         let w = word.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !w.isEmpty, !customWords.contains(where: { $0.caseInsensitiveCompare(w) == .orderedSame }) else { return }
-        customWords.append(w)
+        customWords.insert(w, at: 0)
     }
 
     func removeCustomWord(_ word: String) {
@@ -212,6 +220,8 @@ enum AppVersion {
 
 enum Fixed {
     static let websiteURL = URL(string: "https://typeme.it")!
+    static let contactEmail = "hello@typeme.it"
+    static let contactURL = URL(string: "mailto:\(contactEmail)")!
     /// The GitHub release page for a version, linked from the about row.
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
     static let holdThresholdMs = 300

@@ -3,11 +3,10 @@ import Combine
 import SwiftUI
 
 /// The meetings page (docs/meetings.md 7.11): the list by day, with what
-/// is live above it and the keep, folder and system-audio rows under it.
+/// is live above it.
 struct MeetingsTab: View {
     @State private var store = MeetingStore.shared
     @State private var coordinator = MeetingCoordinator.shared
-    @State private var settings = Settings.shared
     @State private var player = RecordingPlayer.shared
     @State private var appState = AppState.shared
     @State private var search = ""
@@ -87,8 +86,6 @@ struct MeetingsTab: View {
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
             }
-            RowRule()
-            footer
         }
         .onReceive(clock) { now = $0 }
     }
@@ -206,8 +203,6 @@ struct MeetingsTab: View {
             .padding(.horizontal, 8).frame(height: 26)
             .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
             .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
-            Text(counted(store.meetings.count, "meeting"))
-                .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
             if !selected.isEmpty {
                 Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                     .buttonStyle(InkButtonStyle())
@@ -451,95 +446,6 @@ struct MeetingsTab: View {
         }
         .buttonStyle(QuietButtonStyle(side: 24))
         .help(help)
-    }
-
-    // MARK: Footer
-
-    private var folderSubtitle: String {
-        guard store.folderAvailable else { return "unavailable" }
-        let root = store.publishedRoot
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        var path = root.path
-        if path.hasPrefix(home) { path = "~" + path.dropFirst(home.count) }
-        return path
-    }
-
-    private var systemAudioStatus: String {
-        switch coordinator.systemAudioTest {
-        case .notTested: "not tested"
-        case .testing: "testing…"
-        case .working: "working"
-        case .silent: "silent"
-        }
-    }
-
-    private var footer: some View {
-        VStack(spacing: 0) {
-            SettingsRow(label: "keep") {
-                Picker("", selection: Binding(get: { settings.meetingLimit }, set: { settings.meetingLimit = $0; store.prune() })) {
-                    ForEach([50, 100, 250, 500], id: \.self) { Text("the last \(counted($0, "meeting"))").tag($0) }
-                    Text("everything · never delete").tag(0)
-                }.labelsHidden().fixedSize()
-            }
-            SettingsRow(label: "keep the audio", subtitle: "deleted along with the meeting") {
-                Toggle("", isOn: $settings.meetingKeepAudio).toggleStyle(.switch).labelsHidden()
-            }
-            SettingsRow(label: "ask before transcribing", subtitle: "\(counted(Fixed.meetingTranscribeAskSeconds, "second")) to choose later") {
-                Toggle("", isOn: $settings.meetingAskBeforeTranscribing).toggleStyle(.switch).labelsHidden()
-            }
-            SettingsRow(label: "meetings folder", subtitleView: AnyView(Text(folderSubtitle))) {
-                Button("open") { NSWorkspace.shared.open(store.publishedRoot) }.buttonStyle(InkButtonStyle())
-                    .disabled(!store.folderAvailable)
-            }
-            SettingsRow(label: "mcp", subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "lets assistants, including cloud ones, read your meetings"))) {
-                HStack(spacing: 8) {
-                    Button("copy command") { Output.copyToClipboard("claude mcp add --scope user typemeit -- \"\(MeetingsTab.mcpBinary.path)\"") }
-                        .buttonStyle(InkButtonStyle())
-                    Button("copy for claude desktop") { Output.copyToClipboard(MeetingsTab.desktopEntry) }
-                        .buttonStyle(InkButtonStyle())
-                    Toggle("", isOn: $settings.meetingsMCP).toggleStyle(.switch).labelsHidden()
-                }
-                .disabled(MeetingsTab.translocated)
-            }
-            SettingsRow(label: "system audio", last: true, subtitleView: AnyView(systemAudioLines)) {
-                HStack(spacing: 8) {
-                    Text(systemAudioStatus).font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                    if coordinator.systemAudioTest == .silent {
-                        Button("system settings") { NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }.buttonStyle(InkButtonStyle())
-                    }
-                    Button("test") { coordinator.testSystemAudio() }.buttonStyle(InkButtonStyle())
-                        .disabled(coordinator.systemAudioTest == .testing || coordinator.recording != nil)
-                }
-            }
-            if let usage = store.diskUsage {
-                RowRule()
-                Text("meetings use \(ByteCountFormatter.string(fromByteCount: usage, countStyle: .file).lowercased())")
-                    .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-            }
-        }
-        .padding(.horizontal, 8).padding(.vertical, 2)
-    }
-
-    @ViewBuilder private var systemAudioLines: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if coordinator.systemAudioTest == .silent { Text("quit and reopen after granting") }
-            Text("plays a short sound to check type me it can hear other apps")
-        }
-    }
-
-    /// The bundled binary, at this build's own path, so the dev app copies its own.
-    static let mcpBinary = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/typemeit-mcp")
-    /// Gatekeeper runs a quarantined app from a random path that is gone on
-    /// the next launch, so a command naming it would break (docs/meetings.md 7.15).
-    static let translocated = Bundle.main.bundlePath.contains("/AppTranslocation/")
-
-    /// The `mcpServers` entry for Claude Desktop's config file; we never edit that file ourselves.
-    static var desktopEntry: String {
-        let entry = ["mcpServers": ["typemeit": ["command": mcpBinary.path, "args": [String]()]]]
-        let data = (try? JSONSerialization.data(withJSONObject: entry, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])) ?? Data()
-        return String(decoding: data, as: UTF8.self)
     }
 }
 

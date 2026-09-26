@@ -61,7 +61,7 @@ struct PillView: View {
             .help("Open intelligence")
         case .updateReady, .updateFailed:
             Image("akar-sparkles").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink)
-        case .meetingPrompt(let app), .meetingNeverAsking(let app), .meetingResumed(let app):
+        case .meetingPrompt(let app), .meetingResumed(let app):
             Image(nsImage: PillView.icon(for: app)).resizable().frame(width: 18, height: 18)
         case .meetingSystemAudioOff:
             Image("akar-microphone").resizable().frame(width: 14, height: 14).foregroundStyle(DesignTokens.Colors.ink2)
@@ -98,8 +98,6 @@ struct PillView: View {
             label("version \(v) didn't download")
         case .meetingPrompt:
             label("record this meeting?")
-        case .meetingNeverAsking(let app):
-            label("won't ask for \(app.name.lowercased()) again")
         case .meetingSystemAudioOff:
             label("system audio is off")
         case .meetingSaved:
@@ -156,11 +154,6 @@ struct PillView: View {
             HStack(spacing: 6) {
                 Button("record") { model.onRecordMeeting?() }.buttonStyle(InkButtonStyle(primary: true))
                 cross(help: "Not now") { model.onDeclineMeeting?() }
-            }
-        case .meetingNeverAsking:
-            HStack(spacing: 6) {
-                Button("undo") { model.onUndoNeverAsk?() }.buttonStyle(InkButtonStyle())
-                cross(help: "Dismiss") { model.onDismissMeeting?() }
             }
         case .meetingSystemAudioOff:
             HStack(spacing: 6) {

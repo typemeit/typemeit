@@ -61,13 +61,11 @@ struct MeetingMachine: Equatable {
         var rejoin: Duration
         var minimum: Duration
         var sessionCap: Duration
-        var neverAsk: Set<String>
 
         static var fixed: Rules {
             Rules(confirm: .seconds(Fixed.meetingConfirmSeconds), armTimeout: .seconds(Fixed.meetingArmTimeoutSeconds),
                   resume: .seconds(Fixed.meetingResumeSeconds), rejoin: .seconds(Fixed.meetingRejoinSeconds),
-                  minimum: .seconds(Fixed.meetingMinimumSeconds), sessionCap: .seconds(Fixed.meetingSessionCapSeconds),
-                  neverAsk: [])
+                  minimum: .seconds(Fixed.meetingMinimumSeconds), sessionCap: .seconds(Fixed.meetingSessionCapSeconds))
         }
     }
 
@@ -112,7 +110,7 @@ struct MeetingMachine: Equatable {
         inputHolders = inputs
         seeding = false
         armedOut = armedOut.intersection(inputs)
-        let eligible = turnedOn.filter { !rules.neverAsk.contains($0.bundleID) && !armedOut.contains($0) }
+        let eligible = turnedOn.filter { !armedOut.contains($0) }
         // Several at once: the one with both flags, else the first by bundle id.
         let newest = eligible.sorted { a, b in
             let (ao, bo) = (outputs.contains(a), outputs.contains(b))
