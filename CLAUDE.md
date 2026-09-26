@@ -57,6 +57,14 @@ output, then add it with a `why` that says what was seen. Behaviour that is
 pure code (digits, lists, quotes, the safe contractions) is tested in
 `TypeMeItTests`, not with eval cases.
 
+## Granted wishes join the eval
+
+A case with a `wish` field is one the pipeline does not pass yet. When a change
+makes a wish pass, delete its `wish` field in the same change, so the case
+guards that behaviour from then on and `make eval` fails if it regresses. A wish
+passed only by a model output that varies between runs stays a wish until it
+passes on repeated runs.
+
 ## Counts agree with their noun
 
 A string that shows a count next to a noun goes through `counted(n, "word")`
