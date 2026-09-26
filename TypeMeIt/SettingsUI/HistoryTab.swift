@@ -87,6 +87,22 @@ struct TimeOfDayWindow {
     }
 }
 
+/// What search looks through: each dictation's text and transcript,
+/// lowercased once for each change to the history rather than on every
+/// keystroke.
+@MainActor private final class SearchIndex {
+    private var revision = -1
+    private var texts: [UUID: String] = [:]
+
+    func texts(for store: Store) -> [UUID: String] {
+        if revision != store.revision {
+            texts = Dictionary(store.history.map { ($0.id, "\($0.displayText)\n\($0.transcript)".lowercased()) }, uniquingKeysWith: { a, _ in a })
+            revision = store.revision
+        }
+        return texts
+    }
+}
+
 /// History: every dictation by day, filtered by app, time and words. A row
 /// copies or deletes in place, and a click opens the dictation's own page.
 struct HistoryTab: View {
@@ -108,6 +124,7 @@ struct HistoryTab: View {
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
     @State private var open: UUID?
+    @State private var searchIndex = SearchIndex()
     @State private var deletingPicked = false
 
     var body: some View {
@@ -192,6 +209,7 @@ struct HistoryTab: View {
         let calendar = Calendar.current
         let span = when.span(today: .now, calendar: calendar)
         let window = TimeOfDayWindow(from: from, to: to)
+        let texts = q.isEmpty ? [:] : searchIndex.texts(for: store)
         return store.history.reversed().filter { e in
             if let app, HistoryTab.app(of: e) != app { return false }
             if let span {
@@ -199,7 +217,7 @@ struct HistoryTab: View {
                 if day < span.lowerBound || day > span.upperBound { return false }
             }
             if let window, !window.contains(e.timestamp, calendar: calendar) { return false }
-            if !q.isEmpty, !e.displayText.lowercased().contains(q), !e.transcript.lowercased().contains(q) { return false }
+            if !q.isEmpty, texts[e.id]?.contains(q) != true { return false }
             return true
         }
     }
@@ -257,9 +275,7 @@ struct HistoryTab: View {
         return out
     }
 
-    static func words(in entry: HistoryEntry) -> Int {
-        entry.displayText.split(whereSeparator: \.isWhitespace).count
-    }
+    static func words(in entry: HistoryEntry) -> Int { Insights.wordCount(entry.displayText) }
 
     /// "today" over "thursday 24 september"; an older day by its weekday,
     /// over its date.

@@ -49,7 +49,10 @@ struct LearnedWord: Codable, Identifiable, Sendable, Equatable {
 final class Store {
     static let shared = Store()
 
-    private(set) var history: [HistoryEntry] = []
+    private(set) var history: [HistoryEntry] = [] { didSet { revision &+= 1 } }
+    /// Goes up with every change to `history`, so a page can keep what it
+    /// works out from it until the history changes.
+    private(set) var revision = 0
     private(set) var learned: [LearnedWord] = []
 
     /// TYPEMEIT_SUPPORT_DIR points a build at another store, so a screenshot
