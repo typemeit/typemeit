@@ -82,7 +82,7 @@ struct SquareCloudPalette: View {
             }
             if selection == .dynamic {
                 HStack(spacing: 10) {
-                    Text(screenRecordingAllowed ? "picks black or white from the pixels under it" : "follows light and dark mode until screen recording is allowed")
+                    Text(screenRecordingAllowed ? "picks black or white from the pixels under it" : "picks black or white from the pixels under it (needs screen recording permissions)")
                         .font(Square.sans(11.5))
                         .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
