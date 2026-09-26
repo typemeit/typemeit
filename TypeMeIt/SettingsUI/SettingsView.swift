@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var coordinator = MeetingCoordinator.shared
     /// `.key` while this window is in front.
     @Environment(\.controlActiveState) private var activeState
+    @Environment(\.colorScheme) private var scheme
 
     /// How far under the title bar the sidebar's mark sits, clear of the
     /// window's buttons.
@@ -110,9 +111,10 @@ struct SettingsView: View {
         return "\(place) · \(elapsed.formatted(.time(pattern: elapsed < hour ? .minuteSecond : .hourMinuteSecond)))"
     }
 
-    /// The recording cloud in the colour the user chose, or the palette's grey.
+    /// The recording cloud in the colour the user chose, as the palette
+    /// draws it.
     private var cloudTint: Color {
-        settings.cloudColorEnabled ? Color(nsColor: settings.cloudColor.color) : SquareCloudPalette.grey
+        SquareCloudPalette.tint(settings.cloudChoice, scheme: scheme)
     }
 
     /// Whether calls are asked about, and what the meetings take up.

@@ -108,13 +108,10 @@ final class Settings {
     /// The cloud's colour as the settings offer it, one choice over the three
     /// values above. The overlay reads those.
     var cloudChoice: CloudChoice {
-        get { cloudColorEnabled ? .colour(cloudColor) : cloudMatchesBackdrop ? .matchBehind : .grey }
+        get { cloudColorEnabled ? .colour(cloudColor) : .dynamic }
         set {
             switch newValue {
-            case .grey:
-                cloudColorEnabled = false
-                cloudMatchesBackdrop = false
-            case .matchBehind:
+            case .dynamic:
                 cloudColorEnabled = false
                 cloudMatchesBackdrop = true
             case .colour(let c):
