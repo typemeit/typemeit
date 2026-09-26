@@ -203,7 +203,7 @@ final class Settings {
     func addCustomWord(_ word: String) {
         let w = word.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !w.isEmpty, !customWords.contains(where: { $0.caseInsensitiveCompare(w) == .orderedSame }) else { return }
-        customWords.append(w)
+        customWords.insert(w, at: 0)
     }
 
     func removeCustomWord(_ word: String) {
