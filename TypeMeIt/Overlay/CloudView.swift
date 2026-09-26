@@ -98,8 +98,8 @@ struct CloudView: View {
         return struck.addingTimeInterval(max(0, floor(elapsed)))
     }
 
-    /// The chosen colour, or white or dark grey against what is behind the
-    /// cloud when that has been sampled, else with the appearance.
+    /// The chosen colour, or for a dynamic cloud white or black against what
+    /// is behind it when that has been sampled, else with the appearance.
     private var tint: Color {
         let settings = Settings.shared
         let light = switch model.backdrop {
@@ -107,7 +107,7 @@ struct CloudView: View {
         case .dark: true
         case nil: scheme == .dark
         }
-        let base = settings.cloudColorEnabled ? settings.cloudColor.color : (light ? NSColor(white: 1, alpha: 1) : NSColor(white: 0.25, alpha: 1))
-        return Color(nsColor: base)
+        let base = settings.cloudColorEnabled ? settings.cloudColor : light ? .white : .black
+        return Color(nsColor: base.color)
     }
 }
