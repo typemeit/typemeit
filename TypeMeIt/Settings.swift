@@ -383,7 +383,6 @@ enum Fixed {
     /// (docs/meetings.md 6) picks between them; until it runs, the default.
     static let meetingDiarizerStepRatio = 0.2
     /// S3, from humla (MIT) and measured here: see `Diarizer.configuration`.
-    static let meetingDiarizerThreshold = 0.5
     static let meetingDiarizerMinOnSeconds = 1.0
     static let meetingDiarizerMinOffSeconds = 0.5
     /// A diarized speaker with less talk than this is folded into the

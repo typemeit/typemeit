@@ -645,9 +645,12 @@ Start from a shipping MIT app's `OfflineDiarizerConfig` rather than the
 defaults; it runs the same pipeline and its reasons are written down. Measure
 each against the defaults, do not adopt blind:
 
-- `clusteringThreshold` 0.5 against the 0.6 default. Higher stops merging
-  earlier and yields *more* speakers — the polarity 3.3 warns about, stated
-  the same way there.
+- `clusteringThreshold` 0.5 against the 0.6 default. In 0.15.8 it is a
+  distance cut on unit-length embeddings (`AHCClustering.swift`): higher
+  merges more and yields *fewer* speakers. Measured on 26 September against
+  AssemblyAI's labels for the people on six calls and two room recordings:
+  the default put 5.8% of words under the wrong speaker, 0.5 put 7.7%, no
+  recording worse, same speed. The default ships.
 - `segmentationMinDurationOn` 1.0, up from 0.0. At the default the
   segmentation model emits sub-second blips for backchannels ("yeah",
   "right") inside a monologue, which split one sentence across three speaker
