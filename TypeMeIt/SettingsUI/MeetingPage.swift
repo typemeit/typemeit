@@ -518,7 +518,11 @@ private struct SpeakerLanes: View {
 
     private static let lane: CGFloat = 10
     private static let gap: CGFloat = 6
-    private static let label: CGFloat = 44
+    /// The names' column, room for about twenty characters before a longer
+    /// name is cut short with an ellipsis.
+    private static let label: CGFloat = 128
+    /// Kept clear between a name and its lane.
+    private static let labelGap: CGFloat = 8
     /// How far the playhead reaches past the top and bottom lanes.
     private static let reach: CGFloat = 6
 
@@ -536,6 +540,8 @@ private struct SpeakerLanes: View {
                                 .font(Square.mono(10))
                                 .foregroundStyle(DesignTokens.Colors.ink3)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
+                                .padding(.trailing, SpeakerLanes.labelGap)
                                 .frame(width: SpeakerLanes.label, alignment: .leading)
                             turns(of: speaker.id).frame(height: SpeakerLanes.lane)
                         }
