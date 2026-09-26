@@ -90,10 +90,19 @@ final class OverlayPanel {
         }
     }
 
-    func hide() {
+    /// `animated: false` takes the panel away on the click that asked for it,
+    /// for the cross on the pill: a pill that fades is still under the
+    /// pointer, and still in the way, after it has been dismissed.
+    func hide(animated: Bool = true) {
         sampling?.cancel()
         sampling = nil
         guard panel.isVisible else { model.state = .hidden; return }
+        guard animated else {
+            panel.alphaValue = 0
+            panel.orderOut(nil)
+            model.state = .hidden
+            return
+        }
         // The cloud draws in a little as it fades. The pill just fades.
         let shrinking = model.presentation == .cloud
         if shrinking, model.departedAt == nil { model.departedAt = Date() }
