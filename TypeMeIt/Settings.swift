@@ -133,9 +133,6 @@ final class Settings {
     /// Ask to record when another app opens the microphone. Off, the menu
     /// item is the only way to record a call.
     var meetingAsk: Bool { didSet { defaults.set(meetingAsk, forKey: "meetingAsk") } }
-    /// Bundle ids of apps whose calls are never asked about. Only ever added
-    /// to by the menu's explicit item, never inferred.
-    var meetingNeverAsk: [String] { didSet { defaults.set(meetingNeverAsk, forKey: "meetingNeverAsk") } }
     /// While a call is being asked about, hold its last two minutes in
     /// memory so a meeting does not start at the click (D20).
     var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
@@ -192,7 +189,6 @@ final class Settings {
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
-        meetingNeverAsk = d.stringArray(forKey: "meetingNeverAsk") ?? []
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
