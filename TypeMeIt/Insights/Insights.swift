@@ -174,6 +174,13 @@ struct LocalDay: Hashable, Comparable, Sendable {
 }
 
 enum Insights {
+    /// Where a dictation went, as the category rules read it.
+    private struct Place: Hashable {
+        let appId: String?
+        let appName: String?
+        let windowTitle: String?
+    }
+
     /// Typing speed the spoken rate and the time saved are measured against.
     static let typingWPM = 40.0
 
@@ -252,6 +259,9 @@ enum Insights {
         var byCategory: [UsageCategory: (dictations: Int, words: Int)] = [:]
         var byApp: [String: (name: String, dictations: Int, words: Int, meetings: Int)] = [:]
         var byDay: [LocalDay: (dictations: Int, words: Int, meetings: Int)] = [:]
+        // Dictations to the same app and window share a category, so the
+        // rules run once for each.
+        var categoryOf: [Place: UsageCategory?] = [:]
 
         let thisMonth = (today.year, today.month)
         let prevMonth = previousMonth(of: today)
@@ -297,9 +307,15 @@ enum Insights {
             // A row with nothing known about its destination is not "Other", it
             // is unmeasured. Counting it as a category would report a breakdown
             // the data cannot support.
-            if let category = Category.classify(
-                appId: row.appId, appName: row.appName, windowTitle: row.windowTitle
-            ) {
+            let place = Place(appId: row.appId, appName: row.appName, windowTitle: row.windowTitle)
+            let category: UsageCategory?
+            if let known = categoryOf[place] {
+                category = known
+            } else {
+                category = Category.classify(appId: row.appId, appName: row.appName, windowTitle: row.windowTitle)
+                categoryOf[place] = category
+            }
+            if let category {
                 byCategory[category, default: (0, 0)].dictations += 1
                 byCategory[category, default: (0, 0)].words += words
             } else {

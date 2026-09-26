@@ -138,7 +138,7 @@ struct MeetingsTab: View {
             }
             SquareFilter(label: people.isEmpty ? "who" : people.sorted().joined(separator: ", "), active: !people.isEmpty,
                          clear: { people = [] }, open: $whoOpen) {
-                WhoMenu(people: $people, counts: personCounts)
+                WhoMenu(people: $people, counts: MeetingsTab.personCounts(in: store.meetings))
             }
             SquareFilter(label: whenLabel, active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
                 SquareWhenPicker(when: $when, from: $from, to: $to)
@@ -226,17 +226,10 @@ struct MeetingsTab: View {
 
     private var filtered: [Meeting] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        let calendar = Calendar.current
-        let span = when.span(today: .now, calendar: calendar)
-        let window = TimeOfDayWindow(from: from, to: to)
+        let time = WhenFilter(when, from: from, to: to)
         return store.meetings.filter { m in
-            if let place, MeetingsTab.app(of: m) != place, MeetingsTab.channel(of: m) != place { return false }
-            if !people.isEmpty, !people.isSubset(of: Set(MeetingsTab.others(in: m))) { return false }
-            if let span {
-                let day = calendar.startOfDay(for: m.started)
-                if day < span.lowerBound || day > span.upperBound { return false }
-            }
-            if let window, !window.contains(m.started, calendar: calendar) { return false }
+            if !MeetingsTab.matches(m, place: place, people: people) { return false }
+            if !time.contains(m.started) { return false }
             if !q.isEmpty {
                 let text = ([m.title, m.summary ?? ""] + m.speakers.map(\.name)).joined(separator: " ").lowercased()
                 if !text.contains(q), !m.paragraphs.contains(where: { $0.text.lowercased().contains(q) }) { return false }
@@ -258,18 +251,23 @@ struct MeetingsTab: View {
         meeting.speakers.filter { !$0.isYou }.map(\.name)
     }
 
-    /// "Any app", then each app by how many meetings it had, its channels
-    /// under it.
     private var whereItems: [(value: String?, item: SquareMenuList.Item)] {
+        MeetingsTab.placeItems(meetings: store.meetings, place: place)
+    }
+
+    /// "Any app", then each app by how much happened in it, its meetings'
+    /// channels under it. A dictation counts towards the app it went to.
+    static func placeItems(meetings: [Meeting], dictations: [HistoryEntry] = [], place: String?) -> [(value: String?, item: SquareMenuList.Item)] {
         var apps: [String: Int] = [:]
         var channels: [String: [String: Int]] = [:]
-        for m in store.meetings {
+        for e in dictations { apps[HistoryTab.app(of: e), default: 0] += 1 }
+        for m in meetings {
             let app = MeetingsTab.app(of: m)
             apps[app, default: 0] += 1
             if let channel = MeetingsTab.channel(of: m) { channels[app, default: [:]][channel, default: 0] += 1 }
         }
         var out: [(value: String?, item: SquareMenuList.Item)] = [
-            (nil, SquareMenuList.Item(label: "any app", checked: place == nil, count: store.meetings.count.formatted())),
+            (nil, SquareMenuList.Item(label: "any app", checked: place == nil, count: (meetings.count + dictations.count).formatted())),
         ]
         for (app, count) in apps.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }) {
             out.append((app, SquareMenuList.Item(label: app, checked: place == app, count: count.formatted())))
@@ -281,21 +279,24 @@ struct MeetingsTab: View {
     }
 
     /// Everyone met, by how many meetings they were in.
-    private var personCounts: [(name: String, count: Int)] {
+    static func personCounts(in meetings: [Meeting]) -> [(name: String, count: Int)] {
         var counts: [String: Int] = [:]
-        for m in store.meetings {
+        for m in meetings {
             for name in Set(MeetingsTab.others(in: m)) { counts[name, default: 0] += 1 }
         }
         return counts.map { ($0.key, $0.value) }.sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
     }
 
-    private var whenActive: Bool { when != .any || TimeOfDayWindow(from: from, to: to) != nil }
-
-    private var whenLabel: String {
-        let time = TimeOfDayWindow(from: from, to: to)?.label
-        guard when != .any else { return time ?? "when" }
-        return [when.label, time].compactMap { $0 }.joined(separator: " · ")
+    /// Whether a meeting is in the where filter's app or channel, with
+    /// everyone the who filter ticks.
+    static func matches(_ m: Meeting, place: String?, people: Set<String>) -> Bool {
+        if let place, app(of: m) != place, channel(of: m) != place { return false }
+        return people.isEmpty || people.isSubset(of: Set(others(in: m)))
     }
+
+    private var whenActive: Bool { WhenFilter(when, from: from, to: to).narrows }
+
+    private var whenLabel: String { WhenFilter(when, from: from, to: to).label }
 
     // MARK: Rows
 
@@ -593,7 +594,7 @@ struct MeetingChips: View {
 /// The who filter's menu: a field to find someone, everyone met with how
 /// many meetings they were in, ticked to narrow the list to meetings with
 /// all of them.
-private struct WhoMenu: View {
+struct WhoMenu: View {
     @Binding var people: Set<String>
     let counts: [(name: String, count: Int)]
     @State private var find = ""
