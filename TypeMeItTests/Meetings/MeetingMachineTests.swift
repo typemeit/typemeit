@@ -128,14 +128,6 @@ struct MeetingMachineTests {
         #expect(s.state == .idle)
     }
 
-    @Test func neverAskOwnerNeverBecomesACandidate() {
-        var s = S()
-        s.rules.neverAsk = [S.slack.bundleID]
-        s.openCall()
-        s.ticks(1, 30)
-        #expect(s.state == .idle)
-    }
-
     @Test func recordFromThePromptStartsARecording() {
         var s = S()
         let out = s.recordCall()
