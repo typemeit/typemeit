@@ -69,11 +69,6 @@ struct PillView: View {
                          dismiss: "not now", onDismiss: { model.onDeclineMeeting?() }, minWidth: width) {
                 Button("record") { model.onRecordMeeting?() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
-        case .meetingNeverAsking(let app):
-            SquarePrompt(mark: .app(PillView.letter(app)), message: Text("won't ask for \(app.name.lowercased()) again"),
-                         dismiss: "dismiss", onDismiss: { model.onDismissMeeting?() }, minWidth: width) {
-                Button("undo") { model.onUndoNeverAsk?() }.buttonStyle(SquareButtonStyle())
-            }
         case .meetingResumed(let app):
             SquarePrompt(mark: .app(PillView.letter(app)), message: Text("recording again · \(app.name.lowercased())"),
                          dismiss: "dismiss", onDismiss: { model.onDismissMeeting?() }, minWidth: width) {

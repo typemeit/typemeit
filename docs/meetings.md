@@ -64,8 +64,7 @@ change any of them; the default is what gets built.
   is resolved to the app that owns it, so a Chrome or Slack helper counts as
   Chrome or Slack. The resolved app is never matched against a list of
   meeting apps. It is used to pick the processes to tap, to tell two mic
-  holders apart, to name the prompt and the folder, and as the key of the
-  never-ask list.
+  holders apart, and to name the prompt and the folder.
 - **D3. Nothing is captured before the user says record.** A call is
   confirmed from two booleans, input and output both running on the same app
   for `Fixed.meetingConfirmSeconds` (12 s), never from tapped audio. The
@@ -74,14 +73,12 @@ change any of them; the default is what gets built.
 - **D4. Consent is one prompt in the pill, plus a menu item.** The pill asks
   once and stays until answered or until the app drops the mic; it has no
   timer. The menu carries *Record This Meeting* whenever a call is detected
-  and nothing records: after a cross, for an app on the never-ask list, and
-  for a call already running when the app launched. The cross means not this
+  and nothing records: after a cross, and for a call already running when the
+  app launched. The cross means not this
   call, and is remembered for the whole call including a drop and rejoin of
   up to two minutes. A recording survives a drop of up to 30 s and the pill
   says so when it resumes; a longer gap ends the meeting and the next call
-  asks again. *Don't Ask for Slack Again* is an explicit menu item, listed in
-  settings where it can be undone; nothing is ever inferred from repeated
-  crosses. A setting turns asking off entirely. Nothing records without a
+  asks again. Nothing is ever inferred from repeated crosses. A setting turns asking off entirely. Nothing records without a
   click.
 - **D5. Two tracks, one clock.** The mic and the far end are captured by one
   private aggregate device that contains the microphone as a sub-device and a
@@ -479,7 +476,7 @@ Rules for every task below:
 | `AudioCapture.swift` | `deviceID(forUID:)` becomes internal (7.5) |
 | `Pipeline.swift` | Skip `OutputMute`, `MediaPause` and cues while a meeting records (D12); report dictation host-time spans to the coordinator; route the room shortcut |
 | `Shortcuts.swift` | A second user combo, `recordRoomShortcut`, matched while idle (phase 2) |
-| `Overlay/OverlayModel.swift`, `PillView.swift`, `OverlayPanel.swift` | The states in 7.7; closures `onRecordMeeting`, `onDeclineMeeting`, `onStopMeeting`, `onShowMeeting`, `onOpenSystemAudio`, `onUndoNeverAsk`; `showMeeting(_:)` with the `pendingMeeting` slot so a dictation loses neither a prompt nor a toast; `sharingType` per state |
+| `Overlay/OverlayModel.swift`, `PillView.swift`, `OverlayPanel.swift` | The states in 7.7; closures `onRecordMeeting`, `onDeclineMeeting`, `onStopMeeting`, `onShowMeeting`, `onOpenSystemAudio`; `showMeeting(_:)` with the `pendingMeeting` slot so a dictation loses neither a prompt nor a toast; `sharingType` per state |
 | `TypeMeItApp.swift` | Menu items (7.11); `AppState.meeting`; `applicationShouldTerminate` |
 | `MenuBarIcon.swift` | `puff(…, meeting:)`: a dot at the bottom left in `recordingTint`, cut out like the update dot |
 | `Updates.swift` | `installWhenIdle` also waits for `MeetingCoordinator.shared.isIdle` |
@@ -773,8 +770,7 @@ struct RunningApp: Equatable, Sendable { let bundleID: String; let name: String;
 ///    ("com.apple.avconferenced" → "FaceTime"), else the last bundle-id
 ///    component. "com.apple.WebKit.GPU" is shared by every WKWebView app,
 ///    Safari included, so it resolves to Owner(bundleID: "com.apple.WebKit.GPU",
-///    name: "web content", appURL: nil), and never-ask is not offered for it:
-///    one cross would silence every web app.
+///    name: "web content", appURL: nil).
 /// 2. `bundleID` empty: the outermost ".app" in `path` → its running app;
 ///    else the executable name.
 static func owner(of info: AudioProcessInfo, apps: [RunningApp]) -> Owner?
@@ -848,14 +844,13 @@ enum Effect: Equatable {
     case startRecording(Owner?), pauseRecording, resumeRecording, stopRecording
     case finished(keep: Bool)
 }
-struct Rules { var confirm, armTimeout, resume, rejoin, minimum, sessionCap: Duration; var neverAsk: Set<String> }
+struct Rules { var confirm, armTimeout, resume, rejoin, minimum, sessionCap: Duration }
 mutating func handle(_ event: Event, now: Instant, rules: Rules) -> [Effect]
 ```
 
 The coordinator builds `Rules` from `Fixed` (`meetingConfirmSeconds`,
 `meetingArmTimeoutSeconds`, `meetingResumeSeconds`, `meetingRejoinSeconds`,
-`meetingMinimumSeconds`, `meetingSessionCapSeconds`) and
-`Settings.meetingNeverAsk`. `minimum` is compared as
+`meetingMinimumSeconds`, `meetingSessionCapSeconds`). `minimum` is compared as
 `Duration.milliseconds(recordedMs) >= rules.minimum`.
 
 Edge, not level: the machine keeps the set of owners that held input at the
@@ -869,7 +864,7 @@ Transitions:
 
 | From | On | To | Effects |
 | --- | --- | --- | --- |
-| idle | an owner's input turns on, not on `neverAsk` | candidate(owner, now, nil) | beginPreRoll(owner) |
+| idle | an owner's input turns on | candidate(owner, now, nil) | beginPreRoll(owner) |
 | idle | record(owner) | recording(owner, now) | startRecording(owner) |
 | idle | room | recording(nil, now) | startRecording(nil) |
 | candidate(bothSince: nil) | owner output on | candidate(owner, since, now) | |
@@ -1127,7 +1122,7 @@ meeting that says what it is about. So the coordinator starts capturing at
   continues live. Frame 0 is the oldest pre-roll frame and `firstHostTime` is
   that frame's host time, so 5.4's clock, `dictations[]` and the gap
   bookkeeping all keep working unchanged. `preRollMs` goes in `meeting.json`.
-- `decline`, `neverAsk`, the candidate lapsing at `armTimeout`, input
+- `decline`, the candidate lapsing at `armTimeout`, input
   dropping, and `stopForQuit` all call `discard()`, which zeroes the buffers
   before freeing them. Nothing reaches a file, and no buffer outlives the
   candidate that made it.
@@ -1154,9 +1149,6 @@ prompt off turns it off.
   holds the list. `AppState.meeting` mirrors `recording != nil`.
 - `Settings.meetingAsk == false`: the machine still runs (so the menu works)
   but `showPrompt` does nothing.
-- Never-ask: the menu item `Don't Ask for <app> Again` appends the owner's
-  bundle id to `Settings.meetingNeverAsk` and shows `.meetingNeverAsking(app:)`
-  with `undo`.
 - Dictation: `Pipeline` calls `coordinator.dictationBegan(hostTime:)` and
   `dictationEnded(hostTime:historyId:)`; while `recording != nil`,
   `Pipeline.beginRecording` skips `OutputMute.mute()`, `MediaPause.pause()`
@@ -1173,7 +1165,6 @@ Pill states (`OverlayModel.State`, all `.pill`):
 | State | Left | Label | Right | Lifetime |
 | --- | --- | --- | --- | --- |
 | `.meetingPrompt(app: Owner)` | app icon (`NSWorkspace.shared.icon(forFile:)`, or the generic app icon) | `record this meeting?` | `record` (primary), cross (help `Not now`) | until answered or `hidePrompt` |
-| `.meetingNeverAsking(app: Owner)` | app icon | `won't ask for slack again` | `undo`, cross | toast timer |
 | `.meetingSystemAudioOff` | `akar-microphone` | `system audio is off` | `system settings` (primary), cross | toast timer |
 | `.meetingSaved(id: UUID)` | `akar-people-group` | `meeting saved` | `show` (primary), cross | toast timer |
 | `.meetingFailed(id: UUID)` | `akar-people-group` | `meeting not transcribed` | `show`, cross | toast timer |
@@ -1197,7 +1188,6 @@ verified in S1).
 | Key | Type | Default | Where |
 | --- | --- | --- | --- |
 | `meetingAsk` | Bool | true | main tab, `meetings` group: `record meetings` picker `ask` / `never` |
-| `meetingNeverAsk` | [String] bundle ids | [] | main tab: `never ask for` chips, hidden when empty |
 | `meetingKeepAudio` | Bool | true | Meetings tab footer: `keep the audio` |
 | `meetingLimit` | Int | 0 (everything) | Meetings tab footer: `keep` picker like History's |
 | `meetingsMCP` | Bool | false | Meetings tab footer: `mcp` (7.15) |
@@ -1575,18 +1565,14 @@ removes insights only. `MeetingsTab` follows `HistoryTab`'s structure:
 
 Main settings tab, group `meetings` after `microphone`: `record meetings`
 (picker `ask` / `never`, `HelpMark`: `a call is detected when another app
-opens the microphone. nothing is recorded until you say record.`), `never ask
-for` (chips with a cross each, cross help `ask again for zoom`; hidden when
-empty), `record the room` (`ShortcutRecorder`, phase 2), `recognise my voice`
+opens the microphone. nothing is recorded until you say record.`), `record the room` (`ShortcutRecorder`, phase 2), `recognise my voice`
 (phase 3), `names from the screen` (phase 3).
 
 Menu (`MenuContent`), in the recording block:
 
 - While `detected != nil` and nothing records, whatever the machine's state
-  (idle for a call already running at launch or a never-ask app, candidate,
-  prompting, declined): `Record This Meeting`, and `Don't Ask for Slack Again`
-  unless Slack is already on the list or the owner is shared web content
-  (7.2). The item sends `record(detected)`.
+  (idle for a call already running at launch, candidate, prompting,
+  declined): `Record This Meeting`. The item sends `record(detected)`.
 - While idle (phase 2): `Record the Room`.
 - While a meeting records: a disabled `Recording this meeting · 12m` line
   and `Stop Recording Meeting`.
@@ -1648,8 +1634,6 @@ On a real machine, each of these, with debug logs on and the log read afterwards
   far end includes the YouTube audio (expected; the prompt is the guard).
 - Launch the app during a call: no prompt; `Record This Meeting` in the menu
   works.
-- `Don't Ask for Slack Again`: the toast, `undo` works, the chip appears in
-  settings, the next huddle does not prompt until the chip is removed.
 - Decline, then drop and rejoin the call within two minutes: no second prompt.
 - Dictate mid-meeting: the dictation pastes; the meeting transcript does not
   contain it; `dictations` has one span whose frames match the dictation's
@@ -2287,7 +2271,7 @@ Not in this plan, written down so they are not re-derived:
 | Pill, disk | `disk full · meeting stopped` · `show` |
 | Pill, resumed | `recording again · slack` · `stop` |
 | Pill, folder | `meetings folder unavailable` · `settings` |
-| Menu | `Record This Meeting` · `Don't Ask for Slack Again` · `Record the Room` · `Recording this meeting · 12m` · `Stop Recording Meeting` · `Transcribing meeting · 40%` · `View Meetings…` |
+| Menu | `Record This Meeting` · `Record the Room` · `Recording this meeting · 12m` · `Stop Recording Meeting` · `Transcribing meeting · 40%` · `View Meetings…` |
 | Sidebar, page title | `meetings` |
 | Tab count | `counted(n, "meeting")` |
 | Tab buttons | `import…` (help `transcribe a recording`) |
@@ -2301,7 +2285,7 @@ Not in this plan, written down so they are not re-derived:
 | Footer row `mcp` | `let other tools read your meetings` · `copy command` · help `off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.` · error returned when off: `meetings mcp is off. turn it on in type me it settings.` |
 | Delete all | `Delete all N meetings?` (counted) · `Delete All` · `This cannot be undone.` |
 | Footer rows | `keep` (`the last 50 meetings` … `everything · never delete`) · `keep the audio` (`deleted along with the meeting`) · `meetings folder` (`show`, `change`) · `system audio` (`not tested` / `working` / `silent`, `test`, `quit and reopen after granting`, `the other people on a call are not told you are recording.`) · `meetings folder` subtitle `unavailable` / ` · icloud drive` · `meetings use 2.3 GB` |
-| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.`) · `never ask for` (chip cross help `ask again for zoom`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the meeting` (help `reads who is in the meeting and who is talking from its window. nothing is sent anywhere.`) · `read the meet page` (help `needs "allow javascript from apple events" in your browser. only reads the page.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
+| Settings group `meetings` | `record meetings` (`ask` / `never`; help `a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.`) · `record the room` · `recognise my voice` (help `finds you in a room, from your dictations. deleting your history deletes it.`) · `names from the meeting` (help `reads who is in the meeting and who is talking from its window. nothing is sent anywhere.`) · `read the meet page` (help `needs "allow javascript from apple events" in your browser. only reads the page.`) · `names from the screen` (help `reads the meeting window while it records. needs screen recording.`) |
 | Speakers | `You` · `Them` · `Room` · `Speaker 1` · `You (echo)` |
 | Default titles | app name · `web content` · `Room` · `meeting` |
 | About row | `speakers: pyannote community-1, wespeaker and vbx (but speech@fit), converted to core ml by fluid inference · cc-by-4.0`, the licence linked to creativecommons.org/licenses/by/4.0 |

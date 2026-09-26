@@ -189,11 +189,8 @@ struct MenuContent: View {
             Text("Recording this meeting · \(MeetingFolder.durationLabel(.seconds(meetings.recordingMinutes * 60)))").disabled(true)
             Button("Stop Recording Meeting") { meetings.stopMeeting() }
         } else {
-            if let owner = meetings.detected {
+            if meetings.detected != nil {
                 Button("Record This Meeting") { meetings.recordDetected() }
-                if owner.canNeverAsk, !Settings.shared.meetingNeverAsk.contains(owner.bundleID) {
-                    Button("Don't Ask for \(owner.name) Again") { meetings.neverAsk(owner) }
-                }
             }
             Button("Record the Room") { meetings.recordRoom() }
                 .disabled(!appState.ready)
