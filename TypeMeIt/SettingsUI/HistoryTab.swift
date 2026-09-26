@@ -166,7 +166,7 @@ struct HistoryTab: View {
                     appOpen = false
                 }
             }
-            SquareFilter(label: whenLabel, icon: "akar-clock", active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+            SquareFilter(label: whenLabel, active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
                 SquareWhenPicker(when: $when, from: $from, to: $to)
             }
             Spacer(minLength: 0)
