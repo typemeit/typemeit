@@ -28,6 +28,7 @@ struct MeetingsTab: View {
     @State private var anchor: UUID?
     /// Meetings whose stop was clicked, until their transcription lets go.
     @State private var stopping: Set<UUID> = []
+    @State private var deletingPicked = false
     /// The meeting shown as its own page, or nil for the list.
     @State private var open: UUID?
     /// Re-reads the clock for the recording band's time.
@@ -150,11 +151,14 @@ struct MeetingsTab: View {
                 Button("clear", action: clearFilters).buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
             }
             if !selected.isEmpty {
-                Button("delete \(selected.count)") {
-                    store.delete(ids: selected.subtracting(coordinator.liveIDs))
-                    selected = []
-                }
-                .buttonStyle(SquareButtonStyle())
+                let doomed = selected.subtracting(coordinator.liveIDs)
+                Button("delete \(selected.count)") { deletingPicked.toggle() }
+                    .buttonStyle(SquareButtonStyle())
+                    .squareConfirmDelete(isPresented: $deletingPicked, title: "delete \(counted(doomed.count, "meeting"))?",
+                                         detail: SquareDeleteConfirm.gone(doomed.count)) {
+                        store.delete(ids: doomed)
+                        selected = []
+                    }
             }
         }
         .padding(.top, 16)
