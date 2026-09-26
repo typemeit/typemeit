@@ -150,7 +150,7 @@ struct SquareButtonSpecimen: View {
             SquareSpecimenLine(name: "with icon") {
                 Button {} label: { Label { Text("copy") } icon: { SquareIcon("akar-copy", size: 12) } }
                     .buttonStyle(SquareButtonStyle())
-                Button {} label: { Label { Text("this week") } icon: { SquareIcon("akar-clock", size: 12) } }
+                Button {} label: { Label { Text("share") } icon: { SquareIcon("akar-share-box", size: 12) } }
                     .buttonStyle(SquareButtonStyle(kind: .primary))
             }
             SquareSpecimenLine(name: "small") {
