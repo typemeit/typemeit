@@ -182,18 +182,6 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "record meetings", help: "a call is detected when another app opens the microphone. the last two minutes are held in memory so a meeting does not start late, and are thrown away unless you say record.") {
                 SquareChoice(selection: $settings.meetingAsk, options: [true, false]) { $0 ? "ask" : "never" }
             }
-            if !settings.meetingNeverAsk.isEmpty {
-                SquareSettingsRow(label: "never ask for") {
-                    FlowLayout(spacing: 6) {
-                        ForEach(settings.meetingNeverAsk, id: \.self) { bundleID in
-                            SquareChip(text: OnePageSettings.appName(for: bundleID).lowercased()) {
-                                settings.meetingNeverAsk.removeAll { $0 == bundleID }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: 300, alignment: .trailing)
-                }
-            }
             SquareSettingsRow(label: "record the room") { SquareShortcutRecorder(combo: $settings.recordRoomShortcut) }
             SquareSettingsRow(label: "ask before transcribing", help: "\(counted(Fixed.meetingTranscribeAskSeconds, "second")) to choose later") {
                 toggle("ask before transcribing", $settings.meetingAskBeforeTranscribing)
@@ -540,12 +528,5 @@ struct OnePageSettings: View {
             }
             out += part
         }
-    }
-
-    /// The app's name for a never-ask chip, from its bundle on disk; the
-    /// bundle id itself when the app is gone.
-    static func appName(for bundleID: String) -> String {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
-        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 }

@@ -501,12 +501,15 @@ private struct MeetingRow: View {
     @ViewBuilder private var state: some View {
         if let run = coordinator.transcribing, run.id == meeting.id {
             HStack(spacing: 10) {
-                Text(stopping ? "stopping…" : "transcribing · \(Int(run.fraction * 100))%")
+                Text(stopping ? "stopping…" : run.progress.label)
                     .font(Square.mono(11))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
-                SquareBar(fraction: run.fraction)
-                if !stopping { stopButton }
+                // Stopping takes effect between chunks, so only while there are chunks left.
+                if case .transcribing = run.progress {
+                    SquareBar(fraction: run.fraction)
+                    if !stopping { stopButton }
+                }
             }
         } else if coordinator.queued.contains(meeting.id) {
             HStack(spacing: 10) {
@@ -583,7 +586,7 @@ struct MeetingChips: View {
                 SquareTag(text: "waiting for the speech model")
                 Button("download") { ModelStore.shared.download() }.buttonStyle(SquareButtonStyle(small: true))
             }
-            if MeetingState.folderMissing(m, store: store) { SquareTag(text: "meetings folder unavailable") }
+            if MeetingState.folderMissing(m, store: store) { SquareFailure(text: "meetings folder unavailable") }
         }
     }
 }
@@ -649,7 +652,10 @@ private struct MeetingsFirstRun: View {
                 }
                 card("02", "in a room") {
                     HStack(spacing: 12) {
-                        Button("record the room", action: record).buttonStyle(SquareButtonStyle(kind: .primary))
+                        Button(action: record) {
+                            Label { Text("record the room") } icon: { Rectangle().frame(width: 8, height: 8) }
+                        }
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
                         if let combo = settings.recordRoomShortcut {
                             HStack(spacing: 4) { ForEach(combo.caps, id: \.self) { SquareKeycap($0) } }
                         } else {
@@ -676,5 +682,16 @@ private struct MeetingsFirstRun: View {
         .padding(.top, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
+    }
+}
+
+extension MeetingTranscriber.Progress {
+    /// The line a meeting shows while its pass runs.
+    var label: String {
+        switch self {
+        case .transcribing(let fraction): "transcribing · \(Int(fraction * 100))%"
+        case .findingSpeakers: "finding speakers"
+        case .summarising: "summarising"
+        }
     }
 }

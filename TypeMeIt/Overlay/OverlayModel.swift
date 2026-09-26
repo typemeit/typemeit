@@ -24,7 +24,6 @@ final class OverlayModel {
         case updateFailed(version: String)
         /// A call is confirmed: record it? Stays until answered.
         case meetingPrompt(app: ProcessOwner.Owner)
-        case meetingNeverAsking(app: ProcessOwner.Owner)
         /// The tap delivered nothing for `Fixed.meetingSilentSeconds`.
         case meetingSystemAudioOff
         case meetingSaved(id: UUID)
@@ -39,7 +38,7 @@ final class OverlayModel {
 
         var isMeeting: Bool {
             switch self {
-            case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: true
+            case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: true
             default: false
             }
         }
@@ -82,7 +81,7 @@ final class OverlayModel {
         case .hidden: .none
         case .arming, .recording, .pinned, .transcribing, .cleaningUp: .cloud
         case .copyPrompt, .learned, .undone, .updateReady, .updateFailed: .pill
-        case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
+        case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
         }
     }
 
@@ -120,7 +119,6 @@ final class OverlayModel {
     /// The transcribe prompt's okay (true) and later (false).
     var onTranscribeMeeting: (@MainActor (UUID, Bool) -> Void)?
     var onOpenSystemAudio: (@MainActor () -> Void)?
-    var onUndoNeverAsk: (@MainActor () -> Void)?
     /// The cross on any meeting toast.
     var onDismissMeeting: (@MainActor () -> Void)?
 }

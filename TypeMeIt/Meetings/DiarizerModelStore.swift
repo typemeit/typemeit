@@ -25,6 +25,13 @@ final class DiarizerModelStore: NSObject, URLSessionDownloadDelegate {
     /// For `transcription.diarizer`: the pipeline and the weights' revision.
     nonisolated static let pipelineName = "pyannote-community-1+wespeaker+vbx df2625ac"
 
+    /// A `pipelineName` as a person reads it, its models without their
+    /// versions or the revision: "pyannote + wespeaker + vbx".
+    nonisolated static func label(of pipeline: String) -> String {
+        let models = pipeline.split(separator: " ").first ?? Substring(pipeline)
+        return models.split(separator: "+").map { $0.split(separator: "-").first.map(String.init) ?? String($0) }.joined(separator: " + ")
+    }
+
     /// The directory FluidAudio is pointed at; the models sit in `folderName` under it.
     nonisolated static let directory = ModelStore.modelsDirectory.appendingPathComponent("diarizer", isDirectory: true)
     nonisolated static let modelFolder = directory.appendingPathComponent(folderName, isDirectory: true)

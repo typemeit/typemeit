@@ -39,10 +39,9 @@ struct ProcessOwnerTests {
         #expect(owner?.appURL == nil)
     }
 
-    @Test func webKitGPUIsWebContentAndCanNeverBeNeverAsked() {
+    @Test func webKitGPUIsWebContent() {
         let owner = ProcessOwner.owner(of: info(bundleID: "com.apple.WebKit.GPU"), apps: [])
         #expect(owner == ProcessOwner.Owner(bundleID: "com.apple.WebKit.GPU", name: "web content", appURL: nil))
-        #expect(owner?.canNeverAsk == false)
     }
 
     @Test func emptyBundleIDWithAPathResolvesToTheExecutableName() {
