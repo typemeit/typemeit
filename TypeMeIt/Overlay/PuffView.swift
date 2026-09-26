@@ -48,6 +48,10 @@ struct PuffView: View {
     /// Taken off the expansion the level asks for, so the puff can settle
     /// smaller than its rest. Only used with `level`.
     var settle: Double = 0
+    /// When set, the puff is `tint` on its left and this on its right, the
+    /// line between them drifting across it: the cloud passing over the edge
+    /// between something light and something dark. Greys only.
+    var splitTint: Color? = nil
 
     @State private var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     @State private var dynamics = Dynamics()
@@ -60,18 +64,20 @@ struct PuffView: View {
             let s = state(at: now)
             // The shader's clock wraps hourly; the strike is given in it.
             let struck = reduceMotion ? -1.0 : strike.map { ($0.timeIntervalSinceReferenceDate + timeOffset).truncatingRemainder(dividingBy: 3600) } ?? -1
+            let arguments: [Shader.Argument] = [
+                .float(Float(t)),
+                .float(Float(s.expansion)),
+                .float(Float(s.trail)),
+                .float(Float(s.flow)),
+                .float(Float(disperse(at: now))),
+                .float(Float(struck)),
+                .float(Float(density)),
+                .color(tint),
+            ] + (splitTint.map { [.color($0)] } ?? [])
+            let function = ShaderFunction(library: .default, name: splitTint == nil ? "puff" : "puffSplit")
             Color.white
                 .visualEffect { content, proxy in
-                    content.colorEffect(ShaderLibrary.puff(
-                        .float2(proxy.size),
-                        .float(Float(t)),
-                        .float(Float(s.expansion)),
-                        .float(Float(s.trail)),
-                        .float(Float(s.flow)),
-                        .float(Float(disperse(at: now))),
-                        .float(Float(struck)),
-                        .float(Float(density)),
-                        .color(tint)))
+                    content.colorEffect(Shader(function: function, arguments: [.float2(proxy.size)] + arguments))
                 }
         }
     }
