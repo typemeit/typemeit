@@ -22,36 +22,6 @@ enum HistorySelection {
     }
 }
 
-/// A hairline square that fills with ink when the row is selected. Twelve
-/// points is easy to miss, so the border comes up to full ink under the
-/// pointer rather than waiting for the click to say the box was there.
-struct SelectBox: View {
-    let on: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Rectangle().fill(on ? DesignTokens.Colors.ink : .clear)
-                    .overlay(Rectangle().strokeBorder(border, lineWidth: DesignTokens.hairline))
-                    .frame(width: 12, height: 12)
-                if on { Image("akar-check").resizable().frame(width: 8, height: 8).foregroundStyle(DesignTokens.Colors.onSlab) }
-            }
-            .frame(width: 16, height: 16).padding(.top, 2)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: hovering)
-        .help(on ? "deselect" : "select · shift-click for a range")
-    }
-
-    private var border: Color {
-        on || hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl
-    }
-}
-
 /// The time-of-day half of the when filter, "09:00" to "17:30", either end
 /// left open. A window that ends before it starts runs across midnight.
 struct TimeOfDayWindow {

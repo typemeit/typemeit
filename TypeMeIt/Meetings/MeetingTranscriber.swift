@@ -21,12 +21,20 @@ enum MeetingTranscriber {
         var errorDescription: String? { "cancelled" }
     }
 
+    /// How far a pass has got: the share of the audio transcribed, then the
+    /// speakers, then the title and summary.
+    enum Progress: Equatable, Sendable {
+        case transcribing(Double)
+        case findingSpeakers
+        case summarising
+    }
+
     /// Runs steps 1 to 5 and the transcode on `meeting` in `folder`, saving
     /// through `save` as it goes, the store unless a probe says otherwise.
     /// Returns the meeting `done`, `failed`, or `pending` when the model is
     /// not installed or the task was cancelled between chunks.
     static func run(_ start: Meeting, folder: URL, save: @escaping @Sendable (Meeting) async -> Void = MeetingTranscriber.saveToStore,
-                    progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
+                    progress: @escaping @Sendable (Progress) -> Void) async -> Meeting {
         var meeting = start
         guard ModelStore.isInstalled else {
             meeting.transcription.state = .pending
@@ -47,6 +55,7 @@ enum MeetingTranscriber {
             var totalChunks = 0
             for track in meeting.tracks { totalChunks += try chunkCount(of: track, in: folder) }
             var doneChunks = meeting.transcription.done.values.reduce(0, +)
+            let wordsBegan = ContinuousClock.now
             for track in meeting.tracks {
                 let url = folder.appendingPathComponent(track.file)
                 let envelopes = try envelopes(of: url)
@@ -75,11 +84,13 @@ enum MeetingTranscriber {
                     try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1
-                    progress(Double(doneChunks) / Double(max(totalChunks, 1)))
+                    progress(.transcribing(Double(doneChunks) / Double(max(totalChunks, 1))))
                     await save(meeting)
                 }
                 trackWords.append(words)
             }
+
+            meeting.transcription.asrMs = (ContinuousClock.now - wordsBegan).milliseconds
 
             if meeting.kind == .call, let mic = rms[.mic], let others = rms[.others] {
                 meeting.echo = EchoVerdict.verdict(EchoBleedDetector.analyse(micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz))
@@ -91,6 +102,7 @@ enum MeetingTranscriber {
                 }
             }
 
+            progress(.findingSpeakers)
             // The far-end people the window showed talking (8.3): how many
             // the diarizer is told, and the name a one-voice far end takes.
             // The user is whoever the window lit while the mic spoke, else
@@ -105,7 +117,9 @@ enum MeetingTranscriber {
                 SpeakerCount.userTile(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
             } ?? NSFullUserName()
             let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: userName) }
+            let speakersBegan = ContinuousClock.now
             let segments = await speakers(of: &meeting, in: folder, count: count)
+            meeting.transcription.speakersMs = (ContinuousClock.now - speakersBegan).milliseconds
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
             meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
             // A word the segments did not reach keeps its track's label; that
@@ -139,6 +153,8 @@ enum MeetingTranscriber {
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
+            if !meeting.paragraphs.isEmpty { progress(.summarising) }
+            let summaryBegan = ContinuousClock.now
             // The title ladder (9.2): who was there, then what it was about, then the app.
             if meeting.titleSource == .app, let title = meeting.names?.title(excluding: userName) {
                 meeting.title = title
@@ -147,7 +163,10 @@ enum MeetingTranscriber {
                 meeting.title = title
                 meeting.titleSource = .generated
             }
-            if !meeting.paragraphs.isEmpty { meeting.summary = await MeetingSummary.summarise(meeting) }
+            if !meeting.paragraphs.isEmpty {
+                meeting.summary = await MeetingSummary.summarise(meeting)
+                meeting.transcription.summaryMs = (ContinuousClock.now - summaryBegan).milliseconds
+            }
             meeting = await transcode(meeting, in: folder)
             // Done last: the store publishes any done meeting it sees, and the
             // folder must not move while the transcode is still writing into it.

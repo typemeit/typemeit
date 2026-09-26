@@ -111,6 +111,8 @@ struct SquareMenuList: View {
         var label: String
         var checked: Bool
         var count: String?
+        /// A line under the one before it, such as a channel under its app.
+        var indent = false
     }
 
     let items: [Item]
@@ -119,14 +121,24 @@ struct SquareMenuList: View {
 
     var body: some View {
         SquarePanel(padding: EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)) {
-            VStack(spacing: 0) {
-                ForEach(items.indices, id: \.self) { i in
-                    SquareMenuLine(item: items[i]) { pick(i) }
-                }
-            }
-            .frame(minWidth: minWidth)
+            SquareMenuLines(items: items, pick: pick).frame(minWidth: minWidth)
         }
         .fixedSize()
+    }
+}
+
+/// A menu's lines without their panel, for a panel that holds more than the
+/// lines, such as a field over them.
+struct SquareMenuLines: View {
+    let items: [SquareMenuList.Item]
+    var pick: (Int) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(items.indices, id: \.self) { i in
+                SquareMenuLine(item: items[i]) { pick(i) }
+            }
+        }
     }
 }
 
@@ -153,7 +165,8 @@ private struct SquareMenuLine: View {
                     Text(count).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.leading, item.indent ? 32 : 12)
+            .padding(.trailing, 12)
             .frame(height: 28)
             .background(Rectangle().fill(pose.hot(hovering) ? DesignTokens.Colors.inkA08 : .clear))
             .contentShape(Rectangle())

@@ -252,9 +252,9 @@ struct SquareDayHeader: View {
 struct SquareLiveBand: View {
     let place: String
     let time: String
-    /// 0...1, the microphone and the call.
+    /// 0...1, the microphone and the call; a room has no call side.
     var you: Double = 0
-    var call: Double = 0
+    var call: Double? = 0
     var stop: () -> Void = {}
 
     var body: some View {
@@ -262,7 +262,7 @@ struct SquareLiveBand: View {
             Text("recording · \(place)").font(Square.mono(12))
             Spacer()
             level("you", you)
-            level("call", call)
+            if let call { level("call", call) }
             Text(time).font(Square.mono(13)).monospacedDigit().frame(width: 52, alignment: .trailing)
             Button("stop", action: stop).buttonStyle(SquareButtonStyle())
         }

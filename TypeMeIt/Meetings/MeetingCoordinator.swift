@@ -23,7 +23,11 @@ final class MeetingCoordinator {
 
     struct Transcribing: Equatable {
         let id: UUID
-        var fraction: Double
+        var progress: MeetingTranscriber.Progress
+        /// The share of the audio transcribed, all of it once the words are in.
+        var fraction: Double {
+            if case .transcribing(let f) = progress { f } else { 1 }
+        }
     }
 
     enum SystemAudioTest: Equatable { case notTested, testing, working, silent }
@@ -469,6 +473,18 @@ final class MeetingCoordinator {
         enqueue(meeting)
     }
 
+    /// Stops a meeting's transcription: a queued one leaves the queue, and a
+    /// running one stops after the chunk in hand and goes back to waiting,
+    /// its finished chunks kept for when it is transcribed again.
+    func stopTranscribing(_ id: UUID) {
+        if let i = transcribeQueue.firstIndex(where: { $0.id == id }) {
+            transcribeQueue.remove(at: i)
+            queued = transcribeQueue.map(\.id)
+        } else if transcribing?.id == id {
+            transcribeTask?.cancel()
+        }
+    }
+
     /// Meetings whose summary is being written, for the page's placeholder.
     private(set) var summarising: Set<UUID> = []
 
@@ -496,13 +512,13 @@ final class MeetingCoordinator {
         // finished its own pass by now.
         if let id = meeting.continues {
             if let earlier = store.meeting(id), let earlierFolder = store.folder(for: id), !liveIDs.contains(id) {
-                transcribing = Transcribing(id: id, fraction: 0)
+                transcribing = Transcribing(id: id, progress: .transcribing(0))
                 transcribeTask = Task.detached { [meeting, folder] in
                     let joined = await MeetingCoordinator.join(earlier, in: earlierFolder, meeting, in: folder)
                     var alone = meeting
                     alone.continues = nil
-                    let result = await MeetingTranscriber.run(joined ?? alone, folder: joined == nil ? folder : earlierFolder) { fraction in
-                        Task { @MainActor in MeetingCoordinator.shared.transcribing?.fraction = fraction }
+                    let result = await MeetingTranscriber.run(joined ?? alone, folder: joined == nil ? folder : earlierFolder) { progress in
+                        Task { @MainActor in MeetingCoordinator.shared.transcribing?.progress = progress }
                     }
                     await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
                 }
@@ -511,11 +527,11 @@ final class MeetingCoordinator {
             meeting.continues = nil
             store.save(meeting)
         }
-        transcribing = Transcribing(id: meeting.id, fraction: 0)
+        transcribing = Transcribing(id: meeting.id, progress: .transcribing(0))
         transcribeTask = Task.detached { [meeting, folder] in
-            let result = await MeetingTranscriber.run(meeting, folder: folder) { fraction in
+            let result = await MeetingTranscriber.run(meeting, folder: folder) { progress in
                 Task { @MainActor in
-                    if MeetingCoordinator.shared.transcribing?.id == meeting.id { MeetingCoordinator.shared.transcribing?.fraction = fraction }
+                    if MeetingCoordinator.shared.transcribing?.id == meeting.id { MeetingCoordinator.shared.transcribing?.progress = progress }
                 }
             }
             await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
