@@ -18,8 +18,8 @@ enum MissingPermission: CaseIterable {
     /// What stops working without it.
     var consequence: String {
         switch self {
-        case .microphone: "nothing can be recorded"
-        case .accessibility: "the fn key is not seen and nothing can be typed where your cursor is"
+        case .microphone: "type me it can't record"
+        case .accessibility: "type me it can't see the fn key or type where your cursor is"
         }
     }
 

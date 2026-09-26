@@ -103,7 +103,7 @@ struct HistoryTab: View {
                     .disabled(store.history.isEmpty)
                     .confirmationDialog("Delete all \(counted(store.history.count, "dictation"))?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
                         Button("Delete All", role: .destructive) { store.deleteAllHistory(); selected = [] }
-                    } message: { Text("This cannot be undone.") }
+                    } message: { Text("You can't undo this.") }
             }
             .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 18)
             ScrollView {
@@ -204,7 +204,7 @@ struct HistoryTab: View {
                 .padding(.horizontal, 7).padding(.vertical, 3)
             }
             .buttonStyle(QuietButtonStyle(radius: 0))
-            .help(open ? "hide what was heard" : "show what was heard before clean-up")
+            .help(open ? "hide what parakeet heard" : "show what parakeet heard before clean-up")
             if open { stage(nil, heard: e.transcript, typed: e.displayText) }
         }
         .background(Rectangle().fill(DesignTokens.Colors.inkA04))

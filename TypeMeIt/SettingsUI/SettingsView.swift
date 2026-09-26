@@ -364,7 +364,7 @@ struct MainSettingsTab: View {
     /// screen, so the row says what is read and what it asks for.
     private var backdropSubtitle: String {
         if settings.cloudMatchesBackdrop, !screenGranted { return "needs screen recording permissions" }
-        return "reads a few pixels under the cloud - needs screen recording permissions"
+        return "reads a few pixels under the cloud · needs screen recording permissions"
     }
 
     var body: some View {
@@ -559,8 +559,8 @@ struct IntelligenceTab: View {
         guard case .unavailable(let reason) = availability else { return nil }
         switch reason {
         case .deviceNotEligible: return "this mac cannot run apple intelligence"
-        case .appleIntelligenceNotEnabled: return "apple intelligence is off - turn it on in system settings to clean up and learn from corrections"
-        case .modelNotReady: return "apple intelligence is still downloading - try again in a few minutes"
+        case .appleIntelligenceNotEnabled: return "apple intelligence is off · turn it on in system settings to clean up and learn from corrections"
+        case .modelNotReady: return "apple intelligence is still downloading · try again in a few minutes"
         @unknown default: return "apple intelligence is not available right now"
         }
     }

@@ -26,27 +26,27 @@ SCENES = {
     "slack": dict(
         image="slack/out/slack.png", cloud="dark",
         head="hold fn, speak, let go.",
-        text="typed where the cursor is, be it slack, claude or anything with a text box.",
+        text="it types where the cursor is, be it slack, claude or anything with a text box.",
     ),
     "claude": dict(
         image="claude/out/claude.png", cloud="white",
-        head="tidied by apple intelligence.",
-        text="fillers dropped, punctuation put in. nothing leaves your mac.",
+        head="apple intelligence tidies what you said.",
+        text="you get punctuation and no fillers. nothing leaves your mac.",
     ),
     "insights": dict(
         image="app/insights.png",
-        head="three times faster than typing.",
-        text="every dictation counted: words, speed, streaks and the apps you spoke into.",
+        head="you speak three times faster than you type.",
+        text="see your words, speed, streaks and the apps you spoke into.",
     ),
     "history": dict(
         image="app/history.png",
-        head="everything on your mac.",
-        text="transcribed, formatted and tidied on device, then kept in history to review and copy again.",
+        head="history stays on your mac.",
+        text="review past dictations and copy them again.",
     ),
     "settings": dict(
         image="app/settings.png",
-        head="customise your cloud and config.",
-        text="custom colour and position.",
+        head="customise the cloud and the shortcuts.",
+        text="pick the cloud's colour and position.",
     ),
 }
 
