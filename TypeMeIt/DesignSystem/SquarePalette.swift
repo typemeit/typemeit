@@ -28,10 +28,13 @@ struct SquareCloudPalette: View {
     var openSystemSettings: () -> Void = {}
     @State private var hovered: CloudChoice?
 
-    /// A resting puff shows in about half its cell.
     private static let cell: CGFloat = 64
-    /// The least room between two cells, when the row is narrow.
-    private static let gap: CGFloat = 4
+    /// When the row is narrow the cells give up their margins, down to this.
+    private static let narrowest: CGFloat = 40
+    /// Each puff is drawn for a cell this much bigger than its own, so a
+    /// resting cloud fills most of the cell and the chosen one, half as big
+    /// again, still just fits.
+    private static let fill: CGFloat = 1.25
     /// "Grey" is the plain cloud, drawn in a grey that shows on paper and on
     /// dark.
     private static let grey = Color(white: 0.61)
@@ -44,7 +47,7 @@ struct SquareCloudPalette: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 0) {
                 ForEach(Array(CloudChoice.all.enumerated()), id: \.element) { i, choice in
-                    if i > 0 { Spacer(minLength: SquareCloudPalette.gap) }
+                    if i > 0 { Spacer(minLength: 0) }
                     let on = choice == selection
                     let scale = on ? 1.5 : (hovered == choice ? 1.25 : 1.0)
                     Button { selection = choice } label: {
@@ -52,6 +55,7 @@ struct SquareCloudPalette: View {
                             .scaleEffect(scale)
                             .animation(.easeOut(duration: DesignTokens.Duration.n2), value: scale)
                             .frame(width: SquareCloudPalette.cell, height: SquareCloudPalette.cell)
+                            .frame(minWidth: SquareCloudPalette.narrowest, maxWidth: SquareCloudPalette.cell)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -88,7 +92,8 @@ struct SquareCloudPalette: View {
 
     private func puff(_ tint: Color, index: Int, splitTint: Color? = nil) -> some View {
         PuffView(level: 0, tint: tint, timeOffset: Double(index) * PuffView.neighbourTimeOffset, splitTint: splitTint)
-            .frame(width: PuffView.drawnSide(filling: SquareCloudPalette.cell), height: PuffView.drawnSide(filling: SquareCloudPalette.cell))
+            .frame(width: PuffView.drawnSide(filling: SquareCloudPalette.cell * SquareCloudPalette.fill),
+                   height: PuffView.drawnSide(filling: SquareCloudPalette.cell * SquareCloudPalette.fill))
             .frame(width: SquareCloudPalette.cell, height: SquareCloudPalette.cell)
     }
 }
