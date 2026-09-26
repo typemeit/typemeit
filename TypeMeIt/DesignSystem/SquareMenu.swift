@@ -233,6 +233,42 @@ struct SquareConfirm<Answers: View>: View {
     }
 }
 
+/// Every delete's question: what goes, that it can't be recovered, and
+/// cancel or the delete itself.
+struct SquareDeleteConfirm: View {
+    let title: String
+    var detail = SquareDeleteConfirm.gone(1)
+    var confirm = "delete"
+    let cancel: () -> Void
+    let delete: () -> Void
+
+    /// That what goes can't be got back, for one thing or several.
+    static func gone(_ count: Int) -> String {
+        count == 1 ? "it can't be recovered." : "they can't be recovered."
+    }
+
+    var body: some View {
+        SquareConfirm(title: title, detail: detail) {
+            Button("cancel", action: cancel).buttonStyle(SquareButtonStyle())
+            Button(confirm, action: delete).buttonStyle(SquareButtonStyle(kind: .primary))
+        }
+    }
+}
+
+extension View {
+    /// Asks before `delete` runs, on a popup under this view. Nothing is
+    /// deleted without asking.
+    func squareConfirmDelete(isPresented: Binding<Bool>, title: String, detail: String = SquareDeleteConfirm.gone(1),
+                             confirm: String = "delete", delete: @escaping () -> Void) -> some View {
+        squarePopover(isPresented: isPresented) {
+            SquareDeleteConfirm(title: title, detail: detail, confirm: confirm, cancel: { isPresented.wrappedValue = false }) {
+                isPresented.wrappedValue = false
+                delete()
+            }
+        }
+    }
+}
+
 /// The (?) after a label. A click opens its note under it, on a panel.
 struct SquareHelp: View {
     let text: String
@@ -346,11 +382,11 @@ struct SquareFilterSpecimen: View {
 struct SquareConfirmSpecimen: View {
     var body: some View {
         SquareSpecimen {
+            SquareSpecimenLine(name: "delete") {
+                SquareDeleteConfirm(title: "delete this dictation?", cancel: {}, delete: {})
+            }
             SquareSpecimenLine(name: "delete all") {
-                SquareConfirm(title: "delete all dictations?", detail: "this cannot be undone.") {
-                    Button("cancel") {}.buttonStyle(SquareButtonStyle())
-                    Button("delete all") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-                }
+                SquareDeleteConfirm(title: "delete all 1,201 dictations?", detail: SquareDeleteConfirm.gone(1201), confirm: "delete all", cancel: {}, delete: {})
             }
             SquareSpecimenLine(name: "with audio") {
                 SquareConfirm(title: "delete this meeting?", detail: "it has 11m 04s of audio.", width: 300) {
