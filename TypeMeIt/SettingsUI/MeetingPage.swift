@@ -115,7 +115,7 @@ struct MeetingPage: View {
                     .buttonStyle(SquareIconButtonStyle())
                     .help("delete")
                     .accessibilityLabel("delete")
-                    .squarePopover(isPresented: $deleting, edge: .trailing) { deleteConfirm }
+                    .squarePopover(isPresented: $deleting) { deleteConfirm }
             }
         }
         .padding(.top, 12)

@@ -26,7 +26,6 @@ struct MeetingsTab: View {
     @State private var selected: Set<UUID> = []
     /// The row a range is measured from: the last one whose box was clicked.
     @State private var anchor: UUID?
-    @State private var confirmDeleteAll = false
     /// Meetings whose stop was clicked, until their transcription lets go.
     @State private var stopping: Set<UUID> = []
     /// The meeting shown as its own page, or nil for the list.
@@ -157,22 +156,6 @@ struct MeetingsTab: View {
                 }
                 .buttonStyle(SquareButtonStyle())
             }
-            Button { confirmDeleteAll.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
-                .buttonStyle(SquareIconButtonStyle())
-                .disabled(store.meetings.isEmpty)
-                .help("delete all")
-                .accessibilityLabel("delete all")
-                .squarePopover(isPresented: $confirmDeleteAll, edge: .trailing) {
-                    SquareConfirm(title: "delete all \(counted(store.meetings.count, "meeting"))?", detail: "this cannot be undone.") {
-                        Button("cancel") { confirmDeleteAll = false }.buttonStyle(SquareButtonStyle())
-                        Button("delete all") {
-                            store.deleteAll()
-                            selected = []
-                            confirmDeleteAll = false
-                        }
-                        .buttonStyle(SquareButtonStyle(kind: .primary))
-                    }
-                }
         }
         .padding(.top, 16)
         .padding(.horizontal, MeetingColumns.page)
