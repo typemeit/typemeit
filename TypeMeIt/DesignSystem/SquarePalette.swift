@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// What colour the cloud is: black, white, dynamic, or one of the seven
+/// What colour the cloud is: dynamic, black, white, or one of the seven
 /// hues. A dynamic cloud goes black or white against what is behind it, and
 /// follows light and dark mode until Screen Recording lets it look.
 enum CloudChoice: Hashable, Sendable {
     case dynamic, colour(CloudColor)
 
-    static let all: [CloudChoice] = CloudColor.neutrals.map { .colour($0) } + [.dynamic] + CloudColor.hues.map { .colour($0) }
+    static let all: [CloudChoice] = [.dynamic] + CloudColor.neutrals.map { .colour($0) } + CloudColor.hues.map { .colour($0) }
 
     var label: String {
         switch self {
