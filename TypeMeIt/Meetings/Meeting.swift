@@ -74,6 +74,11 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var asr: String?
         var diarizer: String?
         var tookMs: Int?
+        /// What the last pass spent on the words, the speakers, and the title
+        /// and summary.
+        var asrMs: Int?
+        var speakersMs: Int?
+        var summaryMs: Int?
         /// Chunks finished per track role, so a run that stops resumes at
         /// the first chunk not counted here.
         var done: [String: Int] = [:]
