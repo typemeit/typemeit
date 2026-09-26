@@ -41,7 +41,16 @@ and spoken digits fused into LOT-1482; 2 are punctuation. Parakeet writes years
 and most numbers as digits itself, and on its output the model keeps capitalised
 names as heard, which G5 fixes in code.
 
-**Live bugs in `main`, worth fixing on their own:**
+**Shipped** with this research: G7 with the aggressive gate, and the alias guard
+where `Pipeline` builds the custom-word terms. On the eval as updated alongside it
+(cases the model no longer sees take the input Parakeet produces; "set a timer",
+"there house" and "cube control" moved to the wish list), `make eval` passes
+335/335 with 6 of 22 wishes; `main` on the same cases passed 334/335 with 4. The
+wish `main` granted and G7 does not attempt is "let's meet at five actually six":
+nothing in it calls the model. The lab patches still apply to the clean-up sources
+at 6f5ca86, which `Scripts/postprocess-lab/run.sh` reads from git.
+
+**Bugs in `main` before this change, all fixed by it:**
 
 - With the filler-word style on, `WritingStyle.capitaliseSentences` capitalises
   after any dot, including inside a word: "claude.md" → "claude.Md", "lottie.org"
@@ -56,8 +65,8 @@ names as heard, which G5 fixes in code.
 - A learned alias that is a real word replaces that word whenever the recogniser
   scores it under 0.9: with the author's aliases, a "Claude" at 0.87 is typed as
   "granola". Confident ones become hints: every "really" is offered to the model
-  as kinda. The fix belongs where terms are built: leave out an alias that is a
-  dictionary word and does not sound like its term.
+  as kinda. Terms are now built without an alias that is a dictionary word and
+  does not sound like its term (`CustomWordMatcher.trustedAliases`).
 
 ## How it was measured
 

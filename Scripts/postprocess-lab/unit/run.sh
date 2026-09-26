@@ -25,7 +25,7 @@ for f in ['WritingStyleTests.swift', 'LocalCleanupTests.swift', 'PostProcessorTe
     for cls in re.findall(r'class (\w+)\s*:\s*XCTestCase', s):
         body = s[s.index('class ' + cls):]
         for m in re.findall(r'func (test\w+)\(\)', body):
-            calls.append(f'currentTest = "{cls}.{m}"; {cls}().{m}()')
+            calls.append(f'currentTest = "{cls}.{m}"; MainActor.assumeIsolated {{ {cls}().{m}() }}')
 shim = '''import Foundation
 class XCTestCase { required init() {} }
 nonisolated(unsafe) var failures = 0
