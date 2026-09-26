@@ -61,6 +61,7 @@ struct OnePageSettings: View {
     @State private var screenGranted = CGPreflightScreenCaptureAccess()
     @State private var deletingDictations = false
     @State private var deletingMeetings = false
+    @State private var deletingLog = false
     /// Apple Intelligence and Screen Recording are switched in System
     /// Settings, not in the app, so both are re-read while the window is up.
     private let poll = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
@@ -244,9 +245,7 @@ struct OnePageSettings: View {
                 toggle("keep the dictations' audio", $settings.keepRecordings).disabled(settings.historyLimit < 0)
             }
             SquareSettingsRow(label: "delete all") {
-                deleteAll(counted(store.history.count, "dictation"), showing: $deletingDictations, disabled: store.history.isEmpty) {
-                    store.deleteAllHistory()
-                }
+                deleteAll(store.history.count, "dictation", showing: $deletingDictations) { store.deleteAllHistory() }
             }
             SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
             SquareSettingsRow(label: "keep") {
@@ -258,9 +257,7 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "delete all") {
                 // A meeting still recording is left alone; it can be deleted once it stops.
                 let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
-                deleteAll(counted(ids.count, "meeting"), showing: $deletingMeetings, disabled: ids.isEmpty) {
-                    meetings.delete(ids: ids)
-                }
+                deleteAll(ids.count, "meeting", showing: $deletingMeetings) { meetings.delete(ids: ids) }
             }
             SquareSettingsRow(label: "meetings folder", caption: folderPath) {
                 Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
@@ -309,7 +306,9 @@ struct OnePageSettings: View {
                 SquareSettingsRow(label: "log file", help: DebugLog.displayPath) {
                     HStack(spacing: 8) {
                         Button("show") { DebugLog.reveal() }.buttonStyle(SquareButtonStyle())
-                        Button("delete") { DebugLog.delete() }.buttonStyle(SquareButtonStyle())
+                        Button("delete") { deletingLog.toggle() }
+                            .buttonStyle(SquareButtonStyle())
+                            .squareConfirmDelete(isPresented: $deletingLog, title: "delete the log file?") { DebugLog.delete() }
                     }
                 }
             }
@@ -395,22 +394,13 @@ struct OnePageSettings: View {
 
     // MARK: Rows' parts
 
-    /// The button that deletes every dictation or meeting, after a question
-    /// that says they cannot be got back.
-    private func deleteAll(_ what: String, showing: Binding<Bool>, disabled: Bool, delete: @escaping () -> Void) -> some View {
+    /// The button that deletes every dictation or meeting, after asking.
+    private func deleteAll(_ count: Int, _ noun: String, showing: Binding<Bool>, delete: @escaping () -> Void) -> some View {
         Button("delete") { showing.wrappedValue.toggle() }
             .buttonStyle(SquareButtonStyle())
-            .disabled(disabled)
-            .squarePopover(isPresented: showing) {
-                SquareConfirm(title: "delete all \(what)?", detail: "they can't be recovered.") {
-                    Button("cancel") { showing.wrappedValue = false }.buttonStyle(SquareButtonStyle())
-                    Button("delete all") {
-                        delete()
-                        showing.wrappedValue = false
-                    }
-                    .buttonStyle(SquareButtonStyle(kind: .primary))
-                }
-            }
+            .disabled(count == 0)
+            .squareConfirmDelete(isPresented: showing, title: "delete all \(counted(count, noun))?",
+                                 detail: SquareDeleteConfirm.gone(count), confirm: "delete all", delete: delete)
     }
 
     private func toggle(_ label: String, _ isOn: Binding<Bool>) -> some View {
