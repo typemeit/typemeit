@@ -184,13 +184,19 @@ enum Insights {
     /// Typing speed the spoken rate and the time saved are measured against.
     static let typingWPM = 40.0
 
+    /// Unicode `White_Space`, ASCII answered without the property table,
+    /// which is most of the cost of counting a whole history.
+    static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.isASCII ? scalar == " " || (0x09...0x0D).contains(scalar.value) : scalar.properties.isWhitespace
+    }
+
     /// Whitespace-separated tokens, as Rust's `str::split_whitespace`: split
     /// on Unicode `White_Space` scalars, empty pieces dropped.
     static func wordCount(_ text: String) -> Int {
         var count = 0
         var inWord = false
         for scalar in text.unicodeScalars {
-            if scalar.properties.isWhitespace {
+            if isWhitespace(scalar) {
                 inWord = false
             } else if !inWord {
                 inWord = true
@@ -504,7 +510,7 @@ enum TokenDiff {
         var out: [String] = []
         var current = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
-            if scalar.properties.isWhitespace {
+            if Insights.isWhitespace(scalar) {
                 if !current.isEmpty {
                     out.append(String(current))
                     current = String.UnicodeScalarView()
