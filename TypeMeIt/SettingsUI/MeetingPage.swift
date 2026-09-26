@@ -347,17 +347,18 @@ struct MeetingPage: View {
         if running, let run = coordinator.transcribing {
             rows.append(("asr", "\(t.asr ?? "parakeet") · \(Int(run.fraction * 100))%", false))
         } else {
-            rows.append(("asr", t.asr ?? "none yet", t.asr == nil))
+            rows.append(("asr", t.asr.map { MeetingPage.timed($0, t.asrMs) } ?? "none yet", t.asr == nil))
         }
         let stage = running ? coordinator.transcribing?.progress : nil
-        rows.append(("speakers", t.diarizer.map(DiarizerModelStore.label) ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
+        rows.append(("speakers", t.diarizer.map { MeetingPage.timed(DiarizerModelStore.label(of: $0), t.speakersMs) }
+            ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
         rows.append(("names from", MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"), MeetingPage.nameSource(meeting) == nil))
         if meeting.kind == .call { rows.append(("echo", MeetingPage.echo(meeting.echo), meeting.echo == .notMeasured)) }
         if let took = t.tookMs, meeting.durationMs > 0 {
             rows.append(("transcribed", String(format: "%@ · %.2fx", MeetingPage.seconds(took), Double(took) / Double(meeting.durationMs)), false))
         }
         let writing = coordinator.summarising.contains(meeting.id) || stage == .summarising
-        let summary = meeting.summary.map { _ in "apple intelligence" } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
+        let summary = meeting.summary.map { _ in MeetingPage.timed("apple intelligence", t.summaryMs) } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
         rows.append(("summary", summary, meeting.summary == nil))
         rows.append(("title", MeetingPage.titleSource(meeting.titleSource), false))
         return rows
@@ -387,6 +388,11 @@ struct MeetingPage: View {
         case .generated: "generated"
         case .roster: "from who was there"
         }
+    }
+
+    /// What ran, and how long it took when the meeting recorded that.
+    private static func timed(_ what: String, _ ms: Int?) -> String {
+        ms.map { "\(what) · \(seconds($0))" } ?? what
     }
 
     private static func seconds(_ ms: Int) -> String {
