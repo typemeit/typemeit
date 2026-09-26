@@ -2037,17 +2037,22 @@ in phase 2.
 
 ### 8.6 Names from the meeting (D23)
 
-**Off since 25 September.** The rules below were written from other
-projects' notes and never checked against a live call. On four calls on 24
-and 25 September they found no one in Slack or Meet, and once took Meet's
-"Pinned for yourself" for a person, which titled the meeting and named the
-far end. While recording, only the call key is read (the Meet code from the
-tab's address, the channel from a Slack window's title) for `MeetingMerge`.
-In dev builds the menu's Capture Meet Window and Capture Slack Window write
-what that window exposes to the probe folder: the whole tree, what changed at
-each 250 ms poll for 3 minutes, and the whole tree again. Names come back
-once rules written from those captures name the people on a real Slack
-huddle and a real Meet call correctly.
+**Read again since 26 September, from the tiles.** The first rules, written
+from other projects' notes, found no one on four calls on 24 and 25
+September and once took Meet's "Pinned for yourself" for a person; they are
+gone. `Roster` now walks the meeting's window every 5 s, for the call key
+and the participant tiles, and between walks reads only those tiles every
+250 ms. Meet: a tile is an element with class `dkjMxf`, its name the
+`AXStaticText` inside, and it carries `kssMZb` while that person speaks. The
+dev menu's Capture Meet Window saw both on 25 September, and murabcd/graneri
+and salesforce-misc/thread key on the same two. Slack: Neeeser/Pipit's
+huddle tiles, below. A name stays speaking through a 1 s gap in the
+indicator. Meet's classes are generated and will change; when they do,
+nothing matches, the meeting is named from its voices alone as before, and
+Capture Meet Window shows the new ones. Captions are not needed. The user's
+own tile is the name lit while the mic spoke (Meet shows the Google name,
+which need not be the Mac's). Browsers other than Chromium ones are not
+read.
 
 Speakers are named by what the meeting itself shows the user — who is in it,
 who is talking, and in captions who said which words — never by recognising
@@ -2416,6 +2421,9 @@ lifted.
 | `rom4lk/meeting-helper` | MIT | Input-plus-output disambiguation |
 | `artcoholic/akar-icons` | MIT | The `people-group` icon |
 | `handy-computer/transcribe.cpp` | MIT | Already pinned |
+| `Neeeser/Pipit` | MIT, active | Slack huddle tiles: `huddle-grid-gridcell` identifiers, `-self_`, "View <name>'s profile", `p-huddle_peer_tile__overlay--active_speaker` (8.6). Facts, not code |
+| `salesforce-misc/thread` | Apache-2.0 | Meet's speaking class `kssMZb`, the same as graneri's (8.6). Facts, not code |
+| `murabcd/graneri` | No licence stated | Meet's tile class `dkjMxf` and speaking class `kssMZb`, matching the 25 September capture (8.6). Facts only |
 
 Read but not lifted: `makeusabrew/audiotee` (README names MIT, no LICENSE
 file and no grant text; taps every process, not one app), `Mo7amed7osam/zoom-auto-admit`

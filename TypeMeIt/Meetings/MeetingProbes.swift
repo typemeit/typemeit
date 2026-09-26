@@ -355,7 +355,7 @@ enum MeetingProbes {
             for tick in 0...seconds {
                 // What the meeting reader itself would see, and what it costs.
                 let started = ContinuousClock.now
-                let (meetingNodes, code) = Roster.meetingNodes(pid: app.processIdentifier, target: target)
+                let (meetingNodes, _, code) = Roster.meetingNodes(pid: app.processIdentifier, target: target)
                 let reading = RosterRules.read(meetingNodes, target: target)
                 DebugLog.write("Meeting probe names t=\(tick)s: \(meetingNodes.count) nodes in \((ContinuousClock.now - started).milliseconds) ms; roster \(reading.roster), speaking \(reading.speaking.sorted()), \(counted(reading.captions.count, "caption line")), channel \(reading.channel ?? "-"), meet code \(code ?? "-")")
                 let lines = webAreaLines(root)
