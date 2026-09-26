@@ -76,12 +76,11 @@ struct SettingsView: View {
         .safeAreaPadding(.top, SettingsView.markDrop)
     }
 
+    /// History draws its own, which its dictation page replaces.
     @ViewBuilder private var header: some View {
         switch tab {
         case .history:
-            SquarePageHeader(title: tab.rawValue, count: counted(store.history.count, "dictation"),
-                             status: KeepLimit.dictations.status(settings.historyLimit),
-                             linkTitle: "history settings", onLink: { open(.onThisMac) })
+            EmptyView()
         case .meetings:
             SquarePageHeader(title: tab.rawValue, count: counted(meetings.meetings.count, "meeting"),
                              status: meetingsStatus, linkTitle: "meeting settings", onLink: { open(.meetings) })
@@ -95,7 +94,7 @@ struct SettingsView: View {
     @ViewBuilder private var page: some View {
         switch tab {
         case .insights: InsightsTab()
-        case .history: HistoryTab()
+        case .history: HistoryTab(showSettings: { open(.onThisMac) })
         case .meetings: MeetingsTab()
         case .dictionary: DictionaryTab()
         case .settings: OnePageSettings(open: $openSections, reveal: $reveal)

@@ -49,7 +49,10 @@ struct LearnedWord: Codable, Identifiable, Sendable, Equatable {
 final class Store {
     static let shared = Store()
 
-    private(set) var history: [HistoryEntry] = []
+    private(set) var history: [HistoryEntry] = [] { didSet { revision &+= 1 } }
+    /// Goes up with every change to `history`, so a page can keep what it
+    /// works out from it until the history changes.
+    private(set) var revision = 0
     private(set) var learned: [LearnedWord] = []
 
     /// TYPEMEIT_SUPPORT_DIR points a build at another store, so a screenshot
@@ -136,6 +139,14 @@ final class Store {
     func delete(ids: Set<UUID>) {
         RecordingArchive.delete(history.filter { ids.contains($0.id) }.compactMap(\.recordingFile))
         history.removeAll { ids.contains($0.id) }
+        save(history, to: historyURL)
+    }
+
+    /// Deletes a dictation's audio and keeps its text.
+    func deleteAudio(id: UUID) {
+        guard let i = history.firstIndex(where: { $0.id == id }), let file = history[i].recordingFile else { return }
+        RecordingArchive.delete([file])
+        history[i].recordingFile = nil
         save(history, to: historyURL)
     }
 
