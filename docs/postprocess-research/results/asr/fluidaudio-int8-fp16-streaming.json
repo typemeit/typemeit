@@ -1,0 +1,29 @@
+{
+ "rec-tcpp3": {
+  "p50": 112,
+  "p95": 1664,
+  "mean": 517
+ },
+ "rec-int8-plain-2": {
+  "p50": 52,
+  "p95": 358,
+  "mean": 104
+ },
+ "rec-fp16-plain": {
+  "p50": 78,
+  "p95": 549,
+  "mean": 151
+ },
+ "rec-stream-70-13-13": {
+  "finish_p50": 24,
+  "finish_p95": 40,
+  "finish_mean": 26,
+  "busy_over_audio_max": 0.039
+ },
+ "rec-stream-70-7-7": {
+  "finish_p50": 21,
+  "finish_p95": 37,
+  "finish_mean": 24,
+  "busy_over_audio_max": 0.064
+ }
+}
