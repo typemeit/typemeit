@@ -38,7 +38,7 @@ final class Updates: NSObject, SPUUpdaterDelegate {
 
     /// The dev build is not in the appcast, and an update would replace it
     /// with the release, so it never checks.
-    static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+    nonisolated static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
 
     private(set) var state: State = .checking
 
@@ -354,7 +354,7 @@ final class Updates {
         case downloadFailed(version: String)
     }
 
-    static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+    nonisolated static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
     private(set) var state: State = .upToDate
 
     func checkNow() {}

@@ -1,7 +1,6 @@
 import AppKit
 import Combine
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The meetings page (docs/meetings.md 7.11): the list by day, with what
 /// is live above it and the keep, folder and system-audio rows under it.
@@ -19,6 +18,12 @@ struct MeetingsTab: View {
     @State private var confirmDeleteAll = false
     @State private var renaming: UUID?
     @State private var renameText = ""
+    @State private var diarizer = DiarizerModelStore.shared
+    /// The speaker label being renamed: meeting id and speaker id.
+    @State private var renamingSpeaker: (meeting: UUID, speaker: String)?
+    @State private var speakerName = ""
+    /// The `.tmi` file the share menu is showing, and the meeting whose button it is under.
+    @State private var sharing: (meeting: UUID, file: URL)?
     /// Re-reads the clock for the recording row's elapsed time.
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var now = Date()
@@ -60,7 +65,7 @@ struct MeetingsTab: View {
     private var list: some View {
         VStack(spacing: 0) {
             topBar
-            if coordinator.recording != nil || coordinator.transcribing != nil || coordinator.importing != nil || coordinator.importFailure != nil {
+            if coordinator.recording != nil || coordinator.transcribing != nil || diarizerBusy {
                 statusRow
                 RowRule()
             }
@@ -81,17 +86,6 @@ struct MeetingsTab: View {
                     }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
-            }
-            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-                Task { @MainActor in
-                    var urls: [URL] = []
-                    for provider in providers {
-                        if let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
-                           let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) { urls.append(url) }
-                    }
-                    coordinator.importRecordings(urls)
-                }
-                return true
             }
             RowRule()
             footer
@@ -123,8 +117,10 @@ struct MeetingsTab: View {
                 }
                 .buttonStyle(QuietButtonStyle())
                 .keyboardShortcut(.cancelAction)
+                // The chevron lines up with the title; the hover wash reaches past it.
+                .padding(.leading, -7)
                 Spacer()
-                actions(m)
+                actions(m, play: false)
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
             VStack(alignment: .leading, spacing: 6) {
@@ -135,12 +131,66 @@ struct MeetingsTab: View {
                     telemetry(m)
                 }
                 chips(m)
+                summary(m)
             }
             .padding(.horizontal, 20).padding(.bottom, 14)
+            if let urls = audioURLs(m) {
+                playerBar(m, urls: urls).padding(.horizontal, 20).padding(.bottom, 12)
+            }
             RowRule()
             ScrollView {
                 transcript(m)
                     .padding(.horizontal, 20).padding(.vertical, 16)
+            }
+        }
+        // Playback belongs to the page: leaving it, or the tab, stops it.
+        .onDisappear { if player.playing == m.id { player.stop() } }
+        .onAppear { coordinator.summarise(m.id) }
+    }
+
+    @ViewBuilder
+    private func summary(_ m: Meeting) -> some View {
+        if let text = m.summary {
+            // Never fixedSize: the split view measures its columns at almost
+            // no width, and a summary held to its height there made the window
+            // 13 pt tall per character, 27,978 pt for one of 2,085, past what
+            // can be drawn, so the window stayed blank.
+            Text(text).font(.system(size: 13)).foregroundStyle(DesignTokens.Colors.ink2)
+                .frame(maxWidth: 640, alignment: .leading)
+                .textSelection(.enabled).padding(.top, 4)
+        } else if coordinator.summarising.contains(m.id) {
+            Text("summarising…").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink3).padding(.top, 4)
+        }
+    }
+
+    /// The meeting's tracks, when its audio was kept.
+    private func audioURLs(_ m: Meeting) -> [URL]? {
+        guard !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) else { return nil }
+        return m.audioFiles.map { folder.appendingPathComponent($0) }
+    }
+
+    /// Play or pause, where it is, a bar to click or drag along, and the length.
+    private func playerBar(_ m: Meeting, urls: [URL]) -> some View {
+        let loaded = player.playing == m.id
+        let running = loaded && !player.paused
+        let total = loaded ? player.duration : m.duration.timeInterval
+        return HStack(spacing: 10) {
+            iconButton(running ? "akar-pause" : "akar-play", running ? "pause" : "play") {
+                if running { player.pause() } else { player.play(id: m.id, urls: urls) }
+            }
+            .padding(.leading, -5)
+            // Ticks only while playing: each tick lays the page out again.
+            TimelineView(.animation(minimumInterval: 0.25, paused: !running)) { _ in
+                let at = loaded ? player.currentTime : 0
+                HStack(spacing: 10) {
+                    Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
+                    Scrubber(fraction: total > 0 ? at / total : 0) { fraction in
+                        if loaded { player.seek(to: fraction * total) } else { player.play(id: m.id, urls: urls, from: fraction * total) }
+                    }
+                    Text(TranscriptRender.timestamp(ms: Int(total * 1000)))
+                }
+                .font(.system(size: 11).monospaced().monospacedDigit())
+                .foregroundStyle(DesignTokens.Colors.ink2)
             }
         }
     }
@@ -158,9 +208,6 @@ struct MeetingsTab: View {
             .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
             Text(counted(store.meetings.count, "meeting"))
                 .font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-            Button("import…") { chooseRecordings() }
-                .buttonStyle(InkButtonStyle())
-                .help("transcribe a recording")
             if !selected.isEmpty {
                 Button("delete \(selected.count)") { store.delete(ids: selected); selected = [] }
                     .buttonStyle(InkButtonStyle())
@@ -186,21 +233,33 @@ struct MeetingsTab: View {
                 if let others = coordinator.levels.others { Meter(level: others) }
                 Spacer()
                 Button("stop") { coordinator.stopMeeting() }.buttonStyle(InkButtonStyle(primary: true))
-            } else if let name = coordinator.importing {
-                Text("importing \(name) · english only")
-                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink).lineLimit(1).truncationMode(.middle)
-                Spacer()
-            } else if let failure = coordinator.importFailure {
-                Text(failure).font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
-                Spacer()
             } else if let t = coordinator.transcribing {
                 Text("transcribing · \(Int(t.fraction * 100))%")
                     .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
                 InkProgress(value: t.fraction).frame(width: 160)
                 Spacer()
+            } else if case .downloading(let received, let total) = diarizer.state {
+                Text("downloading the speaker model · \(Int(Double(received) / Double(max(total, 1)) * 100))%")
+                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                InkProgress(value: Double(received) / Double(max(total, 1))).frame(width: 160)
+                Spacer()
+            } else if case .verifying = diarizer.state {
+                Text("checking the speaker model").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                Spacer()
+            } else if case .failed = diarizer.state {
+                Text("speaker model didn't download").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink)
+                Spacer()
+                Button("retry") { diarizer.download() }.buttonStyle(InkButtonStyle())
             }
         }
         .padding(.horizontal, 20).padding(.bottom, 14)
+    }
+
+    private var diarizerBusy: Bool {
+        switch diarizer.state {
+        case .downloading, .verifying, .failed: true
+        case .missing, .installed: false
+        }
     }
 
     // MARK: Rows
@@ -239,17 +298,18 @@ struct MeetingsTab: View {
         }
     }
 
-    private func actions(_ m: Meeting) -> some View {
+    /// `play` is off on the meeting's own page, which has the player bar.
+    private func actions(_ m: Meeting, play: Bool = true) -> some View {
         HStack(spacing: 4) {
-            if !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
+            if play, !m.audioFiles.isEmpty, let folder = store.folder(for: m.id) {
                 let on = player.playing == m.id
                 iconButton(on ? "akar-stop" : "akar-play", on ? "stop" : "play") {
                     player.toggle(id: m.id, urls: m.audioFiles.map { folder.appendingPathComponent($0) })
                 }
             }
             iconButton("akar-copy", "copy the transcript") { Output.copyToClipboard(m.transcriptText) }
-            if m.isDone, !m.audioFiles.isEmpty, !coordinator.liveIDs.contains(m.id) {
-                iconButton("akar-arrow-cycle", "transcribe again") { coordinator.transcribeAgain(m.id) }
+            if m.isDone, !m.paragraphs.isEmpty, !coordinator.liveIDs.contains(m.id) {
+                shareButton(m)
             }
             iconButton("akar-pencil", "rename") { renameText = m.title; renaming = m.id }
             if let folder = store.folder(for: m.id) {
@@ -261,17 +321,30 @@ struct MeetingsTab: View {
         }
     }
 
-    /// `45m · 2 speakers · slack`.
+    /// The share menu under the button; the button can also be dragged,
+    /// which drops the `.tmi` file into a message or a folder
+    /// (docs/meetings.md 7.16).
+    private func shareButton(_ m: Meeting) -> some View {
+        iconButton("akar-share-box", "share") {
+            if let file = store.shareFile(m.id) { sharing = (m.id, file) }
+        }
+        .background(SharePicker(file: sharing?.meeting == m.id ? sharing?.file : nil) { sharing = nil })
+        .onDrag { store.shareFile(m.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
+    }
+
+    /// `45m · 2 speakers · slack`, and `· from ellen` on one someone shared.
     private func telemetry(_ m: Meeting) -> some View {
         HStack(spacing: 0) {
             Text(MeetingFolder.durationLabel(m.duration))
             Text(" · ")
             Text(counted(m.speakerCount, "speaker"))
-            if m.source == .imported {
-                Text(" · imported")
-            } else if let app = m.app {
+            if let app = m.app {
                 Text(" · ")
                 Text(app.name.lowercased())
+            }
+            if let from = m.sharedBy, !from.isEmpty {
+                Text(" · ")
+                Text("from \(from.lowercased())")
             }
         }
         .font(.system(size: 10, design: .monospaced))
@@ -284,10 +357,17 @@ struct MeetingsTab: View {
     private func chips(_ m: Meeting) -> some View {
         let waitingForModel = m.transcription.state == .pending && !ModelStore.isInstalled
         let folderMissing = !m.published && m.isDone && !store.folderAvailable
-        if m.onlyYourSide || m.echo == .affected || m.transcription.state == .failed || waitingForModel || folderMissing {
+        let canAddSpeakers = m.isDone && m.transcription.diarizer == nil && !m.audioFiles.isEmpty && diarizer.state == .installed && !coordinator.liveIDs.contains(m.id)
+        let putOff = !waitingForModel && coordinator.isWaiting(m.id)
+        if m.onlyYourSide || m.transcription.state == .failed || waitingForModel || folderMissing || canAddSpeakers || putOff {
             HStack(spacing: 6) {
+                if putOff {
+                    Button("transcribe") { if let latest = store.meeting(m.id) { coordinator.enqueue(latest) } }.buttonStyle(InkButtonStyle(primary: true))
+                }
+                if canAddSpeakers {
+                    Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(InkButtonStyle())
+                }
                 if m.onlyYourSide { chip("only your side") }
-                if m.echo == .affected { chip("on speakers") }
                 if m.transcription.state == .failed {
                     chip("transcription failed")
                     Button("retry") { coordinator.retry(m.id) }.buttonStyle(InkButtonStyle())
@@ -296,10 +376,7 @@ struct MeetingsTab: View {
                     chip("waiting for the speech model")
                     Button("download") { ModelStore.shared.download() }.buttonStyle(InkButtonStyle())
                 }
-                if folderMissing {
-                    chip("meetings folder unavailable")
-                    Button("change") { chooseFolder() }.buttonStyle(InkButtonStyle())
-                }
+                if folderMissing { chip("meetings folder unavailable") }
             }
         }
     }
@@ -310,16 +387,31 @@ struct MeetingsTab: View {
     }
 
     /// The paragraphs, each headed by its speaker and time.
+    /// Lazy: an hour's meeting is hundreds of selectable paragraphs, and only
+    /// those on screen need building.
     private func transcript(_ m: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        LazyVStack(alignment: .leading, spacing: 8) {
             if m.paragraphs.isEmpty {
                 Text(m.transcription.state == .done ? "nothing was said" : "not transcribed yet")
                     .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3)
             }
             ForEach(Array(m.paragraphs.enumerated()), id: \.offset) { _, p in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Text(m.speakerName(p.speaker)).bold()) · \(TranscriptRender.timestamp(ms: p.startMs))")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
+                    HStack(spacing: 0) {
+                        speakerLabel(p.speaker, in: m)
+                        Text(" · ")
+                        if let urls = audioURLs(m) {
+                            Button { player.play(id: m.id, urls: urls, from: Double(p.startMs) / 1000) } label: {
+                                Text(TranscriptRender.timestamp(ms: p.startMs)).underline(true, color: DesignTokens.Colors.inkA20)
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { $0 ? NSCursor.pointingHand.push() : NSCursor.pop() }
+                            .help("play from here")
+                        } else {
+                            Text(TranscriptRender.timestamp(ms: p.startMs))
+                        }
+                    }
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(DesignTokens.Colors.ink3)
                     Text(p.text).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).textSelection(.enabled)
                 }
             }
@@ -327,6 +419,24 @@ struct MeetingsTab: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Rectangle().fill(DesignTokens.Colors.inkA04))
+    }
+
+    /// A speaker's name; a click turns it into a field, return saves,
+    /// escape cancels (docs/meetings.md 8.4). Per meeting.
+    @ViewBuilder
+    private func speakerLabel(_ speaker: String, in m: Meeting) -> some View {
+        if let r = renamingSpeaker, r.meeting == m.id, r.speaker == speaker {
+            TextField("", text: $speakerName)
+                .textFieldStyle(.plain).font(.system(size: 10, design: .monospaced)).frame(width: 120)
+                .onSubmit { store.rename(speaker: speaker, to: speakerName, in: m.id); renamingSpeaker = nil }
+                .onExitCommand { renamingSpeaker = nil }
+        } else {
+            Button { speakerName = m.speakerName(speaker); renamingSpeaker = (m.id, speaker) } label: {
+                Text(m.speakerName(speaker)).bold()
+            }
+            .buttonStyle(.plain)
+            .help("rename")
+        }
     }
 
     private func select(_ id: UUID) {
@@ -351,7 +461,7 @@ struct MeetingsTab: View {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var path = root.path
         if path.hasPrefix(home) { path = "~" + path.dropFirst(home.count) }
-        return MeetingFolder.isInICloudDrive(root) ? path + " · icloud drive" : path
+        return path
     }
 
     private var systemAudioStatus: String {
@@ -374,15 +484,14 @@ struct MeetingsTab: View {
             SettingsRow(label: "keep the audio", subtitle: "deleted along with the meeting") {
                 Toggle("", isOn: $settings.meetingKeepAudio).toggleStyle(.switch).labelsHidden()
             }
-            SettingsRow(label: "meetings folder", subtitleView: AnyView(Text(folderSubtitle))) {
-                HStack(spacing: 8) {
-                    Button("show") { NSWorkspace.shared.activateFileViewerSelecting([store.publishedRoot]) }.buttonStyle(InkButtonStyle())
-                        .disabled(!store.folderAvailable)
-                    Button("change") { chooseFolder() }.buttonStyle(InkButtonStyle())
-                }
+            SettingsRow(label: "ask before transcribing", subtitle: "\(counted(Fixed.meetingTranscribeAskSeconds, "second")) to choose later") {
+                Toggle("", isOn: $settings.meetingAskBeforeTranscribing).toggleStyle(.switch).labelsHidden()
             }
-            SettingsRow(label: "mcp", subtitle: "off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.",
-                        subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "let other tools read your meetings"))) {
+            SettingsRow(label: "meetings folder", subtitleView: AnyView(Text(folderSubtitle))) {
+                Button("open") { NSWorkspace.shared.open(store.publishedRoot) }.buttonStyle(InkButtonStyle())
+                    .disabled(!store.folderAvailable)
+            }
+            SettingsRow(label: "mcp", subtitleView: AnyView(Text(MeetingsTab.translocated ? "move type me it to applications first" : "lets assistants, including cloud ones, read your meetings"))) {
                 HStack(spacing: 8) {
                     Button("copy command") { Output.copyToClipboard("claude mcp add --scope user typemeit -- \"\(MeetingsTab.mcpBinary.path)\"") }
                         .buttonStyle(InkButtonStyle())
@@ -416,18 +525,8 @@ struct MeetingsTab: View {
     @ViewBuilder private var systemAudioLines: some View {
         VStack(alignment: .leading, spacing: 2) {
             if coordinator.systemAudioTest == .silent { Text("quit and reopen after granting") }
-            Text("the other people on a call are not told you are recording.")
+            Text("plays a short sound to check type me it can hear other apps")
         }
-    }
-
-    private func chooseRecordings() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio, .movie]
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.prompt = "Import"
-        guard panel.runModal() == .OK else { return }
-        coordinator.importRecordings(panel.urls)
     }
 
     /// The bundled binary, at this build's own path, so the dev app copies its own.
@@ -442,20 +541,58 @@ struct MeetingsTab: View {
         let data = (try? JSONSerialization.data(withJSONObject: entry, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return String(decoding: data, as: UTF8.self)
     }
+}
 
-    /// An open panel for directories; nothing is moved.
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = store.publishedRoot
-        panel.prompt = "Choose"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.meetingsFolder = url == MeetingFolder.defaultPublishedRoot ? nil : url
-        store.reload()
-        store.republishPending()
+/// A thin line filled to where playback is; a click or a drag moves it,
+/// and the player is told once, when the pointer lifts.
+private struct Scrubber: View {
+    let fraction: Double
+    let seek: (Double) -> Void
+    @State private var dragging: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let shown = min(max(dragging ?? fraction, 0), 1)
+            ZStack(alignment: .leading) {
+                Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: 2)
+                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * shown, height: 2)
+                Circle().fill(DesignTokens.Colors.ink).frame(width: 8, height: 8)
+                    .offset(x: geo.size.width * shown - 4)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { dragging = min(max($0.location.x / max(geo.size.width, 1), 0), 1) }
+                .onEnded { _ in
+                    if let dragging { seek(dragging) }
+                    dragging = nil
+                })
+        }
+        .frame(height: 14)
+    }
+}
+
+/// The system share menu, shown once under the view this sits behind when
+/// it is given a file; `done` clears the file so the next click shows it again.
+private struct SharePicker: NSViewRepresentable {
+    let file: URL?
+    let done: () -> Void
+
+    final class Coordinator { var shown = false }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        guard let file else { context.coordinator.shown = false; return }
+        guard !context.coordinator.shown else { return }
+        context.coordinator.shown = true
+        // Out of the update pass: the menu runs its own tracking loop.
+        Task { @MainActor in
+            NSSharingServicePicker(items: [file]).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+            done()
+        }
     }
 }
 

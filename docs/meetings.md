@@ -6,10 +6,13 @@ notice a call, ask once, record both sides, transcribe when it ends, and keep
 the result in a Meetings tab. A meeting in a room is the same thing started by
 hand.
 
-Phase 1 is built (section 7, plus the room's menu item and shortcut from
-8.1) with the probes of section 6 behind launch arguments on the dev app.
-Spikes S1 and S2 have not been run against a real huddle or Meet call;
-their pass/fail lines are still to be filled in. The streaming-dictation
+Phases 1 and 2 are built (sections 7 and 8) with the probes of section 6
+behind launch arguments on the dev app. Spikes S1 and S2 have not been run
+against a real huddle; a Meet call in Chrome was recorded on both tracks
+and diarized into five far-end speakers. S3's distance test and the
+`stepRatio` choice are still to run; their pass/fail lines are to be
+filled in. The speaker model tar (`make diarizer-model`) still needs
+publishing to the release `DiarizerModelStore` pins. The streaming-dictation
 commit that was once on this branch is not part of the plan; see section 15.
 
 ## Contents
@@ -132,11 +135,24 @@ change any of them; the default is what gets built.
   `Fixed.meetingSilentSeconds` (90 s) and the Meetings tab has a `test`
   button that taps our own process and checks for signal. The mic track is
   kept whatever the far end does.
-- **D14. Echo is detected, never removed.** Every two-track meeting is run
-  through an envelope cross-correlation detector at the end. An affected
-  meeting is marked `echo: affected`, its row says `on speakers`, and
-  nothing is deleted from either transcript. Voice-processing I/O and text
-  dedup are out (section 10).
+- **D14. Echo is detected, and folded out by the clock.** Every two-track
+  meeting is run through an envelope cross-correlation detector at the end.
+  An affected meeting is marked `echo: affected` and its row says `on
+  speakers`. On such a meeting, and only there, a run of two or more
+  identical words at the same instant on both tracks (within 400 ms; the
+  tracks share a clock, 5.4) is one utterance heard twice, and the later
+  copy is dropped (`EchoFold`): the far end's voice reaches the mic just
+  after the far-end track has it, and the user's comes back from the far
+  end a round trip after the mic. A lone shared word is left alone. What
+  the runs miss, far-end speech the mic's transcript turned into other
+  words, is found by level: the echo's lag and loudness are read from the
+  two tracks every 5 s (`EchoLag`), since the lag jumps mid-call by up to
+  90 ms, and a stretch of mic words whose level follows the far end's at
+  that lag while the far end speaks goes, unless the mic is three times
+  louder than the echo alone would make it.
+  Voice-processing I/O and text-only dedup are out (section 10): the first
+  ducks the far end, the second cannot tell an echo from a coincidence
+  without the clock.
 - **D15. Voice prints are opt-in and die with history.** The **You** print
   is built only when the user turns it on, from kept dictation recordings
   and from dictations as they happen, and deleted when they turn it off or
@@ -443,6 +459,8 @@ Rules for every task below:
 | `Meetings/ChunkCutter.swift` | Cut points for a long track from its peak envelope (pure) |
 | `Meetings/TranscriptMerge.swift` | Words from one or two tracks plus speaker segments plus dictation spans to paragraphs (pure) |
 | `Meetings/EchoBleedDetector.swift` | Lifted from meeting-transcriber (MIT): envelope cross-correlation verdict (pure) |
+| `Meetings/EchoFold.swift` | On an affected call, drops the later copy of a run of words both tracks share at the same instant, and far-end speech left on the mic (pure) |
+| `Meetings/EchoLag.swift` | The echo's lag and loudness through a call, read from the two tracks' envelopes (pure) |
 | `Meetings/MeetingTranscriber.swift` | The end-of-meeting pipeline: read tracks, chunk, transcribe, (phase 2) diarize, echo, merge, write, transcode, publish |
 | `Meetings/DiarizerModelStore.swift` (phase 2) | Download and pin the FluidAudio model archive, modelled on `ModelStore` |
 | `Meetings/Diarizer.swift` (phase 2) | FluidAudio offline pipeline behind two functions |
@@ -627,9 +645,12 @@ Start from a shipping MIT app's `OfflineDiarizerConfig` rather than the
 defaults; it runs the same pipeline and its reasons are written down. Measure
 each against the defaults, do not adopt blind:
 
-- `clusteringThreshold` 0.5 against the 0.6 default. Higher stops merging
-  earlier and yields *more* speakers — the polarity 3.3 warns about, stated
-  the same way there.
+- `clusteringThreshold` 0.5 against the 0.6 default. In 0.15.8 it is a
+  distance cut on unit-length embeddings (`AHCClustering.swift`): higher
+  merges more and yields *fewer* speakers. Measured on 26 September against
+  AssemblyAI's labels for the people on six calls and two room recordings:
+  the default put 5.8% of words under the wrong speaker, 0.5 put 7.7%, no
+  recording worse, same speed. The default ships.
 - `segmentationMinDurationOn` 1.0, up from 0.0. At the default the
   segmentation model emits sub-second blips for backchannels ("yeah",
   "right") inside a monologue, which split one sentence across three speaker
@@ -1335,7 +1356,7 @@ never read:
 title: "Slack"
 kind: call
 started: "2026-09-19 14:30 +01:00"
-duration: 35m
+duration: 34:36
 app: "Slack"
 speakers: ["You", "Them"]
 echo: affected
@@ -1802,6 +1823,74 @@ word across two meetings with the right speaker and timestamp; a path
 argument pointing outside the folder is refused; every tool with the setting
 off returns the same error.
 
+### 7.16 Sharing a meeting as a `.tmi` file
+
+A meeting leaves the Mac only as a file the user sends; type me it runs no
+server. The share button (`akar-share-box`, help `share`), on a done meeting
+with words, writes `<folder name>.tmi` into `$TMPDIR/Shared Meetings/<id>/`
+and opens the system share menu under itself: AirDrop, Mail, Messages.
+Dragged, the same button drops the file into a message or a folder.
+
+The file is `transcript.md`'s Markdown (7.9) with `echo` left out and three
+keys added: `from` (`NSFullUserName()`), `id` (the meeting's) and `format`
+(1). Under the front matter, `typeme.it` (`Fixed.websiteURL`'s host)
+sits on its own line for anyone who opens the file without the app; reading
+skips everything before the first heading. Strings are written in JSON's
+string syntax, which YAML reads as double-quoted strings, so a title with a
+quote or a line break stays on its line. The user's own speaker is written under the sender's name unless the
+user renamed it: in anyone else's copy, `You` is the wrong person. No audio,
+summary, dictations, device kinds or window names go in the file; the
+recipient's app writes its own summary when the page opens.
+
+```markdown
+---
+title: "Deploy sync"
+kind: call
+started: "2026-09-19 14:30 +01:00"
+duration: 34:36
+app: "Slack"
+speakers: ["Max Mitchell", "Them"]
+from: "Max Mitchell"
+id: 9F2C0000-0000-0000-0000-000000000000
+format: 1
+---
+
+typeme.it
+
+**Max Mitchell** · 0:14
+Morning. Shall we start with the deploy?
+```
+
+The type is `it.typeme.meeting`, extension `tmi`, conforming to
+`net.daringfireball.markdown` and `public.plain-text`, exported by the app
+with a document type of rank Owner and a system-generated icon
+(project.yml). Plain text is what lets TextEdit open it and Quick Look show
+it. The store build leaves the type out until it has meetings.
+
+A double-click reaches `AppDelegate.application(_:open:)`, which calls
+`MeetingStore.receive`. `MeetingShare.meeting(from:)` parses the file into a
+meeting written into the published folder like any other (7.9): `sharedBy`
+set, no tracks, transcribed and published. Speakers are numbered `s1…` in the
+order the file lists them, none `isYou`; a paragraph ends where the next
+starts. A meeting whose id is already in the store is shown, not added
+again. The settings window opens on it unless onboarding or the gate is up.
+A file that is not a meeting, or has a `format` above 1, gets an alert.
+
+A shared meeting's row says `from <name>`. It has no player or add
+speakers, since it has no audio. The insights and the MCP's
+`meeting_stats` leave it out: it is not the user's time in meetings, and its
+talk times are estimates.
+
+Tests (`MeetingShareTests`, pure but for one temporary directory): the
+example meeting's file, and its name beside a folder's; reading it
+back (id, start to the minute, the offset as the zone, numbered speakers,
+paragraph ends, `sharedBy`); a name the user gave themselves is kept; quotes
+and line breaks in a title and a speaker's name; a paragraph past an hour; a
+line that only looks like a heading stays words; CRLF line endings; a
+forwarded meeting names who forwarded it; plain Markdown, and front matter
+without an id, are not meetings; `format: 2` is refused. `MeetingInsightsTests`
+and `MCPTests`: a shared meeting is not counted.
+
 ## 8. Phase 2: the room, and speakers
 
 ### 8.1 The room
@@ -1883,6 +1972,20 @@ off returns the same error.
   match in the same pass and discarded with it; `meeting.json` never carries
   one (D18). On a call, when the far end has one speaker, the label stays
   `Them`.
+- **The call's window sets the count (`SpeakerCount`).** A far-end talker is
+  a name 8.6 read as speaking while the far-end track had at least 10 s of
+  words inside its spans, and more there than on the mic. That leaves out
+  the user under whatever name the call shows them by, and a tile lit by
+  noise. With any talkers the diarizer is told `withSpeakers(exactly:)`
+  their number, and a far end left as one voice takes the one talker's
+  name. With none, the roster minus the user caps it
+  (`withSpeakers(max:)`); the roster never sets an exact count, since it
+  lists silent listeners too. Measured on 24 September (`-diarizeCounts`):
+  told the right count, the diarizer matched its own; told one too many, it
+  split the Slack call's one far-end voice into 87 s and 37 s, and cut
+  agreement with AssemblyAI on the 0831 room from 87% to 69%. A tile shared
+  by two people (a meeting room on one laptop) is counted as one, and they
+  merge.
 - `TranscriptMerge` assigns each far-end word to the segment containing its
   midpoint; if none, to the nearest segment within 1 s; else to the previous
   word's speaker. Tests: a word between two segments, a word before the first
@@ -1936,6 +2039,23 @@ in phase 2.
   minutes at the floor, with no pill, and is kept.
 
 ### 8.6 Names from the meeting (D23)
+
+**Read again since 26 September, from the tiles.** The first rules, written
+from other projects' notes, found no one on four calls on 24 and 25
+September and once took Meet's "Pinned for yourself" for a person; they are
+gone. `Roster` now walks the meeting's window every 5 s, for the call key
+and the participant tiles, and between walks reads only those tiles every
+250 ms. Meet: a tile is an element with class `dkjMxf`, its name the
+`AXStaticText` inside, and it carries `kssMZb` while that person speaks. The
+dev menu's Capture Meet Window saw both on 25 September, and murabcd/graneri
+and salesforce-misc/thread key on the same two. Slack: Neeeser/Pipit's
+huddle tiles, below. A name stays speaking through a 1 s gap in the
+indicator. Meet's classes are generated and will change; when they do,
+nothing matches, the meeting is named from its voices alone as before, and
+Capture Meet Window shows the new ones. Captions are not needed. The user's
+own tile is the name lit while the mic spoke (Meet shows the Google name,
+which need not be the Mac's). Browsers other than Chromium ones are not
+read.
 
 Speakers are named by what the meeting itself shows the user — who is in it,
 who is talking, and in captions who said which words — never by recognising
@@ -2172,9 +2292,10 @@ Not in this plan, written down so they are not re-derived:
 | Tab count | `counted(n, "meeting")` |
 | Tab buttons | `import…` (help `transcribe a recording`) |
 | Tab status | `recording · 12m` · `stop` · `transcribing · 40%` · `downloading the speaker model · 40%` |
-| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` |
+| Row line 2 | `45m · counted(n, "speaker") · slack` / `imported` · `from ellen` |
 | Row chips | `only your side` · `on speakers` · `transcription failed` · `retry` · `waiting for the speech model` · `download` · `add speakers` · `meetings folder unavailable` · `change` |
-| Row button help | `play` · `stop` · `copy the transcript` · `rename` · `show in finder` · `delete` |
+| Row button help | `play` · `stop` · `copy the transcript` · `share` · `rename` · `show in finder` · `delete` |
+| `.tmi` file | Finder kind `type me it meeting` · `typeme.it` under the front matter · alert `Can't open this meeting` · `It's from a newer version of type me it. Update, then open it again.` / `The file isn't a type me it meeting.` |
 | Empty | `nothing yet` · `no matches` |
 | Import | `english only` · `no audio in that file` |
 | Footer row `mcp` | `let other tools read your meetings` · `copy command` · help `off by default. turning it on lets an assistant search and read your meetings — including ones that run in the cloud.` · error returned when off: `meetings mcp is off. turn it on in type me it settings.` |
@@ -2207,6 +2328,7 @@ file each under `TypeMeItTests/Meetings/`:
 | `PreRollTests` | 7.7: a wrapped ring drains oldest-first; a short pre-roll; `discard` leaves nothing readable |
 | `MeetingImportTests` | 7.14 |
 | `MCPTests` | 7.15 |
+| `MeetingShareTests` | 7.16 |
 | `SpeakerNamingTests` | 8.6 |
 | `VoicePrintTests` | matcher threshold and margin on unit vectors |
 
@@ -2302,6 +2424,9 @@ lifted.
 | `rom4lk/meeting-helper` | MIT | Input-plus-output disambiguation |
 | `artcoholic/akar-icons` | MIT | The `people-group` icon |
 | `handy-computer/transcribe.cpp` | MIT | Already pinned |
+| `Neeeser/Pipit` | MIT, active | Slack huddle tiles: `huddle-grid-gridcell` identifiers, `-self_`, "View <name>'s profile", `p-huddle_peer_tile__overlay--active_speaker` (8.6). Facts, not code |
+| `salesforce-misc/thread` | Apache-2.0 | Meet's speaking class `kssMZb`, the same as graneri's (8.6). Facts, not code |
+| `murabcd/graneri` | No licence stated | Meet's tile class `dkjMxf` and speaking class `kssMZb`, matching the 25 September capture (8.6). Facts only |
 
 Read but not lifted: `makeusabrew/audiotee` (README names MIT, no LICENSE
 file and no grant text; taps every process, not one app), `Mo7amed7osam/zoom-auto-admit`

@@ -70,8 +70,14 @@ final class RecordingPlayer: NSObject, AVAudioPlayerDelegate {
     /// same device clock tick.
     private static let startLead: TimeInterval = 0.1
 
+    /// The recording loaded, playing or paused.
     private(set) var playing: UUID?
+    private(set) var paused = false
     private var players: [AVAudioPlayer] = []
+
+    /// Seconds into what is loaded; 0 when nothing is.
+    var currentTime: TimeInterval { players.first?.currentTime ?? 0 }
+    var duration: TimeInterval { players.map(\.duration).max() ?? 0 }
 
     func toggle(_ entry: HistoryEntry) {
         guard let file = entry.recordingFile else { return }
@@ -81,17 +87,30 @@ final class RecordingPlayer: NSObject, AVAudioPlayerDelegate {
     /// Starts every URL at the same moment, or stops if `id` is playing.
     func toggle(id: UUID, urls: [URL]) {
         if playing == id { stop(); return }
-        stop()
-        guard !urls.isEmpty else { return }
-        do {
-            let ps = try urls.map { try AVAudioPlayer(contentsOf: $0) }
-            for p in ps { p.delegate = self; p.prepareToPlay() }
-            let at = (ps.first?.deviceCurrentTime ?? 0) + RecordingPlayer.startLead
-            for p in ps { p.play(atTime: at) }
-            players = ps
-            playing = id
-        } catch {
-            Log.audio.error("Could not play recording: \(error.localizedDescription)")
+        play(id: id, urls: urls, from: 0)
+    }
+
+    /// Plays `id` from `seconds`, or from where it was paused; loads its
+    /// files first when something else is loaded.
+    func play(id: UUID, urls: [URL], from seconds: TimeInterval? = nil) {
+        if playing != id {
+            stop()
+            guard load(id: id, urls: urls) else { return }
+        }
+        start(from: seconds ?? currentTime)
+    }
+
+    func pause() {
+        for p in players { p.pause() }
+        paused = true
+    }
+
+    /// Moves to `seconds`, playing on if it was playing.
+    func seek(to seconds: TimeInterval) {
+        if paused {
+            for p in players { p.currentTime = min(max(0, seconds), p.duration) }
+        } else {
+            start(from: seconds)
         }
     }
 
@@ -99,6 +118,33 @@ final class RecordingPlayer: NSObject, AVAudioPlayerDelegate {
         for p in players { p.stop() }
         players = []
         playing = nil
+        paused = false
+    }
+
+    private func load(id: UUID, urls: [URL]) -> Bool {
+        guard !urls.isEmpty else { return false }
+        do {
+            players = try urls.map { try AVAudioPlayer(contentsOf: $0) }
+            for p in players { p.delegate = self }
+            playing = id
+            return true
+        } catch {
+            Log.audio.error("Could not play recording: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// Every track from `seconds`, started on one device clock tick so the
+    /// two sides of a call stay aligned.
+    private func start(from seconds: TimeInterval) {
+        for p in players {
+            p.stop()
+            p.currentTime = min(max(0, seconds), p.duration)
+            p.prepareToPlay()
+        }
+        let at = (players.first?.deviceCurrentTime ?? 0) + RecordingPlayer.startLead
+        for p in players { p.play(atTime: at) }
+        paused = false
     }
 
     /// Stops when what is playing is about to be deleted.

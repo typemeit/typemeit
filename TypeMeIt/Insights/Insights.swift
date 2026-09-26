@@ -33,6 +33,8 @@ struct AppUsage: Sendable, Equatable {
     var name: String
     var dictations: Int
     var words: Int
+    /// Calls recorded in the app.
+    var meetings: Int = 0
 }
 
 struct DayActivity: Sendable, Equatable {
@@ -40,6 +42,15 @@ struct DayActivity: Sendable, Equatable {
     var date: String
     var dictations: Int
     var words: Int
+    var meetings: Int = 0
+}
+
+/// One transcribed meeting, as the insights count it: which day, and for a
+/// call, which app.
+struct InsightMeeting: Sendable, Equatable {
+    var started: Date
+    var appId: String?
+    var appName: String?
 }
 
 /// The value a given share of a sample falls under. Percentiles rather than
@@ -163,7 +174,6 @@ struct LocalDay: Hashable, Comparable, Sendable {
 }
 
 enum Insights {
-    static let topApps = 8
     /// Typing speed the spoken rate and the time saved are measured against.
     static let typingWPM = 40.0
 
@@ -213,7 +223,9 @@ enum Insights {
         today.month == 1 ? (today.year - 1, 12) : (today.year, today.month - 1)
     }
 
-    static func compute(_ rows: [InsightRow], now: Date = Date(), calendar: Calendar = .current) -> InsightsStats {
+    /// A meeting makes its day active, and a call counts against its app;
+    /// neither adds words or dictations.
+    static func compute(_ rows: [InsightRow], meetings: [InsightMeeting] = [], now: Date = Date(), calendar: Calendar = .current) -> InsightsStats {
         let today = LocalDay(now, calendar: calendar)
 
         var totalWords = 0
@@ -232,8 +244,8 @@ enum Insights {
         var transcribedAudioMs = 0
         var unattributed = 0
         var byCategory: [UsageCategory: (dictations: Int, words: Int)] = [:]
-        var byApp: [String: (name: String, dictations: Int, words: Int)] = [:]
-        var byDay: [LocalDay: (dictations: Int, words: Int)] = [:]
+        var byApp: [String: (name: String, dictations: Int, words: Int, meetings: Int)] = [:]
+        var byDay: [LocalDay: (dictations: Int, words: Int, meetings: Int)] = [:]
 
         let thisMonth = (today.year, today.month)
         let prevMonth = previousMonth(of: today)
@@ -250,8 +262,8 @@ enum Insights {
             } else if month == (prevMonth.year, prevMonth.month) {
                 wordsPreviousMonth += words
             }
-            byDay[day, default: (0, 0)].dictations += 1
-            byDay[day, default: (0, 0)].words += words
+            byDay[day, default: (0, 0, 0)].dictations += 1
+            byDay[day, default: (0, 0, 0)].words += words
 
             if let ms = row.durationMs, ms > 0 {
                 timedWords += words
@@ -297,11 +309,20 @@ enum Insights {
                 } else {
                     key = name.lowercased()
                 }
-                var entry = byApp[key] ?? (name: name, dictations: 0, words: 0)
+                var entry = byApp[key] ?? (name: name, dictations: 0, words: 0, meetings: 0)
                 entry.dictations += 1
                 entry.words += words
                 byApp[key] = entry
             }
+        }
+
+        for meeting in meetings {
+            byDay[LocalDay(meeting.started, calendar: calendar), default: (0, 0, 0)].meetings += 1
+            guard let name = meeting.appName ?? meeting.appId else { continue }
+            let key = (meeting.appId.flatMap { $0.isEmpty ? nil : $0 } ?? name).lowercased()
+            var entry = byApp[key] ?? (name: name, dictations: 0, words: 0, meetings: 0)
+            entry.meetings += 1
+            byApp[key] = entry
         }
 
         var wordsPerMinute: Double? = nil
@@ -329,23 +350,21 @@ enum Insights {
         }
 
         let totalApps = byApp.count
-        var topApps = byApp.values.map { AppUsage(name: $0.name, dictations: $0.dictations, words: $0.words) }
-        // Most used first, by the words the list shows; then by dictations, then name.
+        var topApps = byApp.values.map { AppUsage(name: $0.name, dictations: $0.dictations, words: $0.words, meetings: $0.meetings) }
+        // Most used first, by the words the list shows; then by meetings, dictations, then name.
         topApps.sort { a, b in
             if a.words != b.words { return a.words > b.words }
+            if a.meetings != b.meetings { return a.meetings > b.meetings }
             if a.dictations != b.dictations { return a.dictations > b.dictations }
             return a.name.unicodeScalars.lexicographicallyPrecedes(b.name.unicodeScalars)
-        }
-        if topApps.count > Self.topApps {
-            topApps.removeSubrange(Self.topApps...)
         }
 
         let (currentStreak, longestStreak) = streaks(byDay, today: today, calendar: calendar)
         let activeToday = byDay[today] != nil
 
         let activity = byDay.keys.sorted().map { day in
-            let (dictations, words) = byDay[day] ?? (0, 0)
-            return DayActivity(date: day.isoString, dictations: dictations, words: words)
+            let (dictations, words, meetings) = byDay[day] ?? (0, 0, 0)
+            return DayActivity(date: day.isoString, dictations: dictations, words: words, meetings: meetings)
         }
 
         return InsightsStats(
@@ -375,11 +394,11 @@ enum Insights {
     }
 
 
-    /// `(current, longest)` runs of consecutive active days. The current streak
-    /// is still alive on a day with no dictation yet, so it is counted back from
-    /// yesterday when today is empty.
+    /// `(current, longest)` runs of consecutive active days, a day with a
+    /// dictation or a meeting. The current streak is still alive on a day with
+    /// nothing yet, so it is counted back from yesterday when today is empty.
     static func streaks(
-        _ byDay: [LocalDay: (dictations: Int, words: Int)],
+        _ byDay: [LocalDay: (dictations: Int, words: Int, meetings: Int)],
         today: LocalDay,
         calendar: Calendar
     ) -> (current: Int, longest: Int) {

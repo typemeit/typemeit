@@ -78,6 +78,7 @@ struct MenuContent: View {
     @State private var appState = AppState.shared
     @State private var store = Store.shared
     @State private var meetings = MeetingCoordinator.shared
+    @State private var capture = WindowCapture.shared
 
     /// The newest five with any text; a dictation that came out empty has
     /// nothing to copy.
@@ -138,6 +139,7 @@ struct MenuContent: View {
             Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
         }
         meetingItems
+        if Updates.isDevBuild { captureItems }
         Divider()
         if recentTranscripts.isEmpty {
             Text("No transcripts yet").disabled(true)
@@ -166,11 +168,22 @@ struct MenuContent: View {
         Button("Quit type me it") { NSApp.terminate(nil) }.keyboardShortcut("q", modifiers: .command)
     }
 
+    /// Dev builds: what a meeting window exposes, to write the name rules from.
+    @ViewBuilder private var captureItems: some View {
+        if let target = capture.running {
+            Text("Capturing the \(target == .meet ? "Meet" : "Slack") window…").disabled(true)
+        } else {
+            Button("Capture Meet Window") { capture.start(.meet) }
+            Button("Capture Slack Window") { capture.start(.slackHuddle) }
+        }
+        Button("Dump Windows") { WindowDump.write() }
+    }
+
     /// The meeting block (docs/meetings.md 7.11): the detected call's items
     /// while nothing records, the room while idle, and what is running.
     @ViewBuilder private var meetingItems: some View {
         if let live = meetings.recording {
-            Text("Recording this meeting · \(MenuContent.elapsed(since: live.started))").disabled(true)
+            Text("Recording this meeting · \(MeetingFolder.durationLabel(.seconds(meetings.recordingMinutes * 60)))").disabled(true)
             Button("Stop Recording Meeting") { meetings.stopMeeting() }
         } else {
             if let owner = meetings.detected {
@@ -185,11 +198,6 @@ struct MenuContent: View {
         if let t = meetings.transcribing {
             Text("Transcribing meeting · \(Int(t.fraction * 100))%").disabled(true)
         }
-    }
-
-    /// `12m`, `1h05m`.
-    static func elapsed(since start: Date) -> String {
-        MeetingFolder.durationLabel(.seconds(max(0, Date().timeIntervalSince(start))))
     }
 
     /// Italic through an attributed string: the menu turns a font modifier
@@ -259,6 +267,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         MeetingCoordinator.shared.stopForQuit()
         return .terminateNow
+    }
+
+    /// A `.tmi` file opened from Finder, Mail or a message (docs/meetings.md
+    /// 7.16): added to the meetings and shown. At launch this runs before
+    /// `applicationDidFinishLaunching`, so it reads the settings itself,
+    /// which is what turns the debug log on, and what it shows waits a turn.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        _ = Settings.shared
+        for url in urls where url.pathExtension.caseInsensitiveCompare(MeetingShare.fileExtension) == .orderedSame {
+            do {
+                let id = try MeetingStore.shared.receive(url)
+                Task { @MainActor in self.showReceived(id) }
+            } catch {
+                Log.meetings.error("Could not open \(url.lastPathComponent): \(error.localizedDescription)")
+                Task { @MainActor in self.showUnreadable(error) }
+            }
+        }
+    }
+
+    /// Onboarding and the gate keep the front; the meeting waits in the tab.
+    private func showReceived(_ id: UUID) {
+        AppState.shared.settingsTab = .meetings
+        AppState.shared.revealMeeting = id
+        guard onboardingWindow?.isVisible != true, gateWindow?.isVisible != true else { return }
+        NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+    }
+
+    private func showUnreadable(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Can't open this meeting"
+        alert.informativeText = (error as? MeetingShare.ReadError) == .newerVersion
+            ? "It's from a newer version of type me it. Update, then open it again."
+            : "The file isn't a type me it meeting."
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

@@ -147,12 +147,12 @@ final class Settings {
     /// Lets the bundled `typemeit-mcp` answer: other tools can list, search
     /// and read published meetings (D22). The binary reads this key itself.
     var meetingsMCP: Bool { didSet { defaults.set(meetingsMCP, forKey: "meetingsMCP") } }
-    /// Keeps a meeting's tracks as `.m4a` beside its transcript.
+    /// Keeps a meeting's tracks, compressed, beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
+    /// After a meeting, the pill offers okay and later before transcribing.
+    var meetingAskBeforeTranscribing: Bool { didSet { defaults.set(meetingAskBeforeTranscribing, forKey: "meetingAskBeforeTranscribing") } }
     /// How many meetings to keep; 0 keeps everything.
     var meetingLimit: Int { didSet { defaults.set(meetingLimit, forKey: "meetingLimit") } }
-    /// Where transcribed meetings are published. Nil is `Store.directory/Meetings`.
-    var meetingsFolder: URL? { didSet { defaults.set(meetingsFolder?.path, forKey: "meetingsFolder") } }
     /// Starts and stops a room recording. Nil means no shortcut.
     var recordRoomShortcut: KeyCombo? {
         didSet { defaults.set(recordRoomShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "recordRoomShortcut") }
@@ -203,8 +203,8 @@ final class Settings {
         meetingPreRoll = bool("meetingPreRoll", true)
         meetingsMCP = bool("meetingsMCP", false)
         meetingKeepAudio = bool("meetingKeepAudio", true)
+        meetingAskBeforeTranscribing = bool("meetingAskBeforeTranscribing", false)
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
-        meetingsFolder = d.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
         recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         debugLogs = bool("debugLogs", false)
         DebugLog.enabled = debugLogs
@@ -279,6 +279,9 @@ enum Fixed {
     static let meetingResumeSeconds = 30
     /// atrium, applied to recorded audio: a shorter call is not kept.
     static let meetingMinimumSeconds = 90
+    /// A call recorded again within this long of its last recording ending
+    /// joins that meeting instead of starting a new one.
+    static let meetingRejoinMergeMinutes = 15
     /// An app that never releases the mic.
     static let meetingSessionCapSeconds = 4 * 60 * 60
     /// meeting-transcriber `SilentRecordingMonitor`: every track at the floor
@@ -297,6 +300,19 @@ enum Fixed {
     static let meetingQuitWaitSeconds = 2
     /// Fits the 4,096-token window beside the title instructions.
     static let meetingTitleSourceWords = 700
+    /// The words are taken as this many runs spread across the meeting:
+    /// the opening is small talk and updates, the subject comes later.
+    /// Measured on an 11-minute call: the first 700 words titled it
+    /// "Weekly Update Meeting", seven runs titled it after its lesson.
+    static let meetingTitleSamples = 7
+    /// A summary part: about 2,000 tokens of transcript, leaving the rest of
+    /// the 4,096-token window for the instructions and the answer.
+    static let meetingSummaryChunkWords = 1500
+    /// The owner's limit. Asked for two or three, the model gave one call 15.
+    static let meetingSummaryMaxSentences = 4
+    /// How long the pill offers okay and later before a meeting is
+    /// transcribed, when asking is on. The owner's choice.
+    static let meetingTranscribeAskSeconds = 5
     /// Longer than a prompt is ever left unanswered; 15.4 MB for a call (D20).
     static let meetingPreRollSeconds = 120
     /// The process-list listener fires several times per launch.
@@ -311,6 +327,11 @@ enum Fixed {
     static let meetingDrainMs = 100
     /// S2 (docs/meetings.md 6): the longest stretch Parakeet is handed.
     static let meetingChunkSeconds = 120
+    /// Parakeet stretches a sentence's last word to its next token, across
+    /// any silence after it: up to 23 s on the 25 September call's far end,
+    /// where the median word is 80 ms and the mic's longest was 560 ms. A
+    /// stretched word would carry its paragraph over the other speaker.
+    static let meetingLongestWordMs = 1000
     static let meetingChunkOverlapSeconds = 2
     /// The seam is placed at the quietest point within this of the nominal cut.
     static let meetingChunkSearchSeconds = 5
@@ -332,16 +353,20 @@ enum Fixed {
     /// And scales so the peak lands here, with the gain held to this range.
     static let meetingQuietTargetPeak: Float = 0.45
     static let meetingQuietGainRange: ClosedRange<Float> = 1...12
-    /// Chosen, not measured: the pause between two thoughts. Raise if
-    /// paragraphs fragment.
+    /// A pause this long ends a speaker's turn, so whoever speaks after it
+    /// can start a paragraph of their own. A pause alone never starts one:
+    /// one speaker's paragraphs with nobody else's between them are joined.
     static let meetingParagraphGapSeconds = 2
     /// NAME_MAX is 255 bytes.
     static let meetingFolderNameMax = 200
     /// Two raw tracks are 230 MB an hour.
     static let meetingMinimumFreeBytes: Int64 = 500 << 20
-    /// The dictation archive's 16 kbps is tuned for one close speaker; a
-    /// far-end mix gets twice that.
-    static let meetingAudioBitrate = 32_000
+    /// Opus at 16 kbps, which averages about 7 kbps on speech with pauses.
+    /// Measured 24 September 2026 on ten minutes of a call's far end: it
+    /// changed 1.7% of the transcript's words against the uncompressed
+    /// track, the same as AAC at 32 kbps (1.5%) at a quarter of the size;
+    /// AAC at 16 kbps changed 4.9%, Opus at 12 kbps 3.6%.
+    static let meetingAudioBitrate = 16_000
     /// Daemons that hold the mic for an app with no process of its own
     /// (docs/meetings.md 3.2: FaceTime's input belongs to avconferenced).
     static let meetingDaemonNames: [String: String] = [
@@ -353,7 +378,39 @@ enum Fixed {
         "com.apple.CoreSpeech", "com.apple.assistantd", "com.apple.universalaccessd",
         "com.apple.accessibility.heard", "com.apple.systemsoundserverd",
     ]
+    /// FluidAudio's segmentation step ratio: its default 0.2; its docs say
+    /// 0.1 measures best on far-field meetings with rapid exchanges. S3
+    /// (docs/meetings.md 6) picks between them; until it runs, the default.
+    static let meetingDiarizerStepRatio = 0.2
+    /// S3, from humla (MIT) and measured here: see `Diarizer.configuration`.
+    static let meetingDiarizerMinOnSeconds = 1.0
+    static let meetingDiarizerMinOffSeconds = 0.5
+    /// A diarized speaker with less talk than this is folded into the
+    /// nearest voice. The 24 September Slack call's one far-end person came
+    /// out as two, one of them 4 s. On the two earlier calls, where
+    /// AssemblyAI found 3 and 4 far-end speakers to our 5 and 5, the
+    /// smallest were 8 s and 2 s; folding them gives 4 and 4.
+    static let meetingMinimumSpeakerSeconds = 10
     /// Every WKWebView app shares this audio process, Safari included, so it
     /// is named `web content` and never put on the never-ask list.
     static let meetingWebContentBundleID = "com.apple.WebKit.GPU"
+    /// The delay between a voice reaching the far-end track and the UI
+    /// indicator lighting. 0 until S4 measures it (median of ten claps).
+    static let meetingUILagMs = 0
+    /// How often the meeting's participant tiles are read while recording: a
+    /// turn shorter than this is a backchannel, not a speaker (docs/meetings.md 7.8).
+    static let meetingSpeakingPollMs = 250
+    /// How often the whole meeting window is walked while recording, for the
+    /// call's code or channel and for tiles that came or went.
+    static let meetingRosterWalkSeconds = 5
+    /// A speaker stays speaking through a gap in the indicator this long:
+    /// Meet's highlight goes out between words, Slack's lingers about 1.5 s.
+    static let meetingSpeakingHoldMs = 1000
+    /// Token containment between a caption line and a paragraph, as in the
+    /// echo work.
+    static let meetingCaptionMatch = 0.5
+    /// Enough speech to tell two people apart.
+    static let meetingNameMinOverlapSeconds = 20
+    /// A name has to clearly win over the runner-up.
+    static let meetingNameMargin = 1.5
 }

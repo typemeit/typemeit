@@ -1,5 +1,7 @@
+import AppKit
 import AVFoundation
 import CoreAudio
+import FluidAudio
 import Foundation
 
 /// The spikes in docs/meetings.md section 6, as launch arguments on the dev
@@ -10,7 +12,13 @@ import Foundation
 ///     -meetingProbeCapture <bundle id> <s>  tap an app for <s> seconds beside the mic and log the tracks (S1)
 ///     -recordRoom <s>                       record the room for <s> seconds through the whole pipeline (7.1)
 ///     -transcribeFile <path>                whole-file against chunked on one CAF (S2)
-///     -importFile <path>                    import a recording as a meeting, as the tab does (7.14)
+///     -addSpeakers <meeting id>             run the pass again on a finished meeting with the diarizer (S3)
+///     -transcribeCopies <meeting id>...     the whole pass on a copy of each meeting, in probe/rerun-<time>/, keeping each track's words; the meetings stay as they are
+///     -diarizeFile <path>...                each file through a sweep of clustering settings; segments to probe/diarize-<name>.json (S3)
+///     -diarizeCounts <path>...              each file left to count its speakers, then told 1…6; segments to probe/counts-<name>.json
+///     -meetingProbeAX <bundle id> [<s>]     the app's web content through the accessibility tree, once and then every second (S4)
+///     -summarise <meeting id>...            write each meeting's summary to the log, without saving it
+///     -dumpMeetingPages <meeting id>...     open each meeting's page in settings and write a window dump (WindowDump)
 @MainActor
 enum MeetingProbes {
     nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
@@ -27,13 +35,97 @@ enum MeetingProbes {
         }
         if let seconds = value(after: "-recordRoom").flatMap(Int.init) { recordRoom(seconds: seconds) }
         if let path = value(after: "-transcribeFile") { transcribeFile(URL(fileURLWithPath: path)) }
-        if let path = value(after: "-importFile") {
+        if let i = args.firstIndex(of: "-diarizeFile") {
+            diarizeFiles(args[(i + 1)...].prefix { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) })
+        }
+        if let i = args.firstIndex(of: "-diarizeCounts") {
+            diarizeFiles(args[(i + 1)...].prefix { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) }, configurations: countSweep, output: "counts")
+        }
+        if let bundle = value(after: "-meetingProbeAX") { probeAccessibility(bundleID: bundle, seconds: value(after: "-meetingProbeAX", 2).flatMap(Int.init) ?? 30) }
+        if let id = value(after: "-addSpeakers").flatMap(UUID.init) {
             DebugLog.enabled = true
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
-                MeetingCoordinator.shared.importRecordings([URL(fileURLWithPath: path)])
+                MeetingCoordinator.shared.transcribeAgain(id)
             }
         }
+        if let i = args.firstIndex(of: "-transcribeCopies") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                DebugLog.write("Meeting probe copies: \(counted(ids.count, "meeting"))")
+                let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "")
+                let root = directory.appendingPathComponent("rerun-\(stamp)", isDirectory: true)
+                for id in ids { await transcribeCopy(id, into: root) }
+                DebugLog.write("Meeting probe copies: done, in \(root.lastPathComponent)")
+            }
+        }
+        if let i = args.firstIndex(of: "-dumpMeetingPages") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                for id in ids {
+                    try? await Task.sleep(for: .seconds(3))
+                    AppState.shared.settingsTab = .meetings
+                    AppState.shared.revealMeeting = id
+                    NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+                    try? await Task.sleep(for: .seconds(4))
+                    DebugLog.write("Meeting probe page: \(id)")
+                    WindowDump.write()
+                }
+            }
+        }
+        if let i = args.firstIndex(of: "-summarise") {
+            let ids = args[(i + 1)...].prefix { !$0.hasPrefix("-") }.compactMap(UUID.init)
+            DebugLog.enabled = true
+            Task { @MainActor in
+                for id in ids {
+                    guard let meeting = MeetingStore.shared.meeting(id) else { continue }
+                    let started = ContinuousClock.now
+                    let summary = await MeetingSummary.summarise(meeting)
+                    DebugLog.write("Meeting probe summary \(meeting.title) (\(MeetingSummary.parts(of: meeting, maxWords: Fixed.meetingSummaryChunkWords).count) parts, \(ContinuousClock.now - started)): \(summary ?? "none")")
+                }
+            }
+        }
+    }
+
+    // MARK: The whole pass on a copy
+
+    /// A finished meeting's folder copied under `root` and transcribed there
+    /// from the first chunk, saved only to the copy.
+    private static func transcribeCopy(_ id: UUID, into root: URL) async {
+        guard var meeting = MeetingStore.shared.meeting(id), let folder = MeetingStore.shared.folder(for: id) else {
+            DebugLog.write("Meeting probe copy: no meeting \(id)")
+            return
+        }
+        let copy = root.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: folder, to: copy)
+        } catch {
+            DebugLog.write("Meeting probe copy: \(error.localizedDescription)")
+            return
+        }
+        meeting.transcription.done = [:]
+        meeting.paragraphs = []
+        meeting.summary = nil
+        // Each save follows a chunk, when the track's words file holds every
+        // word so far; kept under another name, since the pass deletes the
+        // file at the end, for trying the echo and merge steps against it.
+        let roles = meeting.tracks.map(\.role.rawValue)
+        let result = await MeetingTranscriber.run(meeting, folder: copy, save: { _ in
+            for role in roles {
+                guard let words = try? Data(contentsOf: copy.appendingPathComponent("words-\(role).json")) else { continue }
+                try? words.write(to: copy.appendingPathComponent("kept-words-\(role).json"), options: .atomic)
+            }
+        }) { _ in }
+        do {
+            try MeetingFolder.write(result, to: copy)
+        } catch {
+            DebugLog.write("Meeting probe copy: \(error.localizedDescription)")
+        }
+        DebugLog.write("Meeting probe copy: \(folder.lastPathComponent), \(counted(result.paragraphs.count, "paragraph")), \(result.transcription.state)")
     }
 
     // MARK: S1, detection
@@ -193,5 +285,126 @@ enum MeetingProbes {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) }
         }
         return result == KERN_SUCCESS ? Int(info.resident_size >> 20) : 0
+    }
+
+    // MARK: S3, diarizer settings
+
+    /// Every file through each clustering threshold and VBx `Fb`, the
+    /// segmentation settings as shipped, written raw and after
+    /// `SpeakerMerge` so a script can score them against reference labels.
+    private static var thresholdSweep: [(String, OfflineDiarizerConfig)] {
+        var configurations: [(String, OfflineDiarizerConfig)] = []
+        for threshold in [0.3, 0.4, 0.5, 0.6, 0.7] {
+            for fb in [0.8, 0.4] {
+                configurations.append(("t\(threshold) fb\(fb)", OfflineDiarizerConfig(
+                    clusteringThreshold: threshold, Fb: fb, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+                    segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)))
+            }
+        }
+        return configurations
+    }
+
+    /// The shipped settings left to count, then told each count from one to six.
+    private static var countSweep: [(String, OfflineDiarizerConfig)] {
+        [("auto", Diarizer.configuration)] + (1...6).map { ("exactly \($0)", Diarizer.configuration.withSpeakers(exactly: $0)) }
+    }
+
+    private static func diarizeFiles(_ urls: [URL], configurations: [(String, OfflineDiarizerConfig)] = thresholdSweep, output: String = "diarize") {
+        DebugLog.enabled = true
+        Task.detached {
+            for url in urls {
+                do {
+                    var out: [String: [String: [SpeakerSegment]]] = [:]
+                    for run in try await Diarizer.shared.compare(url: url, configurations: configurations) {
+                        let merged = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+                        out[run.name] = ["raw": run.segments, "merged": merged]
+                        DebugLog.write("Meeting probe diarize \(url.lastPathComponent) \(run.name): \(counted(Set(run.segments.map(\.speaker)).count, "speaker")), merged \(Set(merged.map(\.speaker)).count), in \(run.took)")
+                    }
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    let name = url.deletingPathExtension().lastPathComponent + "-" + url.deletingLastPathComponent().lastPathComponent.prefix(15).replacingOccurrences(of: " ", with: "_")
+                    try JSONEncoder().encode(out).write(to: directory.appendingPathComponent("\(output)-\(name).json"))
+                } catch {
+                    DebugLog.write("Meeting probe diarize: \(error.localizedDescription)")
+                }
+            }
+            DebugLog.write("Meeting probe diarize: done")
+        }
+    }
+
+    // MARK: S4, the accessibility tree
+
+    /// Sets the app's activation attribute (Electron's `AXManualAccessibility`,
+    /// Chromium's `AXEnhancedUserInterface`), waits for the tree to build,
+    /// writes every element under each `AXWebArea` to `ax-<bundle>-0.txt`,
+    /// then every second logs the lines that appeared or went, and clears
+    /// the attribute at the end. What it finds decides 8.6's sources.
+    private static func probeAccessibility(bundleID: String, seconds: Int) {
+        DebugLog.enabled = true
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first(where: { $0.activationPolicy == .regular }) else {
+            DebugLog.write("Meeting probe AX: \(bundleID) is not running")
+            return
+        }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        let attribute = bundleID == "com.tinyspeck.slackmacgap" ? "AXManualAccessibility" : "AXEnhancedUserInterface"
+        let set = AXUIElementSetAttributeValue(root, attribute as CFString, kCFBooleanTrue)
+        DebugLog.write("Meeting probe AX: \(attribute) on \(bundleID): \(set == .success ? "set" : "refused (\(set.rawValue))")")
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            var previous = Set<String>()
+            let target: Roster.Target = bundleID == "com.tinyspeck.slackmacgap" ? .slackHuddle : .meet
+            for tick in 0...seconds {
+                // What the meeting reader itself would see, and what it costs.
+                let started = ContinuousClock.now
+                let (meetingNodes, _, code) = Roster.meetingNodes(pid: app.processIdentifier, target: target)
+                let reading = RosterRules.read(meetingNodes, target: target)
+                DebugLog.write("Meeting probe names t=\(tick)s: \(meetingNodes.count) nodes in \((ContinuousClock.now - started).milliseconds) ms; roster \(reading.roster), speaking \(reading.speaking.sorted()), \(counted(reading.captions.count, "caption line")), channel \(reading.channel ?? "-"), meet code \(code ?? "-")")
+                let lines = webAreaLines(root)
+                if tick == 0 {
+                    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    let file = directory.appendingPathComponent("ax-\(bundleID)-0.txt")
+                    try? lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
+                    DebugLog.write("Meeting probe AX: \(lines.count) elements under the web areas, written to \(file.path)")
+                } else {
+                    let now = Set(lines)
+                    let added = now.subtracting(previous), gone = previous.subtracting(now)
+                    if !added.isEmpty || !gone.isEmpty {
+                        DebugLog.write("Meeting probe AX t=\(tick)s:\n" + (added.sorted().map { "  + \($0)" } + gone.sorted().map { "  - \($0)" }).joined(separator: "\n"))
+                    }
+                }
+                previous = Set(lines)
+                try? await Task.sleep(for: .seconds(1))
+            }
+            AXUIElementSetAttributeValue(root, attribute as CFString, kCFBooleanFalse)
+            DebugLog.write("Meeting probe AX: \(attribute) cleared")
+        }
+    }
+
+    /// One line per element under every web area: depth, role, and the
+    /// title, description, value and help that carry text.
+    private static func webAreaLines(_ root: AXUIElement) -> [String] {
+        var lines: [String] = []
+        func string(_ element: AXUIElement, _ attribute: String) -> String? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let text = value as? String, !text.isEmpty else { return nil }
+            return text
+        }
+        func children(_ element: AXUIElement) -> [AXUIElement] {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success else { return [] }
+            return value as? [AXUIElement] ?? []
+        }
+        func walk(_ element: AXUIElement, depth: Int, inWeb: Bool) {
+            guard depth < 60, lines.count < 20_000 else { return }
+            let role = string(element, kAXRoleAttribute) ?? "?"
+            let web = inWeb || role == "AXWebArea"
+            if web {
+                let texts = [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXHelpAttribute, "AXDOMIdentifier", "AXDOMClassList"]
+                    .compactMap { a in string(element, a).map { "\(a.replacingOccurrences(of: "AX", with: ""))=\($0.prefix(120))" } }
+                lines.append(String(repeating: " ", count: depth) + role + (texts.isEmpty ? "" : " " + texts.joined(separator: " ")))
+            }
+            for child in children(element) { walk(child, depth: depth + 1, inWeb: web) }
+        }
+        walk(root, depth: 0, inWeb: false)
+        return lines
     }
 }

@@ -35,6 +35,11 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
+  # The speaker diarizer (docs/meetings.md 8.2). Pinned exactly: its model
+  # files are mirrored per revision and loaded from disk.
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    exactVersion: "0.15.8"
 targets:
   TypeMeIt:
     type: application
@@ -57,6 +62,8 @@ targets:
         product: TranscribeCpp
       - package: Sparkle
         product: Sparkle
+      - package: FluidAudio
+        product: FluidAudio
       # A build-order dependency only: typemeit-mcp is a command-line tool
       # product, nothing to link against. It embeds and signs itself into
       # this app's bundle via its own postBuildScripts step.
@@ -80,6 +87,22 @@ targets:
         NSNetworkVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
+        # A meeting shared as a .tmi file (docs/meetings.md 7.16). Markdown
+        # and plain text underneath, so TextEdit and Quick Look read it; a
+        # double-click opens it here. The store build leaves it out until
+        # it has meetings.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: it.typeme.meeting
+            UTTypeDescription: type me it meeting
+            UTTypeConformsTo: [net.daringfireball.markdown, public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [tmi]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: type me it meeting
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [it.typeme.meeting]
+            CFBundleTypeIconSystemGenerated: 1
         SUFeedURL: https://github.com/typemeit/typemeit/releases/latest/download/appcast.xml
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 3600
@@ -126,6 +149,8 @@ targets:
     dependencies:
       - package: TranscribeCpp
         product: TranscribeCpp
+      - package: FluidAudio
+        product: FluidAudio
     info:
       path: TypeMeIt/Support/Info-Store.plist
       properties:
@@ -169,6 +194,8 @@ targets:
     sources:
       - path: MCP
       - path: TypeMeIt/Meetings/Meeting.swift
+      # Meeting.names is declared here.
+      - path: TypeMeIt/Meetings/SpeakerNaming.swift
     settings:
       base:
         # Its own products folder: in the app's, FluidAudio's modules sit

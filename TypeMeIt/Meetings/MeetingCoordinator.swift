@@ -32,20 +32,21 @@ final class MeetingCoordinator {
     private(set) var detected: Owner?
     private(set) var prompting: Owner?
     private(set) var recording: Live?
+    /// Whole minutes the live recording has run. The menu redraws only when
+    /// state it reads changes, so the tick advances this for it.
+    private(set) var recordingMinutes = 0
     private(set) var levels: (mic: Float, others: Float?) = (0, nil)
     private(set) var transcribing: Transcribing?
     private(set) var systemAudioTest: SystemAudioTest = .notTested
     /// Meetings waiting behind the one being transcribed.
     private(set) var queued: [UUID] = []
-    /// The file being imported, by basename, while it converts.
-    private(set) var importing: String?
-    /// The last import that failed, for the tab's status row.
-    private(set) var importFailure: String?
 
     let watch = MeetingWatch()
     @ObservationIgnored private var machine = MeetingMachine()
     @ObservationIgnored private var tick: Timer?
     @ObservationIgnored private var recorder: MeetingRecorder?
+    /// Reads names off the meeting's window while a call records (8.6).
+    @ObservationIgnored private var roster: Roster?
     /// The capture running since the current candidate formed, and what it
     /// has held so far (D20). Nothing of it reaches a file before `record`.
     @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
@@ -128,6 +129,7 @@ final class MeetingCoordinator {
         model.onDeclineMeeting = { [weak self] in self?.decline() }
         model.onStopMeeting = { [weak self] in self?.dismissToast(); self?.stopMeeting() }
         model.onShowMeeting = { [weak self] id in self?.dismissToast(); self?.showTab(id) }
+        model.onTranscribeMeeting = { [weak self] id, now in self?.answerTranscribe(id, now: now) }
         model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
         model.onUndoNeverAsk = { [weak self] in self?.undoNeverAsk() }
         model.onDismissMeeting = { [weak self] in self?.dismissToast() }
@@ -160,6 +162,10 @@ final class MeetingCoordinator {
 
     private func ticked() {
         send(.tick(.now))
+        if let live = recording {
+            let minutes = Int(Date().timeIntervalSince(live.started)) / 60
+            if minutes != recordingMinutes { recordingMinutes = minutes }
+        }
         if store.meetings.contains(where: { $0.isDone && !$0.published }) { store.republishPending() }
     }
 
@@ -250,12 +256,23 @@ final class MeetingCoordinator {
             recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
             recorder.onFailed = { [weak self] _ in Task { @MainActor in self?.send(.stop) } }
             self.recorder = recorder
+            // Names come from the call's own window whenever a build can read
+            // other apps; a sandboxed one cannot (docs/meetings.md 8.6).
+            if let owner, Sandbox.readsOtherApps {
+                // Meeting time from the recording's own clock, so names line up with words.
+                roster = Roster(owner: owner) { [weak recorder] in
+                    guard let first = recorder?.firstHostTime, first > 0 else { return nil }
+                    return Int(MeetingCapture.seconds(fromHostTime: first, to: mach_absolute_time()) * 1000)
+                }
+                roster?.start()
+            }
             recordingMeeting = recorder.meeting
             recordingOwner = owner
             shownSystemAudioOff = false
             stoppedForDisk = false
             store.adopt(recorder.meeting, folder: recorder.folder)
             recording = Live(id: id, kind: recorder.meeting.kind, started: recorder.meeting.started)
+            recordingMinutes = 0
             AppState.shared.meeting = true
         } catch {
             Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")
@@ -275,6 +292,8 @@ final class MeetingCoordinator {
     private func stopRecording() {
         silenceDeadline?.cancel()
         silenceDeadline = nil
+        lastNames = roster?.finish()
+        roster = nil
         guard let recorder else { send(.recorderEnded(recordedMs: 0)); return }
         self.recorder = nil
         Task.detached { [recorder] in
@@ -284,6 +303,7 @@ final class MeetingCoordinator {
     }
 
     private var lastResult: MeetingRecorder.Result?
+    private var lastNames: MeetingNames?
 
     private func recorderEnded(_ result: MeetingRecorder.Result) {
         lastResult = result
@@ -315,9 +335,17 @@ final class MeetingCoordinator {
         meeting.dictations = result.dictations
         meeting.bothSilentMs = result.bothSilentMs
         meeting.firstHostTime = result.firstHostTime
+        meeting.names = lastNames
+        lastNames = nil
+        // A rejoin of a call recorded minutes ago joins that meeting when it
+        // reaches the queue, instead of standing as a second one.
+        if let earlier = MeetingMerge.previous(of: meeting, among: store.meetings, window: TimeInterval(Fixed.meetingRejoinMergeMinutes * 60)) {
+            meeting.continues = earlier.id
+            DebugLog.write("Meeting \(meeting.id) is a rejoin of \(earlier.id); joining them")
+        }
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
-        enqueue(meeting)
+        if settings.meetingAskBeforeTranscribing, !stoppedForDisk { askBeforeTranscribing(meeting.id) } else { enqueue(meeting) }
     }
 
     private func silenceChanged(_ silent: Bool) {
@@ -398,6 +426,8 @@ final class MeetingCoordinator {
     /// mid-meeting keeps what was recorded and transcribes it on relaunch.
     func stopForQuit() {
         discardPreRoll()
+        let names = roster?.finish()
+        roster = nil
         guard let recorder, let meeting = recordingMeeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
@@ -416,6 +446,7 @@ final class MeetingCoordinator {
             finished.dictations = result.dictations
             finished.bothSilentMs = result.bothSilentMs
             finished.firstHostTime = result.firstHostTime
+            finished.names = names
         }
         try? MeetingFolder.write(finished, to: MeetingFolder.staged(meeting.id))
         DebugLog.write("Meeting saved for quit: \(finished.durationMs) ms")
@@ -423,30 +454,6 @@ final class MeetingCoordinator {
 
     private final class ResultBox: @unchecked Sendable {
         var result: MeetingRecorder.Result?
-    }
-
-    // MARK: Import (D21)
-
-    /// Recordings made elsewhere, one at a time since they share the one
-    /// model: each becomes a room meeting and goes through the same pass.
-    func importRecordings(_ urls: [URL]) {
-        guard !urls.isEmpty else { return }
-        importFailure = nil
-        Task { [weak self] in
-            for url in urls {
-                self?.importing = url.lastPathComponent
-                do {
-                    let (meeting, folder) = try await Task.detached { try await MeetingImport.run(url: url) }.value
-                    DebugLog.write("Meeting imported: \(meeting.durationMs) ms")
-                    self?.store.adopt(meeting, folder: folder)
-                    self?.enqueue(meeting)
-                } catch {
-                    Log.meetings.error("Import failed: \(error.localizedDescription)")
-                    self?.importFailure = error.localizedDescription
-                }
-            }
-            self?.importing = nil
-        }
     }
 
     // MARK: Transcription
@@ -475,15 +482,58 @@ final class MeetingCoordinator {
         meeting.transcription.error = nil
         meeting.transcription.done = [:]
         meeting.paragraphs = []
+        meeting.summary = nil
+        // A generated title is generated again from the new words; a typed one stays.
+        if meeting.titleSource == .generated {
+            meeting.title = meeting.app?.name ?? "Room"
+            meeting.titleSource = .app
+        }
         store.save(meeting)
         enqueue(meeting)
     }
 
+    /// Meetings whose summary is being written, for the page's placeholder.
+    private(set) var summarising: Set<UUID> = []
+
+    /// Writes the summary of a transcribed meeting that has none: one from
+    /// before summaries, or one the model declined last time.
+    func summarise(_ id: UUID) {
+        guard let meeting = store.meeting(id), meeting.isDone, meeting.summary == nil, !meeting.paragraphs.isEmpty,
+              !summarising.contains(id), !liveIDs.contains(id), transcribing?.id != id else { return }
+        summarising.insert(id)
+        Task {
+            let summary = await MeetingSummary.summarise(meeting)
+            summarising.remove(id)
+            guard let summary, var latest = store.meeting(id), latest.summary == nil else { return }
+            latest.summary = summary
+            store.save(latest)
+        }
+    }
+
     private func pump() {
         guard transcribeTask == nil, !transcribeQueue.isEmpty else { return }
-        let meeting = transcribeQueue.removeFirst()
+        var meeting = transcribeQueue.removeFirst()
         queued = transcribeQueue.map(\.id)
         guard let folder = store.folder(for: meeting.id) else { pump(); return }
+        // The queue is serial, so the meeting a rejoin continues has
+        // finished its own pass by now.
+        if let id = meeting.continues {
+            if let earlier = store.meeting(id), let earlierFolder = store.folder(for: id), !liveIDs.contains(id) {
+                transcribing = Transcribing(id: id, fraction: 0)
+                transcribeTask = Task.detached { [meeting, folder] in
+                    let joined = await MeetingCoordinator.join(earlier, in: earlierFolder, meeting, in: folder)
+                    var alone = meeting
+                    alone.continues = nil
+                    let result = await MeetingTranscriber.run(joined ?? alone, folder: joined == nil ? folder : earlierFolder) { fraction in
+                        Task { @MainActor in MeetingCoordinator.shared.transcribing?.fraction = fraction }
+                    }
+                    await MainActor.run { MeetingCoordinator.shared.transcribed(result) }
+                }
+                return
+            }
+            meeting.continues = nil
+            store.save(meeting)
+        }
         transcribing = Transcribing(id: meeting.id, fraction: 0)
         transcribeTask = Task.detached { [meeting, folder] in
             let result = await MeetingTranscriber.run(meeting, folder: folder) { fraction in
@@ -495,13 +545,42 @@ final class MeetingCoordinator {
         }
     }
 
+    /// Joins `later` onto `earlier` on disk and in the store, and deletes
+    /// `later`. Nil, with `later` left to stand alone, if the audio could
+    /// not be joined.
+    nonisolated private static func join(_ earlier: Meeting, in earlierFolder: URL, _ later: Meeting, in laterFolder: URL) async -> Meeting? {
+        let gap = MeetingMerge.gapMs(earlier, later)
+        var joined = MeetingMerge.joined(earlier, later, gapMs: gap)
+        do {
+            let written = try MeetingMerge.joinAudio(earlier, in: earlierFolder, later, in: laterFolder, gapMs: gap)
+            for i in joined.tracks.indices {
+                if let w = written[joined.tracks[i].role] { joined.tracks[i].frames = w.frames; joined.tracks[i].peak = w.peak }
+            }
+            joined.durationMs = (joined.tracks.map(\.frames).max() ?? 0) / Meeting.framesPerMs
+        } catch {
+            Log.meetings.error("Could not join the rejoined call: \(error.localizedDescription)")
+            DebugLog.write("Meeting join failed, keeping it separate: \(error.localizedDescription)")
+            return nil
+        }
+        await MainActor.run {
+            MeetingStore.shared.save(joined)
+            MeetingStore.shared.drop(later.id)
+            try? FileManager.default.removeItem(at: laterFolder)
+        }
+        DebugLog.write("Meeting joined: \(later.id) onto \(earlier.id) after \(gap) ms, now \(joined.durationMs) ms")
+        return joined
+    }
+
     private func transcribed(_ meeting: Meeting) {
         transcribing = nil
         transcribeTask = nil
         switch meeting.transcription.state {
         case .done:
             // The tick may have published it between the run's last save and here.
-            if store.meeting(meeting.id)?.published == true || store.publish(meeting.id) {
+            if store.meeting(meeting.id)?.published == true {
+                store.renameFolderIfNeeded(meeting.id)
+                if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
+            } else if store.publish(meeting.id) {
                 if AppState.shared.visibleTab != .meetings { toast(.meetingSaved(id: meeting.id)) }
             } else {
                 toast(.meetingFolderUnavailable)
@@ -576,6 +655,45 @@ final class MeetingCoordinator {
             guard !Task.isCancelled, let self else { return }
             self.overlay.hideMeeting(state)
         }
+    }
+
+    /// Settings.meetingAskBeforeTranscribing: the pill offers okay and later
+    /// for `Fixed.meetingTranscribeAskSeconds`, counting only while it shows
+    /// and is not hovered, and says okay itself when the time is up. A
+    /// meeting put off waits, pending, for its transcribe button or the
+    /// next launch.
+    private func askBeforeTranscribing(_ id: UUID) {
+        toastTask?.cancel()
+        let state = OverlayModel.State.meetingTranscribeAsk(id: id)
+        overlay.showMeeting(state)
+        toastTask = Task { [weak self] in
+            var remaining = Duration.seconds(Fixed.meetingTranscribeAskSeconds)
+            let step: Duration = .milliseconds(100)
+            while remaining > .zero {
+                try? await Task.sleep(for: step)
+                guard !Task.isCancelled, let self else { return }
+                if self.overlay.model.state == state, !self.overlay.model.toastPaused { remaining -= step }
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.answerTranscribe(id, now: true)
+        }
+    }
+
+    private func answerTranscribe(_ id: UUID, now: Bool) {
+        toastTask?.cancel()
+        overlay.hideMeeting(.meetingTranscribeAsk(id: id))
+        guard now, let meeting = store.meeting(id) else {
+            DebugLog.write("Meeting transcription later: \(id)")
+            return
+        }
+        enqueue(meeting)
+    }
+
+    /// A pending meeting nothing will transcribe until asked: put off from
+    /// the pill, and not queued or recording.
+    func isWaiting(_ id: UUID) -> Bool {
+        guard let meeting = store.meeting(id), meeting.transcription.state == .pending else { return false }
+        return !queued.contains(id) && transcribing?.id != id && !liveIDs.contains(id)
     }
 
     private func dismissToast() {

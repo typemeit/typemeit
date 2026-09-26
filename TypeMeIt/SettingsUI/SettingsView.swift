@@ -520,10 +520,17 @@ struct MainSettingsTab: View {
                     SettingsRow(
                         label: "version",
                         labelView: AnyView(InkLink(title: "version \(AppVersion.current)", url: URL(string: Fixed.releaseURL(AppVersion.current))!)),
-                        subtitleView: AnyView(HStack(spacing: 4) {
-                            InkLink(title: "parakeet 0.6b", url: URL(string: "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2")!)
-                            Text("·")
-                            InkLink(title: "apple intelligence", url: URL(string: "https://www.apple.com/apple-intelligence/")!)
+                        subtitleView: AnyView(VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                InkLink(title: "parakeet 0.6b", url: URL(string: "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2")!)
+                                Text("·")
+                                InkLink(title: "apple intelligence", url: URL(string: "https://www.apple.com/apple-intelligence/")!)
+                            }
+                            // The speaker model's weights are CC-BY-4.0: attribution is owed (docs/meetings.md 8.2).
+                            HStack(spacing: 4) {
+                                Text("speakers: pyannote community-1, wespeaker and vbx (but speech@fit), converted to core ml by fluid inference ·")
+                                InkLink(title: "cc-by-4.0", url: URL(string: "https://creativecommons.org/licenses/by/4.0")!)
+                            }
                         })
                     ) {
                         updateStatus

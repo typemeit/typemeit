@@ -28,6 +28,8 @@ final class OverlayModel {
         /// The tap delivered nothing for `Fixed.meetingSilentSeconds`.
         case meetingSystemAudioOff
         case meetingSaved(id: UUID)
+        /// Transcribe now? Says okay itself after `Fixed.meetingTranscribeAskSeconds`.
+        case meetingTranscribeAsk(id: UUID)
         case meetingFailed(id: UUID)
         /// Stays until dismissed.
         case meetingDiskFull(id: UUID)
@@ -37,7 +39,7 @@ final class OverlayModel {
 
         var isMeeting: Bool {
             switch self {
-            case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: true
+            case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: true
             default: false
             }
         }
@@ -80,7 +82,7 @@ final class OverlayModel {
         case .hidden: .none
         case .arming, .recording, .pinned, .transcribing, .cleaningUp: .cloud
         case .copyPrompt, .learned, .undone, .updateReady, .updateFailed: .pill
-        case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
+        case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
         }
     }
 
@@ -115,6 +117,8 @@ final class OverlayModel {
     var onDeclineMeeting: (@MainActor () -> Void)?
     var onStopMeeting: (@MainActor () -> Void)?
     var onShowMeeting: (@MainActor (UUID?) -> Void)?
+    /// The transcribe prompt's okay (true) and later (false).
+    var onTranscribeMeeting: (@MainActor (UUID, Bool) -> Void)?
     var onOpenSystemAudio: (@MainActor () -> Void)?
     var onUndoNeverAsk: (@MainActor () -> Void)?
     /// The cross on any meeting toast.

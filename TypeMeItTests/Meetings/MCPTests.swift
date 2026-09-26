@@ -123,6 +123,20 @@ private func decodeJSONValue(_ line: String?) -> JSONValue? {
 struct MCPTests {
     // MARK: framing
 
+    /// The page's summary stays on the page: the transcript the MCP
+    /// returns is the one without it, and its words are not searchable.
+    @Test func theSummaryIsNeverServed() throws {
+        let root = tempRoot()
+        var meeting = slackMeeting()
+        let plain = TranscriptRender.markdown(meeting)
+        meeting.summary = "Pelicans migrate in November."
+        try MeetingFolder.write(meeting, to: root.appendingPathComponent("Slack Meeting", isDirectory: true))
+
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(MCPTools.getMeeting(root: root, id: slackID.uuidString) == .success("\(MCPTools.dataReminder)\n\n\(plain)"))
+        #expect(MCPTools.searchMeetings(root: root, query: "Pelicans").isEmpty)
+    }
+
     @Test func pingRequestGetsAMatchingResponse() throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -253,6 +267,19 @@ struct MCPTests {
     @Test func meetingStatsCountsDurationAndTalkTimeOverARange() throws {
         let root = try writeFixture()
         defer { try? FileManager.default.removeItem(at: root) }
+        let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
+        #expect(stats == MCPTools.Stats(
+            count: 2, totalDuration: "1h5m",
+            talkBySpeaker: ["You": "28m", "Them": "23m", "Ana": "13m"]))
+    }
+
+    @Test func meetingStatsLeavesOutAMeetingSomeoneShared() throws {
+        let root = try writeFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var shared = slackMeeting()
+        shared.id = UUID()
+        shared.sharedBy = "Ellen"
+        try MeetingFolder.write(shared, to: root.appendingPathComponent("Shared Meeting", isDirectory: true))
         let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
         #expect(stats == MCPTools.Stats(
             count: 2, totalDuration: "1h5m",

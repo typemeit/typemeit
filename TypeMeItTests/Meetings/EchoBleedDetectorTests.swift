@@ -49,6 +49,29 @@ struct EchoBleedDetectorTests {
         #expect(EchoVerdict.verdict(result) == .affected)
     }
 
+    /// The far end speaks in 4 windows of 30, and bleeds in each: 13% of
+    /// all windows, all of the ones it spoke in.
+    @Test func bleedWhileTheFarEndRarelySpeaksIsAffected() {
+        let envelopeHz = 100
+        let lagFrames = 4
+        let window = Int(EchoBleedDetector.windowSeconds) * envelopeHz
+        let windows = 30
+        let speaking: Set<Int> = [3, 11, 19, 27]
+        let farEnd = noiseEnvelope(seed: 5, count: windows * window)
+        var mic = noiseEnvelope(seed: 6, count: windows * window)
+        var others = [Float](repeating: 0.001, count: windows * window)
+        for w in speaking {
+            for i in (w * window) ..< ((w + 1) * window) {
+                others[i] = farEnd[i]
+                if i - (w * window) >= lagFrames { mic[i] = farEnd[i - lagFrames] }
+            }
+        }
+
+        let result = EchoBleedDetector.analyse(micEnvelope: mic, othersEnvelope: others, envelopeHz: envelopeHz)
+        #expect(result?.windowsScored == speaking.count)
+        #expect(EchoVerdict.verdict(result) == .affected)
+    }
+
     @Test func twoIndependentNoiseEnvelopesAreClean() {
         let count = 60 * 100
         let mic = noiseEnvelope(seed: 11, count: count)

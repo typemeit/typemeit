@@ -52,17 +52,15 @@ private func hostDefaults(bundleID: String) -> UserDefaults? {
     return UserDefaults(suiteName: bundleID)
 }
 
-/// Whether the switch is on, and which folder to read, read fresh so a
-/// setting change in the app takes effect without restarting this process
+/// Whether the switch is on, read fresh so a setting change in the app
+/// takes effect without restarting this process, and the meetings folder
 /// (docs/meetings.md 7.15).
 private func meetingsDefaults(bundleID: String?) -> (enabled: Bool, root: URL) {
-    let fallbackRoot = supportDirectory().appendingPathComponent("Meetings", isDirectory: true)
+    let root = supportDirectory().appendingPathComponent("Meetings", isDirectory: true)
     guard let bundleID, let defaults = hostDefaults(bundleID: bundleID) else {
-        return (false, fallbackRoot)
+        return (false, root)
     }
-    let enabled = defaults.bool(forKey: "meetingsMCP")
-    let root = defaults.string(forKey: "meetingsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) } ?? fallbackRoot
-    return (enabled, root)
+    return (defaults.bool(forKey: "meetingsMCP"), root)
 }
 
 let bundleID = hostBundleID()

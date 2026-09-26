@@ -22,10 +22,11 @@ enum MeetingTranscriber {
     }
 
     /// Runs steps 1 to 5 and the transcode on `meeting` in `folder`, saving
-    /// through the store as it goes. Returns the meeting `done`, `failed`,
-    /// or `pending` when the model is not installed or the task was
-    /// cancelled between chunks.
-    static func run(_ start: Meeting, folder: URL, progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
+    /// through `save` as it goes, the store unless a probe says otherwise.
+    /// Returns the meeting `done`, `failed`, or `pending` when the model is
+    /// not installed or the task was cancelled between chunks.
+    static func run(_ start: Meeting, folder: URL, save: @escaping @Sendable (Meeting) async -> Void = MeetingTranscriber.saveToStore,
+                    progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
         var meeting = start
         guard ModelStore.isInstalled else {
             meeting.transcription.state = .pending
@@ -68,7 +69,9 @@ enum MeetingTranscriber {
                         let chunk = try read(file, range: range)
                         transcribed = try await transcribeRetryingQuiet(chunk, range: range)
                     }
-                    words.words = ChunkStitch.append(transcribed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
+                    let longest = Duration.milliseconds(Fixed.meetingLongestWordMs)
+                    let trimmed = transcribed.map { Transcriber.Word(text: $0.text, confidence: $0.confidence, start: $0.start, end: min($0.end, $0.start + longest)) }
+                    words.words = ChunkStitch.append(trimmed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
                     try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1
@@ -80,21 +83,71 @@ enum MeetingTranscriber {
 
             if meeting.kind == .call, let mic = rms[.mic], let others = rms[.others] {
                 meeting.echo = EchoVerdict.verdict(EchoBleedDetector.analyse(micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz))
+                if meeting.echo == .affected, let m = trackWords.firstIndex(where: { $0.role == Meeting.Speaker.you }), let o = trackWords.firstIndex(where: { $0.role == Meeting.Speaker.them }) {
+                    let folded = EchoFold.fold(mic: trackWords[m].words, others: trackWords[o].words, micEnvelope: mic, othersEnvelope: others, envelopeHz: rmsEnvelopeHz)
+                    trackWords[m].words = folded.mic
+                    trackWords[o].words = folded.others
+                    DebugLog.write("Meeting echo folded: \(counted(folded.droppedFromMic, "word")) off the mic, \(counted(folded.droppedFromOthers, "word")) off the far end")
+                }
             }
 
+            // The far-end people the window showed talking (8.3): how many
+            // the diarizer is told, and the name a one-voice far end takes.
+            // The user is whoever the window lit while the mic spoke, else
+            // the Mac's own name for them.
+            let farEndWords = trackWords.first { $0.role == Meeting.Speaker.them }?.words ?? []
+            let micWords = trackWords.first { $0.role == Meeting.Speaker.you }?.words ?? []
+            let speakerMs = Fixed.meetingMinimumSpeakerSeconds * 1000
+            let talkers = meeting.names.map {
+                SpeakerCount.farEndTalkers(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
+            } ?? []
+            let userName = meeting.names.flatMap {
+                SpeakerCount.userTile(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
+            } ?? NSFullUserName()
+            let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: userName) }
+            let segments = await speakers(of: &meeting, in: folder, count: count)
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
-            meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: nil, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
+            meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
+            // A word the segments did not reach keeps its track's label; that
+            // speaker stays in the list so the row can name it.
+            for role in meeting.tracks.map(\.role) {
+                let id = speakerID(for: role)
+                if meeting.paragraphs.contains(where: { $0.speaker == id }), !meeting.speakers.contains(where: { $0.id == id }) {
+                    meeting.speakers.append(Meeting.Speaker(id: id, name: defaultName(for: role), isYou: role == .mic, talkMs: 0))
+                }
+            }
+            // Names from the meeting window, when it was read (8.6): the
+            // diarizer says how many and when, the meeting says who. Captions
+            // are theirs, not ours, and go once they have been used.
+            if let names = meeting.names {
+                let aligned = SpeakerNaming.align(
+                    speakers: meeting.speakers, segments: segments ?? [], paragraphs: meeting.paragraphs, names: names,
+                    talkers: talkers, userName: userName, lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
+                    minOverlapMs: Fixed.meetingNameMinOverlapSeconds * 1000, margin: Fixed.meetingNameMargin)
+                meeting.speakers = aligned.speakers
+                meeting.paragraphs = aligned.paragraphs
+                meeting.names?.captions = nil
+                DebugLog.write("Meeting names aligned from \(names.source.rawValue): \(counted(meeting.speakers.filter { $0.nameSource != nil }.count, "speaker")) named")
+            }
             for i in meeting.speakers.indices {
                 let id = meeting.speakers[i].id
                 meeting.speakers[i].talkMs = meeting.paragraphs.filter { $0.speaker == id }.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
             }
+            // A speaker the diarizer found but no word landed on is not listed.
+            let spoken = Set(meeting.paragraphs.map(\.speaker))
+            meeting.speakers.removeAll { !$0.isYou && !spoken.contains($0.id) }
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
-            if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
+            // The title ladder (9.2): who was there, then what it was about, then the app.
+            if meeting.titleSource == .app, let title = meeting.names?.title(excluding: userName) {
+                meeting.title = title
+                meeting.titleSource = .roster
+            } else if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
                 meeting.title = title
                 meeting.titleSource = .generated
             }
+            if !meeting.paragraphs.isEmpty { meeting.summary = await MeetingSummary.summarise(meeting) }
             meeting = await transcode(meeting, in: folder)
             // Done last: the store publishes any done meeting it sees, and the
             // folder must not move while the transcode is still writing into it.
@@ -115,7 +168,7 @@ enum MeetingTranscriber {
         return meeting
     }
 
-    private static func save(_ meeting: Meeting) async {
+    static func saveToStore(_ meeting: Meeting) async {
         await MainActor.run { MeetingStore.shared.save(meeting) }
     }
 
@@ -126,6 +179,62 @@ enum MeetingTranscriber {
         case .others: Meeting.Speaker.them
         case .room: Meeting.Speaker.room
         }
+    }
+
+    private static func defaultName(for role: Meeting.Track.Role) -> String {
+        switch role {
+        case .mic: "You"
+        case .others: "Them"
+        case .room: "Room"
+        }
+    }
+
+    // MARK: Speakers (docs/meetings.md 8.3)
+
+    /// Diarizes the far-end track of a call or the one track of a room.
+    /// Speakers become `s1…sN` in first-appearance order named Speaker 1…N,
+    /// keeping a name the user gave the same id before; a call whose far
+    /// end has one speaker stays `Them`. Without the model the meeting
+    /// transcribes as before, and the download starts for the next one.
+    /// The diarizer failing keeps the transcript with `Them` or `Room`.
+    /// `count` is what the call's window said about its far end.
+    private static func speakers(of meeting: inout Meeting, in folder: URL, count: SpeakerCount?) async -> [SpeakerSegment]? {
+        let role: Meeting.Track.Role = meeting.kind == .call ? .others : .room
+        guard let track = meeting.tracks.first(where: { $0.role == role }) else { return nil }
+        guard DiarizerModelStore.isInstalled else {
+            await MainActor.run { DiarizerModelStore.shared.download() }
+            return nil
+        }
+        // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
+        let segments: [SpeakerSegment]
+        do {
+            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: count)
+            segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+        } catch {
+            Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
+            DebugLog.write("Meeting diarization failed: \(error.localizedDescription)")
+            return nil
+        }
+        meeting.transcription.diarizer = DiarizerModelStore.pipelineName
+        var order: [String] = []
+        for segment in segments.sorted(by: { $0.startMs < $1.startMs }) where !order.contains(segment.speaker) { order.append(segment.speaker) }
+        guard !order.isEmpty else { return nil }
+        let previous = meeting.speakers
+        meeting.speakers = meeting.speakers.filter { $0.isYou }
+        if meeting.kind == .call, order.count == 1 {
+            let them = Meeting.Speaker.them
+            meeting.speakers.append(Meeting.Speaker(id: them, name: previous.first { $0.id == them }?.name ?? defaultName(for: .others), isYou: false, talkMs: 0))
+            DebugLog.write("Meeting speakers: 1 on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
+            return nil
+        }
+        let ids = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, "s\($0 + 1)") })
+        for (i, original) in order.enumerated() {
+            let id = ids[original]!
+            let name = previous.first { $0.id == id }?.name ?? "Speaker \(i + 1)"
+            meeting.speakers.append(Meeting.Speaker(id: id, name: name, isYou: false, talkMs: 0))
+        }
+        DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
+        return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
     }
 
     // MARK: Audio
@@ -223,32 +332,45 @@ enum MeetingTranscriber {
 
     // MARK: After the words
 
-    /// Each `.caf` becomes an `.m4a`, deleted only once the copy reopens
-    /// with the right length. With the audio setting off the tracks are
-    /// deleted and no `.m4a` is written.
+    /// Each raw `<role>.caf` becomes `<role>.opus.caf`, and is deleted only
+    /// once the copy reopens with the right length. With the audio setting
+    /// off the tracks are deleted and nothing is written.
     private static func transcode(_ meeting: Meeting, in folder: URL) async -> Meeting {
         var meeting = meeting
         let keep = await MainActor.run { Settings.shared.meetingKeepAudio }
         for i in meeting.tracks.indices {
             let caf = folder.appendingPathComponent(meeting.tracks[i].file)
-            guard caf.pathExtension == "caf" else { continue }
+            guard meeting.tracks[i].file == "\(meeting.tracks[i].role.rawValue).caf" else { continue }
             if !keep {
                 try? FileManager.default.removeItem(at: caf)
                 continue
             }
-            let m4a = caf.deletingPathExtension().appendingPathExtension("m4a")
+            let kept = folder.appendingPathComponent(meeting.tracks[i].role.rawValue + Meeting.keptAudioSuffix)
             do {
-                guard try MeetingFolder.transcode(from: caf, to: m4a) else {
-                    Log.meetings.error("Transcoded \(m4a.lastPathComponent) came back short; keeping the CAF")
+                guard try MeetingFolder.transcode(from: caf, to: kept) else {
+                    Log.meetings.error("Transcoded \(kept.lastPathComponent) came back short; keeping the CAF")
                     continue
                 }
                 try FileManager.default.removeItem(at: caf)
-                meeting.tracks[i].file = m4a.lastPathComponent
+                meeting.tracks[i].file = kept.lastPathComponent
             } catch {
                 Log.meetings.error("Could not transcode \(caf.lastPathComponent): \(error.localizedDescription)")
             }
         }
         return meeting
+    }
+
+    /// `Fixed.meetingTitleSourceWords` words as `Fixed.meetingTitleSamples`
+    /// runs spread evenly across the transcript, joined by an ellipsis line.
+    static func titleSample(of meeting: Meeting) -> String {
+        let words = meeting.paragraphs.flatMap { $0.text.split(separator: " ") }
+        guard !words.isEmpty else { return "" }
+        if words.count <= Fixed.meetingTitleSourceWords { return words.joined(separator: " ") }
+        let size = Fixed.meetingTitleSourceWords / Fixed.meetingTitleSamples
+        return (0..<Fixed.meetingTitleSamples).map { k in
+            let start = k * words.count / Fixed.meetingTitleSamples
+            return words[start..<min(start + size, words.count)].joined(separator: " ")
+        }.joined(separator: "\n…\n")
     }
 
     @Generable
@@ -263,9 +385,9 @@ enum MeetingTranscriber {
     /// Apple Intelligence is unavailable or declines.
     private static func generatedTitle(for meeting: Meeting) async -> String? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
-        let words = meeting.paragraphs.flatMap { $0.text.split(separator: " ") }.prefix(Fixed.meetingTitleSourceWords).joined(separator: " ")
+        let words = titleSample(of: meeting)
         guard !words.isEmpty else { return nil }
-        let session = LanguageModelSession(instructions: "You title meeting transcripts. The user message is the start of one transcript. Answer with a title of three to five words naming what the meeting was about. No quotes, no trailing punctuation.")
+        let session = LanguageModelSession(instructions: "You title meeting transcripts. The user message is the start of one transcript. Answer with a title of three to five words naming the subject the meeting was about, the way someone who was in it would refer to it afterwards. Prefer the topic over a company or product name that merely came up, and never name a person. No quotes, no trailing punctuation.")
         do {
             let response = try await session.respond(to: "<transcript>\n\(words)\n</transcript>", generating: MeetingTitle.self, options: GenerationOptions(samplingMode: .greedy))
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))

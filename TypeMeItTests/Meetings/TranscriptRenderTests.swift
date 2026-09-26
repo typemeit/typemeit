@@ -15,7 +15,7 @@ struct TranscriptRenderTests {
         title: "Slack"
         kind: call
         started: "2026-09-19 14:30 +01:00"
-        duration: 35m
+        duration: 34:36
         app: "Slack"
         speakers: ["You", "Them"]
         echo: affected
@@ -41,7 +41,7 @@ struct TranscriptRenderTests {
         title: "Slack"
         kind: call
         started: "2026-09-19 14:30 +01:00"
-        duration: 35m
+        duration: 34:36
         app: "Slack"
         speakers: ["You", "Them"]
         echo: affected
@@ -69,7 +69,7 @@ struct TranscriptRenderTests {
         title: "Q3 \\"deploy\\" \\\\ plan"
         kind: room
         started: "2026-09-19 14:30 +01:00"
-        duration: 35m
+        duration: 34:36
         speakers: ["Room"]
         echo: affected
         ---

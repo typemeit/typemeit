@@ -13,9 +13,6 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     enum Kind: String, Codable, Sendable { case call, room }
     enum TitleSource: String, Codable, Sendable { case app, user, generated, roster }
     enum Echo: String, Codable, Sendable { case notMeasured, clean, affected }
-    /// Nil means recorded by this app; `imported` is a file brought in from
-    /// elsewhere (docs/meetings.md D21).
-    enum Source: String, Codable, Sendable { case recorded, imported }
 
     struct App: Codable, Equatable, Sendable {
         var bundleId: String
@@ -30,8 +27,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     struct Track: Codable, Equatable, Sendable {
         enum Role: String, Codable, Sendable { case mic, others, room }
         var role: Role
-        /// The file name inside the meeting folder: `.caf` while recording
-        /// and transcribing, `.m4a` once transcoded.
+        /// The file name inside the meeting folder: `mic.caf` (16-bit PCM)
+        /// while recording and transcribing, `mic.opus.caf` once
+        /// transcoded; meetings from before Opus keep `mic.m4a`.
         var file: String
         var frames: Int
         /// Stretches of zeros: a drop and rejoin, or a device rebuild.
@@ -64,6 +62,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var name: String
         var isYou: Bool
         var talkMs: Int
+        /// How this speaker got its name (docs/meetings.md 8.6). Nil for a
+        /// speaker still labelled by number.
+        var nameSource: MeetingNames.Source? = nil
     }
 
     struct Transcription: Codable, Equatable, Sendable {
@@ -108,10 +109,18 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     var speakers: [Speaker]
     var transcription: Transcription
     var paragraphs: [Paragraph]
-    /// Nil for a meeting this app recorded.
-    var source: Source? = nil
-    /// The imported file's basename only, never its path (docs/meetings.md 7.14).
-    var importedFrom: String? = nil
+    /// What the meeting itself showed about who is who (docs/meetings.md
+    /// 8.6). Nil until phase 2's naming runs.
+    var names: MeetingNames? = nil
+    /// A few sentences from the on-device model, for the meeting's page.
+    /// Not rendered into `transcript.md` and never returned by the MCP.
+    var summary: String? = nil
+    /// The meeting this recording is a rejoin of: it is joined onto that
+    /// one before transcription and then deleted (`MeetingMerge`).
+    var continues: UUID? = nil
+    /// Who sent it, for a meeting opened from a `.tmi` file (`MeetingShare`);
+    /// empty when the file did not say. Nil for one recorded on this Mac.
+    var sharedBy: String? = nil
 
     static let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -152,6 +161,10 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
 
     var isDone: Bool { transcription.state == .done }
 
+    /// Recorded here rather than opened from someone's `.tmi` file: only
+    /// these count as the user's own time in meetings.
+    var recordedHere: Bool { sharedBy == nil }
+
     /// The others track never left the floor: the far end was silent, or
     /// the system-audio grant was missing (docs/meetings.md D13).
     var onlyYourSide: Bool {
@@ -159,8 +172,12 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         return peak < Fixed.meetingSilenceFloor
     }
 
-    /// The tracks that have a playable `.m4a`, in file order.
-    var audioFiles: [String] { tracks.map(\.file).filter { $0.hasSuffix(".m4a") } }
+    /// What a kept track is transcoded to, beside the raw `<role>.caf`.
+    static let keptAudioSuffix = ".opus.caf"
+
+    /// The kept, compressed tracks, in file order: Opus, or AAC from
+    /// meetings recorded before it.
+    var audioFiles: [String] { tracks.map(\.file).filter { $0.hasSuffix(Meeting.keptAudioSuffix) || $0.hasSuffix(".m4a") } }
 
     /// The transcript as plain text, one paragraph per speaker turn.
     var transcriptText: String {

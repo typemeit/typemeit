@@ -22,7 +22,7 @@ final class MeetingStore {
     @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
     @ObservationIgnored private var watchedPath: String?
 
-    var publishedRoot: URL { Settings.shared.meetingsFolder ?? MeetingFolder.defaultPublishedRoot }
+    var publishedRoot: URL { MeetingFolder.defaultPublishedRoot }
 
     private init() {
         reload()
@@ -34,11 +34,11 @@ final class MeetingStore {
 
     // MARK: Reading
 
-    /// Re-reads both roots. Called at launch, when the published folder
-    /// changes on disk, and when the setting moves it.
+    /// Re-reads both roots. Called at launch and when the published folder
+    /// changes on disk.
     func reload() {
         let root = publishedRoot
-        folderAvailable = FileManager.default.fileExists(atPath: root.path) || (MeetingFolder.parentResolves(root) && Settings.shared.meetingsFolder == nil)
+        folderAvailable = FileManager.default.fileExists(atPath: root.path) || MeetingFolder.parentResolves(root)
         var found: [(URL, Meeting)] = MeetingFolder.meetings(under: MeetingFolder.stagingRoot)
         if folderAvailable { found += MeetingFolder.meetings(under: root) }
         var byId: [UUID: (URL, Meeting)] = [:]
@@ -91,26 +91,30 @@ final class MeetingStore {
 
     /// A user title. Rewrites the title part of the folder name only.
     func rename(id: UUID, title: String) {
-        guard var meeting = meeting(id), let folder = folders[id] else { return }
+        guard var meeting = meeting(id) else { return }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != meeting.title else { return }
         meeting.title = trimmed
         meeting.titleSource = .user
-        if meeting.published {
-            let root = folder.deletingLastPathComponent()
-            let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current, duration: meeting.duration, title: trimmed,
-                                          existing: MeetingFolder.existingNames(under: root).filter { $0 != folder.lastPathComponent })
-            let destination = root.appendingPathComponent(name, isDirectory: true)
-            if destination.path != folder.path {
-                do {
-                    try FileManager.default.moveItem(at: folder, to: destination)
-                    folders[id] = destination
-                } catch {
-                    Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
-                }
-            }
-        }
         save(meeting)
+        renameFolderIfNeeded(id)
+    }
+
+    /// A published folder's name follows the meeting's title and duration;
+    /// after a rename or a new generated title it is moved to match.
+    func renameFolderIfNeeded(_ id: UUID) {
+        guard let meeting = meeting(id), meeting.published, let folder = folders[id] else { return }
+        let root = folder.deletingLastPathComponent()
+        let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current, duration: meeting.duration, title: meeting.title,
+                                      existing: MeetingFolder.existingNames(under: root).filter { $0 != folder.lastPathComponent })
+        let destination = root.appendingPathComponent(name, isDirectory: true)
+        guard destination.path != folder.path else { return }
+        do {
+            try FileManager.default.moveItem(at: folder, to: destination)
+            folders[id] = destination
+        } catch {
+            Log.meetings.error("Could not rename the meeting folder: \(error.localizedDescription)")
+        }
     }
 
     /// Phase 2: a speaker's name, per meeting.
@@ -119,6 +123,8 @@ final class MeetingStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         meeting.speakers[i].name = trimmed
+        // A name the user gave is never overwritten by a later re-run (8.6).
+        meeting.speakers[i].nameSource = .user
         save(meeting)
     }
 
@@ -239,4 +245,39 @@ final class MeetingStore {
 
     /// The meetings waiting for the speech model to be installed.
     var pendingForModel: [Meeting] { meetings.filter { $0.transcription.state == .pending && !$0.published } }
+
+    // MARK: Sharing
+
+    /// The meeting as a `.tmi` file, written into a temporary folder of its
+    /// own for the share menu or a drag (docs/meetings.md 7.16). Nil when it
+    /// cannot be written.
+    func shareFile(_ id: UUID) -> URL? {
+        guard let meeting = meeting(id) else { return nil }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shared Meetings", isDirectory: true)
+            .appendingPathComponent(id.uuidString, isDirectory: true)
+        do {
+            return try MeetingFolder.writeShare(meeting, sender: NSFullUserName(), into: folder)
+        } catch {
+            Log.meetings.error("Could not write the meeting to share: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// A `.tmi` file opened from Finder, Mail or a message: written into the
+    /// published folder as a meeting without audio. A meeting with the same
+    /// id already here is left as it is, so opening a file twice adds
+    /// nothing. Returns the meeting's id.
+    func receive(_ file: URL) throws -> UUID {
+        let meeting = try MeetingShare.meeting(from: String(decoding: Data(contentsOf: file), as: UTF8.self))
+        guard self.meeting(meeting.id) == nil else { return meeting.id }
+        let root = publishedRoot
+        let name = MeetingFolder.name(started: meeting.started, zone: TimeZone(identifier: meeting.timeZone) ?? .current,
+                                      duration: meeting.duration, title: meeting.title, existing: MeetingFolder.existingNames(under: root))
+        let folder = root.appendingPathComponent(name, isDirectory: true)
+        try MeetingFolder.write(meeting, to: folder)
+        adopt(meeting, folder: folder)
+        diskUsage = MeetingFolder.diskUsage(of: root)
+        DebugLog.write("Meeting received: \(name)")
+        return meeting.id
+    }
 }
