@@ -3,6 +3,16 @@ import SwiftUI
 struct InsightsTab: View {
     @State private var store = Store.shared
     @State private var meetingStore = MeetingStore.shared
+    /// The where filter: an app's name, or a channel.
+    @State private var place: String?
+    /// The who filter: meetings with everyone in it.
+    @State private var people: Set<String> = []
+    @State private var when = SquareWhen.any
+    @State private var from = ""
+    @State private var to = ""
+    @State private var whereOpen = false
+    @State private var whoOpen = false
+    @State private var whenOpen = false
     /// The where box's content at its own height, before the row sizes it.
     @State private var whereHeight: CGFloat = 0
     /// Calendar cell under the pointer, as its `YYYY-MM-DD` key.
@@ -10,13 +20,35 @@ struct InsightsTab: View {
     /// cells lets it go.
     @State private var selectedDay: String?
 
-    private var stats: InsightsStats {
-        Insights.compute(store.history.map {
+    /// The meetings the filters leave.
+    private var shownMeetings: [Meeting] {
+        let time = WhenFilter(when, from: from, to: to)
+        return meetingStore.meetings.filter { MeetingsTab.matches($0, place: place, people: people) && time.contains($0.started) }
+    }
+
+    /// The dictations the filters leave. Who and channels belong to meetings,
+    /// so once either is set, what stays is what was dictated during them.
+    private func shownHistory(during meetings: [Meeting]) -> [HistoryEntry] {
+        let time = WhenFilter(when, from: from, to: to)
+        let channel = place.map { p in meetingStore.meetings.contains { MeetingsTab.channel(of: $0) == p } } ?? false
+        let during: Set<UUID>? = people.isEmpty && !channel ? nil : Set(meetings.flatMap { $0.dictations.map(\.historyId) })
+        return store.history.filter { e in
+            if let during {
+                if !during.contains(e.id) { return false }
+            } else if let place, HistoryTab.app(of: e) != place {
+                return false
+            }
+            return time.contains(e.timestamp)
+        }
+    }
+
+    private func stats(_ meetings: [Meeting]) -> InsightsStats {
+        Insights.compute(shownHistory(during: meetings).map {
             InsightRow(timestamp: $0.timestamp, transcript: $0.transcript, postProcessed: $0.postProcessed,
                        postProcessRequested: $0.postProcessRequested, durationMs: $0.durationMs,
                        transcribeMs: $0.transcribeMs, postProcessMs: $0.postProcessMs,
                        dictionaryFixes: $0.dictionaryFixes, appId: $0.appId, appName: $0.appName, windowTitle: $0.windowTitle)
-        }, meetings: meetingStore.meetings.filter { $0.isDone && $0.recordedHere }.map {
+        }, meetings: meetings.filter { $0.isDone && $0.recordedHere }.map {
             InsightMeeting(started: $0.started, appId: $0.app?.bundleId, appName: $0.app?.name)
         })
     }
@@ -30,48 +62,93 @@ struct InsightsTab: View {
     private static func tone(_ rank: Int) -> Color { ramp[min(rank, ramp.count - 1)] }
 
     var body: some View {
-        let s = stats
-        let m = MeetingInsights.compute(meetingStore.meetings)
-        // Scrolls only when the window is too short for the page.
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 12) {
-                    statCard("words dictated", s.totalWords.formatted(), monthCaption(s))
-                    wpmCard(s)
-                    statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                // The where box sets the row's height, rounded up to whole app
-                // rows, so the last app shown has the same room below it as
-                // the first has above; the rest of the apps scroll.
-                let rowBox = appsBoxHeight(covering: whereHeight)
-                HStack(alignment: .top, spacing: 12) {
-                    SettingsGroup(title: "where") {
-                        categories(s)
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
-                            .frame(height: rowBox, alignment: .top)
+        let shown = shownMeetings
+        let s = stats(shown)
+        let m = MeetingInsights.compute(shown)
+        VStack(spacing: 0) {
+            toolbar
+            // Scrolls only when the window is too short for the page.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 12) {
+                        statCard("words dictated", s.totalWords.formatted(), monthCaption(s))
+                        wpmCard(s)
+                        statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
                     }
-                    .frame(maxWidth: .infinity)
-                    SettingsGroup(title: "apps · \(s.totalApps)") {
-                        ScrollView { topApps(s) }
-                            .scrollBounceBehavior(.basedOnSize)
-                            .frame(height: rowBox)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // The where box sets the row's height, rounded up to whole app
+                    // rows, so the last app shown has the same room below it as
+                    // the first has above; the rest of the apps scroll.
+                    let rowBox = appsBoxHeight(covering: whereHeight)
+                    HStack(alignment: .top, spacing: 12) {
+                        SettingsGroup(title: "where") {
+                            categories(s)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
+                                .frame(height: rowBox, alignment: .top)
+                        }
+                        .frame(maxWidth: .infinity)
+                        SettingsGroup(title: "apps · \(s.totalApps)") {
+                            ScrollView { topApps(s) }
+                                .scrollBounceBehavior(.basedOnSize)
+                                .frame(height: rowBox)
+                        }
+                        .frame(width: 330)
                     }
-                    .frame(width: 330)
+                    SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
+                        calendar(s)
+                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        SettingsGroup(title: "length") { length(s) }
+                        SettingsGroup(title: "speed") { speed(s) }
+                    }
+                    meetings(m)
                 }
-                SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
-                    calendar(s)
-                }
-                HStack(alignment: .top, spacing: 12) {
-                    SettingsGroup(title: "length") { length(s) }
-                    SettingsGroup(title: "speed") { speed(s) }
-                }
-                meetings(m)
+                .padding([.horizontal, .bottom], 20)
             }
-            .padding(20)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
+
+    private var toolbar: some View {
+        HStack(spacing: 8) {
+            SquareFilter(label: place ?? "where", active: place != nil, clear: { place = nil }, open: $whereOpen) {
+                let items = MeetingsTab.placeItems(meetings: meetingStore.meetings, dictations: store.history, place: place)
+                SquareMenuList(items: items.map(\.item), minWidth: 232) { i in
+                    place = items[i].value
+                    whereOpen = false
+                }
+            }
+            SquareFilter(label: people.isEmpty ? "who" : people.sorted().joined(separator: ", "), active: !people.isEmpty,
+                         clear: { people = [] }, open: $whoOpen) {
+                WhoMenu(people: $people, counts: MeetingsTab.personCounts(in: meetingStore.meetings))
+            }
+            let time = WhenFilter(when, from: from, to: to)
+            SquareFilter(label: time.label, active: time.narrows, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+                SquareWhenPicker(when: $when, from: $from, to: $to)
+            }
+            Spacer(minLength: 0)
+            if filtering {
+                Button("clear", action: clearFilters).buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
+            }
+        }
+        .padding(.top, 16)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
+    }
+
+    private var filtering: Bool { place != nil || !people.isEmpty || WhenFilter(when, from: from, to: to).narrows }
+
+    private func clearFilters() {
+        place = nil
+        people = []
+        when = .any
+        from = ""
+        to = ""
+    }
+
+    /// What an empty box says: nothing has happened, or nothing the filters
+    /// leave.
+    private var empty: String { filtering ? "no matches" : "nothing yet" }
 
     /// Time in meetings, your share of the talk on calls, and how long one runs.
     private func meetings(_ m: MeetingStats) -> some View {
@@ -79,7 +156,7 @@ struct InsightsTab: View {
             Text("meetings").font(DesignTokens.Fonts.label.weight(.regular).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
             HStack(alignment: .top, spacing: 12) {
                 statCard("in meetings", m.meetings == 0 ? "–" : InsightsTab.span(m.totalMs),
-                         m.meetings == 0 ? "nothing yet" : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
+                         m.meetings == 0 ? empty : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
                 statCard("you talked", m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
                          m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
                 statCard("typical meeting", m.medianMs.map { MeetingFolder.durationLabel(.milliseconds($0)) } ?? "–",
@@ -91,7 +168,7 @@ struct InsightsTab: View {
 
     /// `longest 47m · most on slack`.
     private func typicalCaption(_ m: MeetingStats) -> String {
-        guard let longest = m.longestMs else { return "nothing yet" }
+        guard let longest = m.longestMs else { return empty }
         let most = m.topApp.map { " · most on \($0.lowercased())" } ?? ""
         return "longest \(MeetingFolder.durationLabel(.milliseconds(longest)))" + most
     }
@@ -226,7 +303,7 @@ struct InsightsTab: View {
         let total = max(1, s.categories.reduce(0) { $0 + $1.dictations })
         return VStack(alignment: .leading, spacing: 10) {
             if s.categories.isEmpty {
-                Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2)
+                Text(empty).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2)
             } else {
                 GeometryReader { geo in
                     let shown = s.categories.filter { $0.dictations > 0 }
@@ -271,7 +348,7 @@ struct InsightsTab: View {
 
     private func topApps(_ s: InsightsStats) -> some View {
         VStack(spacing: 0) {
-            if s.topApps.isEmpty { Text("nothing yet").font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).frame(height: InsightsTab.appRowHeight) }
+            if s.topApps.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).frame(height: InsightsTab.appRowHeight) }
             ForEach(s.topApps, id: \.name) { a in
                 HStack(spacing: 10) {
                     Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)

@@ -57,6 +57,39 @@ struct TimeOfDayWindow {
     }
 }
 
+/// The when filter as a test on dates: the days it covers and the time of
+/// day, worked out once for a pass over a list.
+struct WhenFilter {
+    let when: SquareWhen
+    let window: TimeOfDayWindow?
+    private let span: ClosedRange<Date>?
+    private let calendar: Calendar
+
+    init(_ when: SquareWhen, from: String, to: String, today: Date = .now, calendar: Calendar = .current) {
+        self.when = when
+        window = TimeOfDayWindow(from: from, to: to)
+        span = when.span(today: today, calendar: calendar)
+        self.calendar = calendar
+    }
+
+    /// Whether it narrows a list at all.
+    var narrows: Bool { span != nil || window != nil }
+
+    /// Its chip's name: "when", or the days and time of day it is set to.
+    var label: String {
+        guard when != .any else { return window?.label ?? "when" }
+        return [when.label, window?.label].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    func contains(_ date: Date) -> Bool {
+        if let span {
+            let day = calendar.startOfDay(for: date)
+            if day < span.lowerBound || day > span.upperBound { return false }
+        }
+        return window?.contains(date, calendar: calendar) ?? true
+    }
+}
+
 /// History: every dictation by day, filtered by app, time and words. A row
 /// copies or deletes in place, and a click opens the dictation's own page.
 struct HistoryTab: View {
@@ -159,16 +192,10 @@ struct HistoryTab: View {
 
     private var filtered: [HistoryEntry] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        let calendar = Calendar.current
-        let span = when.span(today: .now, calendar: calendar)
-        let window = TimeOfDayWindow(from: from, to: to)
+        let time = WhenFilter(when, from: from, to: to)
         return store.history.reversed().filter { e in
             if let app, HistoryTab.app(of: e) != app { return false }
-            if let span {
-                let day = calendar.startOfDay(for: e.timestamp)
-                if day < span.lowerBound || day > span.upperBound { return false }
-            }
-            if let window, !window.contains(e.timestamp, calendar: calendar) { return false }
+            if !time.contains(e.timestamp) { return false }
             if !q.isEmpty, !e.displayText.lowercased().contains(q), !e.transcript.lowercased().contains(q) { return false }
             return true
         }
@@ -185,13 +212,9 @@ struct HistoryTab: View {
             + apps.map { (Optional($0.key), SquareMenuList.Item(label: $0.key, checked: app == $0.key, count: $0.value.formatted())) }
     }
 
-    private var whenActive: Bool { when != .any || TimeOfDayWindow(from: from, to: to) != nil }
+    private var whenActive: Bool { WhenFilter(when, from: from, to: to).narrows }
 
-    private var whenLabel: String {
-        let time = TimeOfDayWindow(from: from, to: to)?.label
-        guard when != .any else { return time ?? "when" }
-        return [when.label, time].compactMap { $0 }.joined(separator: " · ")
-    }
+    private var whenLabel: String { WhenFilter(when, from: from, to: to).label }
 
     // MARK: Rows
 
