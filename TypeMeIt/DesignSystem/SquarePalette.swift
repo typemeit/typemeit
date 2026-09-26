@@ -1,17 +1,16 @@
 import SwiftUI
 
-/// What colour the cloud is: grey, whatever is behind it, or one of the
-/// seven colours. One choice, where the settings today have a switch, a
-/// palette and a second switch.
+/// What colour the cloud is: black, white, dynamic, or one of the seven
+/// hues. A dynamic cloud goes black or white against what is behind it, and
+/// follows light and dark mode until Screen Recording lets it look.
 enum CloudChoice: Hashable, Sendable {
-    case grey, matchBehind, colour(CloudColor)
+    case dynamic, colour(CloudColor)
 
-    static let all: [CloudChoice] = [.grey, .matchBehind] + CloudColor.allCases.map { .colour($0) }
+    static let all: [CloudChoice] = CloudColor.neutrals.map { .colour($0) } + [.dynamic] + CloudColor.hues.map { .colour($0) }
 
     var label: String {
         switch self {
-        case .grey: "grey"
-        case .matchBehind: "match what is behind it"
+        case .dynamic: "dynamic"
         case .colour(let c): c.label
         }
     }
@@ -19,9 +18,9 @@ enum CloudChoice: Hashable, Sendable {
 
 /// The cloud's palette: every choice a resting puff, spread evenly across
 /// the row, the chosen one half as big again and a hovered one a quarter.
-/// "Match what is behind it" is the cloud dark on one side and light on the
-/// other, the line between them drifting across it. It reads the screen, so
-/// choosing it says so under the row with the way to allow it.
+/// Dynamic is the cloud dark on one side and light on the other, the line
+/// between them drifting across it. It reads the screen, so choosing it says
+/// what it does under the row, with the way to allow it.
 struct SquareCloudPalette: View {
     @Binding var selection: CloudChoice
     var screenRecordingAllowed = false
@@ -35,13 +34,29 @@ struct SquareCloudPalette: View {
     /// resting cloud fills most of the cell and the chosen one, half as big
     /// again, still just fits.
     private static let fill: CGFloat = 1.25
-    /// "Grey" is the plain cloud, drawn in a grey that shows on paper and on
-    /// dark.
-    static let grey = Color(white: 0.61)
-    /// The two sides of "match what is behind it": the cloud on something
-    /// light, and on something dark.
+    /// Black and white as the palette draws them, a little off so that each
+    /// still shows on paper of its own colour.
     private static let onLight = Color(white: 0.24)
     private static let onDark = Color(white: 0.85)
+
+    /// A colour as a page draws its cloud: the hue itself, or black and white
+    /// as the palette draws them.
+    static func tint(_ colour: CloudColor) -> Color {
+        switch colour {
+        case .black: onLight
+        case .white: onDark
+        default: Color(nsColor: colour.color)
+        }
+    }
+
+    /// The cloud a page shows for `choice`; for dynamic, whichever of black
+    /// and white stands out on the page.
+    static func tint(_ choice: CloudChoice, scheme: ColorScheme) -> Color {
+        switch choice {
+        case .dynamic: tint(scheme == .dark ? .white : .black)
+        case .colour(let c): tint(c)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -65,9 +80,9 @@ struct SquareCloudPalette: View {
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
-            if selection == .matchBehind {
+            if selection == .dynamic {
                 HStack(spacing: 10) {
-                    Text(screenRecordingAllowed ? "reads a few pixels under the cloud" : "reads a few pixels under the cloud · needs screen recording permissions")
+                    Text(screenRecordingAllowed ? "picks black or white from the pixels under it" : "follows light and dark mode until screen recording is allowed")
                         .font(Square.sans(11.5))
                         .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,12 +96,10 @@ struct SquareCloudPalette: View {
 
     @ViewBuilder private func swatch(_ choice: CloudChoice, index: Int) -> some View {
         switch choice {
-        case .matchBehind:
-            puff(SquareCloudPalette.onLight, index: index, splitTint: SquareCloudPalette.onDark)
-        case .grey:
-            puff(SquareCloudPalette.grey, index: index)
+        case .dynamic:
+            puff(SquareCloudPalette.tint(.black), index: index, splitTint: SquareCloudPalette.tint(.white))
         case .colour(let c):
-            puff(Color(nsColor: c.color), index: index)
+            puff(SquareCloudPalette.tint(c), index: index)
         }
     }
 
@@ -101,12 +114,12 @@ struct SquareCloudPalette: View {
 #if DEBUG
 struct SquareCloudPaletteSpecimen: View {
     @State private var choice = CloudChoice.colour(.sky)
-    @State private var match = CloudChoice.matchBehind
+    @State private var match = CloudChoice.dynamic
 
     var body: some View {
         SquareSpecimen {
             SquareSpecimenLine(name: "a colour") { SquareCloudPalette(selection: $choice).frame(width: 720) }
-            SquareSpecimenLine(name: "match behind") { SquareCloudPalette(selection: $match).frame(width: 720) }
+            SquareSpecimenLine(name: "dynamic") { SquareCloudPalette(selection: $match).frame(width: 720) }
         }
     }
 }
