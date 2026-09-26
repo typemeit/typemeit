@@ -22,6 +22,40 @@ final class PostProcessorTests: XCTestCase {
         XCTAssertTrue(PostProcessor.lostOpening(transcript: "twenty five people came", output: "People came."))
     }
 
+    func testLostOpeningNeedsTheSecondWordAfterACorrectedFirst() {
+        XCTAssertTrue(PostProcessor.lostOpening(transcript: "she said ship it", output: "Ship it."))
+    }
+
+    func testGateLeavesPunctuatedAndUnpunctuatedTextToCode() {
+        XCTAssertNil(PostProcessor.reasonForModel("It was cold out there.", hints: [], screenTerms: []))
+        XCTAssertNil(PostProcessor.reasonForModel("it was cold out there and we left", hints: [], screenTerms: []))
+    }
+
+    func testGateCallsTheModelForWhatOnlyItCanDo() {
+        let hint = CustomWordMatcher.Hint(heard: "whisper", term: "wispr")
+        XCTAssertEqual(PostProcessor.reasonForModel("Is whisper running?", hints: [hint], screenTerms: []), "custom word hint")
+        XCTAssertEqual(PostProcessor.reasonForModel("Dear Sam comma thanks", hints: [], screenTerms: []), "spoken punctuation")
+        XCTAssertEqual(PostProcessor.reasonForModel("I don't f a little bit", hints: [], screenTerms: []), "stranded letter")
+        XCTAssertEqual(PostProcessor.reasonForModel("send the the file", hints: [], screenTerms: []), "repeated word")
+        XCTAssertNil(PostProcessor.reasonForModel("very very cold", hints: [], screenTerms: []))
+    }
+
+    func testGateCallsTheModelForAScreenTermOnlyWhenHeardAsANonWord() {
+        XCTAssertEqual(PostProcessor.reasonForModel("Ping Tomash about it", hints: [], screenTerms: ["Tomasz"], unknownWords: ["tomash"]), "sounds like Tomasz")
+        XCTAssertNil(PostProcessor.reasonForModel("Read the file", hints: [], screenTerms: ["READY"], unknownWords: []))
+    }
+
+    func testRestoreKeptWordsPutsBackAWordTheModelDeleted() {
+        XCTAssertEqual(PostProcessor.restoreKeptWords(transcript: "it was like really cold out there", output: "It was really cold out there."), "It was like really cold out there.")
+        XCTAssertEqual(PostProcessor.restoreKeptWords(transcript: "it was cold", output: "It was cold."), "It was cold.")
+    }
+
+    func testCapitaliseOpeningOnlyTouchesAPlainLowercaseWord() {
+        XCTAssertEqual(PostProcessor.capitaliseOpening("it was cold"), "It was cold")
+        XCTAssertEqual(PostProcessor.capitaliseOpening("iPhone sales"), "iPhone sales")
+        XCTAssertEqual(PostProcessor.capitaliseOpening("e.g. this"), "e.g. this")
+    }
+
     func testJoinSpelledLettersMakesAcronyms() {
         XCTAssertEqual(ModelText.joinSpelledLetters("lottie h q signed with anthropic"), "lottie HQ signed with anthropic")
         XCTAssertEqual(ModelText.joinSpelledLetters("send it as a p d f to the c e o"), "send it as a PDF to the CEO")

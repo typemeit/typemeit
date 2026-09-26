@@ -1,0 +1,496 @@
+--- a/TypeMeIt/PostProcessor.swift
++++ b/TypeMeIt/PostProcessor.swift
+@@ -110,10 +110,37 @@
+     /// styles and the finishing touches. Pipeline and the eval both call this,
+     /// so what the eval scores is what gets typed.
+     func clean(_ matched: CustomWordMatcher.Outcome, customWords: [String], screenTerms: [String] = [], styles: Set<WritingStyle> = []) async -> (text: String, applied: Bool) {
+-        let keep = CustomWordMatcher.present(in: matched.text, terms: customWords)
+-        let processed = await run(matched.text, keep: keep, hints: matched.hints, screenTerms: screenTerms, styles: styles)
+-        var text = LocalCleanup.run(processed ?? matched.text)
++        // A word the dictionary does not know is one the speech model could
++        // not place, so a custom word or screen term that sounds like it is
++        // written in code, without asking the model; a real word that sounds
++        // like a term ("whisper", wispr) is still the model's call.
++        let unknown = matched.hints.isEmpty && screenTerms.isEmpty ? [] : await ScreenContext.unknownWords(in: matched.text)
++        let settled = matched.hints.filter { $0.heard.split(separator: " ").contains { unknown.contains(CustomWordMatcher.letters(String($0))) } }
++        // A hint on real words that do not sound like the term came from an
++        // alias alone, and an alias that is a real word ("really" for kinda)
++        // records a change of wording more often than a mishearing.
++        let hints = matched.hints.filter { !settled.contains($0) && CustomWordMatcher.soundsLike($0.heard, $0.term) }
++        var heard = CustomWordMatcher.applyHints(settled, to: matched.text)
++        if !screenTerms.isEmpty, !unknown.isEmpty {
++            let words = heard.split(whereSeparator: \.isWhitespace).map { CustomWordMatcher.Word(text: String($0), confidence: nil) }
++            heard = CustomWordMatcher.apply(words, terms: screenTerms.map { CustomWordMatcher.Term($0) }, only: unknown).text
++        }
++        let keep = CustomWordMatcher.present(in: heard, terms: customWords)
++        // Spelled letters and split terms are settled here, before the model,
++        // so the transcript as heard gets them too when the model has nothing.
++        let joined = ModelText.joinSpelledLetters(heard)
++        let terms = screenTerms + keep + hints.map(\.term)
++        let fused = ModelText.fuseTerms(joined, terms: terms)
++        let reason = PostProcessor.reasonForModel(fused, hints: hints, screenTerms: screenTerms, unknownWords: unknown)
++        lastReason = reason
++        if ProcessInfo.processInfo.environment["EVAL_LOG_GATE"] == "1" { print("GATE  \(reason ?? "code only")") }
++        let processed = reason == nil ? nil : await run(joined, keep: keep, hints: hints, screenTerms: screenTerms, styles: styles)
++        var text = ModelText.fuseTerms(processed ?? joined, terms: terms)
++        text = LocalCleanup.run(text)
++        // The speech model opens with a capital; the transcript as heard keeps that when the model is skipped.
++        if processed == nil { text = PostProcessor.capitaliseOpening(text) }
+         text = WritingStyle.apply(styles, to: text)
++        text = Digits.unitFigures(text)
+         text = ModelText.currencySymbols(text)
+         text = ModelText.stripTrailingFullStop(text)
+         return (text, processed != nil)
+@@ -121,6 +148,7 @@
+ 
+     /// nil means: use the locally cleaned transcript (cancelled, rejected, unavailable or failed).
+     func run(_ transcript: String, keep: [String] = [], hints: [CustomWordMatcher.Hint] = [], screenTerms: [String] = [], styles: Set<WritingStyle> = []) async -> String? {
++        if ProcessInfo.processInfo.environment["EVAL_NO_MODEL"] == "1" { return nil }
+         current?.cancel()
+         let transcript = ModelText.joinSpelledLetters(transcript)
+         let model = self.model
+@@ -133,7 +161,7 @@
+             let session = ready ?? LanguageModelSession(model: model, instructions: instructions)
+             let user = PostProcessor.prompt(for: transcript, keep: keep, hints: hints)
+             do {
+-                let r = try await session.respond(to: user, generating: CleanedTranscript.self, options: GenerationOptions(sampling: .greedy))
++                let r = try await session.respond(to: user, generating: CleanedTranscript.self, options: GenerationOptions(sampling: .greedy, maximumResponseTokens: PostProcessor.responseTokenCap(for: transcript)))
+                 if Task.isCancelled { return nil }
+                 var out = ModelText.stripThinkBlock(r.content.cleanedText).trimmingCharacters(in: .whitespacesAndNewlines)
+                 if out.isEmpty { return nil }
+@@ -146,6 +174,7 @@
+                     return nil
+                 }
+                 out = out.replacingOccurrences(of: "\u{200B}", with: "")
++                if !styles.contains(.fillerWords) { out = PostProcessor.restoreKeptWords(transcript: transcript, output: out) }
+                 out = ModelText.fuseTerms(out, terms: screenTerms + keep + hints.map(\.term))
+                 return out
+             } catch is CancellationError {
+@@ -181,16 +210,167 @@
+     /// digits.
+     static let fillers: Set<String> = ["um", "umm", "uh", "uhh", "er", "erm", "ah"]
+ 
++    /// A corrected first word is only taken as the same opening when the
++    /// transcript's second word follows it within the output's first four:
++    /// "their going" → "They're going" is a fix, "she said ship it" → "ship
++    /// it" lost two words however close ship is to she.
+     static func lostOpening(transcript: String, output: String) -> Bool {
+-        func firstWord(_ s: String) -> String? {
+-            s.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).first { !fillers.contains($0) }
++        func words(_ s: String) -> [String] {
++            s.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).filter { !fillers.contains($0) }
+         }
+-        guard let first = firstWord(transcript) else { return false }
+-        let firsts = [first, firstWord(Digits.apply(transcript))].compactMap { $0 }
+-        let outWords = output.lowercased().split { !$0.isLetter && !$0.isNumber }.prefix(2).map(String.init)
+-        return !outWords.contains { o in firsts.contains { f in o == f || (o.first == f.first && ModelText.levenshtein(o, f) <= 2) } }
++        let heard = words(transcript)
++        guard let first = heard.first else { return false }
++        let firsts = [first, words(Digits.apply(transcript)).first].compactMap { $0 }
++        let out = words(output)
++        let outWords = out.prefix(2)
++        if outWords.contains(where: { firsts.contains($0) }) { return false }
++        guard outWords.contains(where: { o in firsts.contains { f in o.first == f.first && ModelText.levenshtein(o, f) <= 2 } }) else { return true }
++        guard heard.count > 1 else { return false }
++        return !out.prefix(4).contains { o in o == heard[1] || ModelText.levenshtein(o, heard[1]) <= 1 }
++    }
++
++    // MARK: Response cap
++
++    /// Room for the cleaned text to double in length, plus the JSON around it.
++    /// A clean-up that runs past this has stopped editing (history shows one
++    /// that took 18 s on 14 words); cut off, it fails and the transcript as
++    /// heard is used, as for any other rejected output.
++    static let tokensPerWord = 1.4
++    static let capSlack = 40
++
++    static func responseTokenCap(for transcript: String) -> Int {
++        let words = transcript.split(whereSeparator: \.isWhitespace).count
++        return Int(Double(words) * tokensPerWord * 2) + capSlack
++    }
++
++    // MARK: Gate
++
++    /// Uppercases the first letter when the first word is a plain lowercase
++    /// word: "it was cold" → "It was cold"; "iPhone" and "e.g." stay.
++    static func capitaliseOpening(_ text: String) -> String {
++        guard let first = text.split(separator: " ", maxSplits: 1).first,
++              first.allSatisfy({ $0.isLowercase || !$0.isLetter }), first.first?.isLetter == true,
++              !first.contains(".") else { return text }
++        return text.prefix(1).uppercased() + text.dropFirst()
++    }
++
++    /// Why the last clean-up went to the model, or nil when it did not.
++    var lastReason: String?
++
++    /// Whether missing punctuation alone sends a transcript to the model.
++    nonisolated(unsafe) static var punctuateWithModel = ProcessInfo.processInfo.environment["EVAL_GATE_PUNCT"] != "0"
++
++    /// Repeats that are usually meant: "very very", "no no", "bye bye".
++    static let deliberateRepeats: Set<String> = ["very", "no", "bye", "so", "really", "ha", "yeah", "yes", "well", "that", "had", "is", "now", "go", "come", "bla", "blah", "tut", "knock", "chop", "night"]
++    static let spokenPunctuation = try! NSRegularExpression(pattern: #"(?i)\b(?:full stop|period|comma|question mark|exclamation mark|exclamation point|new line|new paragraph|colon|semicolon)\b"#)
++
++    /// Why the transcript needs the model, after the code passes have run on
++    /// it, or nil when it does not. The model costs about half a second before
++    /// its first word and 14 ms a token after that, and most transcripts reach
++    /// it punctuated with nothing left for it to do. It is called for what
++    /// only it can do: settle a custom word the speech model heard as a
++    /// confident ordinary word, match a screen term heard as something else,
++    /// punctuate a transcript that came without, drop a false start or a
++    /// doubled word, and write spoken punctuation.
++    static func reasonForModel(_ text: String, hints: [CustomWordMatcher.Hint], screenTerms: [String], unknownWords: Set<String> = []) -> String? {
++        if !hints.isEmpty { return "custom word hint" }
++        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
++        let keys = words.map { CustomWordMatcher.letters($0) }
++        if punctuateWithModel {
++            let ends = text.filter { ".?!".contains($0) }.count
++            let marks = ends + text.filter { ",;:".contains($0) }.count
++            if words.count >= 4, marks == 0 { return "unpunctuated" }
++            if words.count / max(1, ends) > 40 { return "long unpunctuated run" }
++        }
++        if spokenPunctuation.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil { return "spoken punctuation" }
++        if zip(words, keys).contains(where: { w, k in k.count == 1 && k.first!.isLetter && w.first!.isLowercase && k != "a" }) { return "stranded letter" }
++        for (a, b) in zip(keys, keys.dropFirst()) where a == b && !a.isEmpty && !deliberateRepeats.contains(a) && a.first!.isLetter { return "repeated word" }
++        if let term = soundsLikeScreenTerm(keys, screenTerms, unknownWords: unknownWords) { return "sounds like \(term)" }
++        return nil
+     }
+ 
++    /// A screen term that a run of one to three words sounds like without
++    /// spelling it. As strict as a custom-word hint: a screen carries up to
++    /// 40 terms, and at 0.7 one of them sounded like some run in a tenth of
++    /// real dictations paired with an unrelated screen.
++    static let gateSoundSimilarity = CustomWordMatcher.hintSimilarity
++
++    /// Only a run with a word the dictionary does not know counts: the speech
++    /// model writes a non-word when it is unsure of a name, while a run of
++    /// real words that sounds like a term ("read" and READY) was heard right.
++    static func soundsLikeScreenTerm(_ keys: [String], _ screenTerms: [String], unknownWords: Set<String>) -> String? {
++        let present = Set(keys)
++        for term in screenTerms {
++            let letters = CustomWordMatcher.letters(term)
++            guard letters.count >= CustomWordMatcher.minFuzzyTermLetters, !present.contains(letters) else { continue }
++            let termKey = CustomWordMatcher.soundKey(CustomWordMatcher.compact(letters))
++            for start in keys.indices {
++                for length in 1...3 where start + length <= keys.count {
++                    let run = keys[start..<(start + length)]
++                    guard !run.allSatisfy({ CustomWordMatcher.stopWords.contains($0) }) else { continue }
++                    guard run.contains(where: unknownWords.contains) else { continue }
++                    let joined = run.joined()
++                    let a = CustomWordMatcher.compact(joined), b = CustomWordMatcher.compact(letters)
++                    guard !a.isEmpty, Double(min(a.count, b.count)) / Double(max(a.count, b.count)) >= CustomWordMatcher.minLengthRatio else { continue }
++                    if CustomWordMatcher.similarity(CustomWordMatcher.soundKey(a), termKey) >= gateSoundSimilarity { return term }
++                }
++            }
++        }
++        return nil
++    }
++
++    // MARK: Kept words
++
++    /// Words the base prompt keeps ("Keep every other word, including like")
++    /// that the model still deletes by itself. With the filler-words style off,
++    /// one it deleted outright, with nothing written in its place, goes back
++    /// where it was.
++    static let keptWords: [[String]] = [["like"], ["you", "know"], ["actually"], ["basically"], ["literally"], ["i", "mean"]]
++
++    static func restoreKeptWords(transcript: String, output: String) -> String {
++        let heard = transcript.split(whereSeparator: \.isWhitespace).map(String.init)
++        var out = output.split(whereSeparator: \.isWhitespace).map(String.init)
++        func key(_ w: String) -> String { w.lowercased().filter { $0.isLetter || $0.isNumber } }
++        let a = heard.map(key), b = out.map(key)
++        guard !a.isEmpty, !b.isEmpty else { return output }
++        // Longest common subsequence of the word keys.
++        var lcs = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
++        for i in stride(from: a.count - 1, through: 0, by: -1) {
++            for j in stride(from: b.count - 1, through: 0, by: -1) {
++                lcs[i][j] = a[i] == b[j] && !a[i].isEmpty ? lcs[i + 1][j + 1] + 1 : max(lcs[i + 1][j], lcs[i][j + 1])
++            }
++        }
++        var pairs: [(Int, Int)] = []
++        var i = 0, j = 0
++        while i < a.count, j < b.count {
++            if a[i] == b[j], !a[i].isEmpty { pairs.append((i, j)); i += 1; j += 1 } else if lcs[i + 1][j] >= lcs[i][j + 1] { i += 1 } else { j += 1 }
++        }
++        func restorable(_ keys: ArraySlice<String>) -> Bool {
++            var rest = keys[...]
++            while !rest.isEmpty {
++                guard let seq = keptWords.first(where: { rest.starts(with: $0) }) else { return false }
++                rest = rest.dropFirst(seq.count)
++            }
++            return true
++        }
++        // Gaps between matched words, last first so earlier indices stay valid.
++        for (n, pair) in pairs.enumerated().reversed() {
++            let next = n + 1 < pairs.count ? pairs[n + 1] : (a.count, b.count)
++            let gapIn = (pair.0 + 1)..<next.0, gapOut = (pair.1 + 1)..<next.1
++            guard !gapIn.isEmpty, gapOut.isEmpty, restorable(a[gapIn]) else { continue }
++            var inserted = Array(heard[gapIn]).map { $0.filter { $0.isLetter || $0 == "'" } }
++            if gapOut.lowerBound == out.count {
++                // At the end: the stop after the last word moves after the restored ones.
++                let last = out[pair.1]
++                let stop = String(last.reversed().prefix { !$0.isLetter && !$0.isNumber }.reversed())
++                out[pair.1] = String(last.dropLast(stop.count))
++                inserted[inserted.count - 1] += stop
++            }
++            out.insert(contentsOf: inserted, at: gapOut.lowerBound)
++        }
++        return out.joined(separator: " ")
++    }
++
+     // MARK: Rewrite guard
+ 
+     static func wordSet(_ s: String) -> Set<String> {
+--- a/TypeMeIt/LocalCleanup.swift
++++ b/TypeMeIt/LocalCleanup.swift
+@@ -54,9 +54,18 @@
+             }
+             i += run
+         }
+-        return out.map(\.text).joined(separator: " ")
++        return out.map { pronounI($0).text }.joined(separator: " ")
+     }
+ 
++    /// The speech model is English-only, so a lone "i" is the pronoun, which
++    /// the clean-up model sometimes returns lowercase: "i think" → "I think",
++    /// "i'm" → "I'm".
++    private static func pronounI(_ t: Token) -> Token {
++        let lower = t.core.lowercased()
++        guard t.core.first == "i", lower == "i" || ["i'm", "i'll", "i've", "i'd", "i’m", "i’ll", "i’ve", "i’d"].contains(lower) else { return t }
++        return Token(prefix: t.prefix, core: "I" + t.core.dropFirst(), suffix: t.suffix)
++    }
++
+     /// A filler goes with the comma or full stop it carries. One ending in
+     /// "?" or "!" is an interjection ("eh?"), and one opening a quote or
+     /// bracket would leave it unbalanced; both stay.
+--- a/TypeMeIt/WritingStyle.swift
++++ b/TypeMeIt/WritingStyle.swift
+@@ -78,6 +78,10 @@
+         // "kind of" and "sort of" hedge an adjective; before a noun they are the phrase.
+         #"(?i)(^|[\s,])(kind of|sort of)(\s+)(?!(?:a|an|the|this|that|these|those|my|your|our|their|thing|things|person|people|stuff|way|place|error|problem|issue|work|job|guy|idea|deal|situation)\b)(?=[a-z])"#,
+         #"(?i)(^|[.?!]\s+)(like)(,\s*|\s+)(?=(?:i|you|we|they|he|she|it|there|this|that|the|my|your|our)\b)"#,
++        // "like" before a rough quantity hedges it: "we need like three more
++        // people", "like five minutes". Not the verb ("I'd like two") and not
++        // a comparison ("looks like two people", "something like two hours").
++        #"(?i)(^|[\s,])(?<!\b(?:i|you|we|they|would|i'd|you'd|we'd|they'd|he'd|she'd|do|does|did|don't|doesn't|didn't|to|just|really|also|still|look|looks|looked|sound|sounds|seem|seems|feel|feels|felt|something|anything|nothing)\s)(like)(,\s*|\s+)(?=(?:\d+|a few|a couple|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|a hundred|a thousand)(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine|hundred|thousand))?(?:\s+(?:or|to)\s+\w+)?\s+(?:more|[a-z]+s|percent|quid|grand)\b)"#,
+     ].map { try! NSRegularExpression(pattern: $0) }
+ 
+     static func cutFillers(_ text: String) -> String {
+@@ -94,14 +98,23 @@
+ 
+     /// Uppercases the first letter of the text and of every sentence after a
+     /// full stop, question or exclamation mark, so a cut at a sentence start
+-    /// does not leave it lowercase.
++    /// does not leave it lowercase. A mark ends a sentence only when a space
++    /// follows it, closing quotes and brackets aside: the dot in "lottie.org"
++    /// or "Node.js" does not.
+     static func capitaliseSentences(_ text: String) -> String {
+         var out = ""
+         var atStart = true
++        var afterMark = false
+         for ch in text {
+             if atStart, ch.isLetter { out.append(contentsOf: String(ch).uppercased()); atStart = false; continue }
+             if ch.isLetter || ch.isNumber { atStart = false }
+-            if ".?!".contains(ch) { atStart = true }
++            if ".?!".contains(ch) {
++                afterMark = true
++            } else if afterMark, ch.isWhitespace {
++                atStart = true; afterMark = false
++            } else if !"\"”’')]".contains(ch) {
++                afterMark = false
++            }
+             out.append(ch)
+         }
+         return out
+@@ -150,10 +163,8 @@
+             item = item.trimmingCharacters(in: .whitespacesAndNewlines)
+             lines.append("\(n + 1). " + capitaliseSentences(item))
+         }
+-        // Items end alike: all with a full stop when any does.
+-        if lines.contains(where: { $0.hasSuffix(".") }) {
+-            lines = lines.map { $0.last.map { ".?!:".contains($0) } == true ? $0 : $0 + "." }
+-        }
++        // Every line is a sentence: the lead and each item end with a stop.
++        lines = lines.map { $0.last.map { ".?!:".contains($0) } == true ? $0 : $0 + "." }
+         return lines.joined(separator: "\n")
+     }
+ 
+--- a/TypeMeIt/Digits.swift
++++ b/TypeMeIt/Digits.swift
+@@ -75,6 +75,31 @@
+             .replacingOccurrences(of: #"\b(1[0-2]|[1-9]) ([0-5]\d)\b"#, with: "$1:$2", options: .regularExpression)
+     }
+ 
++    /// Percentages and money take figures whatever the digits style, as the
++    /// clean-up prompt asks and the model often does not: "sixty percent" →
++    /// 60%, "fifty pounds" → 50 pounds, which `ModelText.currencySymbols`
++    /// then writes as £50.
++    private static let unitWords: Set<String> = ["percent", "dollar", "dollars", "pound", "pounds", "euro", "euros"]
++
++    static func unitFigures(_ text: String) -> String {
++        let tokens = tokenise(text)
++        var out: [String] = []
++        var i = 0
++        while i < tokens.count {
++            guard tokens[i].isWord, let (value, end, ordinal) = number(in: tokens, from: i), !ordinal else {
++                out.append(tokens[i].text); i += 1; continue
++            }
++            var j = end
++            while j < tokens.count, tokens[j].text == " " { j += 1 }
++            let next = j < tokens.count && tokens[j].isWord ? tokens[j].word : ""
++            let perCent = next == "per" && j + 2 < tokens.count && tokens[j + 2].word == "cent"
++            guard unitWords.contains(next) || perCent else { out.append(tokens[i].text); i += 1; continue }
++            out.append(String(value))
++            i = end
++        }
++        return out.joined().replacingOccurrences(of: #"(\d) ?(?:percent|per cent)\b"#, with: "$1%", options: .regularExpression)
++    }
++
+     private static func tokenise(_ text: String) -> [Token] {
+         var tokens: [Token] = []
+         var current = ""
+@@ -119,6 +144,13 @@
+         var total = 0, current = 0
+         var any = false, ordinal = false
+         var lastWasScale = false
++        // Scales of a thousand and up only fall ("two million three thousand"),
++        // and a group has one hundred; a scale that breaks either starts a new
++        // number: "two thousand and two thousand two hundred" is 2000 and 2200.
++        // Each checkpoint is where the number ends if the next scale breaks it.
++        var bigScale: Int?
++        var afterBig: (index: Int, value: Int)?
++        var afterHundred: (index: Int, value: Int)?
+         while i < tokens.count {
+             let t = tokens[i]
+             if !t.isWord {
+@@ -151,7 +183,15 @@
+                 any = true; ordinal = true; lastWasScale = false
+             } else if let s = scales[t.word] {
+                 guard any else { break }
+-                if s == 100 { current = (current == 0 ? 1 : current) * 100 } else { total += (current == 0 ? 1 : current) * s; current = 0 }
++                if s == 100 {
++                    if let h = afterHundred { return (h.value, h.index, false) }
++                    current = (current == 0 ? 1 : current) * 100
++                    afterHundred = (i + 1, total + current)
++                } else {
++                    if let big = bigScale, s >= big, let b = afterBig { return (b.value, b.index, false) }
++                    total += (current == 0 ? 1 : current) * s; current = 0
++                    bigScale = s; afterBig = (i + 1, total); afterHundred = nil
++                }
+                 lastWasScale = true
+             } else {
+                 break
+--- a/TypeMeIt/CustomWordMatcher.swift
++++ b/TypeMeIt/CustomWordMatcher.swift
+@@ -79,6 +79,9 @@
+     }
+     /// Words that never stand for a term on their own: "or" is not "VR".
+     static let stopWords: Set<String> = ["a", "an", "the", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for", "with", "as", "is", "are", "was", "were", "be", "been", "it", "its", "this", "that", "these", "those", "i", "you", "he", "she", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "our", "their", "so", "if", "not", "no", "yes", "do", "does", "did", "have", "has", "had", "can", "will", "would", "should", "could", "just", "then", "than", "there", "here", "what", "which", "who", "how", "when", "where", "why", "up", "out", "about", "into", "over", "also", "very", "all", "any", "some", "one", "two"]
++    /// How alike the sound keys of a confident run and a term must be for the
++    /// run to be put to the clean-up model as a possible mishearing.
++    static let hintSimilarity = 0.85
+     /// Shorter of the two compacted letter strings over the longer.
+     static let minLengthRatio = 0.7
+     /// Terms with fewer letters than this match only exactly: "ack" or "lib"
+@@ -89,7 +92,10 @@
+         apply(words, terms: terms.map { Term($0) })
+     }
+ 
+-    static func apply(_ words: [Word], terms: [Term]) -> Outcome {
++    /// `only`, when given, limits matching to runs holding one of these
++    /// `letters` keys: a run without one is left as heard, even when it
++    /// spells a term.
++    static func apply(_ words: [Word], terms: [Term], only: Set<String>? = nil) -> Outcome {
+         let terms = terms.map { Term($0.text.trimmingCharacters(in: .whitespaces), aliases: $0.aliases.map(letters).filter { !$0.isEmpty }) }
+             .filter { !letters($0.text).isEmpty }
+         guard !terms.isEmpty, !words.isEmpty else {
+@@ -108,6 +114,7 @@
+                 let run = Array(tokens[i..<(i + length)])
+                 let runLetters = run.map { letters($0.core) }.joined()
+                 guard !runLetters.isEmpty else { continue }
++                if let only, !run.contains(where: { only.contains(letters($0.core)) }) { continue }
+                 // Already one of the terms: leave it, and never trade it for another.
+                 if run.contains(where: { token in terms.contains { $0.text == token.core } }) { continue }
+                 let allStopWords = run.allSatisfy { stopWords.contains($0.key) }
+@@ -133,6 +140,10 @@
+                         if length > 1, similarity(soundKey(compact(run.dropFirst().map { letters($0.core) }.joined())), termKeys[t]) >= sim { continue }
+                     }
+                     if let lowest, lowest >= confidentAbove {
++                        // A confident word casts doubt only when it sounds all but
++                        // the same: at the looser bar "changed" nominated kinda and
++                        // "storage" lottie.org, each costing a model call.
++                        guard sim >= hintSimilarity else { continue }
+                         let hint = Hint(heard: run.map(\.core).joined(separator: " "), term: term.text)
+                         if !hints.contains(hint) { hints.append(hint) }
+                         continue
+@@ -153,6 +164,27 @@
+         return Outcome(text: out.joined(separator: " "), fixes: fixes, hints: hints)
+     }
+ 
++    /// Whether `heard` sounds like `term` by the hint rule, ignoring aliases.
++    static func soundsLike(_ heard: String, _ term: String) -> Bool {
++        let a = compact(letters(heard)), b = compact(letters(term))
++        guard !a.isEmpty, !b.isEmpty, Double(min(a.count, b.count)) / Double(max(a.count, b.count)) >= minLengthRatio else { return false }
++        return similarity(soundKey(a), soundKey(b)) >= hintSimilarity
++    }
++
++    /// Writes each hint's term in place of the words it was heard as, at
++    /// their first occurrence, keeping the punctuation around them.
++    static func applyHints(_ hints: [Hint], to text: String) -> String {
++        var tokens = text.split(separator: " ", omittingEmptySubsequences: false).map { LocalCleanup.Token(String($0)) }
++        for hint in hints {
++            let heard = hint.heard.split(separator: " ").map(String.init)
++            guard !heard.isEmpty, tokens.count >= heard.count,
++                  let i = (0...(tokens.count - heard.count)).first(where: { tokens[$0..<($0 + heard.count)].map(\.core) == heard }) else { continue }
++            let first = tokens[i], last = tokens[i + heard.count - 1]
++            tokens.replaceSubrange(i..<(i + heard.count), with: [LocalCleanup.Token(prefix: first.prefix, core: hint.term, suffix: last.suffix)])
++        }
++        return tokens.map(\.text).joined(separator: " ")
++    }
++
+     /// The terms that occur in `text` as whole words, spelled as the term.
+     /// The clean-up model is told to keep these; it otherwise rewrites
+     /// "lib" as "library" and lowercases a name it does not know.
+--- a/TypeMeIt/ScreenContext.swift
++++ b/TypeMeIt/ScreenContext.swift
+@@ -152,13 +152,37 @@
+         return !isKnownWord(token.lowercased())
+     }
+ 
+-    /// `terms(from:)` with the system spell checker for the user's language.
++    /// The words of `text`, as `CustomWordMatcher.letters` keys, that the
++    /// English dictionary does not know. A word is checked as written, less
++    /// surrounding punctuation, so "don't" keeps its apostrophe. Numbers are
++    /// never unknown.
+     @MainActor
++    static func unknownWords(in text: String) -> Set<String> {
++        var unknown: Set<String> = []
++        for raw in text.split(whereSeparator: \.isWhitespace) {
++            let word = raw.trimmingCharacters(in: .punctuationCharacters.union(.symbols))
++            guard word.contains(where: \.isLetter), !isEnglishWord(word) else { continue }
++            unknown.insert(CustomWordMatcher.letters(word))
++        }
++        return unknown
++    }
++
++    /// `terms(from:)` with the system spell checker's English dictionary,
++    /// the language the speech model writes. Left to identify each word's
++    /// language, the checker passes "Tomasz" and "Wieczorek" as Polish words,
++    /// and a name from any language the Mac knows would never become a term.
++    @MainActor
+     static func terms(from lines: [String], excluding: [String]) -> [String] {
++        terms(from: lines, excluding: excluding, isKnownWord: isEnglishWord)
++    }
++
++    /// Whether the English dictionary knows `word` as written or capitalised:
++    /// "friday" is Friday, not a name the dictionary lacks.
++    @MainActor
++    static func isEnglishWord(_ word: String) -> Bool {
+         let checker = NSSpellChecker.shared
+-        return terms(from: lines, excluding: excluding) { word in
+-            let range = checker.checkSpelling(of: word, startingAt: 0)
+-            return range.location == NSNotFound
++        return [word, word.capitalized].contains { form in
++            checker.checkSpelling(of: form, startingAt: 0, language: "en", wrap: false, inSpellDocumentWithTag: 0, wordCount: nil).location == NSNotFound
+         }
+     }
+ }

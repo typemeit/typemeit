@@ -91,6 +91,7 @@ final class LocalCleanupTests: XCTestCase {
             ("Ah, Ahh, AHHH. done", "done"),
             ("ha ha ha funny", "funny"),
             ("Uh oh", "Uh oh"),
+            ("i think i'm late and i'll call", "I think I'm late and I'll call"),
             ("", ""),
             ("   ", ""),
         ]

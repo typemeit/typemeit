@@ -75,6 +75,31 @@ enum Digits {
             .replacingOccurrences(of: #"\b(1[0-2]|[1-9]) ([0-5]\d)\b"#, with: "$1:$2", options: .regularExpression)
     }
 
+    /// Percentages and money take figures whatever the digits style, as the
+    /// clean-up prompt asks and the model often does not: "sixty percent" →
+    /// 60%, "fifty pounds" → 50 pounds, which `ModelText.currencySymbols`
+    /// then writes as £50.
+    private static let unitWords: Set<String> = ["percent", "dollar", "dollars", "pound", "pounds", "euro", "euros"]
+
+    static func unitFigures(_ text: String) -> String {
+        let tokens = tokenise(text)
+        var out: [String] = []
+        var i = 0
+        while i < tokens.count {
+            guard tokens[i].isWord, let (value, end, ordinal) = number(in: tokens, from: i), !ordinal else {
+                out.append(tokens[i].text); i += 1; continue
+            }
+            var j = end
+            while j < tokens.count, tokens[j].text == " " { j += 1 }
+            let next = j < tokens.count && tokens[j].isWord ? tokens[j].word : ""
+            let perCent = next == "per" && j + 2 < tokens.count && tokens[j + 2].word == "cent"
+            guard unitWords.contains(next) || perCent else { out.append(tokens[i].text); i += 1; continue }
+            out.append(String(value))
+            i = end
+        }
+        return out.joined().replacingOccurrences(of: #"(\d) ?(?:percent|per cent)\b"#, with: "$1%", options: .regularExpression)
+    }
+
     private static func tokenise(_ text: String) -> [Token] {
         var tokens: [Token] = []
         var current = ""
@@ -119,6 +144,13 @@ enum Digits {
         var total = 0, current = 0
         var any = false, ordinal = false
         var lastWasScale = false
+        // Scales of a thousand and up only fall ("two million three thousand"),
+        // and a group has one hundred; a scale that breaks either starts a new
+        // number: "two thousand and two thousand two hundred" is 2000 and 2200.
+        // Each checkpoint is where the number ends if the next scale breaks it.
+        var bigScale: Int?
+        var afterBig: (index: Int, value: Int)?
+        var afterHundred: (index: Int, value: Int)?
         while i < tokens.count {
             let t = tokens[i]
             if !t.isWord {
@@ -151,7 +183,15 @@ enum Digits {
                 any = true; ordinal = true; lastWasScale = false
             } else if let s = scales[t.word] {
                 guard any else { break }
-                if s == 100 { current = (current == 0 ? 1 : current) * 100 } else { total += (current == 0 ? 1 : current) * s; current = 0 }
+                if s == 100 {
+                    if let h = afterHundred { return (h.value, h.index, false) }
+                    current = (current == 0 ? 1 : current) * 100
+                    afterHundred = (i + 1, total + current)
+                } else {
+                    if let big = bigScale, s >= big, let b = afterBig { return (b.value, b.index, false) }
+                    total += (current == 0 ? 1 : current) * s; current = 0
+                    bigScale = s; afterBig = (i + 1, total); afterHundred = nil
+                }
                 lastWasScale = true
             } else {
                 break

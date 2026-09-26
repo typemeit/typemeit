@@ -64,6 +64,29 @@ final class WritingStyleTests: XCTestCase {
         XCTAssertEqual(WritingStyle.numberedList("First, plug it in. Secondly, turn it on."), "1. Plug it in.\n2. Turn it on.")
     }
 
+    func testCapitaliseSentencesSkipsDotsInsideWords() {
+        XCTAssertEqual(WritingStyle.capitaliseSentences("open claude.md and lottie.org. then stop"), "Open claude.md and lottie.org. Then stop")
+        XCTAssertEqual(WritingStyle.capitaliseSentences("he said \"yes.\" then left"), "He said \"yes.\" Then left")
+        XCTAssertEqual(WritingStyle.apply([.fillerWords], to: "Can you update the claude.md file?"), "Can you update the claude.md file?")
+    }
+
+    func testFillerStyleCutsLikeBeforeARoughQuantity() {
+        XCTAssertEqual(WritingStyle.apply([.fillerWords], to: "We need like three more people."), "We need three more people.")
+        XCTAssertEqual(WritingStyle.apply([.fillerWords], to: "I'd like two coffees."), "I'd like two coffees.")
+        XCTAssertEqual(WritingStyle.apply([.fillerWords], to: "It looks like two people."), "It looks like two people.")
+    }
+
+    func testDigitsStartsANewNumberWhenAScaleCannotContinueIt() {
+        XCTAssertEqual(Digits.apply("two thousand and two thousand two hundred pounds"), "2000 and 2200 pounds")
+        XCTAssertEqual(Digits.apply("two million three thousand"), "2003000")
+    }
+
+    func testUnitFiguresWritePercentagesAndMoneyAsFigures() {
+        XCTAssertEqual(Digits.unitFigures("about sixty percent of them"), "about 60% of them")
+        XCTAssertEqual(Digits.unitFigures("fifty pounds and ten per cent"), "50 pounds and 10%")
+        XCTAssertEqual(Digits.unitFigures("three people"), "three people")
+    }
+
     func testNumberedListLeavesProseAlone() {
         XCTAssertEqual(WritingStyle.numberedList("She came first and I came fourth."), "She came first and I came fourth.")
         XCTAssertEqual(WritingStyle.numberedList("First, the good news."), "First, the good news.")
@@ -72,13 +95,13 @@ final class WritingStyleTests: XCTestCase {
 
     func testNumberedListIgnoresOrdinalsAfterDeterminers() {
         XCTAssertEqual(WritingStyle.numberedList("first we wait for the second review and second they sign"),
-                       "1. We wait for the second review\n2. They sign")
+                       "1. We wait for the second review.\n2. They sign.")
     }
 
     func testNumberedListWorksWithoutPunctuation() {
         XCTAssertEqual(WritingStyle.numberedList("two things first the build is red and second the notes are missing"),
-                       "Two things\n1. The build is red\n2. The notes are missing")
-        XCTAssertEqual(WritingStyle.numberedList("first um preheat the oven secondly mix the flour"), "1. Preheat the oven\n2. Mix the flour")
+                       "Two things.\n1. The build is red.\n2. The notes are missing.")
+        XCTAssertEqual(WritingStyle.numberedList("first um preheat the oven secondly mix the flour"), "1. Preheat the oven.\n2. Mix the flour.")
         XCTAssertEqual(WritingStyle.numberedList("Okay, two things first. We wait, and second, they sign."), "Okay, two things.\n1. We wait.\n2. They sign.")
         XCTAssertEqual(WritingStyle.numberedList("we came second in the league and first in the cup"), "we came second in the league and first in the cup")
     }

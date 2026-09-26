@@ -71,6 +71,17 @@ final class ScreenContextTests: XCTestCase {
         XCTAssertEqual(ScreenContext.terms(from: ["see https://x.dev/a and ~/repos/hulk"], isKnownWord: { _ in true }), [])
     }
 
+    @MainActor
+    func testTermsCheckWordsAgainstTheEnglishDictionary() {
+        let terms = ScreenContext.terms(from: ["Tomasz Wieczorek: reproduced on staging on Friday"], excluding: [])
+        XCTAssertEqual(terms.sorted(), ["Tomasz", "Wieczorek"])
+    }
+
+    @MainActor
+    func testUnknownWordsKeepsApostrophesAndSkipsNumbers() {
+        XCTAssertEqual(ScreenContext.unknownWords(in: "Ping Tomash, don't wait 42 minutes."), ["tomash"])
+    }
+
     func testInstructionsCarryTheScreenTerms() {
         XCTAssertEqual(PostProcessor.instructions(screenTerms: ["Zentryx", "GitHub"]), PostProcessor.instructions
             + "\n\nNames and terms that were on the user's screen while they spoke, with their exact spelling:\nZentryx, GitHub\n\nThe speech-to-text model does not know these terms, so it writes what they sound like, often as several ordinary words (\"cube control\" for kubectl, \"use state\" for useState, \"centrics\" for Zentryx). Where a word or run of words in the transcript sounds like one of these terms, replace it with the exact spelling above. Do not add a term the transcript does not say, and do not change anything else because of this list.")
