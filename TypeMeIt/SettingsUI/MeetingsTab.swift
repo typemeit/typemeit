@@ -140,7 +140,7 @@ struct MeetingsTab: View {
                          clear: { people = [] }, open: $whoOpen) {
                 WhoMenu(people: $people, counts: personCounts)
             }
-            SquareFilter(label: whenLabel, icon: "akar-clock", active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+            SquareFilter(label: whenLabel, active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
                 SquareWhenPicker(when: $when, from: $from, to: $to)
             }
             Spacer(minLength: 0)

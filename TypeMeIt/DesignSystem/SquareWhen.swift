@@ -281,7 +281,7 @@ struct SquareWhenSpecimen: View {
     var body: some View {
         SquareSpecimen {
             SquareSpecimenLine(name: "filter") {
-                SquareFilter(label: when.label, icon: "akar-clock", active: when != .any, clear: { when = .any }, open: $open) {
+                SquareFilter(label: when == .any ? "when" : when.label, active: when != .any, clear: { when = .any }, open: $open) {
                     SquareWhenPicker(when: $when, from: $from, to: $to, today: SquareWhenSpecimen.today)
                 }
             }
