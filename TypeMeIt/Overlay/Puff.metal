@@ -375,3 +375,23 @@ static half4 render(float2 position, float2 size, float time, float expansion, f
 [[stitchable]] half4 puff(float2 position, half4 color, float2 size, float time, float expansion, float trail, float flow, float disperse, float strike, float density, half4 tint) {
     return smoke::render(position, size, time, expansion, trail, flow, disperse, strike, density, tint);
 }
+
+/// The puff in `tint` on one side of a line and `other` on the far side: the
+/// cloud as it looks drifting over the edge between something light and
+/// something dark. The line wanders to and fro across the cloud, leaning as it
+/// goes, and the smoke's own noise ruffles it, so wisps change colour as they
+/// cross it rather than being wiped. At time 0 it stands upright through the
+/// middle. Both tints must be greys: the puff is rendered once in white and
+/// each side scales it.
+[[stitchable]] half4 puffSplit(float2 position, half4 color, float2 size, float time, float expansion, float trail, float flow, float disperse, float strike, float density, half4 tint, half4 other) {
+    half4 white = smoke::render(position, size, time, expansion, trail, flow, disperse, strike, density, half4(1.0));
+    if (white.a <= 0.0) { return white; }
+    float2 uv = (position - 0.5 * size) / min(size.x, size.y);
+    float R = smoke::radius(saturate(expansion));
+    float drift = R * (0.32 * sin(time * 0.31) + 0.1 * sin(time * 0.77));
+    float lean = 0.22 * sin(time * 0.23);
+    float ruffle = 0.1 * R * smoke::snoise(float3(uv * (1.4 / R), time * 0.15));
+    float across = dot(uv, float2(cos(lean), sin(lean))) - drift + ruffle;
+    half4 side = mix(tint, other, half(smoothstep(-0.06 * R, 0.06 * R, across)));
+    return half4(white.rgb * side.rgb, white.a) * side.a;
+}

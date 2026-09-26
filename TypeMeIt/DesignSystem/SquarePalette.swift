@@ -17,32 +17,34 @@ enum CloudChoice: Hashable, Sendable {
     }
 }
 
-/// The cloud's palette: every choice a resting puff in a 44 pt cell, the
-/// chosen one half as big again and a hovered one a quarter. "Match what is
-/// behind it" reads the screen, so choosing it says so under the row with
-/// the way to allow it.
+/// The cloud's palette: every choice a resting puff, spread evenly across
+/// the row, the chosen one half as big again and a hovered one a quarter.
+/// "Match what is behind it" is the cloud dark on one side and light on the
+/// other, the line between them drifting across it. It reads the screen, so
+/// choosing it says so under the row with the way to allow it.
 struct SquareCloudPalette: View {
     @Binding var selection: CloudChoice
     var screenRecordingAllowed = false
     var openSystemSettings: () -> Void = {}
     @State private var hovered: CloudChoice?
 
-    /// A resting puff shows in about half its cell, so "match what is behind
-    /// it" is drawn at half the cell to sit with them.
-    private static let cell: CGFloat = 44
-    private static var matchSide: CGFloat { cell / 2 }
+    /// A resting puff shows in about half its cell.
+    private static let cell: CGFloat = 64
+    /// The least room between two cells, when the row is narrow.
+    private static let gap: CGFloat = 4
     /// "Grey" is the plain cloud, drawn in a grey that shows on paper and on
     /// dark.
     private static let grey = Color(white: 0.61)
-    /// The two halves of "match what is behind it": the cloud on something
+    /// The two sides of "match what is behind it": the cloud on something
     /// light, and on something dark.
     private static let onLight = Color(white: 0.24)
     private static let onDark = Color(white: 0.85)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
+            HStack(spacing: 0) {
                 ForEach(Array(CloudChoice.all.enumerated()), id: \.element) { i, choice in
+                    if i > 0 { Spacer(minLength: SquareCloudPalette.gap) }
                     let on = choice == selection
                     let scale = on ? 1.5 : (hovered == choice ? 1.25 : 1.0)
                     Button { selection = choice } label: {
@@ -76,13 +78,7 @@ struct SquareCloudPalette: View {
     @ViewBuilder private func swatch(_ choice: CloudChoice, index: Int) -> some View {
         switch choice {
         case .matchBehind:
-            Circle()
-                .fill(LinearGradient(stops: [.init(color: SquareCloudPalette.onLight, location: 0.5),
-                                             .init(color: SquareCloudPalette.onDark, location: 0.5)],
-                                     startPoint: .leading, endPoint: .trailing))
-                .blur(radius: 1.5)
-                .mask(RadialGradient(colors: [.black, .black, .clear], center: .center, startRadius: 0, endRadius: SquareCloudPalette.matchSide / 2))
-                .frame(width: SquareCloudPalette.matchSide, height: SquareCloudPalette.matchSide)
+            puff(SquareCloudPalette.onLight, index: index, splitTint: SquareCloudPalette.onDark)
         case .grey:
             puff(SquareCloudPalette.grey, index: index)
         case .colour(let c):
@@ -90,8 +86,8 @@ struct SquareCloudPalette: View {
         }
     }
 
-    private func puff(_ tint: Color, index: Int) -> some View {
-        PuffView(level: 0, tint: tint, timeOffset: Double(index) * PuffView.neighbourTimeOffset)
+    private func puff(_ tint: Color, index: Int, splitTint: Color? = nil) -> some View {
+        PuffView(level: 0, tint: tint, timeOffset: Double(index) * PuffView.neighbourTimeOffset, splitTint: splitTint)
             .frame(width: PuffView.drawnSide(filling: SquareCloudPalette.cell), height: PuffView.drawnSide(filling: SquareCloudPalette.cell))
             .frame(width: SquareCloudPalette.cell, height: SquareCloudPalette.cell)
     }
@@ -104,8 +100,8 @@ struct SquareCloudPaletteSpecimen: View {
 
     var body: some View {
         SquareSpecimen {
-            SquareSpecimenLine(name: "a colour") { SquareCloudPalette(selection: $choice) }
-            SquareSpecimenLine(name: "match behind") { SquareCloudPalette(selection: $match).frame(width: 440) }
+            SquareSpecimenLine(name: "a colour") { SquareCloudPalette(selection: $choice).frame(width: 720) }
+            SquareSpecimenLine(name: "match behind") { SquareCloudPalette(selection: $match).frame(width: 720) }
         }
     }
 }
