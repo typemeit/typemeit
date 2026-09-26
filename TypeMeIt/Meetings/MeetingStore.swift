@@ -11,7 +11,10 @@ import Observation
 final class MeetingStore {
     static let shared = MeetingStore()
 
-    private(set) var meetings: [Meeting] = []
+    private(set) var meetings: [Meeting] = [] { didSet { revision &+= 1 } }
+    /// Goes up with every change to `meetings`, so a page can keep what it
+    /// works out from them until they change.
+    private(set) var revision = 0
     /// Bytes under the published folder, nil while it does not resolve.
     private(set) var diskUsage: Int64?
     /// The published folder resolves; false for an ejected disk or an

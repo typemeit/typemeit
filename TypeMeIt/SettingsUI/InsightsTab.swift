@@ -19,6 +19,9 @@ struct InsightsTab: View {
     /// The streak cell whose day is shown; a click on the box outside the
     /// cells lets it go.
     @State private var selectedDay: String?
+    /// The figures, kept across redraws that change neither the filters nor
+    /// the data: a hover on the calendar, a resize.
+    @State private var cache = FiguresCache()
 
     /// The meetings the filters leave.
     private var shownMeetings: [Meeting] {
@@ -62,9 +65,10 @@ struct InsightsTab: View {
     private static func tone(_ rank: Int) -> Color { ramp[min(rank, ramp.count - 1)] }
 
     var body: some View {
-        let shown = shownMeetings
-        let s = stats(shown)
-        let m = MeetingInsights.compute(shown)
+        let (s, m) = cache.figures(for: figuresKey) {
+            let shown = shownMeetings
+            return (stats(shown), MeetingInsights.compute(shown))
+        }
         VStack(spacing: 0) {
             toolbar
             // Scrolls only when the window is too short for the page.
@@ -134,6 +138,12 @@ struct InsightsTab: View {
         .padding(.top, 16)
         .padding(.horizontal, 20)
         .padding(.bottom, 14)
+    }
+
+    private var figuresKey: FiguresCache.Key {
+        FiguresCache.Key(place: place, people: people, when: when, from: from, to: to,
+                         today: Calendar.current.startOfDay(for: .now),
+                         history: store.revision, meetings: meetingStore.revision)
     }
 
     private var filtering: Bool { place != nil || !people.isEmpty || WhenFilter(when, from: from, to: to).narrows }
@@ -425,5 +435,31 @@ struct InsightsTab: View {
         if day.dictations > 0 { parts += [counted(day.dictations, "dictation"), counted(day.words, "word")] }
         if day.meetings > 0 { parts.append(counted(day.meetings, "meeting")) }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The insights page's figures and what they were worked out from.
+@MainActor private final class FiguresCache {
+    struct Key: Equatable {
+        let place: String?
+        let people: Set<String>
+        let when: SquareWhen
+        let from: String
+        let to: String
+        /// The when presets move on at midnight.
+        let today: Date
+        let history: Int
+        let meetings: Int
+    }
+
+    private var key: Key?
+    private var figures: (InsightsStats, MeetingStats)?
+
+    func figures(for key: Key, compute: () -> (InsightsStats, MeetingStats)) -> (InsightsStats, MeetingStats) {
+        if key == self.key, let figures { return figures }
+        let fresh = compute()
+        self.key = key
+        figures = fresh
+        return fresh
     }
 }
