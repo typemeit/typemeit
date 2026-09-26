@@ -87,19 +87,42 @@ struct TimeOfDayWindow {
     }
 }
 
-/// What search looks through: each dictation's text and transcript,
-/// lowercased once for each change to the history rather than on every
-/// keystroke.
-@MainActor private final class SearchIndex {
+/// What the list works out from each dictation, kept until the history
+/// changes rather than redone on every keystroke: its words for the day
+/// totals, and its text and transcript lowercased for search.
+@MainActor private final class HistoryIndex {
     private var revision = -1
-    private var texts: [UUID: String] = [:]
+    private var words: [UUID: Int] = [:]
+    private var texts: [UUID: [UInt8]] = [:]
 
-    func texts(for store: Store) -> [UUID: String] {
-        if revision != store.revision {
-            texts = Dictionary(store.history.map { ($0.id, "\($0.displayText)\n\($0.transcript)".lowercased()) }, uniquingKeysWith: { a, _ in a })
-            revision = store.revision
+    private func current(_ store: Store) {
+        guard revision != store.revision else { return }
+        revision = store.revision
+        words = [:]
+        texts = [:]
+    }
+
+    func words(in entry: HistoryEntry, store: Store) -> Int {
+        current(store)
+        if let n = words[entry.id] { return n }
+        let n = HistoryTab.words(in: entry)
+        words[entry.id] = n
+        return n
+    }
+
+    /// Whether the entry's text or transcript holds `query`, lowercased UTF-8.
+    func matches(_ entry: HistoryEntry, _ query: [UInt8], store: Store) -> Bool {
+        current(store)
+        let text: [UInt8]
+        if let known = texts[entry.id] {
+            text = known
+        } else {
+            text = Array("\(entry.displayText)\n\(entry.transcript)".lowercased().utf8)
+            texts[entry.id] = text
         }
-        return texts
+        return text.withUnsafeBytes { hay in
+            query.withUnsafeBytes { q in memmem(hay.baseAddress, hay.count, q.baseAddress, q.count) != nil }
+        }
     }
 }
 
@@ -124,7 +147,7 @@ struct HistoryTab: View {
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
     @State private var open: UUID?
-    @State private var searchIndex = SearchIndex()
+    @State private var index = HistoryIndex()
     @State private var deletingPicked = false
 
     var body: some View {
@@ -153,7 +176,7 @@ struct HistoryTab: View {
                 HistoryColumns.head.padding(.horizontal, HistoryColumns.page)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(HistoryTab.lines(rows)) { line in
+                        ForEach(HistoryTab.lines(rows, wordsIn: { index.words(in: $0, store: store) })) { line in
                             switch line {
                             case .day(_, let day, let date, let total):
                                 HistoryDayRow(day: day, date: date, total: total)
@@ -209,7 +232,7 @@ struct HistoryTab: View {
         let calendar = Calendar.current
         let span = when.span(today: .now, calendar: calendar)
         let window = TimeOfDayWindow(from: from, to: to)
-        let texts = q.isEmpty ? [:] : searchIndex.texts(for: store)
+        let query = Array(q.utf8)
         return store.history.reversed().filter { e in
             if let app, HistoryTab.app(of: e) != app { return false }
             if let span {
@@ -217,7 +240,7 @@ struct HistoryTab: View {
                 if day < span.lowerBound || day > span.upperBound { return false }
             }
             if let window, !window.contains(e.timestamp, calendar: calendar) { return false }
-            if !q.isEmpty, texts[e.id]?.contains(q) != true { return false }
+            if !query.isEmpty, !index.matches(e, query, store: store) { return false }
             return true
         }
     }
@@ -257,7 +280,7 @@ struct HistoryTab: View {
 
     /// The rows under a line for each day, newest first, the day saying how
     /// much it held.
-    static func lines(_ rows: [HistoryEntry], calendar: Calendar = .current) -> [Line] {
+    static func lines(_ rows: [HistoryEntry], wordsIn: (HistoryEntry) -> Int = HistoryTab.words, calendar: Calendar = .current) -> [Line] {
         var out: [Line] = []
         var i = rows.startIndex
         while i < rows.endIndex {
@@ -265,7 +288,7 @@ struct HistoryTab: View {
             var j = i
             while j < rows.endIndex, calendar.isDate(rows[j].timestamp, inSameDayAs: day) { j += 1 }
             let same = rows[i..<j]
-            let words = same.reduce(0) { $0 + HistoryTab.words(in: $1) }
+            let words = same.reduce(0) { $0 + wordsIn($1) }
             let label = HistoryTab.dayLabel(day, calendar: calendar)
             out.append(.day(id: day, day: label.day, date: label.date,
                             total: "\(counted(same.count, "dictation")) · \(counted(words, "word"))"))
@@ -275,7 +298,7 @@ struct HistoryTab: View {
         return out
     }
 
-    static func words(in entry: HistoryEntry) -> Int { Insights.wordCount(entry.displayText) }
+    nonisolated static func words(in entry: HistoryEntry) -> Int { Insights.wordCount(entry.displayText) }
 
     /// "today" over "thursday 24 september"; an older day by its weekday,
     /// over its date.
