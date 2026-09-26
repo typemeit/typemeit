@@ -164,26 +164,6 @@ enum CustomWordMatcher {
         return Outcome(text: out.joined(separator: " "), fixes: fixes, hints: hints)
     }
 
-    /// The terms with only the aliases the matcher can trust. An alias made
-    /// of words the dictionary knows ("really", learned once for kinda) is
-    /// kept only when it also sounds like its term: otherwise every "really"
-    /// the speech model was unsure of would be typed as kinda, and every
-    /// confident one would be put to the clean-up model.
-    static func trustedAliases(_ terms: [Term], isKnownWord: (String) -> Bool) -> [Term] {
-        terms.map { term in
-            Term(term.text, aliases: term.aliases.filter { alias in
-                !alias.split(whereSeparator: \.isWhitespace).allSatisfy { isKnownWord(String($0)) } || soundsLike(alias, term.text)
-            })
-        }
-    }
-
-    /// Whether `heard` sounds like `term` by the hint rule, ignoring aliases.
-    static func soundsLike(_ heard: String, _ term: String) -> Bool {
-        let a = compact(letters(heard)), b = compact(letters(term))
-        guard !a.isEmpty, !b.isEmpty, Double(min(a.count, b.count)) / Double(max(a.count, b.count)) >= minLengthRatio else { return false }
-        return similarity(soundKey(a), soundKey(b)) >= hintSimilarity
-    }
-
     /// Writes each hint's term in place of the words it was heard as, at
     /// their first occurrence, keeping the punctuation around them.
     static func applyHints(_ hints: [Hint], to text: String) -> String {

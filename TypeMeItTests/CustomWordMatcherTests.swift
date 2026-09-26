@@ -113,14 +113,6 @@ final class CustomWordMatcherTests: XCTestCase {
         XCTAssertEqual(CustomWordMatcher.applyHints([.init(heard: "Maxo", term: "Maxxo")], to: "Ping Maxo, now."), "Ping Maxxo, now.")
     }
 
-    func testTrustedAliasesDropRealWordsThatDoNotSoundLikeTheTerm() {
-        let known: Set<String> = ["really", "type", "me", "it"]
-        let terms = CustomWordMatcher.trustedAliases(
-            [.init("kinda", aliases: ["really"]), .init("typeme.it", aliases: ["Titemere", "type me it"])],
-            isKnownWord: { known.contains($0.lowercased()) })
-        XCTAssertEqual(terms, [.init("kinda", aliases: []), .init("typeme.it", aliases: ["Titemere", "type me it"])])
-    }
-
     func testScoredWordsAttachWhenTheyLineUp() {
         let scored = [Transcriber.Word(text: "hello", confidence: 0.9, start: .zero, end: .zero),
                       Transcriber.Word(text: "world", confidence: .nan, start: .zero, end: .zero)]
