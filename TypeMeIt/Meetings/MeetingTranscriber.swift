@@ -22,10 +22,11 @@ enum MeetingTranscriber {
     }
 
     /// Runs steps 1 to 5 and the transcode on `meeting` in `folder`, saving
-    /// through the store as it goes. Returns the meeting `done`, `failed`,
-    /// or `pending` when the model is not installed or the task was
-    /// cancelled between chunks.
-    static func run(_ start: Meeting, folder: URL, progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
+    /// through `save` as it goes, the store unless a probe says otherwise.
+    /// Returns the meeting `done`, `failed`, or `pending` when the model is
+    /// not installed or the task was cancelled between chunks.
+    static func run(_ start: Meeting, folder: URL, save: @escaping @Sendable (Meeting) async -> Void = MeetingTranscriber.saveToStore,
+                    progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
         var meeting = start
         guard ModelStore.isInstalled else {
             meeting.transcription.state = .pending
@@ -92,13 +93,18 @@ enum MeetingTranscriber {
 
             // The far-end people the window showed talking (8.3): how many
             // the diarizer is told, and the name a one-voice far end takes.
-            let talkers = meeting.names.map { names in
-                SpeakerCount.farEndTalkers(
-                    spans: names.spans, farEnd: trackWords.first { $0.role == Meeting.Speaker.them }?.words ?? [],
-                    mic: trackWords.first { $0.role == Meeting.Speaker.you }?.words ?? [],
-                    lagMs: Fixed.meetingUILagMs, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+            // The user is whoever the window lit while the mic spoke, else
+            // the Mac's own name for them.
+            let farEndWords = trackWords.first { $0.role == Meeting.Speaker.them }?.words ?? []
+            let micWords = trackWords.first { $0.role == Meeting.Speaker.you }?.words ?? []
+            let speakerMs = Fixed.meetingMinimumSpeakerSeconds * 1000
+            let talkers = meeting.names.map {
+                SpeakerCount.farEndTalkers(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
             } ?? []
-            let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: NSFullUserName()) }
+            let userName = meeting.names.flatMap {
+                SpeakerCount.userTile(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
+            } ?? NSFullUserName()
+            let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: userName) }
             let segments = await speakers(of: &meeting, in: folder, count: count)
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
             meeting.paragraphs = TranscriptMerge.paragraphs(tracks: trackWords, segments: segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
@@ -116,7 +122,7 @@ enum MeetingTranscriber {
             if let names = meeting.names {
                 let aligned = SpeakerNaming.align(
                     speakers: meeting.speakers, segments: segments ?? [], paragraphs: meeting.paragraphs, names: names,
-                    talkers: talkers, userName: NSFullUserName(), lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
+                    talkers: talkers, userName: userName, lagMs: Fixed.meetingUILagMs, captionMatch: Fixed.meetingCaptionMatch,
                     minOverlapMs: Fixed.meetingNameMinOverlapSeconds * 1000, margin: Fixed.meetingNameMargin)
                 meeting.speakers = aligned.speakers
                 meeting.paragraphs = aligned.paragraphs
@@ -134,7 +140,7 @@ enum MeetingTranscriber {
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
             // The title ladder (9.2): who was there, then what it was about, then the app.
-            if meeting.titleSource == .app, let title = meeting.names?.title(excluding: NSFullUserName()) {
+            if meeting.titleSource == .app, let title = meeting.names?.title(excluding: userName) {
                 meeting.title = title
                 meeting.titleSource = .roster
             } else if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await generatedTitle(for: meeting) {
@@ -162,7 +168,7 @@ enum MeetingTranscriber {
         return meeting
     }
 
-    private static func save(_ meeting: Meeting) async {
+    static func saveToStore(_ meeting: Meeting) async {
         await MainActor.run { MeetingStore.shared.save(meeting) }
     }
 

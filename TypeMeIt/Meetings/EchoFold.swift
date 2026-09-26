@@ -23,15 +23,34 @@ enum EchoFold {
     /// deleted a far-end "So it's" from its own track on a 29-minute call.
     static let returnedVoiceMs = 100
 
-    /// What the runs miss: a word or three of the far end left on the mic,
-    /// where the tracks' transcripts differ ("gonna" for "going to") or only
-    /// one word coincides. Such an island goes when the mic's level follows
-    /// the far end's over it and one of its words sounds like a far-end word
-    /// said at the same moment. On the 25 September call, against
-    /// AssemblyAI, echo islands correlated 0.83 to 0.99 and the user's own
-    /// mostly under 0.4; the sounds-like test keeps a "yeah" said into a
-    /// far-end pause, which the level alone did not.
+    /// What the runs miss: far-end speech left on the mic, where the mic's
+    /// transcript of the echo came out as other words ("the the" for "of the
+    /// component") or only one word coincides. With the echo's lag and
+    /// gain read from the call (`EchoLag`), an island of any length goes
+    /// when the mic's level follows the far end's at that lag, the far end
+    /// is speaking over it, and the mic is not much louder than the echo
+    /// would be, which is the user talking over the far end. On six calls
+    /// from 21 to 25 September, against AssemblyAI, this took the far-end
+    /// words left on the user's side from 975 to 803 and kept all but 0.1%
+    /// of the user's own; the fixed search it replaced looked 0 to 100 ms
+    /// behind, and after a jump in the lag the echo of the 25 September
+    /// lunch call sat at 60 ms ahead for 45 minutes.
     static let islandGapMs = 700
+    static let trackedCorrelation = 0.7
+    /// Either side of the read lag, searched for the island's own.
+    static let trackedSearchMs = 30
+    /// A far-end word this close to the island, once moved by the lag, is the far end speaking over it.
+    static let farEndOverlapMs = 200
+    /// The mic's level over the echo the far end predicts, above which the
+    /// island has the user's voice in it.
+    static let userLouder = 3.0
+
+    /// Without a read lag, as on a call with too little echo to read: an
+    /// island of up to three words goes when the mic's level follows the far
+    /// end's 0 to 100 ms behind and one of its words sounds like a far-end
+    /// word said at the same moment. On the 25 September call echo islands
+    /// correlated 0.83 to 0.99 and the user's own mostly under 0.4; the
+    /// sounds-like test keeps a "yeah" said into a far-end pause.
     static let islandMaxWords = 3
     static let islandCorrelation = 0.8
     /// The mic's lag behind the far end searched, and the level either side
@@ -64,8 +83,10 @@ enum EchoFold {
             }
         }
         let keptOthers = others.enumerated().filter { !dropOthers.contains($0.offset) }.map(\.element)
+        let lag = EchoLag.read(micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: envelopeHz)
+        let envelopes = Envelopes(mic: micEnvelope, others: othersEnvelope, hz: envelopeHz)
         for island in islands(mic.indices.filter { !dropMic.contains($0) }, of: mic)
-        where isEcho(island.map { mic[$0] }, others: keptOthers, micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: envelopeHz) {
+        where isEcho(island.map { mic[$0] }, others: keptOthers, lag: lag, envelopes: envelopes) {
             dropMic.formUnion(island)
         }
         return Result(
@@ -87,19 +108,50 @@ enum EchoFold {
         return islands
     }
 
-    private static func isEcho(_ island: [Transcriber.Word], others: [Transcriber.Word], micEnvelope: [Float], othersEnvelope: [Float], envelopeHz: Int) -> Bool {
-        guard let first = island.first, let last = island.last, island.count <= islandMaxWords else { return false }
-        let from = max(0, (first.start.milliseconds - islandPadMs) * envelopeHz / 1000)
-        let to = min(micEnvelope.count, othersEnvelope.count, (last.end.milliseconds + islandPadMs) * envelopeHz / 1000)
-        guard from < to else { return false }
-        let lagFrames = islandMaxLagMs * envelopeHz / 1000
-        let farEnd = ArraySlice(othersEnvelope[from..<to].map(Double.init))
-        let heard = ArraySlice(micEnvelope[from..<to].map(Double.init))
-        guard let peak = EchoBleedDetector.peakCorrelation(farEnd, heard, maxLag: lagFrames / 2, centre: lagFrames / 2),
-              peak.correlation >= islandCorrelation else { return false }
-        return island.contains { word in
-            others.contains { abs($0.start.milliseconds - word.start.milliseconds) <= soundsLikeWindowMs && soundsLike($0.text, word.text) }
+    private struct Envelopes {
+        let mic: [Float]
+        let others: [Float]
+        let hz: Int
+
+        func frame(_ ms: Int) -> Int { ms * hz / 1000 }
+
+        /// The peak correlation of the mic's level with the far end's over
+        /// `from..<to` ms, searched `maxLagMs` either side of `centreMs`.
+        func correlation(from: Int, to: Int, centreMs: Int, maxLagMs: Int) -> Double? {
+            let a = max(0, frame(from)), b = min(mic.count, others.count, frame(to))
+            guard a < b else { return nil }
+            return EchoBleedDetector.peakCorrelation(
+                ArraySlice(others[a..<b].map(Double.init)), ArraySlice(mic[a..<b].map(Double.init)),
+                maxLag: frame(maxLagMs), centre: frame(centreMs))?.correlation
         }
+    }
+
+    private static func isEcho(_ island: [Transcriber.Word], others: [Transcriber.Word], lag: EchoLag, envelopes: Envelopes) -> Bool {
+        guard let first = island.first, let last = island.last else { return false }
+        let start = first.start.milliseconds, end = last.end.milliseconds
+        guard let lagMs = lag.lagMs(at: start) else {
+            guard island.count <= islandMaxWords,
+                  let correlation = envelopes.correlation(from: start - islandPadMs, to: end + islandPadMs, centreMs: islandMaxLagMs / 2, maxLagMs: islandMaxLagMs / 2),
+                  correlation >= islandCorrelation else { return false }
+            return island.contains { word in
+                others.contains { abs($0.start.milliseconds - word.start.milliseconds) <= soundsLikeWindowMs && soundsLike($0.text, word.text) }
+            }
+        }
+        guard let correlation = envelopes.correlation(from: start - islandPadMs, to: end + islandPadMs, centreMs: lagMs, maxLagMs: trackedSearchMs),
+              correlation >= trackedCorrelation,
+              others.contains(where: { $0.start.milliseconds + lagMs - farEndOverlapMs < end && start < $0.end.milliseconds + lagMs + farEndOverlapMs })
+        else { return false }
+        return !userIsLouder(from: start, to: end, lagMs: lagMs, gain: lag.gain(at: start), envelopes: envelopes)
+    }
+
+    /// Whether the mic is `userLouder` times what the echo alone would give
+    /// it over `from..<to` ms, the far end's level at `lagMs` before times the gain.
+    private static func userIsLouder(from: Int, to: Int, lagMs: Int, gain: Double?, envelopes: Envelopes) -> Bool {
+        guard let gain, gain > 0 else { return false }
+        let a = envelopes.frame(from), b = max(a + 1, envelopes.frame(to)), shift = envelopes.frame(lagMs)
+        guard a - shift >= 0, b - shift <= envelopes.others.count, b <= envelopes.mic.count else { return false }
+        let ratios = (a..<b).map { Double(envelopes.mic[$0]) / (gain * Double(envelopes.others[$0 - shift]) + .leastNonzeroMagnitude) }
+        return EchoLag.median(ratios) >= userLouder
     }
 
     /// The same word, one a prefix of the other ("9", "9am"), or within
