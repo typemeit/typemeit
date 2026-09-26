@@ -99,6 +99,28 @@ final class CustomWordMatcherTests: XCTestCase {
         XCTAssertEqual(CustomWordMatcher.soundKey("philip"), "flp")
     }
 
+    func testAConfidentWordHintsOnlyWhenItSoundsAllButTheSame() {
+        XCTAssertEqual(CustomWordMatcher.apply([.init(text: "changed", confidence: 1)], terms: ["kinda"]).hints, [])
+        XCTAssertEqual(CustomWordMatcher.apply([.init(text: "whisper", confidence: 1)], terms: ["wispr"]).hints, [.init(heard: "whisper", term: "wispr")])
+    }
+
+    func testOnlyLimitsMatchingToRunsWithTheGivenWords() {
+        let words = "Ping Tomash about the name".split(separator: " ").map { CustomWordMatcher.Word(text: String($0), confidence: nil) }
+        XCTAssertEqual(CustomWordMatcher.apply(words, terms: [.init("Tomasz"), .init("NAME")], only: ["tomash"]).text, "Ping Tomasz about the name")
+    }
+
+    func testApplyHintsWritesTheTermWithItsPunctuation() {
+        XCTAssertEqual(CustomWordMatcher.applyHints([.init(heard: "Maxo", term: "Maxxo")], to: "Ping Maxo, now."), "Ping Maxxo, now.")
+    }
+
+    func testTrustedAliasesDropRealWordsThatDoNotSoundLikeTheTerm() {
+        let known: Set<String> = ["really", "type", "me", "it"]
+        let terms = CustomWordMatcher.trustedAliases(
+            [.init("kinda", aliases: ["really"]), .init("typeme.it", aliases: ["Titemere", "type me it"])],
+            isKnownWord: { known.contains($0.lowercased()) })
+        XCTAssertEqual(terms, [.init("kinda", aliases: []), .init("typeme.it", aliases: ["Titemere", "type me it"])])
+    }
+
     func testScoredWordsAttachWhenTheyLineUp() {
         let scored = [Transcriber.Word(text: "hello", confidence: 0.9, start: .zero, end: .zero),
                       Transcriber.Word(text: "world", confidence: .nan, start: .zero, end: .zero)]

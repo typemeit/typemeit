@@ -152,13 +152,37 @@ enum ScreenContext {
         return !isKnownWord(token.lowercased())
     }
 
-    /// `terms(from:)` with the system spell checker for the user's language.
+    /// The words of `text`, as `CustomWordMatcher.letters` keys, that the
+    /// English dictionary does not know. A word is checked as written, less
+    /// surrounding punctuation, so "don't" keeps its apostrophe. Numbers are
+    /// never unknown.
+    @MainActor
+    static func unknownWords(in text: String) -> Set<String> {
+        var unknown: Set<String> = []
+        for raw in text.split(whereSeparator: \.isWhitespace) {
+            let word = raw.trimmingCharacters(in: .punctuationCharacters.union(.symbols))
+            guard word.contains(where: \.isLetter), !isEnglishWord(word) else { continue }
+            unknown.insert(CustomWordMatcher.letters(word))
+        }
+        return unknown
+    }
+
+    /// `terms(from:)` with the system spell checker's English dictionary,
+    /// the language the speech model writes. Left to identify each word's
+    /// language, the checker passes "Tomasz" and "Wieczorek" as Polish words,
+    /// and a name from any language the Mac knows would never become a term.
     @MainActor
     static func terms(from lines: [String], excluding: [String]) -> [String] {
+        terms(from: lines, excluding: excluding, isKnownWord: isEnglishWord)
+    }
+
+    /// Whether the English dictionary knows `word` as written or capitalised:
+    /// "friday" is Friday, not a name the dictionary lacks.
+    @MainActor
+    static func isEnglishWord(_ word: String) -> Bool {
         let checker = NSSpellChecker.shared
-        return terms(from: lines, excluding: excluding) { word in
-            let range = checker.checkSpelling(of: word, startingAt: 0)
-            return range.location == NSNotFound
+        return [word, word.capitalized].contains { form in
+            checker.checkSpelling(of: form, startingAt: 0, language: "en", wrap: false, inSpellDocumentWithTag: 0, wordCount: nil).location == NSNotFound
         }
     }
 }

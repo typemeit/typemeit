@@ -54,7 +54,16 @@ enum LocalCleanup {
             }
             i += run
         }
-        return out.map(\.text).joined(separator: " ")
+        return out.map { pronounI($0).text }.joined(separator: " ")
+    }
+
+    /// The speech model is English-only, so a lone "i" is the pronoun, which
+    /// the clean-up model sometimes returns lowercase: "i think" → "I think",
+    /// "i'm" → "I'm".
+    private static func pronounI(_ t: Token) -> Token {
+        let lower = t.core.lowercased()
+        guard t.core.first == "i", lower == "i" || ["i'm", "i'll", "i've", "i'd", "i’m", "i’ll", "i’ve", "i’d"].contains(lower) else { return t }
+        return Token(prefix: t.prefix, core: "I" + t.core.dropFirst(), suffix: t.suffix)
     }
 
     /// A filler goes with the comma or full stop it carries. One ending in

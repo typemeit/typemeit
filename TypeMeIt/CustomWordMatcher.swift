@@ -79,6 +79,9 @@ enum CustomWordMatcher {
     }
     /// Words that never stand for a term on their own: "or" is not "VR".
     static let stopWords: Set<String> = ["a", "an", "the", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for", "with", "as", "is", "are", "was", "were", "be", "been", "it", "its", "this", "that", "these", "those", "i", "you", "he", "she", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "our", "their", "so", "if", "not", "no", "yes", "do", "does", "did", "have", "has", "had", "can", "will", "would", "should", "could", "just", "then", "than", "there", "here", "what", "which", "who", "how", "when", "where", "why", "up", "out", "about", "into", "over", "also", "very", "all", "any", "some", "one", "two"]
+    /// How alike the sound keys of a confident run and a term must be for the
+    /// run to be put to the clean-up model as a possible mishearing.
+    static let hintSimilarity = 0.85
     /// Shorter of the two compacted letter strings over the longer.
     static let minLengthRatio = 0.7
     /// Terms with fewer letters than this match only exactly: "ack" or "lib"
@@ -89,7 +92,10 @@ enum CustomWordMatcher {
         apply(words, terms: terms.map { Term($0) })
     }
 
-    static func apply(_ words: [Word], terms: [Term]) -> Outcome {
+    /// `only`, when given, limits matching to runs holding one of these
+    /// `letters` keys: a run without one is left as heard, even when it
+    /// spells a term.
+    static func apply(_ words: [Word], terms: [Term], only: Set<String>? = nil) -> Outcome {
         let terms = terms.map { Term($0.text.trimmingCharacters(in: .whitespaces), aliases: $0.aliases.map(letters).filter { !$0.isEmpty }) }
             .filter { !letters($0.text).isEmpty }
         guard !terms.isEmpty, !words.isEmpty else {
@@ -108,6 +114,7 @@ enum CustomWordMatcher {
                 let run = Array(tokens[i..<(i + length)])
                 let runLetters = run.map { letters($0.core) }.joined()
                 guard !runLetters.isEmpty else { continue }
+                if let only, !run.contains(where: { only.contains(letters($0.core)) }) { continue }
                 // Already one of the terms: leave it, and never trade it for another.
                 if run.contains(where: { token in terms.contains { $0.text == token.core } }) { continue }
                 let allStopWords = run.allSatisfy { stopWords.contains($0.key) }
@@ -133,6 +140,10 @@ enum CustomWordMatcher {
                         if length > 1, similarity(soundKey(compact(run.dropFirst().map { letters($0.core) }.joined())), termKeys[t]) >= sim { continue }
                     }
                     if let lowest, lowest >= confidentAbove {
+                        // A confident word casts doubt only when it sounds all but
+                        // the same: at the looser bar "changed" nominated kinda and
+                        // "storage" lottie.org, each costing a model call.
+                        guard sim >= hintSimilarity else { continue }
                         let hint = Hint(heard: run.map(\.core).joined(separator: " "), term: term.text)
                         if !hints.contains(hint) { hints.append(hint) }
                         continue
@@ -151,6 +162,40 @@ enum CustomWordMatcher {
             }
         }
         return Outcome(text: out.joined(separator: " "), fixes: fixes, hints: hints)
+    }
+
+    /// The terms with only the aliases the matcher can trust. An alias made
+    /// of words the dictionary knows ("really", learned once for kinda) is
+    /// kept only when it also sounds like its term: otherwise every "really"
+    /// the speech model was unsure of would be typed as kinda, and every
+    /// confident one would be put to the clean-up model.
+    static func trustedAliases(_ terms: [Term], isKnownWord: (String) -> Bool) -> [Term] {
+        terms.map { term in
+            Term(term.text, aliases: term.aliases.filter { alias in
+                !alias.split(whereSeparator: \.isWhitespace).allSatisfy { isKnownWord(String($0)) } || soundsLike(alias, term.text)
+            })
+        }
+    }
+
+    /// Whether `heard` sounds like `term` by the hint rule, ignoring aliases.
+    static func soundsLike(_ heard: String, _ term: String) -> Bool {
+        let a = compact(letters(heard)), b = compact(letters(term))
+        guard !a.isEmpty, !b.isEmpty, Double(min(a.count, b.count)) / Double(max(a.count, b.count)) >= minLengthRatio else { return false }
+        return similarity(soundKey(a), soundKey(b)) >= hintSimilarity
+    }
+
+    /// Writes each hint's term in place of the words it was heard as, at
+    /// their first occurrence, keeping the punctuation around them.
+    static func applyHints(_ hints: [Hint], to text: String) -> String {
+        var tokens = text.split(separator: " ", omittingEmptySubsequences: false).map { LocalCleanup.Token(String($0)) }
+        for hint in hints {
+            let heard = hint.heard.split(separator: " ").map(String.init)
+            guard !heard.isEmpty, tokens.count >= heard.count,
+                  let i = (0...(tokens.count - heard.count)).first(where: { tokens[$0..<($0 + heard.count)].map(\.core) == heard }) else { continue }
+            let first = tokens[i], last = tokens[i + heard.count - 1]
+            tokens.replaceSubrange(i..<(i + heard.count), with: [LocalCleanup.Token(prefix: first.prefix, core: hint.term, suffix: last.suffix)])
+        }
+        return tokens.map(\.text).joined(separator: " ")
     }
 
     /// The terms that occur in `text` as whole words, spelled as the term.

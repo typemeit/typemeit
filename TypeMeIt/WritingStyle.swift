@@ -78,6 +78,10 @@ enum WritingStyle: String, Codable, CaseIterable, Sendable {
         // "kind of" and "sort of" hedge an adjective; before a noun they are the phrase.
         #"(?i)(^|[\s,])(kind of|sort of)(\s+)(?!(?:a|an|the|this|that|these|those|my|your|our|their|thing|things|person|people|stuff|way|place|error|problem|issue|work|job|guy|idea|deal|situation)\b)(?=[a-z])"#,
         #"(?i)(^|[.?!]\s+)(like)(,\s*|\s+)(?=(?:i|you|we|they|he|she|it|there|this|that|the|my|your|our)\b)"#,
+        // "like" before a rough quantity hedges it: "we need like three more
+        // people", "like five minutes". Not the verb ("I'd like two") and not
+        // a comparison ("looks like two people", "something like two hours").
+        #"(?i)(^|[\s,])(?<!\b(?:i|you|we|they|would|i'd|you'd|we'd|they'd|he'd|she'd|do|does|did|don't|doesn't|didn't|to|just|really|also|still|look|looks|looked|sound|sounds|seem|seems|feel|feels|felt|something|anything|nothing)\s)(like)(,\s*|\s+)(?=(?:\d+|a few|a couple|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|a hundred|a thousand)(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine|hundred|thousand))?(?:\s+(?:or|to)\s+\w+)?\s+(?:more|[a-z]+s|percent|quid|grand)\b)"#,
     ].map { try! NSRegularExpression(pattern: $0) }
 
     static func cutFillers(_ text: String) -> String {
@@ -94,14 +98,23 @@ enum WritingStyle: String, Codable, CaseIterable, Sendable {
 
     /// Uppercases the first letter of the text and of every sentence after a
     /// full stop, question or exclamation mark, so a cut at a sentence start
-    /// does not leave it lowercase.
+    /// does not leave it lowercase. A mark ends a sentence only when a space
+    /// follows it, closing quotes and brackets aside: the dot in "lottie.org"
+    /// or "Node.js" does not.
     static func capitaliseSentences(_ text: String) -> String {
         var out = ""
         var atStart = true
+        var afterMark = false
         for ch in text {
             if atStart, ch.isLetter { out.append(contentsOf: String(ch).uppercased()); atStart = false; continue }
             if ch.isLetter || ch.isNumber { atStart = false }
-            if ".?!".contains(ch) { atStart = true }
+            if ".?!".contains(ch) {
+                afterMark = true
+            } else if afterMark, ch.isWhitespace {
+                atStart = true; afterMark = false
+            } else if !"\"”’')]".contains(ch) {
+                afterMark = false
+            }
             out.append(ch)
         }
         return out
@@ -150,10 +163,8 @@ enum WritingStyle: String, Codable, CaseIterable, Sendable {
             item = item.trimmingCharacters(in: .whitespacesAndNewlines)
             lines.append("\(n + 1). " + capitaliseSentences(item))
         }
-        // Items end alike: all with a full stop when any does.
-        if lines.contains(where: { $0.hasSuffix(".") }) {
-            lines = lines.map { $0.last.map { ".?!:".contains($0) } == true ? $0 : $0 + "." }
-        }
+        // Every line is a sentence: the lead and each item end with a stop.
+        lines = lines.map { $0.last.map { ".?!:".contains($0) } == true ? $0 : $0 + "." }
         return lines.joined(separator: "\n")
     }
 
