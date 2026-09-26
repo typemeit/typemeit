@@ -182,7 +182,6 @@ private struct SquareMenuLine: View {
 /// pick and grows a cross that clears it.
 struct SquareFilter<Popover: View>: View {
     let label: String
-    var icon: String?
     var active = false
     var clear: () -> Void = {}
     @Binding var open: Bool
@@ -192,9 +191,8 @@ struct SquareFilter<Popover: View>: View {
         HStack(spacing: 0) {
             Button { open.toggle() } label: {
                 HStack(spacing: 7) {
-                    if let icon { SquareIcon(icon, size: 13) }
-                    if icon == nil || active { Text(label) }
-                    if icon == nil { SquareIcon("akar-chevron-down", size: 9) }
+                    Text(label)
+                    SquareIcon("akar-chevron-down", size: 9)
                 }
             }
             .buttonStyle(SquareButtonStyle(kind: active ? .primary : .outline))
@@ -382,11 +380,11 @@ struct SquareFilterSpecimen: View {
             }
             SquareSpecimenLine(name: "rest") {
                 SquareFilter(label: "who", open: .constant(false)) { EmptyView() }
-                SquareFilter(label: "when", icon: "akar-clock", open: $whenOpen) { EmptyView() }
+                SquareFilter(label: "when", open: $whenOpen) { EmptyView() }
             }
             SquareSpecimenLine(name: "picked") {
                 SquareFilter(label: "slack", active: true, open: .constant(false)) { EmptyView() }
-                SquareFilter(label: "this week", icon: "akar-clock", active: true, open: .constant(false)) { EmptyView() }
+                SquareFilter(label: "this week", active: true, open: .constant(false)) { EmptyView() }
             }
         }
     }
