@@ -66,12 +66,6 @@ final class MeetingCoordinator {
     private var store: MeetingStore { MeetingStore.shared }
     private var settings: Settings { Settings.shared }
 
-    private var rules: MeetingMachine.Rules {
-        var rules = MeetingMachine.Rules.fixed
-        rules.neverAsk = Set(settings.meetingNeverAsk)
-        return rules
-    }
-
     var isIdle: Bool { recording == nil && transcribing == nil && machine.state == .idle }
 
     /// Meetings whose files are being written: recording, transcribing or waiting to be.
@@ -131,7 +125,6 @@ final class MeetingCoordinator {
         model.onShowMeeting = { [weak self] id in self?.dismissToast(); self?.showTab(id) }
         model.onTranscribeMeeting = { [weak self] id, now in self?.answerTranscribe(id, now: now) }
         model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
-        model.onUndoNeverAsk = { [weak self] in self?.undoNeverAsk() }
         model.onDismissMeeting = { [weak self] in self?.dismissToast() }
     }
 
@@ -139,7 +132,7 @@ final class MeetingCoordinator {
 
     private func send(_ event: MeetingMachine.Event) {
         let before = machine.state
-        let effects = machine.handle(event, now: .now, rules: rules)
+        let effects = machine.handle(event, now: .now, rules: .fixed)
         if machine.state != before || !effects.isEmpty {
             DebugLog.write("Meeting machine: \(MeetingCoordinator.describe(event)) → \(MeetingCoordinator.describe(machine.state))\(effects.isEmpty ? "" : " · \(effects.map(MeetingCoordinator.describe).joined(separator: ", "))")")
         }
@@ -383,22 +376,6 @@ final class MeetingCoordinator {
     func stopMeeting() { send(.stop) }
 
     func recordRoom() { send(.room) }
-
-    /// The menu's Don't Ask for <app> Again, with the undo toast.
-    func neverAsk(_ owner: Owner) {
-        guard owner.canNeverAsk, !settings.meetingNeverAsk.contains(owner.bundleID) else { return }
-        settings.meetingNeverAsk.append(owner.bundleID)
-        if preRoll?.held.owner == owner { discardPreRoll() }
-        if prompting == owner { send(.decline) }
-        toast(.meetingNeverAsking(app: owner))
-    }
-
-    private func undoNeverAsk() {
-        if case .meetingNeverAsking(let owner) = overlay.model.state {
-            settings.meetingNeverAsk.removeAll { $0 == owner.bundleID }
-        }
-        dismissToast()
-    }
 
     private func showTab(_ id: UUID?) {
         AppState.shared.settingsTab = .meetings
