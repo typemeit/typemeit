@@ -472,8 +472,21 @@ private struct HeardRunMenu: View {
     @State private var store = Store.shared
     @State private var settings = Settings.shared
     @State private var spelling = ""
+    /// Forget was clicked: the menu turns into its question.
+    @State private var forgetting = false
 
     var body: some View {
+        if forgetting {
+            SquareDeleteConfirm(title: forgetTitle, confirm: "forget", cancel: { forgetting = false }) {
+                forget()
+                close()
+            }
+        } else {
+            menu
+        }
+    }
+
+    private var menu: some View {
         SquarePanel(padding: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)) {
             VStack(alignment: .leading, spacing: 8) {
                 switch standing {
@@ -487,20 +500,32 @@ private struct HeardRunMenu: View {
                     }
                     SquareField(placeholder: "should be…", text: $spelling, onSubmit: correct).frame(width: 180)
                 case .kept:
-                    Button("forget “\(term)”") {
-                        store.forgetLearned(word: term)
-                        settings.removeCustomWord(term)
-                        close()
-                    }
-                    .buttonStyle(SquareButtonStyle(small: true))
+                    Button("forget “\(term)”") { forgetting = true }
+                        .buttonStyle(SquareButtonStyle(small: true))
                 case .heard(let word):
-                    Button("forget “\(term) = \(word)”") {
-                        store.forgetAlias(heard: term, for: word)
-                        close()
-                    }
-                    .buttonStyle(SquareButtonStyle(small: true))
+                    Button("forget “\(term) = \(word)”") { forgetting = true }
+                        .buttonStyle(SquareButtonStyle(small: true))
                 }
             }
+        }
+    }
+
+    private var forgetTitle: String {
+        switch standing {
+        case .heard(let word): "forget “\(term) = \(word)”?"
+        default: "forget “\(term)”?"
+        }
+    }
+
+    private func forget() {
+        switch standing {
+        case .kept:
+            store.forgetLearned(word: term)
+            settings.removeCustomWord(term)
+        case .heard(let word):
+            store.forgetAlias(heard: term, for: word)
+        case .unknown:
+            break
         }
     }
 
