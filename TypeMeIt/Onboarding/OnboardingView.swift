@@ -317,7 +317,7 @@ private struct Status: View {
 }
 
 /// A flat ink bar on an ink-a08 track, the same gauge insights draws.
-private struct InkProgress: View {
+struct InkProgress: View {
     var value: Double
 
     var body: some View {

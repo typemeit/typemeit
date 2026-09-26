@@ -69,7 +69,13 @@ final class Pipeline {
         if settings.postProcessingEnabled, settings.screenContextEnabled { Task.detached { await ScreenContext.prewarm() } }
         // Loading the model takes seconds; done here, the first dictation does not pay for it.
         if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
+        MeetingCoordinator.shared.start()
     }
+
+    /// A meeting is being recorded: the output stays unmuted and unpaused,
+    /// since muting it would silence the far end for the user while the tap
+    /// keeps recording it, and no cue plays into the call.
+    private var meetingRecording: Bool { MeetingCoordinator.shared.recording != nil }
 
     var isBusy: Bool { phase != .idle }
 
@@ -85,7 +91,15 @@ final class Pipeline {
         case .recordingEnded: endRecording()
         case .cancelled: cancel()
         case .copyLastRequested: copyLast()
+        case .roomRequested: toggleRoom()
         }
+    }
+
+    /// The room shortcut and the menu: start a room recording, or stop the
+    /// meeting that is running.
+    func toggleRoom() {
+        let coordinator = MeetingCoordinator.shared
+        if coordinator.recording != nil { coordinator.stopMeeting() } else { coordinator.recordRoom() }
     }
 
     /// The newest transcript with any text goes to the clipboard.
@@ -98,6 +112,7 @@ final class Pipeline {
     /// The output device is muted while recording, so a cue played then has
     /// to lift the mute, sound, and put it back.
     private func playWhileMuted(_ kind: Feedback.Kind) {
+        guard !meetingRecording else { return }
         let gen = generation
         let wasMuted = OutputMute.restore()
         let wait = wasMuted ? 0.08 : 0
@@ -118,10 +133,11 @@ final class Pipeline {
         toastTask?.cancel()
         ReadBack.shared.finishNow()
         shortcuts.setPhase(.recording)
-        if settings.muteWhileRecording { OutputMute.mute() }
-        if settings.pauseWhileRecording { MediaPause.pause() }
+        if settings.muteWhileRecording, !meetingRecording { OutputMute.mute() }
+        if settings.pauseWhileRecording, !meetingRecording { MediaPause.pause() }
         do {
             try capture.start(uid: settings.microphoneUID)
+            MeetingCoordinator.shared.dictationBegan(hostTime: mach_absolute_time())
         } catch {
             Log.audio.error("Could not start capture: \(error.localizedDescription)")
             phase = .idle
@@ -180,11 +196,12 @@ final class Pipeline {
         guard phase == .recording else { return }
         let gen = generation
         let pcm = capture.stop()
+        let stoppedAt = mach_absolute_time()
         let duration = Double(pcm.count) / 16000
         let durationMs = Int(duration * 1000)
         let wasMuted = OutputMute.restore()
         MediaPause.resume()
-        if settings.audioFeedback {
+        if settings.audioFeedback, !meetingRecording {
             // The device takes a moment to come back from mute; a cue played
             // in the same instant is lost.
             let wait = wasMuted ? 0.08 : 0
@@ -202,6 +219,7 @@ final class Pipeline {
 
         let target = Frontmost.capture()
         let entryId = UUID()
+        MeetingCoordinator.shared.dictationEnded(hostTime: stoppedAt, historyId: entryId)
         let recordingFile = settings.keepRecordings && settings.historyLimit >= 0 ? RecordingArchive.save(pcm, id: entryId) : nil
         phase = .transcribing
         shortcuts.setPhase(.transcribing)

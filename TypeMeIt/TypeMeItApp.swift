@@ -37,15 +37,21 @@ final class AppState {
     var modelUnavailable: SystemLanguageModel.Availability.UnavailableReason?
     var recording = false
     var transcribing = false
+    /// A meeting is being recorded, set by the coordinator.
+    var meeting = false
     var ready = false
     /// The version downloaded and waiting to be installed, if any.
     var updateReady: String?
     /// The tab the settings window should show when next opened from the
     /// menu, if any. Cleared once the window has moved there.
     var settingsTab: SettingsTab?
+    /// The tab the settings window is showing, nil while it is closed.
+    var visibleTab: SettingsTab?
+    /// A meeting the meetings tab should scroll to and expand when next shown.
+    var revealMeeting: UUID?
 
     var menuBarImage: NSImage {
-        MenuBarIconRenderer.puff(recording: recording, transcribing: transcribing, struck: missingPermission != nil, updateReady: updateReady != nil)
+        MenuBarIconRenderer.puff(recording: recording, transcribing: transcribing, struck: missingPermission != nil, updateReady: updateReady != nil, meeting: meeting)
     }
 }
 
@@ -71,6 +77,7 @@ struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
     @State private var appState = AppState.shared
     @State private var store = Store.shared
+    @State private var meetings = MeetingCoordinator.shared
 
     /// The newest five with any text; a dictation that came out empty has
     /// nothing to copy.
@@ -130,6 +137,7 @@ struct MenuContent: View {
         if Pipeline.shared.isBusy {
             Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
         }
+        meetingItems
         Divider()
         if recentTranscripts.isEmpty {
             Text("No transcripts yet").disabled(true)
@@ -149,8 +157,39 @@ struct MenuContent: View {
                 NSApp.activate(ignoringOtherApps: true)
             } label: { Text("View All…") }
         }
+        Button {
+            appState.settingsTab = .meetings
+            openWindow(id: "settings")
+            NSApp.activate(ignoringOtherApps: true)
+        } label: { Text("View Meetings…") }
         Divider()
         Button("Quit type me it") { NSApp.terminate(nil) }.keyboardShortcut("q", modifiers: .command)
+    }
+
+    /// The meeting block (docs/meetings.md 7.11): the detected call's items
+    /// while nothing records, the room while idle, and what is running.
+    @ViewBuilder private var meetingItems: some View {
+        if let live = meetings.recording {
+            Text("Recording this meeting · \(MenuContent.elapsed(since: live.started))").disabled(true)
+            Button("Stop Recording Meeting") { meetings.stopMeeting() }
+        } else {
+            if let owner = meetings.detected {
+                Button("Record This Meeting") { meetings.recordDetected() }
+                if owner.canNeverAsk, !Settings.shared.meetingNeverAsk.contains(owner.bundleID) {
+                    Button("Don't Ask for \(owner.name) Again") { meetings.neverAsk(owner) }
+                }
+            }
+            Button("Record the Room") { meetings.recordRoom() }
+                .disabled(!appState.ready)
+        }
+        if let t = meetings.transcribing {
+            Text("Transcribing meeting · \(Int(t.fraction * 100))%").disabled(true)
+        }
+    }
+
+    /// `12m`, `1h05m`.
+    static func elapsed(since start: Date) -> String {
+        MeetingFolder.durationLabel(.seconds(max(0, Date().timeIntervalSince(start))))
     }
 
     /// Italic through an attributed string: the menu turns a font modifier
@@ -215,6 +254,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _exit(0)
     }
 
+    /// A meeting being recorded is stopped and saved first; nothing after
+    /// `applicationWillTerminate` runs.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MeetingCoordinator.shared.stopForQuit()
+        return .terminateNow
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if onboardingWindow?.isVisible == true {
             onboardingWindow?.makeKeyAndOrderFront(nil)
@@ -231,6 +277,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarClick.install()
         observePipeline()
         previewToastIfAsked()
+        MeetingProbes.runIfAsked()
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let owner = SecureInput.owner

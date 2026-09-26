@@ -22,6 +22,33 @@ final class OverlayModel {
         case updateReady(version: String)
         /// An update was found but its download failed; Sparkle retries on the next hourly check.
         case updateFailed(version: String)
+        /// A call is confirmed: record it? Stays until answered.
+        case meetingPrompt(app: ProcessOwner.Owner)
+        case meetingNeverAsking(app: ProcessOwner.Owner)
+        /// The tap delivered nothing for `Fixed.meetingSilentSeconds`.
+        case meetingSystemAudioOff
+        case meetingSaved(id: UUID)
+        case meetingFailed(id: UUID)
+        /// Stays until dismissed.
+        case meetingDiskFull(id: UUID)
+        /// The call dropped and rejoined; the recording carried on.
+        case meetingResumed(app: ProcessOwner.Owner)
+        case meetingFolderUnavailable
+
+        var isMeeting: Bool {
+            switch self {
+            case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: true
+            default: false
+            }
+        }
+
+        /// Stays up until a button answers it, never on a timer.
+        var isStanding: Bool {
+            switch self {
+            case .updateReady, .meetingPrompt, .meetingDiskFull: true
+            default: false
+            }
+        }
     }
 
     /// Which view a state is shown in: the dictation itself is the cloud,
@@ -44,11 +71,16 @@ final class OverlayModel {
     /// back to the appearance.
     var backdrop: ScreenSampler.Backdrop?
 
+    /// A meeting state that arrived while the cloud was up, shown when it
+    /// leaves (docs/meetings.md 7.7).
+    var pendingMeeting: State?
+
     var presentation: Presentation {
         switch state {
         case .hidden: .none
         case .arming, .recording, .pinned, .transcribing, .cleaningUp: .cloud
         case .copyPrompt, .learned, .undone, .updateReady, .updateFailed: .pill
+        case .meetingPrompt, .meetingNeverAsking, .meetingSystemAudioOff, .meetingSaved, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
         }
     }
 
@@ -78,4 +110,13 @@ final class OverlayModel {
     var onInstall: (@MainActor () -> Void)?
     var onOpenIntelligence: (@MainActor () -> Void)?
     var onOpenAccessibility: (@MainActor () -> Void)?
+    // Meetings, wired by the coordinator.
+    var onRecordMeeting: (@MainActor () -> Void)?
+    var onDeclineMeeting: (@MainActor () -> Void)?
+    var onStopMeeting: (@MainActor () -> Void)?
+    var onShowMeeting: (@MainActor (UUID?) -> Void)?
+    var onOpenSystemAudio: (@MainActor () -> Void)?
+    var onUndoNeverAsk: (@MainActor () -> Void)?
+    /// The cross on any meeting toast.
+    var onDismissMeeting: (@MainActor () -> Void)?
 }

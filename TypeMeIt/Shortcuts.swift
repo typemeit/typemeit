@@ -10,6 +10,9 @@ enum ShortcutEvent: Sendable {
     case cancelled
     /// The user's copy-last-transcript shortcut, while idle.
     case copyLastRequested
+    /// The user's record-the-room shortcut, while idle: starts a room
+    /// recording, or stops the one running.
+    case roomRequested
 }
 
 /// One listen-only CGEvent tap. Fn is keycode 63 on flagsChanged. Space (49)
@@ -150,6 +153,10 @@ final class Shortcuts {
             if phase == .idle, let combo = Settings.shared.copyLastShortcut, combo.matches(keyCode: keycode, flags: event.flags) {
                 if type == .keyDown { onEvent?(.copyLastRequested) }
                 return false  // swallow both so the key does not also reach the app underneath
+            }
+            if phase == .idle, let combo = Settings.shared.recordRoomShortcut, combo.matches(keyCode: keycode, flags: event.flags) {
+                if type == .keyDown { onEvent?(.roomRequested) }
+                return false
             }
             if keycode == Shortcuts.spaceKeycode, fnIsDown || phase == .pinned, phase == .recording || phase == .pinned {
                 if type == .keyDown, phase == .recording {

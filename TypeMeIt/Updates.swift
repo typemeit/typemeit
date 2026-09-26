@@ -175,12 +175,13 @@ final class Updates: NSObject, SPUUpdaterDelegate {
         !installRequested && Settings.shared.autoUpdate && Settings.shared.askBeforeUpdating
     }
 
-    /// Installs a ready update once no dictation is in flight, so the relaunch
-    /// never cuts off a recording or a paste.
+    /// Installs a ready update once no dictation is in flight and no meeting
+    /// is recording or transcribing, so the relaunch never cuts off a
+    /// recording, a paste or a call.
     fileprivate func installWhenIdle() {
         guard installsUnattended, case .readyToInstall = state else { return }
         idleTimer?.invalidate()
-        if Pipeline.shared.phase == .idle { install(); return }
+        if Pipeline.shared.phase == .idle, MeetingCoordinator.shared.isIdle { install(); return }
         idleTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
             Task { @MainActor in Updates.shared.installWhenIdle() }
         }

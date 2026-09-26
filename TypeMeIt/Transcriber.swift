@@ -1,17 +1,24 @@
 import Foundation
 import TranscribeCpp
 
-/// transcribe.cpp with Metal. One model, one session, loaded on first use and
-/// freed after five idle minutes. Sessions are single-threaded; the actor
-/// guarantees one run at a time.
+/// transcribe.cpp with Metal. One model, loaded on first use and freed after
+/// five idle minutes, with a session for dictation and a second one for
+/// meeting chunks: the abort flag is per session, so a dictation cancel
+/// never aborts a meeting chunk and vice versa. Sessions are
+/// single-threaded and the library allows one run per model at a time; the
+/// actor guarantees that.
 actor Transcriber {
     static let shared = Transcriber()
 
     private var model: OpaquePointer?
     private var session: OpaquePointer?
+    private var meetingSession: OpaquePointer?
     private var unloadTask: Task<Void, Never>?
     private let abortFlag = AbortFlag()
+    private let meetingAbortFlag = AbortFlag()
     private var backendsReady = false
+    /// Meeting chunks waiting on the actor; the idle unload waits for them.
+    private var meetingChunksQueued = 0
 
     final class AbortFlag: @unchecked Sendable {
         private let lock = NSLock()
@@ -21,11 +28,13 @@ actor Transcriber {
     }
 
     enum Error: Swift.Error, LocalizedError {
-        case status(String)
+        /// The library's status beside its message, so a caller can tell an
+        /// out-of-memory run (retryable on a shorter input) from the rest.
+        case status(transcribe_status, String)
         case aborted
         var errorDescription: String? {
             switch self {
-            case .status(let s): "Transcription failed: \(s)"
+            case .status(_, let s): "Transcription failed: \(s)"
             case .aborted: "Transcription cancelled"
             }
         }
@@ -36,7 +45,7 @@ actor Transcriber {
     private static func check(_ st: transcribe_status) throws {
         guard st != TRANSCRIBE_OK else { return }
         if st == TRANSCRIBE_ERR_ABORTED { throw Error.aborted }
-        throw Error.status(String(cString: transcribe_status_string(Int32(st.rawValue))))
+        throw Error.status(st, String(cString: transcribe_status_string(Int32(st.rawValue))))
     }
 
     private func ensureLoaded() throws {
@@ -67,19 +76,31 @@ actor Transcriber {
             st = transcribe_model_load_file(path, &lp, &m)
         }
         try Transcriber.check(st)
+        let s = try Transcriber.makeSession(on: m, abort: abortFlag)
+        model = m
+        session = s
+        let backend = m.map { String(cString: transcribe_model_backend($0)) } ?? "?"
+        Log.transcriber.info("Model loaded on \(backend) in \(ContinuousClock.now - started)")
+    }
+
+    private static func makeSession(on model: OpaquePointer?, abort flag: AbortFlag) throws -> OpaquePointer? {
         var sp = transcribe_session_params()
         transcribe_session_params_init(&sp)
         var s: OpaquePointer?
-        try Transcriber.check(transcribe_session_init(m, &sp, &s))
-        model = m
-        session = s
-        let flag = abortFlag
+        try Transcriber.check(transcribe_session_init(model, &sp, &s))
         transcribe_set_abort_callback(s, { userInfo in
             guard let userInfo else { return false }
             return Unmanaged<AbortFlag>.fromOpaque(userInfo).takeUnretainedValue().get()
         }, Unmanaged.passUnretained(flag).toOpaque())
-        let backend = m.map { String(cString: transcribe_model_backend($0)) } ?? "?"
-        Log.transcriber.info("Model loaded on \(backend) in \(ContinuousClock.now - started)")
+        return s
+    }
+
+    /// The meeting session, created on the loaded model the first time a
+    /// chunk needs it.
+    private func ensureMeetingSession() throws -> OpaquePointer? {
+        try ensureLoaded()
+        if meetingSession == nil { meetingSession = try Transcriber.makeSession(on: model, abort: meetingAbortFlag) }
+        return meetingSession
     }
 
     func preload() {
@@ -88,7 +109,7 @@ actor Transcriber {
     }
 
     /// One word of a transcript with how sure the model was of it.
-    struct Word: Sendable, Equatable {
+    struct Word: Sendable, Equatable, Codable {
         let text: String
         /// The lowest per-token probability among the word's tokens. Parakeet
         /// reports a joint-softmax probability per emitted token; the library
@@ -163,8 +184,33 @@ actor Transcriber {
 
     nonisolated func cancel() { abortFlag.set(true) }
 
+    // MARK: Meetings
+
+    /// A meeting chunk on the meeting session. `pcm` is 16 kHz mono Float32,
+    /// at most `Fixed.meetingChunkSeconds` long. The actor serialises it
+    /// with dictation, so a dictation waits at most one chunk.
+    func transcribeMeetingChunk(_ pcm: [Float]) throws -> Transcript {
+        unloadTask?.cancel()
+        meetingChunksQueued += 1
+        defer { meetingChunksQueued -= 1; scheduleUnload() }
+        let s = try ensureMeetingSession()
+        meetingAbortFlag.set(false)
+        var rp = transcribe_run_params()
+        transcribe_run_params_init(&rp)
+        let started = ContinuousClock.now
+        let st = pcm.withUnsafeBufferPointer { transcribe_run(s, $0.baseAddress, Int32(pcm.count), &rp) }
+        try Transcriber.check(st)
+        let text = String(cString: transcribe_full_text(s))
+        Log.transcriber.info("Meeting chunk: \(pcm.count / 16000) s of audio in \(ContinuousClock.now - started)")
+        return Transcript(text: text, words: Transcriber.words(of: s))
+    }
+
+    /// Aborts the meeting chunk in flight, and only that.
+    nonisolated func cancelMeeting() { meetingAbortFlag.set(true) }
+
     private func scheduleUnload() {
         unloadTask?.cancel()
+        guard meetingChunksQueued == 0 else { return }
         unloadTask = Task { [weak self] in
             try? await Task.sleep(for: Fixed.modelUnloadIdle)
             guard !Task.isCancelled else { return }
@@ -174,8 +220,10 @@ actor Transcriber {
 
     func unload() {
         guard session != nil || model != nil else { return }
+        if meetingSession != nil { transcribe_session_free(meetingSession) }
         transcribe_session_free(session)
         transcribe_model_free(model)
+        meetingSession = nil
         session = nil
         model = nil
         Log.transcriber.info("Model unloaded after idle")

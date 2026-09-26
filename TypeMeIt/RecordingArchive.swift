@@ -58,37 +58,58 @@ enum RecordingArchive {
     }
 }
 
-/// Plays one history recording at a time from the history tab.
+/// Plays one recording at a time from the history and meetings tabs. A
+/// meeting's tracks are several files started together, so its two sides
+/// stay aligned.
 @MainActor
 @Observable
 final class RecordingPlayer: NSObject, AVAudioPlayerDelegate {
     static let shared = RecordingPlayer()
 
+    /// How far ahead every player is scheduled, so all of them start on the
+    /// same device clock tick.
+    private static let startLead: TimeInterval = 0.1
+
     private(set) var playing: UUID?
-    private var player: AVAudioPlayer?
+    private var players: [AVAudioPlayer] = []
 
     func toggle(_ entry: HistoryEntry) {
-        if playing == entry.id { stop(); return }
-        stop()
         guard let file = entry.recordingFile else { return }
+        toggle(id: entry.id, urls: [RecordingArchive.url(for: file)])
+    }
+
+    /// Starts every URL at the same moment, or stops if `id` is playing.
+    func toggle(id: UUID, urls: [URL]) {
+        if playing == id { stop(); return }
+        stop()
+        guard !urls.isEmpty else { return }
         do {
-            let p = try AVAudioPlayer(contentsOf: RecordingArchive.url(for: file))
-            p.delegate = self
-            p.play()
-            player = p
-            playing = entry.id
+            let ps = try urls.map { try AVAudioPlayer(contentsOf: $0) }
+            for p in ps { p.delegate = self; p.prepareToPlay() }
+            let at = (ps.first?.deviceCurrentTime ?? 0) + RecordingPlayer.startLead
+            for p in ps { p.play(atTime: at) }
+            players = ps
+            playing = id
         } catch {
             Log.audio.error("Could not play recording: \(error.localizedDescription)")
         }
     }
 
     func stop() {
-        player?.stop()
-        player = nil
+        for p in players { p.stop() }
+        players = []
         playing = nil
     }
 
+    /// Stops when what is playing is about to be deleted.
+    func stopIfPlaying(any ids: Set<UUID>) {
+        if let playing, ids.contains(playing) { stop() }
+    }
+
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.stop() }
+        Task { @MainActor in
+            // The tracks end together; the first to finish takes the rest down.
+            self.stop()
+        }
     }
 }

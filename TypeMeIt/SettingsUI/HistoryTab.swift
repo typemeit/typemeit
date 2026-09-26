@@ -25,7 +25,7 @@ enum HistorySelection {
 /// A hairline square that fills with ink when the row is selected. Twelve
 /// points is easy to miss, so the border comes up to full ink under the
 /// pointer rather than waiting for the click to say the box was there.
-private struct SelectBox: View {
+struct SelectBox: View {
     let on: Bool
     let action: () -> Void
     @State private var hovering = false
