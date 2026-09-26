@@ -78,6 +78,7 @@ struct HistoryTab: View {
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
     @State private var open: UUID?
+    @State private var deletingPicked = false
 
     var body: some View {
         if let id = open, let entry = store.history.first(where: { $0.id == id }) {
@@ -140,11 +141,13 @@ struct HistoryTab: View {
             }
             Spacer(minLength: 0)
             if !selected.isEmpty {
-                Button("delete \(selected.count)") {
-                    store.delete(ids: selected)
-                    selected = []
-                }
-                .buttonStyle(SquareButtonStyle())
+                Button("delete \(selected.count)") { deletingPicked.toggle() }
+                    .buttonStyle(SquareButtonStyle())
+                    .squareConfirmDelete(isPresented: $deletingPicked, title: "delete \(counted(selected.count, "dictation"))?",
+                                         detail: SquareDeleteConfirm.gone(selected.count)) {
+                        store.delete(ids: selected)
+                        selected = []
+                    }
             }
         }
         .padding(.top, 16)
@@ -263,8 +266,16 @@ enum HistoryColumns {
     static let words: CGFloat = 52
     static let action: CGFloat = 26
     static let gap: CGFloat = 16
-    /// Between the select box, the row and its two actions.
+    /// Between the select box and the row.
     static let edge: CGFloat = 4
+    /// Between the words and the first action's box, whose own margin makes
+    /// up the rest of a column's gap. The two actions sit box to box.
+    static let actionLead: CGFloat = 8
+    /// What the two actions take at the end of a row.
+    static var actions: CGFloat { actionLead + action * 2 }
+    /// The select box and the actions are centred on the first line of the
+    /// row, where its words are: this far above the line's baseline.
+    static let lineMiddle = Square.appKitMono(12).capHeight / 2
     /// How far the columns sit inside the row's own left edge.
     static let inset: CGFloat = 8
     /// Where the time column starts, from the list's edge.
@@ -280,7 +291,7 @@ enum HistoryColumns {
                 Text("words").frame(width: words, alignment: .trailing)
             }
             .padding(.leading, inset)
-            Color.clear.frame(width: action * 2 + edge, height: 1)
+            Color.clear.frame(width: actions, height: 1)
         }
         .font(Square.mono(11))
         .foregroundStyle(DesignTokens.Colors.ink3)
@@ -320,7 +331,7 @@ private struct HistoryDayRow: View {
             .padding(.leading, HistoryColumns.inset)
             .padding(.top, 14)
             .padding(.bottom, 8)
-            Color.clear.frame(width: HistoryColumns.action * 2 + HistoryColumns.edge, height: 1)
+            Color.clear.frame(width: HistoryColumns.actions, height: 1)
         }
         .padding(.trailing, HistoryColumns.inset)
         .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
@@ -341,15 +352,18 @@ private struct HistoryRow: View {
     let copy: () -> Void
     let delete: () -> Void
     @State private var hovering = false
+    @State private var deleting = false
 
     var body: some View {
-        HStack(spacing: HistoryColumns.edge) {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
             Toggle("select", isOn: $picked)
                 .toggleStyle(SquareTickStyle(faint: true))
                 .labelsHidden()
                 .frame(width: HistoryColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
                 .help(picked ? "deselect" : "select · shift-click for a range")
+                .onFirstLine()
+                .padding(.trailing, HistoryColumns.edge)
             Button(action: open) {
                 HStack(alignment: .firstTextBaseline, spacing: HistoryColumns.gap) {
                     Text(entry.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
@@ -381,18 +395,31 @@ private struct HistoryRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            Button(action: copy) { SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14) }
-                .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
-                .help("copy")
-                .accessibilityLabel("copy")
-            Button(action: delete) { SquareIcon("akar-trash-can", size: 14) }
-                .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
-                .help("delete")
-                .accessibilityLabel("delete")
+            HStack(spacing: 0) {
+                Button(action: copy) { SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14) }
+                    .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                    .help("copy")
+                    .accessibilityLabel("copy")
+                Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
+                    .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                    .help("delete")
+                    .accessibilityLabel("delete")
+                    .squareConfirmDelete(isPresented: $deleting, title: "delete this dictation?", delete: delete)
+            }
+            .onFirstLine()
+            .padding(.leading, HistoryColumns.actionLead)
         }
         .padding(.trailing, HistoryColumns.inset)
         .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
         .overlay(alignment: .top) { SquareRule() }
         .onHover { hovering = $0 }
+    }
+}
+
+private extension View {
+    /// Centres a box on the first line of a history row, however many lines
+    /// the dictation runs to.
+    func onFirstLine() -> some View {
+        alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + HistoryColumns.lineMiddle }
     }
 }

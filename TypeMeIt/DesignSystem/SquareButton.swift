@@ -2,10 +2,11 @@ import SwiftUI
 
 /// The square button: a mono label on an ink outline. Primary fills with the
 /// slab, quiet drops the outline, and disabled goes to ink-3 on a rule
-/// outline whatever its kind. Under the pointer every kind casts a hard
-/// shadow 2 pt down and to the right, a quiet one taking an ink edge to cast
-/// it from; held, the button presses down onto its shadow. On a slab surface
-/// every kind but quiet fills with on-slab, and casts an on-slab shadow.
+/// outline whatever its kind. Under the pointer an outline or quiet button
+/// casts a hard shadow 2 pt down and to the right, a quiet one taking an ink
+/// edge to cast it from; a black one casts none. Held, the button presses
+/// down 2 pt. On a slab surface every kind but quiet fills with on-slab, and
+/// casts an on-slab shadow.
 ///
 /// An icon goes in as a `Label`, with the icon a `SquareIcon` of 12.
 struct SquareButtonStyle: ButtonStyle {
@@ -35,6 +36,9 @@ private struct SquareButtonLabel: View {
     private var hot: Bool { enabled && pose.hot(hovering) }
     private var down: Bool { enabled && pose.down(configuration.isPressed) }
     private var inverse: Bool { onSlab && kind != .quiet }
+    /// A black button casts no shadow under the pointer: black on black only
+    /// reads as the button growing.
+    private var casts: Bool { kind != .primary || inverse }
 
     var body: some View {
         configuration.label
@@ -48,7 +52,7 @@ private struct SquareButtonLabel: View {
             .frame(height: small ? SquareButtonStyle.smallHeight : SquareButtonStyle.height)
             .background(Rectangle().fill(background))
             .overlay(Rectangle().strokeBorder(border, lineWidth: DesignTokens.hairline))
-            .squarePress(hot: hot, down: down, shadow: inverse || onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
+            .squarePress(hot: hot && casts, down: down, shadow: inverse || onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
     }
