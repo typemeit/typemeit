@@ -37,16 +37,16 @@ struct SquareWordChip: View {
             if let learnedFrom {
                 SquareIcon("akar-sparkles", size: 11)
                     .foregroundStyle(DesignTokens.Colors.ink2)
-                    .help("learned when you corrected \(learnedFrom)")
+                    .help("learned from a correction: heard “\(learnedFrom)”")
             }
             Text(word).centredLetters(word)
             if !heardAs.isEmpty {
-                let heard = heardAs.joined(separator: " · ")
+                let heard = heardAs.joined(separator: ", ")
                 Text(heard)
                     .font(Square.mono(11))
                     .foregroundStyle(DesignTokens.Colors.ink3)
                     .centredLetters(heard, size: 11)
-                    .help("also heard as \(heard)")
+                    .help("heard as \(heard)")
             }
             if forget != nil {
                 SquareCross(help: "forget \(word)", action: { forgetting.toggle() }, rest: DesignTokens.Colors.ink3)
