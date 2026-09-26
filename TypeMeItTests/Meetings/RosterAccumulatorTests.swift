@@ -56,6 +56,28 @@ struct RosterAccumulatorTests {
         #expect(a.finish(atMs: 1000) == MeetingNames(source: .roster, roster: [], channel: nil, spans: [], captions: nil, call: "gzt-tyaf-sdy"))
     }
 
+    @Test func aFlickerShorterThanTheHoldIsOneTurn() {
+        // Meet's highlight goes out between words.
+        var a = RosterAccumulator(minimumSpanMs: 250, holdMs: 1000)
+        for (ms, lit) in [(0, true), (250, false), (500, true), (750, false), (1000, false), (1250, false), (1500, false), (1750, false)] {
+            a.add(reading(speaking: lit ? ["Ana"] : []), atMs: ms)
+        }
+        #expect(a.finish(atMs: 2000)?.spans == [MeetingNames.Span(name: "Ana", startMs: 0, endMs: 750)])
+    }
+
+    @Test func aPauseLongerThanTheHoldEndsTheTurn() {
+        var a = RosterAccumulator(minimumSpanMs: 250, holdMs: 1000)
+        a.add(reading(speaking: ["Ana"]), atMs: 0)
+        a.add(reading(speaking: ["Ana"]), atMs: 1000)
+        a.add(reading(), atMs: 1250)
+        a.add(reading(), atMs: 2250)
+        a.add(reading(speaking: ["Ana"]), atMs: 3000)
+        a.add(reading(), atMs: 3500)
+        #expect(a.finish(atMs: 4000)?.spans == [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 1250), MeetingNames.Span(name: "Ana", startMs: 3000, endMs: 3500),
+        ])
+    }
+
     @Test func nothingReadIsNil() {
         var a = RosterAccumulator(minimumSpanMs: 250)
         a.add(reading(), atMs: 0)
