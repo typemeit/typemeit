@@ -88,7 +88,7 @@ struct SquareMenu<Value: Hashable>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .squarePopover(isPresented: $open, edge: .trailing) {
+        .squarePopover(isPresented: $open) {
             SquareMenuList(items: options.map { SquareMenuList.Item(label: label($0), checked: $0 == selection) }, minWidth: minWidth) { i in
                 selection = options[i]
                 open = false
@@ -202,7 +202,7 @@ struct SquareFilter<Popover: View>: View {
                 .accessibilityLabel("clear \(label)")
             }
         }
-        .squarePopover(isPresented: $open, edge: .leading, content: popover)
+        .squarePopover(isPresented: $open, content: popover)
     }
 }
 
