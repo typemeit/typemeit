@@ -21,12 +21,20 @@ enum MeetingTranscriber {
         var errorDescription: String? { "cancelled" }
     }
 
+    /// How far a pass has got: the share of the audio transcribed, then the
+    /// speakers, then the title and summary.
+    enum Progress: Equatable, Sendable {
+        case transcribing(Double)
+        case findingSpeakers
+        case summarising
+    }
+
     /// Runs steps 1 to 5 and the transcode on `meeting` in `folder`, saving
     /// through `save` as it goes, the store unless a probe says otherwise.
     /// Returns the meeting `done`, `failed`, or `pending` when the model is
     /// not installed or the task was cancelled between chunks.
     static func run(_ start: Meeting, folder: URL, save: @escaping @Sendable (Meeting) async -> Void = MeetingTranscriber.saveToStore,
-                    progress: @escaping @Sendable (Double) -> Void) async -> Meeting {
+                    progress: @escaping @Sendable (Progress) -> Void) async -> Meeting {
         var meeting = start
         guard ModelStore.isInstalled else {
             meeting.transcription.state = .pending
@@ -75,7 +83,7 @@ enum MeetingTranscriber {
                     try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1
-                    progress(Double(doneChunks) / Double(max(totalChunks, 1)))
+                    progress(.transcribing(Double(doneChunks) / Double(max(totalChunks, 1))))
                     await save(meeting)
                 }
                 trackWords.append(words)
@@ -91,6 +99,7 @@ enum MeetingTranscriber {
                 }
             }
 
+            progress(.findingSpeakers)
             // The far-end people the window showed talking (8.3): how many
             // the diarizer is told, and the name a one-voice far end takes.
             // The user is whoever the window lit while the mic spoke, else
@@ -139,6 +148,7 @@ enum MeetingTranscriber {
             meeting.transcription.asr = (ModelStore.fileName as NSString).deletingPathExtension
             for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
+            if !meeting.paragraphs.isEmpty { progress(.summarising) }
             // The title ladder (9.2): who was there, then what it was about, then the app.
             if meeting.titleSource == .app, let title = meeting.names?.title(excluding: userName) {
                 meeting.title = title

@@ -207,11 +207,11 @@ struct MeetingPage: View {
     @ViewBuilder private var state: some View {
         if let run = coordinator.transcribing, run.id == meeting.id {
             HStack(spacing: 12) {
-                Text("transcribing · \(Int(run.fraction * 100))%")
+                Text(run.progress.label)
                     .font(Square.mono(12))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
-                SquareBar(fraction: run.fraction, width: 220)
+                if case .transcribing = run.progress { SquareBar(fraction: run.fraction, width: 220) }
             }
         } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
             MeetingChips(meeting: meeting)
@@ -223,7 +223,7 @@ struct MeetingPage: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: 560, alignment: .leading)
         } else if coordinator.summarising.contains(meeting.id) {
-            Text("summarising…").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink3)
+            Text("summarising…").font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
         }
     }
 
@@ -349,13 +349,15 @@ struct MeetingPage: View {
         } else {
             rows.append(("asr", t.asr ?? "none yet", t.asr == nil))
         }
-        rows.append(("speakers", t.diarizer ?? (meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
+        let stage = running ? coordinator.transcribing?.progress : nil
+        rows.append(("speakers", t.diarizer.map(DiarizerModelStore.label) ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
         rows.append(("names from", MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"), MeetingPage.nameSource(meeting) == nil))
         if meeting.kind == .call { rows.append(("echo", MeetingPage.echo(meeting.echo), meeting.echo == .notMeasured)) }
         if let took = t.tookMs, meeting.durationMs > 0 {
             rows.append(("transcribed", String(format: "%@ · %.2fx", MeetingPage.seconds(took), Double(took) / Double(meeting.durationMs)), false))
         }
-        let summary = meeting.summary.map { _ in "apple intelligence" } ?? (coordinator.summarising.contains(meeting.id) ? "writing" : meeting.isDone ? "none" : "waiting")
+        let writing = coordinator.summarising.contains(meeting.id) || stage == .summarising
+        let summary = meeting.summary.map { _ in "apple intelligence" } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
         rows.append(("summary", summary, meeting.summary == nil))
         rows.append(("title", MeetingPage.titleSource(meeting.titleSource), false))
         return rows
