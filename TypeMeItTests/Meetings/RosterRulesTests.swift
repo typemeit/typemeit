@@ -36,43 +36,56 @@ struct RosterRulesTests {
 
     // MARK: Meet
 
+    /// A tile as the 25 September capture had it: the name six levels down,
+    /// `kssMZb` on the tile and on one element inside it while its person speaks.
     private func meetTile(_ depth: Int, name: String, speaking: Bool) -> [AXNode] {
-        [
-            node(depth, classes: ["tile"]),
-            node(depth + 1, classes: speaking ? ["ring", "Oaajhc"] : ["ring"]),
-            node(depth + 1, classes: ["notranslate"]),
-            node(depth + 2, "AXStaticText", value: name),
+        let lit = speaking ? [RosterRules.Meet.speakingClass] : []
+        return [
+            node(depth, classes: [RosterRules.Meet.tileClass, "i8wGAe"] + lit + ["iPFm3e", "MVbbRb", "tSl2vc"]),
+            node(depth + 1, classes: ["oZRSLe"]),
+            node(depth + 1),
+            node(depth + 2, classes: ["ZY8hPc", "iPFm3e"]),
+            node(depth + 3, classes: ["OFfHfd", "urlhDe", "iPFm3e"]),
+            node(depth + 4, classes: ["XEazBc", "adnwBd"]),
+            node(depth + 5),
+            node(depth + 6, "AXStaticText", value: name),
+            node(depth + 2, classes: ["lH9pqf", "atLQQ", "iPFm3e"] + lit),
         ]
     }
 
-    @Test func meetReadsTileNamesAndTheLitTile() {
-        let nodes = [node(0, "AXWebArea", title: "Meet - abc-defg-hij")]
-            + [node(1, classes: ["notranslate"]), node(2, "AXStaticText", value: "abc-defg-hij")]
-            + meetTile(1, name: "Ana Lopez", speaking: false)
-            + meetTile(1, name: "Ben Ode", speaking: true)
+    private func meetPage(_ tiles: [AXNode]) -> [AXNode] {
+        [node(0, "AXWebArea", title: "Meet – vmt-xuvg-jgd"), node(1, "AXStaticText", value: "18:32"), node(1, "AXStaticText", value: "vmt-xuvg-jgd"),
+         node(1, title: "Call feature notifications and actions"), node(2, "AXPopUpButton", title: "People"), node(1)] + tiles
+    }
+
+    @Test func meetReadsTileNamesAndTheSpeakingTile() {
+        let nodes = meetPage(meetTile(2, name: "Ana Lopez", speaking: false) + meetTile(2, name: "Ben Ode", speaking: true))
         #expect(RosterRules.meet(nodes) == RosterReading(roster: ["Ana Lopez", "Ben Ode"], speaking: ["Ben Ode"], captions: [], channel: nil))
     }
 
-    @Test func aSpeakingClassAboveTwoTilesNamesNobody() {
-        let nodes = [node(0, "AXWebArea"), node(1, classes: ["Oaajhc"])] + meetTile(2, name: "Ana Lopez", speaking: false) + meetTile(2, name: "Ben Ode", speaking: false)
-        #expect(RosterRules.meet(nodes).speaking == [])
+    @Test func aTileWithoutAPersonsNameIsSkipped() {
+        let nodes = meetPage(meetTile(2, name: "You", speaking: true) + meetTile(2, name: "Max Mitchell (Presentation)", speaking: false)
+            + meetTile(2, name: "2 others", speaking: false))
+        #expect(RosterRules.meet(nodes) == RosterReading())
     }
 
-    @Test func meetReadsCaptionTurns() {
-        let nodes = [
-            node(0, "AXWebArea"),
-            node(1, description: "Captions"),
-            node(2, classes: ["nMcdL"]),
-            node(3, classes: ["NWpY1d"]), node(4, "AXStaticText", value: "Ana Lopez"),
-            node(3, classes: ["ygicle"]), node(4, "AXStaticText", value: "so the plan is"), node(4, "AXStaticText", value: "to ship friday"),
-            node(2, classes: ["nMcdL"]),
-            node(3, classes: ["NWpY1d"]), node(4, "AXStaticText", value: "Ben Ode"),
-            node(3, classes: ["ygicle"]), node(4, "AXStaticText", value: "sounds good"),
-        ]
-        #expect(RosterRules.meet(nodes).captions == [
-            RosterReading.Caption(name: "Ana Lopez", text: "so the plan is to ship friday"),
-            RosterReading.Caption(name: "Ben Ode", text: "sounds good"),
-        ])
+    @Test func theSpeakingClassOffATileNamesNobody() {
+        let nodes = meetPage([node(2, classes: [RosterRules.Meet.speakingClass]), node(3, "AXStaticText", value: "Ana Lopez")])
+        #expect(RosterRules.meet(nodes) == RosterReading())
+    }
+
+    @Test func tileRootsAreTheTilesAlone() {
+        let meet = meetPage(meetTile(2, name: "Ana Lopez", speaking: false) + meetTile(2, name: "Ben Ode", speaking: true))
+        #expect(RosterRules.tileRoots(meet, target: .meet) == [6, 15])
+        let slack = [node(0, description: "View Ana Lopez's profile", id: "huddle-grid-gridcell-9f2c_U0BBBBBBBBB-a11y_huddle_peer_tile_description")]
+            + slackTile(0, session: "9f2c", user: "U0BBBBBBBBB", name: "Ana Lopez", speaking: false)
+        #expect(RosterRules.tileRoots(slack, target: .slackHuddle) == [1])
+    }
+
+    @Test func aTileReadOnItsOwnReadsTheSame() {
+        // Between walks, Roster reads each tile's own subtree from depth 0.
+        let nodes = meetTile(0, name: "Ana Lopez", speaking: true) + meetTile(0, name: "Ben Ode", speaking: false)
+        #expect(RosterRules.meet(nodes) == RosterReading(roster: ["Ana Lopez", "Ben Ode"], speaking: ["Ana Lopez"], captions: [], channel: nil))
     }
 
     @Test func meetsOwnWordsAreNotNames() {

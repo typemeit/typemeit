@@ -378,7 +378,6 @@ enum Fixed {
     /// (docs/meetings.md 6) picks between them; until it runs, the default.
     static let meetingDiarizerStepRatio = 0.2
     /// S3, from humla (MIT) and measured here: see `Diarizer.configuration`.
-    static let meetingDiarizerThreshold = 0.5
     static let meetingDiarizerMinOnSeconds = 1.0
     static let meetingDiarizerMinOffSeconds = 0.5
     /// A diarized speaker with less talk than this is folded into the
@@ -393,12 +392,15 @@ enum Fixed {
     /// The delay between a voice reaching the far-end track and the UI
     /// indicator lighting. 0 until S4 measures it (median of ten claps).
     static let meetingUILagMs = 0
-    /// How often the meeting window is read while recording: a turn shorter
-    /// than this is a backchannel, not a speaker (docs/meetings.md 7.8).
+    /// How often the meeting's participant tiles are read while recording: a
+    /// turn shorter than this is a backchannel, not a speaker (docs/meetings.md 7.8).
     static let meetingSpeakingPollMs = 250
-    /// How often the Meet code or the huddle's channel is read while
-    /// recording: it changes only when the call does.
-    static let meetingCallKeyPollSeconds = 5
+    /// How often the whole meeting window is walked while recording, for the
+    /// call's code or channel and for tiles that came or went.
+    static let meetingRosterWalkSeconds = 5
+    /// A speaker stays speaking through a gap in the indicator this long:
+    /// Meet's highlight goes out between words, Slack's lingers about 1.5 s.
+    static let meetingSpeakingHoldMs = 1000
     /// Token containment between a caption line and a paragraph, as in the
     /// echo work.
     static let meetingCaptionMatch = 0.5
