@@ -11,6 +11,9 @@ struct SquarePrompt<Actions: View>: View {
         case icon(String)
         /// The first letter of the app a call is in.
         case app(String)
+        /// An akar icon that is also a way somewhere, such as the
+        /// dictionary a learned word went to.
+        case button(String, help: String, action: () -> Void)
     }
 
     var mark: Mark = .none
@@ -21,6 +24,9 @@ struct SquarePrompt<Actions: View>: View {
     var onDismiss: () -> Void = {}
     var minWidth: CGFloat?
     @ViewBuilder var actions: Actions
+
+    /// The pointer's square round a mark that is a button.
+    fileprivate static var markButton: CGFloat { 22 }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -67,6 +73,14 @@ struct SquarePrompt<Actions: View>: View {
                 .centredLetters(letter, size: 10)
                 .frame(width: 18, height: 18)
                 .overlay(Rectangle().strokeBorder(ink, lineWidth: DesignTokens.hairline))
+        case .button(let name, let help, let action):
+            // The icon button's grey square reaches past the mark's 14 pt,
+            // but the message starts where it would after any other mark.
+            Button(action: action) { SquareIcon(name, size: 14) }
+                .buttonStyle(SquareIconButtonStyle(side: SquarePrompt.markButton))
+                .padding(-(SquarePrompt.markButton - 14) / 2)
+                .help(help)
+                .accessibilityLabel(help)
         }
     }
 }
@@ -95,10 +109,10 @@ struct SquarePromptSpecimen: View {
             SquarePrompt(mark: .icon("akar-clipboard"), message: Text("nowhere to type it"), dismiss: "cancel") {
                 Button("copied") {}.buttonStyle(SquareButtonStyle(kind: .primary)).disabled(true)
             }
-            SquarePrompt(mark: .icon("akar-sparkles"), message: Text("added \(Text("typeme.it").fontWeight(.medium)) to dictionary"), dismiss: "dismiss") {
+            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") {}, message: Text("added \(Text("typeme.it").fontWeight(.medium)) to dictionary"), dismiss: "dismiss") {
                 Button("undo") {}.buttonStyle(SquareButtonStyle())
             }
-            SquarePrompt(mark: .icon("akar-sparkles"), message: Text("learned \(counted(3, "word"))"), dismiss: "dismiss") {
+            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") {}, message: Text("learned \(counted(3, "word"))"), dismiss: "dismiss") {
                 Button("undo") {}.buttonStyle(SquareButtonStyle())
             }
             SquarePrompt(message: Text("undone")) {}
