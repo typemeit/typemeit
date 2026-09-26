@@ -30,6 +30,7 @@ struct SquareWordChip: View {
     /// What the correction changed, for the sparkle's tooltip.
     var learnedFrom: String?
     var forget: (() -> Void)?
+    @State private var forgetting = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -47,8 +48,8 @@ struct SquareWordChip: View {
                     .centredLetters(heard, size: 11)
                     .help("also heard as \(heard)")
             }
-            if let forget {
-                SquareCross(help: "forget \(word)", action: forget, rest: DesignTokens.Colors.ink3)
+            if forget != nil {
+                SquareCross(help: "forget \(word)", action: { forgetting.toggle() }, rest: DesignTokens.Colors.ink3)
             }
         }
         .font(Square.mono(Square.controlSize))
@@ -57,6 +58,9 @@ struct SquareWordChip: View {
         .padding(.trailing, forget == nil ? 9 : 4)
         .frame(height: 26)
         .background(DesignTokens.Colors.inkA08)
+        .squareConfirmDelete(isPresented: $forgetting, title: "forget “\(word)”?",
+                             detail: heardAs.isEmpty ? SquareDeleteConfirm.gone(1) : "it and \(counted(heardAs.count, "spelling")) can't be recovered.",
+                             confirm: "forget") { forget?() }
     }
 }
 
