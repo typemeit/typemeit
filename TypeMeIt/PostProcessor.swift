@@ -116,10 +116,7 @@ actor PostProcessor {
         // like a term ("whisper", wispr) is still the model's call.
         let unknown = matched.hints.isEmpty && screenTerms.isEmpty ? [] : await ScreenContext.unknownWords(in: matched.text)
         let settled = matched.hints.filter { $0.heard.split(separator: " ").contains { unknown.contains(CustomWordMatcher.letters(String($0))) } }
-        // A hint on real words that do not sound like the term came from an
-        // alias alone, and an alias that is a real word ("really" for kinda)
-        // records a change of wording more often than a mishearing.
-        let hints = matched.hints.filter { !settled.contains($0) && CustomWordMatcher.soundsLike($0.heard, $0.term) }
+        let hints = matched.hints.filter { !settled.contains($0) }
         var heard = CustomWordMatcher.applyHints(settled, to: matched.text)
         if !screenTerms.isEmpty, !unknown.isEmpty {
             let words = heard.split(whereSeparator: \.isWhitespace).map { CustomWordMatcher.Word(text: String($0), confidence: nil) }

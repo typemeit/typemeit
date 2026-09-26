@@ -41,8 +41,9 @@ and spoken digits fused into LOT-1482; 2 are punctuation. Parakeet writes years
 and most numbers as digits itself, and on its output the model keeps capitalised
 names as heard, which G5 fixes in code.
 
-**Shipped** with this research: G7 with the aggressive gate, and the alias guard
-where `Pipeline` builds the custom-word terms. On the eval as updated alongside it
+**Shipped** with this research: G5 with the aggressive gate. G7's alias rule was
+left out of the app: the two aliases that were real words were removed from the
+author's settings instead. On the eval as updated alongside it
 (cases the model no longer sees take the input Parakeet produces; "set a timer",
 "there house" and "cube control" moved to the wish list), `make eval` passes
 335/335 with 6 of 22 wishes; `main` on the same cases passed 334/335 with 4. The
@@ -50,7 +51,7 @@ wish `main` granted and G7 does not attempt is "let's meet at five actually six"
 nothing in it calls the model. The lab patches still apply to the clean-up sources
 at 6f5ca86, which `Scripts/postprocess-lab/run.sh` reads from git.
 
-**Bugs in `main` before this change, all fixed by it:**
+**Bugs in `main` before this change:**
 
 - With the filler-word style on, `WritingStyle.capitaliseSentences` capitalises
   after any dot, including inside a word: "claude.md" → "claude.Md", "lottie.org"
@@ -63,10 +64,10 @@ at 6f5ca86, which `Scripts/postprocess-lab/run.sh` reads from git.
 - The number parser reads "two thousand and two thousand two hundred pounds" as
   £4200 in the digits style.
 - A learned alias that is a real word replaces that word whenever the recogniser
-  scores it under 0.9: with the author's aliases, a "Claude" at 0.87 is typed as
-  "granola". Confident ones become hints: every "really" is offered to the model
-  as kinda. Terms are now built without an alias that is a dictionary word and
-  does not sound like its term (`CustomWordMatcher.trustedAliases`).
+  scores it under 0.9: with the author's aliases, a "Claude" at 0.87 was typed as
+  "granola", and every confident "really" was offered to the model as kinda. The
+  two aliases were removed from the author's settings; the app still trusts
+  every alias it has learned.
 
 ## How it was measured
 

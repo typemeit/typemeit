@@ -249,8 +249,7 @@ final class Pipeline {
         }
         let styles = settings.writingStyles
         let requested = settings.postProcessingEnabled
-        let terms = CustomWordMatcher.trustedAliases(store.terms(for: settings.customWords), isKnownWord: ScreenContext.isEnglishWord)
-        let matched = CustomWordMatcher.apply(raw.matcherWords, terms: terms)
+        let matched = CustomWordMatcher.apply(raw.matcherWords, terms: store.terms(for: settings.customWords))
         if matched.fixes > 0 { Log.postProcess.info("Custom words replaced \(matched.fixes) run(s)") }
         var finalText = matched.text
         var postProcessed: String?

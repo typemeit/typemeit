@@ -947,7 +947,6 @@
   },
   {
     "input": "ping tomash about the kavu contract",
-    "wish": "Tomasz and Kavuu from the screen. Kavuu is fixed now; Tomasz is in the macOS dictionary, so the screen filter drops it as an ordinary capitalised word before the model sees it.",
     "screen": [
       "#eng-platform",
       "Priya Raghunathan  10:42",
@@ -992,13 +991,11 @@
   },
   {
     "input": "it was like really cold out there",
-    "wish": "With no style on, every word kept, like included. The base prompt deletes this like by itself.",
     "exact": true,
     "expected": "It was like really cold out there."
   },
   {
     "input": "I am actually going to be like five minutes late",
-    "wish": "With no style on, every word kept, like included. The base prompt deletes this like by itself.",
     "exact": true,
     "expected": "I am actually going to be like five minutes late."
   },
@@ -1011,7 +1008,6 @@
   },
   {
     "input": "two things first the build is red and second the release notes are missing",
-    "wish": "A punctuated list. The model returns this transcript unpunctuated, so the list is built from the raw words.",
     "styles": [
       "lists"
     ],
@@ -1073,16 +1069,14 @@
     "styles": [
       "fillerWords"
     ],
-    "expected": "Right so a quick update on where we are with the migration. We have moved about 60% of the customers over to the new database and so far there have been no complaints, which is either a good sign or a sign that nobody has noticed yet. The remaining 40% are the larger accounts so we are going to do those one at a time starting on Monday. I do not think we will need the extra downtime window we booked but I would rather keep it just in case, and I will send round a summary at the end of each day so everyone knows where things stand.",
-    "wish": "A 100-word update with the fillers cut, punctuated and with the percentages as digits. The model cuts the you know but returns the rest as spoken."
+    "expected": "Right so a quick update on where we are with the migration. We have moved about 60% of the customers over to the new database and so far there have been no complaints, which is either a good sign or a sign that nobody has noticed yet. The remaining 40% are the larger accounts so we are going to do those one at a time starting on Monday. I do not think we will need the extra downtime window we booked but I would rather keep it just in case, and I will send round a summary at the end of each day so everyone knows where things stand."
   },
   {
     "input": "she said ship it",
     "styles": [
       "quotes"
     ],
-    "expected": "She said \"ship it\".",
-    "wish": "The reporting verb kept and the two words quoted. On a transcript this short the model returns only ship it, and the opening guard lets it through because ship is within two edits of she."
+    "expected": "She said \"ship it\"."
   },
   {
     "input": "he told me don't worry about it",
