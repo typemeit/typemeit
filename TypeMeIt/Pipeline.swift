@@ -254,8 +254,10 @@ final class Pipeline {
         var finalText = matched.text
         var postProcessed: String?
         var postProcessMs: Int?
+        var modelState: String?
 
         if requested {
+            modelState = PostProcessor.state
             phase = .cleaningUp
             shortcuts.setPhase(.cleaningUp)
             overlay.show(.cleaningUp)
@@ -288,7 +290,8 @@ final class Pipeline {
         guard gen == generation else { return }
 
         let entry = HistoryEntry(
-            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested, typed: typed,
+            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested,
+            modelState: modelState, styles: WritingStyle.allCases.filter(styles.contains), typed: typed,
             durationMs: durationMs, transcribeMs: transcribeMs, postProcessMs: postProcessMs, appId: target?.appId, appName: target?.appName, windowTitle: target?.windowTitle,
             dictionaryFixes: matched.fixes, recordingFile: recordingFile)
         store.append(entry, limit: settings.historyLimit)
