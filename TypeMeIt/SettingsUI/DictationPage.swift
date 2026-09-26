@@ -277,18 +277,18 @@ struct SquarePlayButtonStyle: ButtonStyle {
     }
 }
 
+/// Black, so like every black button it casts no shadow under the pointer;
+/// held, it presses down.
 private struct SquarePlayButton: View {
     let configuration: ButtonStyleConfiguration
-    @State private var hovering = false
 
     var body: some View {
         configuration.label
             .foregroundStyle(DesignTokens.Colors.onSlab)
             .frame(width: SquarePlayButtonStyle.side, height: SquarePlayButtonStyle.side)
             .background(DesignTokens.Colors.slab)
-            .squarePress(hot: hovering, down: configuration.isPressed, shadow: DesignTokens.Colors.ink)
+            .squarePress(hot: false, down: configuration.isPressed, shadow: DesignTokens.Colors.ink)
             .contentShape(Rectangle())
-            .onHover { hovering = $0 }
     }
 }
 
