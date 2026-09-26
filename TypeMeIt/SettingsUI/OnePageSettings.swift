@@ -357,8 +357,7 @@ struct OnePageSettings: View {
     private func summary(_ section: SettingsSection) -> String {
         switch section {
         case .cloud:
-            let colour = settings.cloudChoice == .matchBehind ? "matches what is behind it" : settings.cloudChoice.label
-            return OnePageSettings.join(colour, settings.cloudPosition.label, settings.audioFeedback ? "sounds on" : "sounds off")
+            return OnePageSettings.join(settings.cloudChoice.label, settings.cloudPosition.label, settings.audioFeedback ? "sounds on" : "sounds off")
         case .typing:
             return OnePageSettings.join(settings.appendTrailingSpace ? "space after" : "no space after",
                                         settings.copyPromptEnabled ? "offers to copy" : nil,
@@ -427,7 +426,7 @@ struct OnePageSettings: View {
     private var cloudChoice: Binding<CloudChoice> {
         Binding(get: { settings.cloudChoice }, set: { choice in
             settings.cloudChoice = choice
-            if choice == .matchBehind, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
+            if choice == .dynamic, !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
             screenGranted = CGPreflightScreenCaptureAccess()
         })
     }
