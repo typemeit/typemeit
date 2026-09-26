@@ -98,29 +98,25 @@ final class Settings {
     var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
     var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: "appearance") } }
-    /// Off, the cloud is white or dark grey with the appearance.
+    /// Off, the cloud is dynamic: white or black against what is behind it.
     var cloudColorEnabled: Bool { didSet { defaults.set(cloudColorEnabled, forKey: "cloudColorEnabled") } }
     var cloudColor: CloudColor { didSet { defaults.set(cloudColor.rawValue, forKey: "cloudColor") } }
     var cloudPosition: CloudPosition { didSet { defaults.set(cloudPosition.rawValue, forKey: "cloudPosition") } }
-    /// The cloud samples the screen under it and goes white or dark against
-    /// it. Needs Screen Recording; without the grant the appearance decides.
-    var cloudMatchesBackdrop: Bool { didSet { defaults.set(cloudMatchesBackdrop, forKey: "cloudMatchesBackdrop") } }
-    /// The cloud's colour as the settings offer it, one choice over the three
-    /// values above. The overlay reads those.
+    /// A cloud with no colour of its own samples the screen under it and goes
+    /// white or black against it. Needs Screen Recording; without the grant
+    /// the appearance decides.
+    var cloudMatchesBackdrop: Bool { !cloudColorEnabled }
+    /// The cloud's colour as the settings offer it, one choice over the
+    /// switch and colour above. The overlay reads those.
     var cloudChoice: CloudChoice {
-        get { cloudColorEnabled ? .colour(cloudColor) : cloudMatchesBackdrop ? .matchBehind : .grey }
+        get { cloudColorEnabled ? .colour(cloudColor) : .dynamic }
         set {
             switch newValue {
-            case .grey:
+            case .dynamic:
                 cloudColorEnabled = false
-                cloudMatchesBackdrop = false
-            case .matchBehind:
-                cloudColorEnabled = false
-                cloudMatchesBackdrop = true
             case .colour(let c):
                 cloudColorEnabled = true
                 cloudColor = c
-                cloudMatchesBackdrop = false
             }
         }
     }
@@ -191,7 +187,6 @@ final class Settings {
         cloudColorEnabled = bool("cloudColorEnabled", false)
         cloudColor = CloudColor(rawValue: d.string(forKey: "cloudColor") ?? "") ?? .coral
         cloudPosition = CloudPosition(rawValue: d.string(forKey: "cloudPosition") ?? "") ?? .centre
-        cloudMatchesBackdrop = bool("cloudMatchesBackdrop", false)
         screenContextEnabled = bool("screenContextEnabled", false)
         onboardingComplete = bool("onboardingComplete", false)
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
