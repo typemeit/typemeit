@@ -24,14 +24,16 @@ actor Diarizer {
 
     private init() {}
 
-    /// S3's starting values from michaelwilhelmsen/humla (MIT), measured
-    /// against FluidAudio's defaults on two real calls (docs/meetings.md S3):
-    /// the same speaker counts, a quiet speaker given more of their own
-    /// speech, and half the time. Threshold 0.5 against 0.6 (lower merges
-    /// sooner); a turn needs 1.0 s on so a "yeah" does not split a sentence
-    /// across speakers, and 0.5 s off so a breath does not end one.
+    /// FluidAudio's own clustering threshold, with S3's segmentation values
+    /// from michaelwilhelmsen/humla (MIT) (docs/meetings.md S3): a turn
+    /// needs 1.0 s on so a "yeah" does not split a sentence across
+    /// speakers, and 0.5 s off so a breath does not end one. The threshold
+    /// is a distance cut, so a higher one merges more. Against AssemblyAI's
+    /// labels for the people on six calls and two room recordings, the
+    /// default put 5.8% of words under the wrong speaker and humla's 0.5
+    /// put 7.7%, no recording worse, at the same speed.
     static let configuration = OfflineDiarizerConfig(
-        clusteringThreshold: Fixed.meetingDiarizerThreshold, segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+        segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
         segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)
 
     private func ensureLoaded() async throws -> Loaded {

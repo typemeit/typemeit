@@ -20,18 +20,15 @@ struct AXNode: Equatable, Sendable {
     var texts: [String] { [title, description, value].compactMap { $0 }.filter { !$0.isEmpty } }
 }
 
-/// Reads which call a recording is, the Meet code from the tab's address or
-/// the huddle's channel from a Slack window's title, so a rejoin of the same
-/// call is joined and another call is not (docs/meetings.md 8.6, 9.2). No
-/// new permission: the app already has Accessibility.
-///
-/// Names, speakers and captions are not read. `RosterRules` was written from
-/// other projects' notes, not from Slack and Meet as they are: on four calls
-/// on 24 and 25 September it found no one, and once took Meet's "Pinned for
-/// yourself" for a person, which titled the meeting and named the far end.
-/// Dev builds capture what the window exposes from the menu
-/// (`WindowCapture`), so the rules can be written from that before names
-/// come back.
+/// Reads the meeting's own window while it records (docs/meetings.md 8.6,
+/// 9.2): who is in the call and who it shows speaking, by `RosterRules`, and
+/// which call it is, the Meet code from the tab's address or the huddle's
+/// channel from a Slack window's title, so a rejoin of the same call is
+/// joined and another call is not. The whole window is walked every
+/// `Fixed.meetingRosterWalkSeconds`; between walks only the participant
+/// tiles it found are read again, every `Fixed.meetingSpeakingPollMs`,
+/// which is a few dozen elements rather than the page. No new permission:
+/// the app already has Accessibility.
 final class Roster: @unchecked Sendable {
     enum Target: String, Sendable {
         case meet, slackHuddle
@@ -57,10 +54,13 @@ final class Roster: @unchecked Sendable {
     private let now: @Sendable () -> Int?
     private let queue = DispatchQueue(label: "it.typeme.typemeit.meeting-roster", qos: .utility)
     private let lock = NSLock()
-    private var accumulator = RosterAccumulator(minimumSpanMs: Fixed.meetingSpeakingPollMs)
+    private var accumulator = RosterAccumulator(minimumSpanMs: Fixed.meetingSpeakingPollMs, holdMs: Fixed.meetingSpeakingHoldMs)
     private var timer: DispatchSourceTimer?
     private var lastMs = 0
     private var readings = 0
+    /// The tiles the last walk found, and when it ran; touched only on `queue`.
+    private var tiles: [AXUIElement] = []
+    private var walked: ContinuousClock.Instant?
 
     /// `now` gives meeting time in ms, nil until the recording's clock starts.
     init?(owner: ProcessOwner.Owner, now: @escaping @Sendable () -> Int?) {
@@ -75,17 +75,30 @@ final class Roster: @unchecked Sendable {
         let root = AXUIElementCreateApplication(pid)
         AXUIElementSetAttributeValue(root, target.activation as CFString, kCFBooleanTrue)
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + .seconds(1), repeating: .seconds(Fixed.meetingCallKeyPollSeconds))
+        timer.schedule(deadline: .now() + .seconds(1), repeating: .milliseconds(Fixed.meetingSpeakingPollMs))
         timer.setEventHandler { @Sendable [weak self] in self?.poll() }
         timer.resume()
         self.timer = timer
-        DebugLog.write("Meeting call: reading the \(target.rawValue) window")
+        DebugLog.write("Meeting names: reading the \(target.rawValue) window")
     }
 
     private func poll() {
-        guard let ms = now(), let key = Roster.callKey(pid: pid, target: target) else { return }
+        guard let ms = now() else { return }
+        let reading: RosterReading
+        if let walked, ContinuousClock.now - walked < .seconds(Fixed.meetingRosterWalkSeconds), !tiles.isEmpty {
+            var nodes: [AXNode] = [], elements: [AXUIElement] = []
+            for tile in tiles { Roster.walk(tile, depth: 0, maxDepth: Roster.tileDepthLimit, into: &nodes, elements: &elements) }
+            reading = RosterRules.read(nodes, target: target)
+        } else {
+            let window = Roster.meetingNodes(pid: pid, target: target)
+            var whole = RosterRules.read(window.nodes, target: target)
+            whole.call = target == .meet ? window.meetCode : whole.channel
+            tiles = RosterRules.tileRoots(window.nodes, target: target).map { window.elements[$0] }
+            walked = ContinuousClock.now
+            reading = whole
+        }
         lock.lock()
-        accumulator.add(RosterReading(call: key), atMs: ms)
+        accumulator.add(reading, atMs: ms)
         lastMs = ms
         readings += 1
         lock.unlock()
@@ -100,25 +113,8 @@ final class Roster: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let names = accumulator.finish(atMs: lastMs)
-        DebugLog.write("Meeting call: \(names?.call ?? "not read") after \(counted(readings, "reading"))")
+        DebugLog.write("Meeting names: \(counted(names?.roster.count ?? 0, "name")), \(counted(names?.spans.count ?? 0, "speaking span")), call \(names?.call ?? "not read") after \(counted(readings, "reading"))")
         return names
-    }
-
-    /// Which call this is: the Meet code from the tab's address, or the
-    /// channel from a Slack window's title.
-    static func callKey(pid: pid_t, target: Target) -> String? {
-        let app = AXUIElementCreateApplication(pid)
-        for window in children(app, kAXWindowsAttribute) {
-            switch target {
-            case .slackHuddle:
-                if let channel = string(window, kAXTitleAttribute).flatMap(RosterRules.Slack.channel(inTitle:)) { return channel }
-            case .meet:
-                for area in webAreas(under: window) {
-                    if let address = url(of: area), address.host == "meet.google.com", let code = RosterRules.Meet.code(inPath: address.path) { return code }
-                }
-            }
-        }
-        return nil
     }
 
     // MARK: Capture (dev builds)
@@ -133,16 +129,16 @@ final class Roster: @unchecked Sendable {
         for window in children(app, kAXWindowsAttribute) {
             let title = string(window, kAXTitleAttribute) ?? ""
             lines.append("window \(title)")
-            var nodes: [AXNode] = []
+            var nodes: [AXNode] = [], elements: [AXUIElement] = []
             switch target {
             case .slackHuddle:
-                walk(window, depth: 0, maxDepth: depthLimit, into: &nodes)
+                walk(window, depth: 0, maxDepth: depthLimit, into: &nodes, elements: &elements)
             case .meet:
                 for area in webAreas(under: window) {
                     let address = url(of: area)
                     guard address?.host == "meet.google.com" || title.localizedCaseInsensitiveContains("meet") else { continue }
                     lines.append("area \(address?.absoluteString ?? "no address")")
-                    walk(area, depth: 0, maxDepth: depthLimit, into: &nodes)
+                    walk(area, depth: 0, maxDepth: depthLimit, into: &nodes, elements: &elements)
                 }
             }
             lines += nodes.map(line)
@@ -164,24 +160,25 @@ final class Roster: @unchecked Sendable {
     /// The meeting's part of the app: for Meet, the web area of the tab on
     /// meet.google.com; for Slack, every window, since a huddle can sit in
     /// the main window as well as its own, walked no deeper than its tiles.
-    /// Also the Meet code from the tab's address, for Meet.
-    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], meetCode: String?) {
+    /// Each node's element beside it, and the Meet code from the tab's
+    /// address, for Meet.
+    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], elements: [AXUIElement], meetCode: String?) {
         let app = AXUIElementCreateApplication(pid)
-        var nodes: [AXNode] = []
+        var nodes: [AXNode] = [], elements: [AXUIElement] = []
         var code: String?
         for window in children(app, kAXWindowsAttribute) {
             switch target {
             case .slackHuddle:
-                walk(window, depth: 0, maxDepth: slackDepthLimit, into: &nodes)
+                walk(window, depth: 0, maxDepth: slackDepthLimit, into: &nodes, elements: &elements)
             case .meet:
                 for area in webAreas(under: window) {
                     guard let address = url(of: area), address.host == "meet.google.com" else { continue }
                     code = code ?? RosterRules.Meet.code(inPath: address.path)
-                    walk(area, depth: 0, maxDepth: depthLimit, into: &nodes)
+                    walk(area, depth: 0, maxDepth: depthLimit, into: &nodes, elements: &elements)
                 }
             }
         }
-        return (nodes, code)
+        return (nodes, elements, code)
     }
 
     private static let nodeLimit = 20_000
@@ -189,13 +186,16 @@ final class Roster: @unchecked Sendable {
     /// Pipit (MIT) reads huddle tiles from 24 levels down; the rest of the
     /// main window is deeper and not wanted.
     private static let slackDepthLimit = 32
+    /// A tile's name and speaking marker: six levels down on the 25
+    /// September Meet capture, one for a Slack tile.
+    private static let tileDepthLimit = 12
 
     /// Read in one round trip per element: a Meet page is a few thousand
     /// elements, and one call per attribute would take longer than a poll.
     private static let attributes = [kAXRoleAttribute, kAXSubroleAttribute, kAXTitleAttribute, kAXDescriptionAttribute,
                                      kAXValueAttribute, "AXDOMIdentifier", "AXDOMClassList", kAXSelectedAttribute, kAXChildrenAttribute]
 
-    private static func walk(_ element: AXUIElement, depth: Int, maxDepth: Int, into nodes: inout [AXNode]) {
+    private static func walk(_ element: AXUIElement, depth: Int, maxDepth: Int, into nodes: inout [AXNode], elements: inout [AXUIElement]) {
         guard depth < maxDepth, nodes.count < nodeLimit else { return }
         var values: CFArray?
         guard AXUIElementCopyMultipleAttributeValues(element, attributes as CFArray, AXCopyMultipleAttributeOptions(rawValue: 0), &values) == .success,
@@ -210,7 +210,8 @@ final class Roster: @unchecked Sendable {
         node.domClasses = v[6] as? [String] ?? []
         node.selected = (v[7] as? Bool) ?? false
         nodes.append(node)
-        for child in v[8] as? [AXUIElement] ?? [] { walk(child, depth: depth + 1, maxDepth: maxDepth, into: &nodes) }
+        elements.append(element)
+        for child in v[8] as? [AXUIElement] ?? [] { walk(child, depth: depth + 1, maxDepth: maxDepth, into: &nodes, elements: &elements) }
     }
 
     private static func webAreas(under element: AXUIElement, depth: Int = 0) -> [AXUIElement] {

@@ -26,6 +26,18 @@ struct SpeakerCountTests {
         #expect(talkers == ["Ana"])
     }
 
+    @Test func theUsersTileIsTheNameLitWhileTheMicSpoke() {
+        let spans = [span("Max Mitchell", 0, 30_000), span("Ana", 30_000, 60_000)]
+        let user = SpeakerCount.userTile(spans: spans, farEnd: words(30_000, 60_000), mic: words(0, 30_000), lagMs: 0, minimumMs: Self.minimumMs)
+        #expect(user == "Max Mitchell")
+    }
+
+    @Test func aUserWhoBarelySpokeHasNoTile() {
+        let spans = [span("Max Mitchell", 0, 5_000), span("Ana", 5_000, 60_000)]
+        let user = SpeakerCount.userTile(spans: spans, farEnd: words(5_000, 60_000), mic: words(0, 5_000), lagMs: 0, minimumMs: Self.minimumMs)
+        #expect(user == nil)
+    }
+
     @Test func crosstalkUnderTheUsersTileDoesNotMakeThemATalker() {
         // Twenty seconds of Ana talking over the user, inside the user's long turn.
         let spans = [span("Max Mitchell", 0, 120_000), span("Ana", 120_000, 150_000)]
