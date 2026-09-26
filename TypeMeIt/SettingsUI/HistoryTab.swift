@@ -74,7 +74,6 @@ struct HistoryTab: View {
     @State private var selected: Set<UUID> = []
     /// The row a range is measured from: the last one whose box was clicked.
     @State private var anchor: UUID?
-    @State private var confirmDeleteAll = false
     /// The row whose copy ran last, which shows a check for it.
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
@@ -147,22 +146,6 @@ struct HistoryTab: View {
                 }
                 .buttonStyle(SquareButtonStyle())
             }
-            Button { confirmDeleteAll.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
-                .buttonStyle(SquareIconButtonStyle())
-                .disabled(store.history.isEmpty)
-                .help("delete all")
-                .accessibilityLabel("delete all")
-                .squarePopover(isPresented: $confirmDeleteAll, edge: .trailing) {
-                    SquareConfirm(title: "delete all \(counted(store.history.count, "dictation"))?", detail: "this cannot be undone.") {
-                        Button("cancel") { confirmDeleteAll = false }.buttonStyle(SquareButtonStyle())
-                        Button("delete all") {
-                            store.deleteAllHistory()
-                            selected = []
-                            confirmDeleteAll = false
-                        }
-                        .buttonStyle(SquareButtonStyle(kind: .primary))
-                    }
-                }
         }
         .padding(.top, 16)
         .padding(.horizontal, HistoryColumns.page)

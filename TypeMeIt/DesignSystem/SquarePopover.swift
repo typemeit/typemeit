@@ -2,19 +2,18 @@ import AppKit
 import SwiftUI
 
 extension View {
-    /// Floats `content` under this view on a borderless panel, lined up with
-    /// this view's leading or trailing edge, the way the canvas's popups open.
-    /// SwiftUI's own popover draws a rounded bubble with an arrow, which the
-    /// square parts have no place for. A click outside the panel or esc
-    /// closes it.
+    /// Floats `content` under this view on a borderless panel, centred on
+    /// it and kept inside the window. Every popup opens this way, menus and
+    /// questions alike. SwiftUI's own popover draws a rounded bubble with an
+    /// arrow, which the square parts have no place for. A click outside the
+    /// panel or esc closes it.
     func squarePopover<Content: View>(
         isPresented: Binding<Bool>,
-        edge: HorizontalEdge = .leading,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         background {
             if isPresented.wrappedValue {
-                SquarePopoverAnchor(isPresented: isPresented, edge: edge, content: content)
+                SquarePopoverAnchor(isPresented: isPresented, content: content)
             }
         }
     }
@@ -22,7 +21,6 @@ extension View {
 
 private struct SquarePopoverAnchor<Content: View>: NSViewRepresentable {
     @Binding var isPresented: Bool
-    let edge: HorizontalEdge
     let content: () -> Content
 
     func makeNSView(context: Context) -> SquarePopoverAnchorView { SquarePopoverAnchorView() }
@@ -34,7 +32,7 @@ private struct SquarePopoverAnchor<Content: View>: NSViewRepresentable {
         let root = AnyView(content().environment(\.colorScheme, scheme))
         anchor.place = { [weak anchor] in
             guard let anchor, anchor.window != nil else { return }
-            coordinator.show(root, under: anchor, edge: edge, scheme: scheme)
+            coordinator.show(root, under: anchor, scheme: scheme)
         }
         anchor.place?()
     }
@@ -82,8 +80,11 @@ final class SquarePopoverController {
     private static let margin: CGFloat = 28
     /// The canvas's popups open this far below what they belong to.
     private static let gap: CGFloat = 4
+    /// A popup under something near the window's side shifts along to stay
+    /// this far inside it.
+    private static let inset: CGFloat = 12
 
-    func show(_ root: AnyView, under anchor: NSView, edge: HorizontalEdge, scheme: ColorScheme) {
+    func show(_ root: AnyView, under anchor: NSView, scheme: ColorScheme) {
         guard let window = anchor.window else { return }
         let padded = AnyView(root.padding(SquarePopoverController.margin))
         if let host {
@@ -105,7 +106,10 @@ final class SquarePopoverController {
         let size = host.fittingSize
         let below = window.convertToScreen(anchor.convert(anchor.bounds, to: nil))
         let margin = SquarePopoverController.margin
-        let x = edge == .leading ? below.minX - margin : below.maxX - size.width + margin
+        let inset = SquarePopoverController.inset
+        let leftmost = window.frame.minX + inset - margin
+        let rightmost = max(leftmost, window.frame.maxX - inset + margin - size.width)
+        let x = min(max(below.midX - size.width / 2, leftmost), rightmost)
         let y = below.minY - SquarePopoverController.gap - size.height + margin
         panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
     }

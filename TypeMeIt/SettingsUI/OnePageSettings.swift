@@ -59,6 +59,8 @@ struct OnePageSettings: View {
     @State private var devices = AudioCapture.inputDevices()
     @State private var availability = PostProcessor.availability
     @State private var screenGranted = CGPreflightScreenCaptureAccess()
+    @State private var deletingDictations = false
+    @State private var deletingMeetings = false
     /// Apple Intelligence and Screen Recording are switched in System
     /// Settings, not in the app, so both are re-read while the window is up.
     private let poll = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
@@ -75,7 +77,6 @@ struct OnePageSettings: View {
                     }
                 }
                 .overlay(alignment: .bottom) { SquareRule() }
-                .frame(maxWidth: 780, alignment: .leading)
                 .padding(.top, 26)
                 .padding(.leading, 40)
                 .padding(.trailing, 48)
@@ -242,12 +243,24 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "keep the audio", help: "deleted along with the dictation") {
                 toggle("keep the dictations' audio", $settings.keepRecordings).disabled(settings.historyLimit < 0)
             }
+            SquareSettingsRow(label: "delete all") {
+                deleteAll(counted(store.history.count, "dictation"), showing: $deletingDictations, disabled: store.history.isEmpty) {
+                    store.deleteAllHistory()
+                }
+            }
             SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
             SquareSettingsRow(label: "keep") {
                 SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
             }
             SquareSettingsRow(label: "keep the audio", help: "deleted along with the meeting") {
                 toggle("keep the meetings' audio", $settings.meetingKeepAudio)
+            }
+            SquareSettingsRow(label: "delete all") {
+                // A meeting still recording is left alone; it can be deleted once it stops.
+                let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
+                deleteAll(counted(ids.count, "meeting"), showing: $deletingMeetings, disabled: ids.isEmpty) {
+                    meetings.delete(ids: ids)
+                }
             }
             SquareSettingsRow(label: "meetings folder", caption: folderPath) {
                 Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
@@ -382,6 +395,24 @@ struct OnePageSettings: View {
     }
 
     // MARK: Rows' parts
+
+    /// The button that deletes every dictation or meeting, after a question
+    /// that says they cannot be got back.
+    private func deleteAll(_ what: String, showing: Binding<Bool>, disabled: Bool, delete: @escaping () -> Void) -> some View {
+        Button("delete") { showing.wrappedValue.toggle() }
+            .buttonStyle(SquareButtonStyle())
+            .disabled(disabled)
+            .squarePopover(isPresented: showing) {
+                SquareConfirm(title: "delete all \(what)?", detail: "they can't be recovered.") {
+                    Button("cancel") { showing.wrappedValue = false }.buttonStyle(SquareButtonStyle())
+                    Button("delete all") {
+                        delete()
+                        showing.wrappedValue = false
+                    }
+                    .buttonStyle(SquareButtonStyle(kind: .primary))
+                }
+            }
+    }
 
     private func toggle(_ label: String, _ isOn: Binding<Bool>) -> some View {
         Toggle(label, isOn: isOn).toggleStyle(SquareSwitchStyle()).labelsHidden()

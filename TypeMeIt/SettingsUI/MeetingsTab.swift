@@ -162,7 +162,7 @@ struct MeetingsTab: View {
                 .disabled(store.meetings.isEmpty)
                 .help("delete all")
                 .accessibilityLabel("delete all")
-                .squarePopover(isPresented: $confirmDeleteAll, edge: .trailing) {
+                .squarePopover(isPresented: $confirmDeleteAll) {
                     SquareConfirm(title: "delete all \(counted(store.meetings.count, "meeting"))?", detail: "this cannot be undone.") {
                         Button("cancel") { confirmDeleteAll = false }.buttonStyle(SquareButtonStyle())
                         Button("delete all") {
