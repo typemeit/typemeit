@@ -65,8 +65,14 @@ final class ClaudeRun: @unchecked Sendable {
 
     static let installPage = URL(string: "https://claude.com/claude-code")!
 
+    /// The `claude` this build may run: the installed one, never from a
+    /// sandboxed build.
+    static func availableExecutable(sandboxed: Bool = Sandbox.isActive, installed: URL? = executable) -> URL? {
+        sandboxed ? nil : installed
+    }
+
     /// Claude Code is installed and this build may run it; a sandboxed one cannot.
-    static var isAvailable: Bool { !Sandbox.isActive && executable != nil }
+    static var isAvailable: Bool { availableExecutable() != nil }
 
     /// The login shell's PATH, so the MCP servers Claude Code starts (npx, uv,
     /// bq…) are found the way they are in a terminal.
@@ -100,15 +106,42 @@ final class ClaudeRun: @unchecked Sendable {
     /// Each line of output as it arrives, on a background thread.
     var onLine: (@Sendable (String) -> Void)?
 
-    /// Nil when Claude Code is not installed.
+    /// Nil when Claude Code is not available.
     init?(arguments: [String], input: String, folder: URL, timeoutSeconds: Double) {
-        guard let executable = Self.executable else { return nil }
+        guard let executable = Self.availableExecutable() else { return nil }
         process.executableURL = executable
         process.currentDirectoryURL = folder
         process.arguments = arguments
         process.environment = Self.environment
         self.input = Data(input.utf8)
         self.timeoutSeconds = timeoutSeconds
+    }
+
+    /// A short `claude` command, such as `claude mcp get`, and its pipes.
+    struct Command {
+        let process: Process
+        let input: FileHandle
+        /// Its stdout, with stderr when `withErrors`.
+        let output: FileHandle
+    }
+
+    /// Starts `executable` with `arguments` in the home folder with
+    /// `environment`, and ends it after `timeoutSeconds`. Nil when Claude
+    /// Code is not available or did not start.
+    static func command(_ arguments: [String], withErrors: Bool = false, timeoutSeconds: Double, executable: URL? = availableExecutable()) -> Command? {
+        guard let executable else { return nil }
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.environment = environment
+        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        let stdin = Pipe(), stdout = Pipe()
+        process.standardInput = stdin
+        process.standardOutput = stdout
+        process.standardError = withErrors ? stdout : FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeoutSeconds) { if process.isRunning { process.terminate() } }
+        return Command(process: process, input: stdin.fileHandleForWriting, output: stdout.fileHandleForReading)
     }
 
     /// `transcript` is the meeting's so far, or nil for a question dictated

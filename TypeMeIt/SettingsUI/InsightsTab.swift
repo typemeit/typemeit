@@ -30,12 +30,7 @@ struct InsightsTab: View {
     }
 
     private func stats(_ meetings: [Meeting]) -> InsightsStats {
-        Insights.compute(shownHistory.map {
-            InsightRow(timestamp: $0.timestamp, transcript: $0.transcript, postProcessed: $0.postProcessed,
-                       postProcessRequested: $0.postProcessRequested, durationMs: $0.durationMs,
-                       transcribeMs: $0.transcribeMs, postProcessMs: $0.postProcessMs,
-                       dictionaryFixes: $0.dictionaryFixes, appId: $0.appId, appName: $0.appName, windowTitle: $0.windowTitle)
-        }, meetings: meetings.filter { $0.isDone && $0.recordedHere }.map {
+        Insights.compute(shownHistory.map(InsightRow.init), meetings: meetings.filter { $0.isDone && $0.recordedHere }.map {
             InsightMeeting(started: $0.started, appId: $0.app?.bundleId, appName: $0.app?.name)
         })
     }

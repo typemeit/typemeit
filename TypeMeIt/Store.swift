@@ -32,6 +32,9 @@ struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
     var question: Meeting.Question?
 
     var displayText: String { edited ?? typed ?? postProcessed ?? transcript }
+
+    /// The words history shows for it, which insights total by day too.
+    var wordCount: Int { Insights.wordCount(displayText) }
 }
 
 struct LearnedWord: Codable, Identifiable, Sendable, Equatable {

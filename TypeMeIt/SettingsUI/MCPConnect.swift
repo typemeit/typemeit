@@ -39,25 +39,18 @@ extension MCPSetup {
         return add?.status == 0
     }
 
-    /// Runs `claude` and waits for it; nil when Claude Code is not installed
+    /// Runs `claude` and waits for it; nil when Claude Code is not available
     /// or did not start.
     private static func claude(_ arguments: [String]) async -> (status: Int32, output: String)? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                guard let executable = ClaudeRun.executable else { return continuation.resume(returning: nil) }
-                let process = Process()
-                process.executableURL = executable
-                process.arguments = arguments
-                process.environment = ClaudeRun.environment
-                process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = output
-                guard (try? process.run()) != nil else { return continuation.resume(returning: nil) }
-                DispatchQueue.global().asyncAfter(deadline: .now() + claudeTimeoutSeconds) { if process.isRunning { process.terminate() } }
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                continuation.resume(returning: (process.terminationStatus, String(decoding: data, as: UTF8.self)))
+                guard let claude = ClaudeRun.command(arguments, withErrors: true, timeoutSeconds: claudeTimeoutSeconds) else {
+                    return continuation.resume(returning: nil)
+                }
+                try? claude.input.close()
+                let output = claude.output.readDataToEndOfFile()
+                claude.process.waitUntilExit()
+                continuation.resume(returning: (claude.process.terminationStatus, String(decoding: output, as: UTF8.self)))
             }
         }
     }

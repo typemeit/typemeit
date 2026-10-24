@@ -353,12 +353,10 @@ enum MeetingTranscriber {
         let file = try AVAudioFile(forReading: url)
         let rate = Int(file.processingFormat.sampleRate)
         let peakFrames = rate * peakEnvelopeMs / 1000
-        let rmsFrames = rate / rmsEnvelopeHz
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(rate)) else { return ([], []) }
         var peaks: [Float] = []
-        var rms: [Float] = []
+        var rms = EchoBleedDetector.RMSEnvelope(sampleRate: rate, hz: rmsEnvelopeHz)
         var peakAcc: Float = 0, peakCount = 0
-        var rmsAcc: Float = 0, rmsCount = 0
         while file.framePosition < file.length {
             try file.read(into: buffer, frameCount: AVAudioFrameCount(rate))
             let n = Int(buffer.frameLength)
@@ -366,14 +364,12 @@ enum MeetingTranscriber {
             for i in 0..<n {
                 let v = data[i]
                 peakAcc = max(peakAcc, abs(v)); peakCount += 1
-                rmsAcc += v * v; rmsCount += 1
+                rms.add(v)
                 if peakCount == peakFrames { peaks.append(peakAcc); peakAcc = 0; peakCount = 0 }
-                if rmsCount == rmsFrames { rms.append((rmsAcc / Float(rmsFrames)).squareRoot()); rmsAcc = 0; rmsCount = 0 }
             }
         }
         if peakCount > 0 { peaks.append(peakAcc) }
-        if rmsCount > 0 { rms.append((rmsAcc / Float(rmsCount)).squareRoot()) }
-        return (peaks, rms)
+        return (peaks, rms.envelope)
     }
 
     /// A chunk's samples, read a second at a time. One read of a whole

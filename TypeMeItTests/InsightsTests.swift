@@ -230,6 +230,18 @@ final class InsightsTests: XCTestCase {
         XCTAssertNil(compute([row(day(2026, 9, 3), "untimed")], today: day(2026, 9, 3)).timeSavedMs)
     }
 
+    func testWordTotalsAgreeWithHistoryAndSpeedIsSpoken() {
+        let entry = HistoryEntry(timestamp: day(2026, 9, 3), transcript: "um so the deploy is done now", postProcessed: nil,
+                                 postProcessRequested: false, edited: "The deploy is done.", durationMs: 60_000, dictionaryFixes: 0)
+        let stats = compute([InsightRow(entry)], today: day(2026, 9, 3))
+        XCTAssertEqual(entry.wordCount, 4)
+        XCTAssertEqual(stats.activity, [DayActivity(date: "2026-09-03", dictations: 1, words: entry.wordCount)])
+        XCTAssertEqual(stats.totalWords, entry.wordCount)
+        XCTAssertEqual(stats.wordsThisMonth, entry.wordCount)
+        // Seven words were said in the minute.
+        XCTAssertEqual(stats.wordsPerMinute, 7.0)
+    }
+
     func testDictationLengthIsAudioOverTimedRowsAndWordsOverAll() {
         var a = row(day(2026, 9, 3), "one two three")
         a.durationMs = 2_000
