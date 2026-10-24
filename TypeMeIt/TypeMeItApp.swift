@@ -1,0 +1,506 @@
+import AppKit
+import FoundationModels
+import ServiceManagement
+import SwiftUI
+
+@main
+struct TypeMeItApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @State private var appState = AppState.shared
+
+    /// macOS keeps where the user dragged a status item under this key, as a
+    /// distance from the right edge, and reads it when the item is created.
+    /// On first launch there is none, so the puff would land wherever there
+    /// is room, at the far left of the other icons; a small distance puts it
+    /// at the right end. Once the user moves it, the key is theirs.
+    private static let statusItemPositionKey = "NSStatusItem Preferred Position Item-0"
+    private static let rightmostStatusItemPosition = 1
+
+    init() {
+        if UserDefaults.standard.object(forKey: Self.statusItemPositionKey) == nil {
+            UserDefaults.standard.set(Self.rightmostStatusItemPosition, forKey: Self.statusItemPositionKey)
+        }
+    }
+
+    var body: some Scene {
+        MenuBarExtra {
+            MenuContent()
+        } label: {
+            MenuBarLabel()
+        }
+        .menuBarExtraStyle(.menu)
+
+        // No title bar: the sidebar runs to the window's top edge, its
+        // buttons over it, as on the design canvas.
+        Window("settings", id: "settings") {
+            SettingsView()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1100, height: 760)
+    }
+}
+
+/// State the menu bar item and windows observe.
+@MainActor
+@Observable
+final class AppState {
+    static let shared = AppState()
+    /// Who holds Secure Input, or nil when it is off.
+    var secureInputOwner: SecureInput.Owner?
+    /// A permission revoked in System Settings since launch, or nil.
+    var missingPermission: MissingPermission?
+    /// Why Apple Intelligence cannot run since launch, or nil while it can.
+    var modelUnavailable: SystemLanguageModel.Availability.UnavailableReason?
+    var recording = false
+    var transcribing = false
+    /// A meeting is being recorded, set by the coordinator.
+    var meeting = false
+    var ready = false
+    /// The version downloaded and waiting to be installed, if any.
+    var updateReady: String?
+    /// The tab the settings window should show when next opened from the
+    /// menu, if any. Cleared once the window has moved there.
+    var settingsTab: SettingsTab?
+    /// The tab the settings window is showing, nil while it is closed.
+    var visibleTab: SettingsTab?
+    /// A meeting the meetings tab should scroll to and expand when next shown.
+    var revealMeeting: UUID?
+    /// A dictation the dictations tab should open when next shown.
+    var revealDictation: UUID?
+    /// Clicks on each sidebar page, counted so a page can go back to its
+    /// whole list on every click, even one on the page already showing.
+    var sidebarClicks: [SettingsTab: Int] = [:]
+
+    var menuBarImage: NSImage {
+        MenuBarIconRenderer.puff(recording: recording, transcribing: transcribing, struck: missingPermission != nil, updateReady: updateReady != nil, meeting: meeting)
+    }
+}
+
+/// The menu bar image. It is always on screen, so it also holds the window
+/// opener for callers outside SwiftUI: the app delegate asks for the settings
+/// window through it when the app is reopened from the Dock or Finder.
+struct MenuBarLabel: View {
+    @Environment(\.openWindow) private var openWindow
+    @State private var appState = AppState.shared
+
+    static let openSettings = Notification.Name("it.typeme.openSettings")
+
+    var body: some View {
+        Image(nsImage: appState.menuBarImage)
+            .onReceive(NotificationCenter.default.publisher(for: MenuBarLabel.openSettings)) { _ in
+                openWindow(id: "settings")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+    }
+}
+
+struct MenuContent: View {
+    @Environment(\.openWindow) private var openWindow
+    @State private var appState = AppState.shared
+    @State private var store = Store.shared
+    @State private var meetings = MeetingCoordinator.shared
+    @State private var capture = WindowCapture.shared
+
+    /// The newest five with any text; a dictation that came out empty has
+    /// nothing to copy.
+    private var recentTranscripts: [HistoryEntry] {
+        Array(store.history.filter { !$0.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.suffix(5).reversed())
+    }
+
+    /// The user's copy-last shortcut when one is set and the menu can show
+    /// it, otherwise ⌘C.
+    private var copyLastKeyboardShortcut: KeyboardShortcut? {
+        guard let combo = Settings.shared.copyLastShortcut else { return KeyboardShortcut("c", modifiers: .command) }
+        return combo.keyboardShortcut
+    }
+
+    var body: some View {
+        if let owner = appState.secureInputOwner {
+            if owner.isLoginWindow {
+                Text("secure input is stuck on from the lock screen")
+                Text("esc, space and the copy shortcut don't work. lock and unlock the mac to clear it.")
+            } else {
+                Text("secure input is on in \(owner.name)")
+                Text("esc, space and the copy shortcut don't work until it's off.")
+            }
+            Divider()
+        }
+        if let missing = appState.missingPermission {
+            Text("\(missing.name) permission is off")
+            Text("\(missing.consequence) until you turn it back on.")
+            Button("Open \(missing.name.capitalized) Settings") { NSWorkspace.shared.open(missing.settingsURL) }
+            Divider()
+        }
+        switch appState.modelUnavailable {
+        case .appleIntelligenceNotEnabled:
+            Text("apple intelligence is off")
+            Text("transcripts are typed without clean-up until you turn it back on.")
+            Button("Open Apple Intelligence Settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }
+            Divider()
+        case .modelNotReady:
+            Text("apple intelligence is still downloading")
+            Text("transcripts are typed without clean-up until it finishes.")
+            Button("Open Apple Intelligence Settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }
+            Divider()
+        default:
+            EmptyView()
+        }
+        Button { openWindow(id: "settings"); NSApp.activate(ignoringOtherApps: true) } label: { Text("Open type me it") }
+            .keyboardShortcut(",", modifiers: .command)
+        if let version = appState.updateReady {
+            Button("Install Update \(version)") { Updates.shared.install() }
+        }
+        Divider()
+        if Pipeline.shared.phase == .recording {
+            Button("Stop Recording") { Pipeline.shared.shortcuts.stopFromMenu() }
+        }
+        if Pipeline.shared.isBusy {
+            Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
+        }
+        meetingItems
+        if Updates.isDevBuild {
+            Divider()
+            captureItems
+        }
+        Divider()
+        if recentTranscripts.isEmpty {
+            Text("No transcripts yet").disabled(true)
+        }
+        ForEach(Array(recentTranscripts.enumerated()), id: \.element.id) { i, entry in
+            let button = Button { Output.copyToClipboard(entry.displayText) } label: { Text(MenuContent.italic(MenuContent.title(for: entry.displayText))) }
+            if i == 0 {
+                button.keyboardShortcut(copyLastKeyboardShortcut)
+            } else {
+                button
+            }
+        }
+        if !recentTranscripts.isEmpty {
+            Button {
+                appState.settingsTab = .history
+                openWindow(id: "settings")
+                NSApp.activate(ignoringOtherApps: true)
+            } label: { Text("View All…") }
+        }
+        Divider()
+        Button("Quit type me it") { NSApp.terminate(nil) }.keyboardShortcut("q", modifiers: .command)
+    }
+
+    /// Dev builds: what a meeting window exposes, to write the name rules from.
+    @ViewBuilder private var captureItems: some View {
+        if let target = capture.running {
+            Text("Capturing the \(target == .meet ? "Meet" : "Slack") window…").disabled(true)
+        } else {
+            Button("Capture Meet Window") { capture.start(.meet) }
+            Button("Capture Slack Window") { capture.start(.slackHuddle) }
+        }
+        Button("Dump Windows") { WindowDump.write() }
+    }
+
+    /// The meeting block (docs/meetings.md 7.11): the detected call's items
+    /// while nothing records, the room while idle, and what is running.
+    @ViewBuilder private var meetingItems: some View {
+        if meetings.recording != nil {
+            if Settings.shared.askClaude, ClaudeRun.isAvailable {
+                Button("Ask Claude") { meetings.askLatestQuestion() }
+            }
+            Button("Stop Recording Meeting") { meetings.stopMeeting() }
+        } else {
+            if meetings.detected != nil {
+                Button("Record This Meeting") { meetings.recordDetected() }
+            }
+            Button("Record the Room") { meetings.recordRoom() }
+                .disabled(!appState.ready)
+        }
+        if let t = meetings.transcribing {
+            Text("Transcribing meeting · \(Int(t.fraction * 100))%").disabled(true)
+        }
+    }
+
+    /// Italic through an attributed string: the menu turns a font modifier
+    /// into nothing, but carries an attributed title across.
+    static func italic(_ text: String) -> AttributedString {
+        var title = AttributedString(text)
+        title.font = .body.italic()
+        title.inlinePresentationIntent = .emphasized
+        return title
+    }
+
+    /// One line of the transcript, cut so the menu stays narrow.
+    static func title(for text: String, limit: Int = 48) -> String {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count > limit else { return trimmed }
+        return String(trimmed.prefix(limit)).trimmingCharacters(in: .whitespaces) + "…"
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// SwiftUI installs its own object as `NSApp.delegate` and forwards to
+    /// this one, so `NSApp.delegate as? AppDelegate` is always nil. Views
+    /// reach the delegate through here instead.
+    private(set) static var shared: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
+    private var gateWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
+    private var upgradeWindow: NSWindow?
+    private var secureInputTimer: Timer?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // The unit tests run inside this app. No test needs the running
+        // app, so none of it starts.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        _ = Settings.shared
+        _ = Store.shared
+        OutputMute.restoreLeftover()
+        applyDevIcon()
+        applyAppearance()
+        // Clean-up is the only clean-up there is, so anything that stops the
+        // model running stops the app: an ineligible Mac, Apple Intelligence
+        // switched off, or the model still downloading.
+        if case .unavailable(let reason) = PostProcessor.availability {
+            showGate(reason)
+            return
+        }
+        let modelInstalled = ModelStore.isInstalled
+        if Settings.shared.onboardingComplete, OnboardingView.permissionsGranted {
+            startRunning()
+            if ModelStore.needsUpgrade(onboardingComplete: true, currentInstalled: modelInstalled) { showUpgrade() }
+        } else {
+            showOnboarding()
+        }
+    }
+
+    /// A meeting being recorded is stopped and saved first, and a dictation's
+    /// mute lifted; nothing after `applicationWillTerminate` runs.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MeetingCoordinator.shared.stopForQuit()
+        OutputMute.restore()
+        return .terminateNow
+    }
+
+    /// A `.tmi` file opened from Finder, Mail or a message (docs/meetings.md
+    /// 7.16): added to the meetings and shown. At launch this runs before
+    /// `applicationDidFinishLaunching`, so it reads the settings itself,
+    /// which is what turns the debug log on, and what it shows waits a turn.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        _ = Settings.shared
+        for url in urls where url.pathExtension.caseInsensitiveCompare(MeetingShare.fileExtension) == .orderedSame {
+            do {
+                let id = try MeetingStore.shared.receive(url)
+                Task { @MainActor in self.showReceived(id) }
+            } catch {
+                Log.meetings.error("Could not open \(url.lastPathComponent): \(error.localizedDescription)")
+                Task { @MainActor in self.showUnreadable(error) }
+            }
+        }
+    }
+
+    /// Onboarding and the gate keep the front; the meeting waits in the tab.
+    private func showReceived(_ id: UUID) {
+        AppState.shared.settingsTab = .meetings
+        AppState.shared.revealMeeting = id
+        guard onboardingWindow?.isVisible != true, gateWindow?.isVisible != true else { return }
+        NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+    }
+
+    private func showUnreadable(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Can't open this meeting"
+        alert.informativeText = (error as? MeetingShare.ReadError) == .newerVersion
+            ? "It's from a newer version of type me it. Update, then open it again."
+            : "The file isn't a type me it meeting."
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if onboardingWindow?.isVisible == true {
+            onboardingWindow?.makeKeyAndOrderFront(nil)
+        } else if gateWindow?.isVisible != true {
+            NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+        }
+        return false
+    }
+
+    /// Launch sequence step 4 onwards.
+    func startRunning() {
+        Pipeline.shared.start()
+        AppState.shared.ready = true
+        MenuBarClick.install()
+        observePipeline()
+        previewToastIfAsked()
+        MeetingProbes.runIfAsked()
+        secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in
+                let owner = SecureInput.owner
+                if owner != AppState.shared.secureInputOwner { AppState.shared.secureInputOwner = owner }
+                let missing = MissingPermission.first
+                if missing != AppState.shared.missingPermission { AppState.shared.missingPermission = missing }
+                var unavailable: SystemLanguageModel.Availability.UnavailableReason?
+                if case .unavailable(let reason) = PostProcessor.availability { unavailable = reason }
+                if unavailable != AppState.shared.modelUnavailable { AppState.shared.modelUnavailable = unavailable }
+            }
+        }
+        // Creating the updater checks for an update now and schedules the hourly check.
+        _ = Updates.shared
+        reconcileLaunchAtLogin()
+    }
+
+    private func observePipeline() {
+        // Mirror the pipeline phase into the menu bar icon.
+        withObservationTracking {
+            let phase = Pipeline.shared.phase
+            AppState.shared.recording = phase == .recording
+            AppState.shared.transcribing = phase == .transcribing || phase == .cleaningUp
+        } onChange: {
+            Task { @MainActor in self.observePipeline() }
+        }
+    }
+
+    func reconcileLaunchAtLogin() {
+        let want = Settings.shared.launchAtLogin
+        let service = SMAppService.mainApp
+        let enabled = service.status == .enabled
+        guard want != enabled else { return }
+        do {
+            if want { try service.register() } else { try service.unregister() }
+        } catch {
+            Log.app.error("Launch at login could not be changed: \(error.localizedDescription)")
+        }
+    }
+
+    /// The Dock caches an icon per bundle path, so a rebuilt dev app can keep
+    /// showing the release icon it had before; setting the running app's own
+    /// icon sidesteps the cache.
+    private func applyDevIcon() {
+        if Updates.isDevBuild, let url = Bundle.main.url(forResource: "AppIcon-Dev", withExtension: "icns"), let icon = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = icon
+        }
+    }
+
+    /// Every window, the overlay panel included, takes the app's appearance,
+    /// so this is the one place the setting is applied.
+    func applyAppearance() {
+        NSApp.appearance = Settings.shared.appearance.nsAppearance
+    }
+
+    /// `-previewToast "word,word"` shows the learned-words toast a moment
+    /// after launch, for looking at it without dictating.
+    private func previewToastIfAsked() {
+        MeetingCoordinator.shared.previewAnswerIfAsked()
+        // `-previewUpdate 1.2` shows the ready toast, the puff dot and the
+        // menu item as the dev build would never see them.
+        if let version = UserDefaults.standard.string(forKey: "previewUpdate"), !version.isEmpty {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                AppState.shared.updateReady = version
+                Pipeline.shared.showToast(.updateReady(version: version))
+            }
+        }
+        guard let words = UserDefaults.standard.string(forKey: "previewToast"), !words.isEmpty else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            Pipeline.shared.showLearnedToast(batchId: UUID(), words: words.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
+        }
+    }
+
+    // MARK: Windows
+
+    /// A window sized once to its SwiftUI content. By default an
+    /// `NSHostingController` keeps resizing its window to the content's
+    /// preferred size from inside the window's own layout pass, and on
+    /// macOS 26 AppKit raises when that happens, which aborted the app on
+    /// launch with the welcome window up.
+    private func showGate(_ reason: SystemLanguageModel.Availability.UnavailableReason) {
+        let view = GateView(reason: reason)
+        let window = AppDelegate.fixedSizeWindow(for: view)
+        window.title = "type me it needs Apple Intelligence"
+        window.styleMask = [.titled, .closable]
+        window.center()
+        gateWindow = window
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private static func fixedSizeWindow<V: View>(for view: V) -> NSWindow {
+        let hosting = NSHostingController(rootView: view)
+        hosting.sizingOptions = []
+        let size = hosting.view.fittingSize
+        let window = NSWindow(contentViewController: hosting)
+        window.isReleasedWhenClosed = false
+        window.setContentSize(size)
+        return window
+    }
+
+    /// The speech model on this Mac is not the current one. Closing the
+    /// window leaves dictation blocked; the next try to dictate opens it again.
+    func showUpgrade() {
+        if let w = upgradeWindow { NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil); return }
+        let view = UpgradeView { [weak self] in
+            self?.upgradeWindow?.close()
+            self?.upgradeWindow = nil
+        }
+        let window = AppDelegate.fixedSizeWindow(for: view)
+        window.title = ModelStore.upgradeTitle
+        window.styleMask = [.titled, .closable]
+        window.center()
+        upgradeWindow = window
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func showOnboarding() {
+        if let w = onboardingWindow { NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil); return }
+        let view = OnboardingView { [weak self] in
+            Settings.shared.onboardingComplete = true
+            self?.onboardingWindow?.close()
+            self?.onboardingWindow = nil
+        } startRunning: { [weak self] in
+            if AppState.shared.ready == false { self?.startRunning() }
+        }
+        let window = AppDelegate.fixedSizeWindow(for: view)
+        window.title = "welcome"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.center()
+        onboardingWindow = window
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+}
+
+struct GateView: View {
+    let reason: SystemLanguageModel.Availability.UnavailableReason
+
+    private var message: String {
+        switch reason {
+        case .deviceNotEligible: "This Mac cannot run Apple Intelligence."
+        case .appleIntelligenceNotEnabled: "Turn on Apple Intelligence in System Settings, then reopen type me it."
+        case .modelNotReady: "Apple Intelligence is still downloading. Try again in a few minutes."
+        @unknown default: "Apple Intelligence is not available right now."
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("type me it needs Apple Intelligence").font(.title2.weight(.semibold))
+            Text(message).fixedSize(horizontal: false, vertical: true).frame(maxWidth: 380, alignment: .leading)
+            HStack {
+                if case .appleIntelligenceNotEnabled = reason {
+                    Button("Open System Settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }
+                }
+                Spacer()
+                Button("Quit") { NSApp.terminate(nil) }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 440)
+    }
+}

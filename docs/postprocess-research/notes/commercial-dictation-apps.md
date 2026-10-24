@@ -1,0 +1,90 @@
+# Commercial dictation apps: post-processing pipelines
+
+Research agent report, 2026-09-25 (web sources as cited; claims marked unverified are as the agent flagged them).
+
+# Commercial Dictation App Research — Post-Processing Pipelines
+
+Findings below are drawn from each vendor's own site, docs, blog, or changelog. Every claim is cited with its exact source URL. Where I found nothing technical, I say so explicitly.
+
+---
+
+## 1. Superwhisper (superwhisper.com)
+
+**By far the most technically transparent of the four** — public docs, a models page with benchmark tables, and a dedicated engineering blog post about their own small cleanup model.
+
+- **STT models offered:** Both cloud and on-device, user-selectable per "mode." Cloud: S1-Voice (Superwhisper's own, 6.6% WER, "26× speed"), Scribe V2 (ElevenLabs, 7.5% WER), Nova 3 (Deepgram, 10.1% WER), Ultra. On-device: Parakeet V2/V3 (NVIDIA, 476–494MB, "118–133× speed," English/24-language), Cohere Transcribe (1.3GB), and multiple Whisper size variants (75MB–3.0GB, 10.9–20.3% WER). — [superwhisper.com/models](https://superwhisper.com/models)
+
+- **LLM cleanup — explicitly gated/optional:** Superwhisper's "Modes" bundle an STT model with an *optional* post-processing language model, prompt, and output action. The built-in "Voice to Text" mode **skips AI processing entirely** for the fastest path when formatting isn't needed. Modes can be switched via hotkey. — [superwhisper.com/docs/modes/modes](https://superwhisper.com/docs/modes/modes), [superwhisper.com/docs/llms-full.txt](https://superwhisper.com/docs/llms-full.txt)
+
+- **Small dedicated model instead of a general LLM:** In August 2026 they shipped **S1-mini**, a 0.6B-parameter, 462–484MB open-weight model (Apache 2.0 + naming clause, published on Hugging Face) whose "sole purpose is to clean the raw ASR transcripts outputted by speech-to-text models" — punctuation, filler/stutter removal, list/email formatting, tone control (5 levels) — entirely on-device with "zero network requests." Their own framing: *"By design, S1-mini is highly focused to achieve a handful of common tasks extremely well. This allows us to have an efficient and lightweight model running locally on consumer devices."* It's explicitly not a general chat model: *"S1-mini is not a chat model and will not follow general instructions; it does one job."* Pipeline is literally: audio → ASR (Whisper, Parakeet, …) → S1-mini → clean text. Reported benchmarks: 94.8% token accuracy, 11.6% text-edit error rate, 99.3%/97.9%/97.6% on email greeting/sign-off/structure matching. — [superwhisper.com/blog/s1](https://superwhisper.com/blog/s1)
+
+- **Custom vocabulary — dual mechanism, both disclosed:** (1) **Vocabulary** words are "sent alongside your audio as recognition hints" directly to the STT model — i.e., true ASR-level hinting, not post-hoc. Docs explicitly warn this is a tradeoff: *"The vocabulary prompt sent to the transcription model can sometimes lead to confusion, especially when too many custom words are added... keep the vocabulary list short."* (2) **Replacements** run as deterministic post-transcription string substitution with case-insensitive matching and exact-case output, explicitly "no AI interpretation." — [superwhisper.com/docs/get-started/interface-vocabulary](https://superwhisper.com/docs/get-started/interface-vocabulary)
+
+- **Streaming/latency-hiding:** Realtime transcription shows words on screen as you speak, but only with specific models — Nova (cloud) or Parakeet Realtime (local); other model choices don't get this. Shipped as "new realtime streaming UI with live transcription display" (v2.10.0, Feb 2026). Also stream the LLM output token-by-token: "Show output from language model as it outputs" (v1.19.11, Dec 2023). — [superwhisper.com/changelog](https://superwhisper.com/changelog)
+
+- **Latency numbers:** S1-Voice cloud ASR: *"most dictations under 30s appearing 0.32 seconds after you stop talking"* (~46× realtime). Separately, a paste-latency optimization: "time to paste latency reduced by 300ms" (v2.16.2, Jul 2026). — [superwhisper.com/blog/s1](https://superwhisper.com/blog/s1), [superwhisper.com/changelog](https://superwhisper.com/changelog)
+
+---
+
+## 2. Wispr Flow (wisprflow.ai)
+
+Good disclosure on latency budgeting and infra choice; STT model identity itself is not named.
+
+- **STT model:** Not named. Their own post only describes building *"context-aware, personalized, and code-switched"* proprietary ASR — no base model or architecture disclosed. — [wisprflow.ai/post/technical-challenges](https://wisprflow.ai/post/technical-challenges)
+
+- **LLM cleanup — always-on, cloud-only, not gated in any disclosed way:** Cleanup runs on **fine-tuned Llama models**, chosen because *"Llama is controllable and customizable, which lets us focus on the output."* Deployed via Baseten using their **TensorRT-LLM engine builder** for the fine-tuned Llama models and the **Chains framework** for multi-step inference orchestration, with GPU autoscaling on AWS. No public mention of a skip-cleanup / lightweight-path option — dictation is described as always going through both ASR and LLM stages. Confirmed cloud-only: their Data Controls page states *"Transcription always occurs on the cloud. This is the best way for us to provide accurate, low latency transcription."* (no offline/local mode exists). — [baseten.co/resources/customers/wispr-flow](https://www.baseten.co/resources/customers/wispr-flow/), [wisprflow.ai/data-controls](https://wisprflow.ai/data-controls)
+
+- **Latency numbers — the most specific budget of any app researched:** Stated targets: *"E2E ASR inference in <200ms, E2E LLM inference in <200ms, and have a maximum networking budget of 200ms,"* for a full requirement of *"full transcription and LLM formatting/interpretation of their speech within 700ms"* after the user stops speaking. They explicitly optimize for tail latency, not typical case: *"We measure latency on a p90 or p99 basis for each user; we don't care at all about p50."* Baseten's writeup corroborates: end-to-end **<700ms (p99)**, with the Llama model required to *"consistently process and generate 100+ tokens in under 250ms."* — [wisprflow.ai/post/technical-challenges](https://wisprflow.ai/post/technical-challenges), [baseten.co/resources/customers/wispr-flow](https://www.baseten.co/resources/customers/wispr-flow/)
+
+- **Custom vocabulary — "Dictionary" feature, disclosed at user-facing level only:** Manual add of names/jargon/acronyms, auto-add when the user manually corrects a transcription (*"When you correct a spelling, Flow adds it automatically to your personal dictionary"*), shared/team dictionaries on Teams/Enterprise, misspelling-correction mappings, and a stated cap of "the 200 most recently modified" entries used per dictation. It applies to dictation and meeting-notes generation but explicitly **not** to free-form prompts: *"Free-form and custom prompt requests run without your dictionary."* — **not disclosed**: whether entries are injected as ASR hints, as an LLM-stage prompt addition, or as post-hoc replacement — their own help docs stop short of this. — [wisprflow.ai/features](https://wisprflow.ai/features), [docs.wisprflow.ai/articles/4052411709](https://docs.wisprflow.ai/articles/4052411709-teach-flow-your-words-with-the-dictionary)
+
+- **Streaming/latency-hiding:** Not disclosed publicly at a technical level. Their own blog and features page describe the result as fast but don't describe a partial-result/streaming UI mechanism the way Superwhisper or Aqua do. (Third-party reviews describe the practical experience as "near real-time," but that is not Wispr's own technical claim, so I'm not counting it as disclosed.)
+
+---
+
+## 3. MacWhisper (macwhisper.com, by Jordi Bruin / Good Snooze)
+
+**Least public technical detail of the four.** Docs describe user-facing configuration, not pipeline design, model rationale, or any latency numbers.
+
+- **STT models:** Only a passing mention — the site's meta description says *"MacWhisper transcribes audio, video, meetings, and system audio locally on your Mac using Whisper, Parakeet and other AI models,"* plus one line, *"Easily switch between different models hosted remotely or locally on your Mac."* No version/variant breakdown, no benchmark data, no explanation of why/when Whisper vs. Parakeet is used. (Separately, Jordi Bruin has publicly stated on X that MacWhisper was built on top of `whisper.cpp` — a developer tweet, not docs: [x.com/jordibruin/status/1618585571592634369](https://x.com/jordibruin/status/1618585571592634369).) — [macwhisper.com](https://www.macwhisper.com/)
+
+- **LLM cleanup — optional, BYOK, no fast/local alternative disclosed:** AI cleanup (filler removal, grammar fixes) and custom prompts are opt-in and require the user's own API key. Per the official docs (dictation article), only OpenAI is currently supported: *"To use the ChatGPT features you will need to add your own OpenAI API key,"* with *"Support for Anthropic and other AI providers will be added soon."* (Some third-party summaries claim Anthropic/Groq are already supported — that may reflect a newer app version than the docs page, but I can't confirm it from MacWhisper's own docs, so flagging the discrepancy rather than asserting it.) Users write custom prompts in Settings > Dictation, including app-specific prompts. There is **no disclosed small/local model for cleanup** (unlike Superwhisper's S1-mini) — MacWhisper's cleanup path is entirely "send transcript text to a hosted chat-completion API." — [docs.macwhisper.com/article/14-how-to-use-the-dictation-feature](https://docs.macwhisper.com/article/14-how-to-use-the-dictation-feature)
+
+- **Custom vocabulary — replacement-only, not ASR hinting:** "Find and Replace" / Global Replace: user-defined Original→Replacement pairs, case-sensitive and whole-word-only toggles, JSON import/export for sharing rule sets. This is a deterministic post-transcription substitution mechanism, comparable to Superwhisper's "Replacements" — there is **no disclosed equivalent of an ASR-level vocabulary hint** (like Superwhisper's Vocabulary or Wispr's Dictionary feeding the model itself). — [docs.macwhisper.com/article/37-find-and-replace-in-transcriptions](https://docs.macwhisper.com/article/37-find-and-replace-in-transcriptions)
+
+- **Streaming/latency-hiding:** Not disclosed. Site mentions "real-time dictation" only as a feature label, with zero architectural detail on how it's achieved.
+
+- **Latency numbers:** **Not disclosed publicly anywhere I found** — no changelog, blog, or docs page with speed/latency figures. One user testimonial cited on the marketing site mentions transcribing a 2.77GB file "in minutes," which is not a rigorous or vendor-authored performance claim.
+
+**Flag: MacWhisper is the one app in this set with essentially no public engineering disclosure** — no architecture posts, no benchmark numbers, no discussion of model-selection tradeoffs or latency budgets. Everything found is user-facing feature documentation.
+
+---
+
+## 4. Aqua Voice (aquavoice.com)
+
+Good disclosure on their STT model's benchmarks and, notably, the clearest public example of streaming-to-hide-latency as a deliberate, user-selectable design choice.
+
+- **STT model — Avalon (proprietary):** Launched August 2025, explicitly trained on "human-computer interaction" speech (prompts, code, email) rather than the audiobook/news/meeting-heavy data typical of general ASR corpora. Benchmarks: on the OpenASR Leaderboard, Avalon ranked **#6 overall / #1 among commercial models** at **6.24% WER** (Oct 2025); "Avalon 1.5" (April 2026) improved to **5.55% WER**, is *"more than 2× faster"* than v1, and *"wins 76% of blind tests vs. ElevenLabs Scribe v2."* On their own jargon benchmark (AISpeak-10, coding/AI terms), Avalon scores **97.3–97.4%** vs. Whisper Large v3's **65.1%** and ElevenLabs Scribe v1's **78%**. — [aquavoice.com/blog/introducing-avalon](https://aquavoice.com/blog/introducing-avalon), [aquavoice.com/blog/avalon-openasr-leaderboard](https://aquavoice.com/blog/avalon-openasr-leaderboard)
+
+- **LLM cleanup — disclosed at a high level, gating not clearly specified:** Marketing copy states *"Avalon processes every word in real time, refining phrasing, fixing grammar, and formatting text without delay,"* and separately their own llms.txt overview references *"language-model post-processing for accurate, contextual, well-formatted output."* **Not disclosed:** whether cleanup is a separate LLM call (as with Wispr's Llama stage or MacWhisper's BYOK GPT call) or built into Avalon's own decoding, and whether/how it's conditionally skipped. This is a genuine gap in their public technical writing — the "real time, without delay" framing suggests it's integrated into the STT step itself rather than a distinct slow LLM pass, but they don't say so explicitly. — [aquavoice.com](https://aquavoice.com/), [aquavoice.com/llms.txt](https://aquavoice.com/llms.txt)
+
+- **Custom vocabulary + context injection (their most distinctive disclosed mechanism):** "Custom Dictionary" for names/brands/technical terms with contextual casing (e.g., "factorio" → "Factorio is a great game"). Separately, **"Deep Context"** is a client-side engine that reads on-screen content (e.g., variable names, code syntax) to bias recognition toward what's visible — explicitly **optional, off by default, and stated as not stored**: e.g., turning `"Can you modify the canonical title..."` into `` "Can you modify the `canonical_title` on the `ContextResponse` model..." ``. This is effectively a hotword mechanism sourced from screen content rather than a static list. — [aquavoice.com](https://aquavoice.com/), [aquavoice.com/llms.txt](https://aquavoice.com/llms.txt)
+
+- **Streaming/latency-hiding — explicit two-mode design:** Aqua publicly documents two distinct latency/UX tradeoffs as a user-facing choice: **Instant Mode** (press key → talk → release → see text; startup <200ms, full text inserted ~450ms after release) — described as best for short clips or chaining commands — versus **Streaming Mode** (press key → talk → see text appear continuously in real time as you speak → release; ~850ms characterizes the continuous-output experience), recommended for pairing with Deep Context for "maximum contextual understanding." This is a direct, disclosed example of trading immediate partial output against final-accuracy/context benefit. — [aquavoice.com](https://aquavoice.com/), corroborated via [aquavoice.com/llms.txt](https://aquavoice.com/llms.txt)
+
+- **Latency numbers:** Instant Mode: startup **<200ms**, full result **~450ms** after key release. Streaming Mode: **~850ms** characterization for continuous output. Also market themselves at **230 WPM** effective throughput vs. ~40 WPM typing (a UX claim, not a pipeline latency figure). — [aquavoice.com](https://aquavoice.com/)
+
+- **Edit Mode (voice-driven text editing):** Select text, speak the correction in natural language (e.g., "Hey John, let's meet on Tuesday" → "on Monday"), and Aqua rewrites in place — described as switching into "Edit Mode automatically" on selection, backed by a proprietary "edit engine." No model or latency disclosure for this specific feature; one example in the post mentions "Grok for inference" but in the context of an unrelated coding-agent example, not as a disclosure of Aqua's own backend model — so I'm not counting that as an Aqua architecture disclosure. — [aquavoice.com/blog/introducing-edit-mode](https://aquavoice.com/blog/introducing-edit-mode)
+
+---
+
+## Summary comparison
+
+| | STT model(s) disclosed | LLM cleanup gated/conditional | Small fast local model instead of LLM | Custom vocab/hotwords | Streaming to hide latency | Latency numbers published |
+|---|---|---|---|---|---|---|
+| **Superwhisper** | Yes, detailed (multiple cloud+local, with WER/speed table) | Yes — explicit per-mode opt-out ("Voice to Text" skips AI) | Yes — S1-mini, 0.6B, on-device, disclosed in depth | Yes — ASR-hint vocabulary + deterministic replacements, both documented | Yes — realtime UI + streamed LLM tokens | Yes (0.32s ASR turnaround, 300ms paste-latency cut) |
+| **Wispr Flow** | No (proprietary, unnamed) | Not disclosed as skippable; always cloud, always Llama-cleanup per available docs | No — uses full fine-tuned Llama, not a small dedicated model | Yes — Dictionary (auto-learn + manual), mechanism (ASR hint vs. prompt injection) not disclosed | Not disclosed | Yes — detailed p99 budget (<700ms total, <200/200/200ms per stage) |
+| **MacWhisper** | Minimal (names Whisper + Parakeet, no detail) | Yes, opt-in (BYOK), but no gating logic beyond "user turned it on" | No | Replacement-only (no ASR hinting disclosed) | Not disclosed | **None found** |
+| **Aqua Voice** | Yes, detailed (Avalon, with WER and jargon-accuracy benchmarks) | Described as real-time/integrated, but gating logic not disclosed | Ambiguous — cleanup may be integrated into Avalon itself rather than a separate model, not clearly stated | Yes — static Custom Dictionary + dynamic "Deep Context" screen-reading | Yes — explicit Instant vs. Streaming mode tradeoff, publicly documented | Yes (<200ms startup, ~450ms/~850ms result times) |
+
+**Bottom line for the report:** Superwhisper is the only app with a public engineering disclosure directly analogous to your situation — a dedicated small on-device model (S1-mini, 0.6B) built specifically to replace a general LLM for transcript cleanup, with explicit reasoning about why a focused small model beats a general one for this task. Wispr Flow publishes the most rigorous latency-budget numbers but keeps model identity and gating logic private. Aqua Voice is the clearest public example of trading a streamed/partial-result mode against a more contextual final-pass mode as a deliberate, user-facing latency/quality tradeoff. **MacWhisper has essentially no public technical disclosure** beyond feature documentation — no architecture rationale, no benchmarks, no latency figures.

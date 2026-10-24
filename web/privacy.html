@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>privacy · type me it</title>
+<meta name="description" content="What type me it does with your speech, your text and your Mac.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="type me it">
+<meta property="og:title" content="privacy · type me it">
+<meta property="og:description" content="What type me it does with your speech, your text and your Mac.">
+<meta property="og:url" content="https://typeme.it/privacy">
+<meta property="og:image" content="https://typeme.it/og.png">
+<meta property="og:image:width" content="4800">
+<meta property="og:image:height" content="2520">
+<meta property="og:image:alt" content="A puff of smoke growing from a dense wisp into a large cloud, left to right.">
+<meta property="og:video" content="https://typeme.it/og.mp4">
+<meta property="og:video:secure_url" content="https://typeme.it/og.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1920">
+<meta property="og:video:height" content="1008">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="privacy · type me it">
+<meta name="twitter:description" content="What type me it does with your speech, your text and your Mac.">
+<meta name="twitter:image" content="https://typeme.it/og.png">
+<link rel="canonical" href="https://typeme.it/privacy">
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+<header>
+  <a class="home" href="/">← type me it</a>
+  <h1>privacy</h1>
+  <p class="meta">last updated 6 october 2026</p>
+</header>
+
+<p class="lead">type me it turns your speech into text on your mac. your speech, the text it becomes, and the history it keeps never leave the computer. this page lists what the app touches, what it stores, and the two servers it talks to.</p>
+
+<section>
+  <h2>what the app does with your speech</h2>
+  <div>
+<p>while you hold the fn key the app records from the microphone. when you let go, the recording is transcribed on your mac by the parakeet ultra speech model, running inside the app through fluidaudio. the audio is held in memory for the length of the transcription and then discarded. it is never written to disk and never sent anywhere.</p>
+<p>if apple intelligence is turned on in settings, the transcript is tidied up by apple's on-device foundation model, through the foundationmodels framework. that model runs on your mac. type me it does not use private cloud compute or any other apple server for this step. apple's own privacy policy governs apple intelligence itself.</p>
+<p>the finished text is typed into whichever app has the cursor.</p>
+<p>if "match what is behind it" is on in settings, the app reads an 8 by 8 pixel picture of the screen under the recording cloud to choose whether the cloud is white or dark. the pixels are averaged in memory and discarded. nothing is stored or sent. macos asks for screen recording because that is the only permission that allows any of the screen to be read, and it reminds you from time to time that the app has it. the option is off unless you turn it on.</p>
+  </div>
+</section>
+
+<section>
+  <h2>what the app stores on your mac</h2>
+  <div>
+<p>everything below lives in <code>~/library/application support/typemeit/</code> and in the app's preferences. you can open, copy or delete these files at any time.</p>
+<ul>
+  <li><code>history.json</code> holds each dictation: the transcript, the apple intelligence version if there was one, any edit you made afterwards, the time, how long the recording and transcription took, and the app and window you dictated into (bundle identifier, app name and window title). the insights tab is computed from this file. you choose how many entries to keep in settings, including none, and you can delete any entry or all of them from the history tab.</li>
+  <li><code>learned-words.json</code> holds pairs of what the app heard and what you meant, gathered from your corrections, together with when each was learned and which dictation it came from. these improve future transcripts. each one can be undone or removed from the custom words list.</li>
+  <li><code>models/</code> holds the downloaded speech model.</li>
+  <li><code>Voices/</code> exists only while "learn voices" is on in settings. for each transcribed meeting it holds numbers that describe each speaker's voice, and no audio. the app compares them to suggest names for speakers the meeting did not name. turning the setting off deletes the folder; deleting a meeting deletes its voices.</li>
+  <li><em>preferences</em> hold your settings, such as the hotkey, the history limit and whether the app checks for updates.</li>
+</ul>
+<p>the app writes diagnostic messages to the macos unified log, which stays on your mac and is managed by the system.</p>
+  </div>
+</section>
+
+<section>
+  <h2>how learning reads your corrections</h2>
+  <div>
+<p>after a dictation is typed, the app watches the text field it typed into for a short while, through macos accessibility, so that if you fix a word it can learn the correction. it only reads the field it just typed into. it does not read fields in password managers or terminals, and it does nothing while macos secure input is active, which is the state a password field puts the system into.</p>
+  </div>
+</section>
+
+<section>
+  <h2>what the app connects to</h2>
+  <div>
+<p>the app makes two kinds of network request. neither carries your speech, your text or your history. what the other end sees is your ip address and the request itself.</p>
+<ul>
+  <li><em>the speech model</em>, downloaded once during onboarding from this app's github releases page. github sees an ordinary download request from your ip address.</li>
+  <li><em>update checks</em>, made by the sparkle framework against the app's github releases page. by default the app checks on a schedule sparkle manages. the request includes the app version and macos version so the right update can be offered. nothing else about your mac is sent. you can turn automatic checks off in settings, and check by hand from the menu instead.</li>
+</ul>
+<p>there is no account, no sign-in, no analytics, no crash reporting and no advertising. the app makes no other network requests.</p>
+  </div>
+</section>
+
+<section>
+  <h2>permissions the app asks for</h2>
+  <div>
+<ul>
+  <li><em>microphone</em>, to hear you while the fn key is held.</li>
+  <li><em>accessibility</em>, to notice the fn key being pressed and released in any app, to type the text where the cursor is, to read the title of the window you dictated into, and to read back your corrections as described above.</li>
+</ul>
+<p>each is granted in system settings and can be withdrawn there. without the microphone the app cannot dictate. without accessibility it cannot see the fn key, type, attribute dictations to an app, or learn from corrections.</p>
+  </div>
+</section>
+
+<section>
+  <h2>the website</h2>
+  <div>
+<p>typeme.it is a static page served by cloudflare. cloudflare records the requests it serves, including your ip address, under its own privacy policy. the page loads the dm mono typeface from google fonts, which means google receives the request for the font file. the site sets no cookies and runs no analytics. the download button links to the app's github releases, so github handles the download.</p>
+  </div>
+</section>
+
+<section>
+  <h2>children</h2>
+  <div>
+<p>the app and site are not directed at children under 13 and do not knowingly collect information from them.</p>
+  </div>
+</section>
+
+<section>
+  <h2>your rights</h2>
+  <div>
+<p>type me it holds no data about you, so there is nothing for us to access, correct, export or delete on your behalf. every record the app makes is a file on your mac that you control, and deleting the app's application support folder removes all of it.</p>
+  </div>
+</section>
+
+<section>
+  <h2>changes</h2>
+  <div>
+<p>if the app starts touching anything new, this page changes first and the date at the top moves. the history of this page is in the public repository.</p>
+  </div>
+</section>
+
+<section>
+  <h2>contact</h2>
+  <div>
+<p>questions go to <a href="mailto:hello@typeme.it">hello@typeme.it</a>. reports of the app doing something this page does not describe go to <a href="https://github.com/typemeit/typemeit/issues">github.com/typemeit/typemeit/issues</a>, where they are treated as bugs.</p>
+  </div>
+</section>
+
+<footer>
+  <a href="/terms">terms</a>
+  <span aria-hidden="true">·</span>
+  <a href="/">type me it</a>
+</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# type me it
+
+<img src="web/og.png" alt="the puff growing, in four steps" width="100%">
+
+Hold the fn key, speak, let go. Parakeet Ultra transcribes the speech on this Mac through FluidAudio's Core ML build, Apple Intelligence tidies it up, and the app types it wherever the cursor is. It learns your vocabulary from the corrections you make, keeps a history, and shows usage insights. Nothing leaves the computer.
+
+macOS 26 or newer, Apple silicon.
+
+## Build
+
+```
+brew install xcodegen
+DEVELOPMENT_TEAM=Z28DW76Y3W xcodegen generate
+```
+
+Debug builds are a separate app, `type me it dev` with bundle id
+`it.typeme.typemeit.dev`, signed with the Developer ID certificate. It runs
+beside the installed release with its own settings, and because the signature
+is stable across rebuilds, macOS keeps its Accessibility and Microphone
+grants: they are asked for once, not after every build. Without that
+certificate in the keychain, drop the `Debug` block under `configs` in
+`project.yml` before generating.
+
+```sh
+xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug build
+xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt test
+```
+
+Dependencies are FluidAudio, which runs the speech and speaker models on Core ML, and Sparkle, which handles updates. The speech model (632 MB) is downloaded during onboarding into `~/Library/Application Support/TypeMeIt/models/asr/`. `make asr-model` builds the tar the app downloads from `typeme.it/models`.
+
+## Permissions
+
+Microphone, and Accessibility (the fn key, pasting, and reading corrections). Grants are keyed to the code signature, so run a Developer ID signed build from `/Applications` or expect to re-grant after each rebuild.
+
+## Layout
+
+- `TypeMeIt/` app sources, one file per module
+- `TypeMeIt/Learning/`, `TypeMeIt/Insights/` ports of Handy's learning engine and insights, with their tests in `TypeMeItTests/`
+- `web/` the puff on a web page, driven by the pointer; `generate.py` transpiles the shader from `TypeMeIt/Overlay/Puff.metal`
+- `Scripts/`, `.github/workflows/` the release pipeline; `Scripts/generate-dmg-background.sh` draws the disk image's background from frames of the app's own puff shader in `Scripts/puff/`; `Scripts/generate-og.sh` draws the site's link previews, `web/og.png` and `web/og-square.png`, the same way through `Scripts/og/`; `npm run og` in `Scripts/launch-video/` animates the same four puffs into `web/og.mp4`

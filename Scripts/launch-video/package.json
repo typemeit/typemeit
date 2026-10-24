@@ -1,0 +1,27 @@
+{
+  "name": "ask-claude-video",
+  "version": "0.1.0",
+  "description": "The ask-claude launch video, in Remotion, from EveryInc's product-launch-video scaffold",
+  "private": true,
+  "scripts": {
+    "shader": "node scripts/shader.mjs",
+    "studio": "npm run shader && remotion studio",
+    "render": "npm run shader && remotion render AskClaude out/ask-claude.mp4",
+    "og": "npm run shader && remotion render OgVideo ../../web/og.mp4 --muted",
+    "still": "npm run shader && remotion still"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

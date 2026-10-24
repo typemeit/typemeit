@@ -1,0 +1,704 @@
+{
+  "seen": [
+    {
+      "id": "Edge0/ARK-ASR-0.6B",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-redux",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2 (FluidAudio)",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3 (FluidAudio)",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-tdt-ctc-110m",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-ctc-0.6b",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "parakeet-realtime-eou-120m",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/nemotron-speech-streaming-en-0.6b",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/canary-1b-v2",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "cohere-transcribe-03-2026-coreml",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "diar-streaming-sortformer",
+      "date": "2026-10-14",
+      "role": "diarization"
+    },
+    {
+      "id": "HojoAI/Hojo-ASR-V1",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "bosonai/higgs-audio-v3-stt",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Qwen/Qwen3-ASR-1.7B-hf",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "TheStageAI/thewhisper-large-v3-turbo",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-5.0-470m-turboctc-nc",
+      "date": "2026-10-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "LiquidAI/LFM2.5-24B-A2B",
+      "date": "2026-10-14",
+      "role": "clean-up"
+    },
+    {
+      "id": "openbmb/MiniCPM5-2B",
+      "date": "2026-10-14",
+      "role": "clean-up"
+    },
+    {
+      "id": "FluidInference/clef-text-0.6b",
+      "date": "2026-10-15",
+      "role": "clean-up"
+    },
+    {
+      "id": "Calico (diarization, r/speechtech)",
+      "date": "2026-10-15",
+      "role": "diarization"
+    },
+    {
+      "id": "OtterAI/speech-v3.1",
+      "date": "2026-10-15",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-4.1-2b-nar",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-4.1-2b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/canary-qwen-2.5b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-4.1-2b-plus",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-4.0-1b-speech",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-3.3-2b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-3.3-8b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/Phi-4-multimodal-instruct",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Edge0/ARK-ASR-3B",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Edge0/Audio8-ASR-0.1B",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "soundsgoodai/Zipformer-cr-ctc-transducer-XL-290M",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/nemotron-3.5-asr-streaming-0.6b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/parakeet-ctc-1.1b",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "distil-whisper/distil-large-v3.5",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FunAudioLLM/Fun-ASR-Nano-2512-hf",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "espnet/owsm_ctc_v4_1B",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/VibeVoice-ASR-HF",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "facebook/omniASR-LLM-7B-v2",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "facebook/omniASR-CTC-7B-v2",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mistralai/Voxtral-Mini-3B-2507",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mistralai/Voxtral-Small-24B-2507",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mistralai/Voxtral-Mini-4B-Realtime-2602",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "abr-ai/niagara-9m-batch.en",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "abr-ai/niagara-19m-batch.en",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "abr-ai/niagara-38m-batch.en",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "abr-ai/niagara-84m-batch.en",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "assemblyai/universal-3-5-pro",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "smallestai/pulse",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "sprag/symphony",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "gladia/solaria-3",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "modulate/multilingual",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "reson8/resonant-1",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "reson8/resonant-1-flash",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "zoom/scribe_v1",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "zoom/scribe_v2_pro",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/azure-speech-06-2026",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/azure-speech-07-2026",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "sophea/asr-k1 (preview)",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "elevenlabs/scribe_v2",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "openai/gpt-transcribe",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "meta/muse-voice-transcribe",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "sachmatkris/agirdi",
+      "date": "2026-10-16",
+      "role": "speech recognition"
+    },
+    {
+      "id": "tencent/Hy-Memory-30B-A3B",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "inclusionAI/Ling-3.1-flash",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "mlx-community/Ternary-Bonsai-2-2B-2bit",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "IFM/K2-Horizon-0.9B",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "meta-models/Muse-Spark-Open-816B-A42B",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "chaoliangUNSW/Jev-Style-0.8B-Decision-v3",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "vllm-sr/d3-edge",
+      "date": "2026-10-16",
+      "role": "clean-up"
+    },
+    {
+      "id": "FluidVoice-Labs/fluid-speech-mini-coreml",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "zoom/scribe_v2_pro (eval reference)",
+      "date": "2026-10-17",
+      "role": "eval reference"
+    },
+    {
+      "id": "elevenlabs/scribe_v2 (eval reference)",
+      "date": "2026-10-17",
+      "role": "eval reference"
+    },
+    {
+      "id": "nineninesix/tyger",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Embedding Gemma Transcribe (eg2.haku.sh)",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "KaanAydinli/Duyu-small",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "qnguyen3/QUAN-Transcribe-1.0",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "TeamUNIVA/qwen3_asr_1.7b_ko",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "luweigen/vibevoice-asr-streaming-android",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "handy-computer/silero-vad-v6.2-gguf",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B",
+      "date": "2026-10-17",
+      "role": "clean-up"
+    },
+    {
+      "id": "ibm-granite/granite-switch-4.1-8b",
+      "date": "2026-10-17",
+      "role": "clean-up"
+    },
+    {
+      "id": "reflection/Beam-1.0-501B-A23B",
+      "date": "2026-10-17",
+      "role": "clean-up"
+    },
+    {
+      "id": "Aleph-Alpha/Kolibri-1",
+      "date": "2026-10-17",
+      "role": "clean-up"
+    },
+    {
+      "id": "google/gemma-4-E2B-it (ASR row)",
+      "date": "2026-10-17",
+      "role": "speech recognition"
+    },
+    {
+      "id": "sophea/asr-k1 (preview) (eval reference)",
+      "date": "2026-10-17",
+      "role": "eval reference"
+    },
+    {
+      "id": "MAI-Transcribe-2 (eval reference)",
+      "date": "2026-10-17",
+      "role": "eval reference"
+    },
+    {
+      "id": "CohereLabs/cohere-transcribe-03-2026",
+      "date": "2026-10-10",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "FluidInference/clef-text-0.6b-coreml",
+      "date": "2026-10-10",
+      "role": "Clean-up gate"
+    },
+    {
+      "id": "OpenMOSS-Team/MOSS-Transcribe-Diarize",
+      "date": "2026-10-13",
+      "role": "Meetings speech and diarization"
+    },
+    {
+      "id": "Qwen/Qwen3-ASR-1.7B",
+      "date": "2026-10-13",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "FluidInference/parakeet-redux-coreml",
+      "date": "2026-10-13",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "oruk/orukeet",
+      "date": "2026-10-13",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "rewayai/suplime",
+      "date": "2026-10-13",
+      "role": "Diarization"
+    },
+    {
+      "id": "Cactus-Compute/whistle",
+      "date": "2026-10-13",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "FoxNoseTech/diarize",
+      "date": "2026-10-13",
+      "role": "Diarization"
+    },
+    {
+      "id": "ConwayResearch/Underdog-Bark-3.0-Pro",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ConwayResearch/Underdog-Bark-3.0-Plus",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ConwayResearch/Underdog-Bark-3.0",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ConwayResearch/Underdog-Bark-3.0-Clean",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidInference/bark-3.0-coreml",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-5.0-2b",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "phequals/qwen35-2b-muesli-cleanup-v12-gguf",
+      "date": "2026-10-21",
+      "role": "clean-up"
+    },
+    {
+      "id": "freetranscribe/parakeet-ft-v1",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "arbazsiddiqui/voxlock",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "qvac/TranscribePsy-250M-EU",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "desert-ant-labs/voz",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "XiaomiMiMo/MiMo-V2.5-ASR",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "inclusionAI/Ming-3.0-asr-tiny",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "AuroraAI-Research/AuroraASR-1M",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "raj7676/ivy-dictation",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "futo-org/asr4all-l-plus",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "h2oai/h2o-lightning-4b",
+      "date": "2026-10-21",
+      "role": "clean-up"
+    },
+    {
+      "id": "FluidAudio campplus-coreml",
+      "date": "2026-10-21",
+      "role": "diarization"
+    },
+    {
+      "id": "FluidAudio fsmn-vad-coreml",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio SenseVoice-Small",
+      "date": "2026-10-21",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mistral/voxtral-small-transcribe-3 (eval reference)",
+      "date": "2026-10-21",
+      "role": "eval reference"
+    },
+    {
+      "id": "mistral/voxtral-mini-transcribe-3 (eval reference)",
+      "date": "2026-10-21",
+      "role": "eval reference"
+    },
+    {
+      "id": "alibaba/fun-realtime-asr-preview (eval reference)",
+      "date": "2026-10-21",
+      "role": "eval reference"
+    },
+    {
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB",
+      "date": "2026-10-21",
+      "role": "clean-up"
+    },
+    {
+      "id": "RecursiveSI/flint",
+      "date": "2026-10-21",
+      "role": "clean-up"
+    },
+    {
+      "id": "Muse Glimmer 30B",
+      "date": "2026-10-21",
+      "role": "clean-up"
+    },
+    {
+      "id": "FermionResearch/Phonon-2.5-English",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FermionResearch/Phonon-2.5",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ibm-granite/granite-speech-5.0-470m-turboctc (multilingual, 2026-10-21)",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "EverPaper/everparakeet-tdt-0.6b-v3",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "rajb3/kea-b",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "BUT-FIT/Pandemonium",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Scicom-intl/Who-Spoke-When-Over-the-Phone-Nemotron-3-Diarization",
+      "date": "2026-10-24",
+      "role": "diarization"
+    },
+    {
+      "id": "minomonchan/ONIVO-speech-correction-v2-GGUF",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "unsloth/Nemotron-3.5-Bolt-E4B",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "Spark-X2.6-4B",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "ConwayResearch/woof-2B-1.1-GGUF",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "MiniMaxAI/MiniMax-M3.1-Flash",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "date": "2026-10-24",
+      "role": "clean-up"
+    },
+    {
+      "id": "Spark-Audio 1.0 (arXiv 2610.31292)",
+      "date": "2026-10-24",
+      "role": "speech recognition"
+    },
+    {
+      "id": "xai/grok-voice-transcribe-2.0 (eval reference)",
+      "date": "2026-10-24",
+      "role": "eval reference"
+    },
+    {
+      "id": "google/gemini-3.5-transcribe (eval reference)",
+      "date": "2026-10-24",
+      "role": "eval reference"
+    },
+    {
+      "id": "stepfun/stepaudio-3-asr (eval reference)",
+      "date": "2026-10-24",
+      "role": "eval reference"
+    },
+    {
+      "id": "inworld/stt-1 (eval reference)",
+      "date": "2026-10-24",
+      "role": "eval reference"
+    }
+  ]
+}

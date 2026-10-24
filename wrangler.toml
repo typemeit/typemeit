@@ -1,0 +1,25 @@
+# Every request is served from ./web as a static file, except the release paths
+# worker.js answers from the typemeit-releases R2 bucket.
+name = "typemeit-web-dev"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[assets]
+directory = "./web"
+binding = "ASSETS"
+
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "typemeit-releases"
+
+[env.production]
+name = "typemeit-web"
+routes = [{ pattern = "typeme.it", custom_domain = true }]
+
+[env.production.assets]
+directory = "./web"
+binding = "ASSETS"
+
+[[env.production.r2_buckets]]
+binding = "RELEASES"
+bucket_name = "typemeit-releases"

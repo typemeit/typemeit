@@ -1,0 +1,38 @@
+instructions tokens: 470
+prompt tokens 1w: 19
+prompt tokens 8w: 26
+prompt tokens 100w: 135
+schema tokens: 59
+config                   len    median ms   (ttft)   runs
+generable cold 1w     2014      4488 3115 2014 743 779
+generable cold 8w      725      772 727 725 708 703
+    -> can you check if whisper is still running
+generable cold 100w     2450      2325 2290 4395 3194 2450
+generable prewarm 1w      408      362 413 446 362 408
+generable prewarm 8w      485      469 485 482 500 489
+    -> can you check if whisper is still running
+generable prewarm 100w     2020      1919 2026 2046 1981 2020
+noSchema cold 1w      564      564 567 564 538 553
+noSchema cold 8w      641      639 672 670 638 641
+    -> can you check if whisper is still running
+noSchema cold 100w     2214      2275 2160 2122 2214 2231
+noSchema prewarm 1w      335      335 331 315 398 377
+noSchema prewarm 8w      473      397 473 435 489 489
+    -> can you check if whisper is still running
+noSchema prewarm 100w     2000      1833 2479 1962 2039 2000
+string cold 1w      317      325 314 313 318 317
+string cold 8w      419      421 408 413 421 419
+    -> Whisper is still running.
+string cold 100w     2603      1985 2102 2736 2785 2603
+string prewarm 1w      165      140 165 161 179 170
+string prewarm 8w      318      320 318 324 298 298
+    -> Whisper is still running.
+string prewarm 100w     2565      2758 2565 2434 2547 2833
+stream prewarm 1w      451   (409)   528 468 448 421 451
+stream prewarm 8w      649   (553)   642 653 655 587 649
+    -> can you check if whisper is still running
+stream prewarm 100w     2931   (688)   2988 2851 2931 2827 2953
+string no-instr cold 1w      765      820 765 705 689 779
+string no-instr cold 8w      844      1032 812 778 934 844
+    -> I'm sorry, but I can't check if Whisper is running. You might want to check the system logs or the Whisper app itself fo
+string no-instr cold 100w     2657      2392 2657 2770 2835 2624

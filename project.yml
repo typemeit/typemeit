@@ -1,0 +1,315 @@
+name: TypeMeIt
+options:
+  bundleIdPrefix: it.typeme
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    # Every build signs with the Developer ID certificate, and only that one.
+    # Automatic signing would also want an Apple Development certificate, and
+    # on CI, where each run starts with a keychain holding only Developer ID,
+    # it asks Apple for a new one every run until the account hits its cap.
+    # Debug builds gain from it too: macOS keys Input Monitoring and
+    # Microphone grants on the code signature, so a build keeps its grants from
+    # one build to the next instead of needing them again after every rebuild.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    ENABLE_HARDENED_RUNTIME: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # The release scripts override both from the tag. They are build settings
+    # rather than literals in the Info.plist because Sparkle compares
+    # CFBundleVersion to decide whether an update is newer: baked as "1", every
+    # release looks like the same build and no update is ever offered.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+  # The speech model (Parakeet Ultra) and the speaker diarizer (docs/meetings.md
+  # 8.2). Pinned exactly: their model files are mirrored per revision and
+  # loaded from disk.
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    exactVersion: "0.17.6"
+targets:
+  TypeMeIt:
+    type: application
+    platform: macOS
+    sources:
+      - path: TypeMeIt
+        excludes:
+          - "Resources/AppIcon.icns"
+          - "Resources/AppIcon-Dev.icns"
+          - "Support/Icon/**"
+          # The store target's; left in, they would be copied as resources.
+          - "Support/Info-Store.plist"
+          - "Support/TypeMeIt-Store.entitlements"
+      - path: TypeMeIt/Resources/AppIcon.icns
+        buildPhase: resources
+      - path: TypeMeIt/Resources/AppIcon-Dev.icns
+        buildPhase: resources
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
+      - package: FluidAudio
+        product: FluidAudio
+      # docs/meetings.md 7.15: the tool ships at Contents/MacOS/typemeit-mcp,
+      # copied in and signed by this target, so archives carry it too.
+      - target: typemeit-mcp
+        link: false
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
+      - target: TypeMeItThumbnail
+        embed: true
+        codeSign: true
+    info:
+      path: TypeMeIt/Support/Info.plist
+      properties:
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleIconFile: "$(APP_ICON_FILE)"
+        LSMinimumSystemVersion: "26.0"
+        NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
+        NSAudioCaptureUsageDescription: "type me it records the other side of a call when you ask it to record a meeting."
+        NSDocumentsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSDesktopFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSDownloadsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSRemovableVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSNetworkVolumesUsageDescription: "type me it keeps your meetings in the folder you chose."
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+        # A meeting shared as a .tmi file (docs/meetings.md 7.16). Markdown
+        # and plain text underneath, so TextEdit and Quick Look read it; a
+        # double-click opens it here. The store build leaves it out until
+        # it has meetings.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: it.typeme.meeting
+            UTTypeDescription: type me it meeting
+            UTTypeConformsTo: [net.daringfireball.markdown, public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [tmi]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: type me it meeting
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [it.typeme.meeting]
+            CFBundleTypeIconSystemGenerated: 1
+        SUFeedURL: https://typeme.it/appcast.xml
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 3600
+        SUAutomaticallyUpdate: true
+        SUPublicEDKey: WGBC31wJMt0uMIwvfVDsWaqVJL8ki+jRfdKACFhPEDw=
+    entitlements:
+      path: TypeMeIt/Support/TypeMeIt.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
+        PRODUCT_NAME: type me it
+        PRODUCT_MODULE_NAME: TypeMeIt
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+        APP_ICON_FILE: AppIcon
+      configs:
+        # A separate app, so it runs beside the installed release with its
+        # own grants and settings rather than replacing it. Its icon is the
+        # release icon inverted and its menu bar puff is dashed.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.dev
+          PRODUCT_NAME: type me it dev
+          APP_ICON_FILE: AppIcon-Dev
+  # Finder's icon for .tmi files (Thumbnail/ThumbnailProvider.swift). Only
+  # the DMG app declares the type, so only it embeds this.
+  TypeMeItThumbnail:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Thumbnail
+      - path: TypeMeIt/Resources/AppIcon.icns
+        buildPhase: resources
+    info:
+      path: Thumbnail/Info.plist
+      properties:
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ThumbnailProvider"
+          NSExtensionAttributes:
+            QLSupportedContentTypes: [it.typeme.meeting]
+            QLThumbnailMinimumDimension: 0
+    entitlements:
+      path: Thumbnail/Thumbnail.entitlements
+      properties:
+        # Extensions must be sandboxed; it never reads the file.
+        com.apple.security.app-sandbox: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.thumbnail
+        PRODUCT_NAME: TypeMeItThumbnail
+        GENERATE_INFOPLIST_FILE: NO
+      configs:
+        # An extension's id must start with its app's.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.dev.thumbnail
+  # The Mac App Store build: the same sources in the App Sandbox, signed for
+  # distribution through the store, with no Sparkle (the store updates it).
+  # Sandboxed, the app hides what the sandbox takes away (Sandbox.swift).
+  typemeit:
+    type: application
+    platform: macOS
+    sources:
+      - path: TypeMeIt
+        excludes:
+          - "Resources/AppIcon.icns"
+          - "Resources/AppIcon-Dev.icns"
+          - "Support/Icon/**"
+          # The DMG target's; left in, they would be copied as resources.
+          - "Support/Info.plist"
+          - "Support/TypeMeIt.entitlements"
+      - path: TypeMeIt/Resources/AppIcon.icns
+        buildPhase: resources
+    dependencies:
+      - package: FluidAudio
+        product: FluidAudio
+    info:
+      path: TypeMeIt/Support/Info-Store.plist
+      properties:
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleIconFile: AppIcon
+        LSMinimumSystemVersion: "26.0"
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+        # No encryption of its own, so no export compliance step per build.
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: TypeMeIt/Support/TypeMeIt-Store.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.device.audio-input: true
+        # The speech model is downloaded from a GitHub release on first run.
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
+        PRODUCT_NAME: type me it
+        PRODUCT_MODULE_NAME: TypeMeIt
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        PROVISIONING_PROFILE_SPECIFIER: "it.typeme.typemeit AppStore"
+  # Command-line tool, docs/meetings.md 7.15: reads a published meetings
+  # folder over stdio JSON-RPC. Shares TypeMeIt/Meetings/Meeting.swift's
+  # source (an application target can't be imported as a library), with
+  # MCP/Shims.swift standing in for the app-only symbols that file
+  # references (Log, Fixed, AudioCapture) so it compiles standalone.
+  typemeit-mcp:
+    type: tool
+    platform: macOS
+    sources:
+      - path: MCP
+      - path: TypeMeIt/Meetings/Meeting.swift
+      # The hooks it writes, in the shape the app reads.
+      - path: TypeMeIt/Meetings/MeetingHook.swift
+      # The defaults keys it shares with the app.
+      - path: TypeMeIt/MCPDefaults.swift
+      # Meeting.names is declared here.
+      - path: TypeMeIt/Meetings/SpeakerNaming.swift
+    settings:
+      base:
+        # Its own products folder: in the app's, FluidAudio's modules sit
+        # beside it and the compiler goes looking for their C parts.
+        CONFIGURATION_BUILD_DIR: $(BUILD_DIR)/$(CONFIGURATION)/typemeit-mcp
+        # Installed into an archive, a loose tool makes it a generic archive,
+        # which cannot be exported for Developer ID. The app copies it in.
+        SKIP_INSTALL: YES
+  # The design system on its own. Previews of its parts load here in seconds,
+  # where the app's target first loads everything the app links; running it
+  # opens every part in one window. Signed to run locally: it never ships.
+  DesignSystem:
+    type: application
+    platform: macOS
+    sources:
+      - DesignSystemGallery
+      - TypeMeIt/DesignSystem
+      - TypeMeIt/DesignTokens.swift
+      - TypeMeIt/CloudColor.swift
+      - TypeMeIt/CloudPosition.swift
+      - TypeMeIt/KeyCombo.swift
+      - TypeMeIt/MenuBarIcon.swift
+      - TypeMeIt/Plural.swift
+      - TypeMeIt/Overlay/PuffView.swift
+      - TypeMeIt/Overlay/Puff.metal
+      - TypeMeIt/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.designsystem
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+  TypeMeItTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - TypeMeItTests
+      # MCPTests.swift exercises MCPTools/MCPServer directly; these two
+      # files are not otherwise part of any app-linked target, so they are
+      # added here to compile alongside the tests (docs/meetings.md 7.15).
+      # Guarded by `#if canImport(TypeMeIt)`, they use the real Meeting,
+      # Fixed and Log from the app module in this target, not MCP/Shims.swift.
+      - path: MCP/Protocol.swift
+      - path: MCP/Tools.swift
+    dependencies:
+      - target: TypeMeIt
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.tests
+        GENERATE_INFOPLIST_FILE: YES
+      configs:
+        # The host app has a different product name in Debug.
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/type me it dev.app/Contents/MacOS/type me it dev"
+          BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  DesignSystem:
+    build:
+      targets:
+        DesignSystem: all
+    run:
+      config: Debug
+  typemeit:
+    build:
+      targets:
+        typemeit: all
+    archive:
+      config: Release
+  TypeMeIt:
+    build:
+      targets:
+        TypeMeIt: all
+        typemeit-mcp: all
+        TypeMeItTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [TypeMeItTests]

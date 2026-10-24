@@ -1,0 +1,142 @@
+name: release
+
+# Only a `v*` tag builds. Every job needs a macOS runner and nothing else in
+# CI does, so branches and pull requests are deliberately not built.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A notarized, stapled DMG plus the Sparkle appcast, put in the
+  # typemeit-releases R2 bucket that typeme.it serves. SUFeedURL is
+  # typeme.it/appcast.xml, so shipping an update to existing users *is* the
+  # R2 step; the GitHub release is the private record of it.
+  release-macos:
+    runs-on: macos-26
+    environment: production
+    permissions:
+      contents: write # create the release and upload the DMG and appcast
+    env:
+      DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: brew install xcodegen
+      - run: echo "MARKETING_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Import Developer ID signing assets
+        env:
+          DEVELOPER_ID_CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/devid.keychain-db"
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          echo "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KEYCHAIN" -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN"
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+      - name: Build, notarize and sign the Sparkle appcast
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          Scripts/release-dmg.sh
+      # First, so a failed R2 upload can be retried from the release's assets:
+      # the appcast in it already points at typeme.it.
+      - name: Record the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            build/TypeMeIt.dmg \
+            build/updates/appcast.xml
+      - name: Put the DMG and appcast on typeme.it
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: Scripts/publish-release.sh
+
+  # The Mac App Store channel: the sandboxed `typemeit` target uploaded to
+  # App Store Connect, the listing text and screenshots put on the version,
+  # and the version submitted for review. Approval does not release it: the
+  # store version is released by hand in App Store Connect, so the DMG and
+  # the store can go out on the same day. The build number is the minute
+  # of the run, so it outranks every earlier upload; the store refuses a
+  # bundle version lower than one it already has.
+  release-store:
+    runs-on: macos-26
+    environment: production
+    env:
+      DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: brew install xcodegen fastlane
+      - run: |
+          echo "MARKETING_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$(date +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+      - name: Import App Store signing assets
+        env:
+          APPLE_DISTRIBUTION_CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERT_P12 }}
+          APPLE_DISTRIBUTION_CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERT_PASSWORD }}
+          MAC_INSTALLER_CERT_P12: ${{ secrets.MAC_INSTALLER_CERT_P12 }}
+          MAC_INSTALLER_CERT_PASSWORD: ${{ secrets.MAC_INSTALLER_CERT_PASSWORD }}
+          MAC_APP_STORE_PROFILE: ${{ secrets.MAC_APP_STORE_PROFILE }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/store.keychain-db"
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          echo "$APPLE_DISTRIBUTION_CERT_P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$APPLE_DISTRIBUTION_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          echo "$MAC_INSTALLER_CERT_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+          security import "$RUNNER_TEMP/installer.p12" -k "$KEYCHAIN" -P "$MAC_INSTALLER_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$MAC_APP_STORE_PROFILE" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/typemeit-appstore.provisionprofile"
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+      - name: Archive and upload the store build
+        run: Scripts/release-store.sh
+      - name: Render the screenshots
+        # The frames are drawn by headless Chrome over the captures in the
+        # repo; the runner image ships Chrome.
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          "$RUNNER_TEMP/store-venv/bin/pip" install --quiet pillow numpy
+          "$RUNNER_TEMP/store-venv/bin/python" Scripts/store/build.py
+      - name: Put the listing on the version and submit it
+        run: |
+          fastlane mac listing version:"$MARKETING_VERSION"
+          fastlane mac submit version:"$MARKETING_VERSION" build:"$BUILD_NUMBER"

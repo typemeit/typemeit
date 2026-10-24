@@ -1,0 +1,1377 @@
+[
+  {
+    "name": "quick-sync-supplier-quote-pricing",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Hey, quick one before the day gets away from us. Did you see the quote back from Anthony at Colton Supply?"
+      },
+      {
+        "speaker": "Sam",
+        "text": "Yeah, I looked at it this morning. Um, the unit price is like twelve percent higher than what he quoted us back in March. I don't know if that's just materials going up or if something got miscommunicated."
+      },
+      {
+        "speaker": "You",
+        "text": "Twelve percent is a lot to just, you know, wave through. Do we know if the volume changed on our end? Because if we're ordering the same amount, that jump seems off."
+      },
+      {
+        "speaker": "Sam",
+        "text": "No, same volume as far as I can tell. I pulled up the old PO and it's basically identical quantities. So either their costs went up that much or there's a typo somewhere in the new sheet."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's not guess. I think we just go back to Anthony and ask him to walk us through the difference before we sign anything. Can you send that email today, or should I?"
+      },
+      {
+        "speaker": "Sam",
+        "text": "I can send it. I'll ask him to break out materials versus shipping versus whatever else, so we're not comparing apples to oranges. Should have something back by tomorrow probably."
+      },
+      {
+        "speaker": "You",
+        "text": "Perfect, that works. Let's regroup once we hear from him, don't want to hold up the order longer than we have to."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "quote",
+          "quotes",
+          "pricing",
+          "price",
+          "prices",
+          "cost",
+          "costs"
+        ],
+        [
+          "anthony"
+        ]
+      ],
+      "avoid": [
+        "agreed to the price",
+        "accepted the quote",
+        "signed the contract"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "quote",
+          "quotes",
+          "pricing",
+          "price",
+          "prices",
+          "cost",
+          "costs"
+        ]
+      ],
+      "avoid": []
+    }
+  },
+  {
+    "name": "design-review-onboarding-cut-step",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Okay so today's just the onboarding flow, right? I want to get through this fast because I know Priya's got another review at eleven."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Yeah, eleven's fine, we've got time. So I put the whole flow up on the screen, walk me through where you want to start."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Can we start at step three? That's the one that's been bugging me. The 'invite your team' step, before people have even seen the product. It feels really early."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, I've felt that too honestly. Like, um, you sign up, you verify your email, and then boom, we're asking you to invite coworkers before you've done anything yourself."
+      },
+      {
+        "speaker": "Priya",
+        "text": "I hear that. When I built it originally the thinking was, get people to invite teammates while they're excited, but the data's kind of mixed on whether it actually helps activation."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Right, and it adds friction. It's one more screen between sign up and actually seeing value. I'd rather move it to after they've created their first project."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, let's just cut it from the initial flow. We can surface an invite prompt later, like after their first project, instead of upfront. Simpler is better here."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Okay, I can live with that. So new flow is basically sign up, verify, straight into project creation, and the invite step moves to a later trigger."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "That's a much tighter flow. Honestly I think it'll bump completion rate just from removing a step, regardless of anything else we do."
+      },
+      {
+        "speaker": "You",
+        "text": "Great, so Priya, can you update the mockups to reflect that by Friday? Then we can get it in front of the team next week."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Yep, Friday works. I'll drop the updated designs in the shared file and ping you both when they're ready."
+      },
+      {
+        "speaker": "You",
+        "text": "Perfect. Oh, and before we go, did anyone grab coffee, I feel like I'm running on fumes today."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Ha, there's a pot in the kitchen, it's fresh, I just made it."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "onboarding",
+          "signup",
+          "sign-up",
+          "sign up"
+        ],
+        [
+          "cut",
+          "remove",
+          "removing",
+          "dropping",
+          "drop",
+          "skip",
+          "skipping"
+        ]
+      ],
+      "avoid": [
+        "redesigned the entire flow",
+        "complete redesign"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "onboarding",
+          "signup",
+          "sign-up",
+          "sign up"
+        ]
+      ],
+      "avoid": []
+    }
+  },
+  {
+    "name": "bug-triage-checkout-crash-hotfix",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Alright, top of the list is the checkout crash. Tom, you've been looking into it, what do we know?"
+      },
+      {
+        "speaker": "Tom",
+        "text": "So it's happening specifically on older iPhones, like iPhone 8 and below, running the last couple iOS versions. Newer devices seem totally fine."
+      },
+      {
+        "speaker": "Dana",
+        "text": "How many users are we talking about? Is this like a handful of people or is it actually moving the needle on support tickets?"
+      },
+      {
+        "speaker": "Tom",
+        "text": "It's not huge in raw numbers, but the ones who hit it, hit it every single time at the payment step. So for them checkout is completely broken, which is bad."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, that's not something we can sit on. Do we know the actual cause yet, or are we still narrowing it down?"
+      },
+      {
+        "speaker": "Tom",
+        "text": "I think I found it, um, it's a memory issue in how we're rendering the card previews, older devices just don't have the headroom and the app crashes right as you hit confirm."
+      },
+      {
+        "speaker": "Dana",
+        "text": "Ouch. Okay so is this a quick fix or does it need a bigger rework of that screen?"
+      },
+      {
+        "speaker": "Tom",
+        "text": "I think it's quick, honestly. We can lazy load the previews instead of rendering all of them at once, that should fix the memory spike without touching the rest of the flow."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's ship that as a hotfix rather than waiting for the next regular release. This is blocking purchases, we shouldn't sit on it."
+      },
+      {
+        "speaker": "Dana",
+        "text": "Agreed. Tom, are you good to own that end to end, get it tested and out the door?"
+      },
+      {
+        "speaker": "Tom",
+        "text": "Yeah, I'll own it. I can have a build ready for testing today and if it looks clean we push the hotfix tomorrow morning."
+      },
+      {
+        "speaker": "You",
+        "text": "Great, thanks Tom. Let's check back in standup tomorrow and see how the fix is looking before it goes out."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "checkout"
+        ],
+        [
+          "crash",
+          "crashes",
+          "crashing"
+        ],
+        [
+          "hotfix",
+          "fix",
+          "patch"
+        ]
+      ],
+      "avoid": [
+        "delay the fix",
+        "wait until the next release",
+        "postpone"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "crash",
+          "crashes",
+          "crashing"
+        ]
+      ],
+      "avoid": []
+    }
+  },
+  {
+    "name": "office-move-after-hiking-smalltalk",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Hey, how was the weekend, didn't you say you were doing that hike up near the ridge?"
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Oh man, yeah, it kicked my butt. We did like eleven miles and there was way more elevation gain than the map made it look like."
+      },
+      {
+        "speaker": "You",
+        "text": "Eleven miles, wow. Did you make it to the top before it got hot, or were you baking the whole way up?"
+      },
+      {
+        "speaker": "Jordan",
+        "text": "We started early, like six a.m., so the first half was actually really nice and cool. Coming down was rough though, my knees are still mad at me."
+      },
+      {
+        "speaker": "Elena",
+        "text": "Ha, I did basically nothing this weekend, just sat on the couch and watched three seasons of a show I probably shouldn't admit to watching."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "No judgment, honestly after that hike a couch sounds amazing. I could barely walk up the stairs yesterday."
+      },
+      {
+        "speaker": "You",
+        "text": "I feel that in my soul. Okay, um, should we get into it, I know we've all got a hard stop at the top of the hour."
+      },
+      {
+        "speaker": "Elena",
+        "text": "Yeah let's do it. So, the main thing today is the office move, we finally have real options from facilities."
+      },
+      {
+        "speaker": "You",
+        "text": "Right, so we're definitely moving off the fourth floor, it's just a question of which floor we land on and when."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "I thought we were leaning toward the sixth floor? That was the one with the better light and the bigger kitchen."
+      },
+      {
+        "speaker": "Elena",
+        "text": "We were, but facilities just told me the sixth floor won't be ready until December because of some electrical work. Eighth floor is ready now though."
+      },
+      {
+        "speaker": "You",
+        "text": "December's a long time to wait, especially with the lease situation on our current floor. What's wrong with the eighth floor, is it just smaller?"
+      },
+      {
+        "speaker": "Elena",
+        "text": "It's a little smaller, but honestly not by much, and it's move-in ready. I'd rather take the sure thing than gamble on the sixth floor timeline slipping again."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Yeah, that's fair, facilities timelines always slip. I'd rather just get it done than keep waiting around for the nicer option."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed, let's go with the eighth floor. Do we have an actual date, or is it just 'ready now' in a vague sense?"
+      },
+      {
+        "speaker": "Elena",
+        "text": "They gave me October 19th as the earliest we could start moving desks in. I think we should just lock that in and tell the team."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's do October 19th then. I'll send a note to the team today so people can start planning around it."
+      },
+      {
+        "speaker": "Jordan",
+        "text": "Sounds good. I'll figure out the moving logistics for our team's equipment, make sure nothing gets left behind on the fourth floor."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "office"
+        ],
+        [
+          "move",
+          "moving",
+          "relocate",
+          "relocating",
+          "relocation"
+        ]
+      ],
+      "avoid": [
+        "hiking",
+        "hike",
+        "weekend trip",
+        "trail"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "office move",
+          "moving offices",
+          "relocation",
+          "office floor"
+        ]
+      ],
+      "avoid": [
+        "hiking",
+        "hike",
+        "weekend"
+      ]
+    }
+  },
+  {
+    "name": "refund-policy-annual-plans",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "So today's topic is the refund policy for annual plans, we've been getting more questions about it lately than I'd like."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Yeah, support flagged like fifteen tickets this month alone where people are asking for a refund partway through their annual term."
+      },
+      {
+        "speaker": "Isla",
+        "text": "Right now our policy is basically no refunds once you're past thirty days, full stop, which I think is creating a lot of the friction."
+      },
+      {
+        "speaker": "You",
+        "text": "It's harsh, honestly. If someone's four months into a twelve month plan and wants out, telling them tough luck doesn't feel great, and it's bad for word of mouth."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Oh, and side note, I was digging into this and apparently Paylane changes how they report partial refunds versus full ones, something about how the fee gets clawed back. Just flagging it since it might affect the mechanics."
+      },
+      {
+        "speaker": "Isla",
+        "text": "Good to know, we'll need to loop in finance on that part regardless of what we land on. But let's figure out the policy itself first."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed. I don't think we want to do full refunds any time someone asks, that's too generous and opens us up to people gaming it near renewal."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "What if we do something time based? Like, pro-rated for the unused months, so if you cancel at month four you get eight months back, roughly."
+      },
+      {
+        "speaker": "Isla",
+        "text": "I like that better than all or nothing. Though, should there be some window where you can't touch it at all, or is it pro-rated from day one?"
+      },
+      {
+        "speaker": "You",
+        "text": "I think pro-rated makes sense once you're past the standard thirty day window, and within the first thirty days it's still a full refund like it is today."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "That's clean actually, keeps the existing thirty day policy intact and just adds pro-rated refunds for anything after that instead of a hard no."
+      },
+      {
+        "speaker": "Isla",
+        "text": "Okay, so to confirm, we're doing pro-rated refunds for annual plans once you're past the initial thirty days. I'll draft the updated policy language this week."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, let's go with that. Marcus, can you check with finance on how the Paylane side handles the partial refund piece, so the numbers actually reconcile?"
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Will do, I'll set up time with them tomorrow and report back before Isla finalizes the wording."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "refund",
+          "refunds"
+        ],
+        [
+          "pro-rated",
+          "prorated",
+          "pro rata"
+        ]
+      ],
+      "avoid": [
+        "no refunds",
+        "refunds are not allowed",
+        "decided against refunds",
+        "rejected refunds"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "refund policy",
+          "refund",
+          "refunds"
+        ]
+      ],
+      "avoid": [
+        "paylane"
+      ]
+    },
+    "wish": "The summary runs to 42 words: the outcome sentence carries the refund rule and the finance follow-up together."
+  },
+  {
+    "name": "hiring-debrief-backend-engineer",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Okay, debrief on the backend candidate, Owen. Everyone got a chance to do their round, right? Let's go through impressions."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "I had him for the systems design portion. Honestly really strong, he walked through a caching strategy that was cleaner than what half our team would come up with."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I did the coding round with him. He was solid too, not flashy, but he actually tested his own code before saying he was done, which, you'd be surprised how rare that is."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, I did the behavioral round and he talked through a production incident he'd handled that was genuinely impressive, calm under pressure, owned his mistakes."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Any concerns at all? I know we've had candidates look great on paper and then the team fit round raises flags."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Not really, honestly. He asked good questions back too, about our on-call rotation and how we handle incident postmortems, felt like he was actually evaluating us too."
+      },
+      {
+        "speaker": "You",
+        "text": "That's a good sign. My only tiny hesitation is his experience with distributed systems is a bit lighter than I'd love, but that's coachable, it's not a dealbreaker."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Agreed, everything else more than makes up for it. I'd be excited to work with him honestly."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Same here. I think we should move forward, this was a strong loop across the board and I don't want to lose him to another offer while we deliberate."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's do it then, we make the offer. I'll talk to recruiting today so we can get something in front of him before the end of the week."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Sounds good. Let me know if you need me to do the informal call too, sometimes hearing from a future teammate helps close things out."
+      },
+      {
+        "speaker": "You",
+        "text": "That'd be great actually, I'll loop you in once recruiting has the numbers finalized."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "candidate",
+          "backend engineer",
+          "engineer"
+        ],
+        [
+          "offer",
+          "hire",
+          "hired",
+          "hiring"
+        ]
+      ],
+      "avoid": [
+        "rejected the candidate",
+        "decided not to hire",
+        "passed on the candidate"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "backend engineer",
+          "engineering hire",
+          "engineer hire",
+          "engineer candidate"
+        ]
+      ],
+      "avoid": [
+        "owen"
+      ]
+    },
+    "wish": "The title names the candidate (\"Owen Backend Candidate\") although the instructions say never to name a person; the candidate is not a speaker."
+  },
+  {
+    "name": "one-on-one-growth-toward-senior",
+    "turns": [
+      {
+        "speaker": "Rachel",
+        "text": "Hey, thanks for making time, I know we pushed this a week because of the release crunch. How are you feeling now that that's settled down?"
+      },
+      {
+        "speaker": "You",
+        "text": "Good, honestly relieved it's out the door. Um, I wanted to use today to talk about, like, where I stand on the senior track, if that's okay."
+      },
+      {
+        "speaker": "Rachel",
+        "text": "Of course, yeah, that's a great use of the time. So where's your head at, what do you feel like is still missing?"
+      },
+      {
+        "speaker": "You",
+        "text": "I think technically I'm mostly there, but I haven't really led anything end to end that's, you know, cross team or high visibility. Most of what I've done is scoped pretty narrowly."
+      },
+      {
+        "speaker": "Rachel",
+        "text": "That's a fair read, honestly, and it matches what I've been thinking too. The main gap for senior on this team is ownership at that bigger scope, not raw skill."
+      },
+      {
+        "speaker": "You",
+        "text": "Right, that's kind of what I figured. Is there something coming up that could be that kind of project? I don't want to just wait around for the right opportunity to fall in my lap."
+      },
+      {
+        "speaker": "Rachel",
+        "text": "Actually, yeah, timing works out. The database migration project is going to need an owner starting next quarter, and honestly I think you'd be a great fit for leading it."
+      },
+      {
+        "speaker": "You",
+        "text": "Oh, that's a big one. I'd definitely want that, it touches like four different services if I remember right, which is exactly the cross team thing we're talking about."
+      },
+      {
+        "speaker": "Rachel",
+        "text": "Exactly. It'll mean coordinating with the platform team and probably presenting progress to leadership every couple weeks, which is good visibility for the case we'd be building."
+      },
+      {
+        "speaker": "You",
+        "text": "That works for me. So, to be clear, the plan is I lead the migration project starting next quarter, and we use that as the main evidence for the promotion case?"
+      },
+      {
+        "speaker": "Rachel",
+        "text": "That's the plan. Let's check in monthly on how it's going instead of waiting for the next formal cycle, so we can course correct early if something's off."
+      },
+      {
+        "speaker": "You",
+        "text": "Sounds good, I'm excited about it honestly, feels good to have something concrete instead of just vague 'keep doing what you're doing.'"
+      },
+      {
+        "speaker": "Rachel",
+        "text": "Ha, fair, vague feedback isn't useful to anyone. I'll send you the project brief this week so you can start getting familiar with it before it officially kicks off."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "senior",
+          "promotion",
+          "growth"
+        ],
+        [
+          "migration project",
+          "migration",
+          "lead the migration",
+          "leading the migration"
+        ]
+      ],
+      "avoid": [
+        "denied",
+        "not ready for senior",
+        "rejected the promotion"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "senior",
+          "promotion",
+          "growth plan",
+          "senior role"
+        ]
+      ],
+      "avoid": [
+        "rachel"
+      ]
+    }
+  },
+  {
+    "name": "database-migration-rejected-optimize-instead",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Okay, big topic today, whether we move the database to a new provider. I know this has been debated for weeks, let's actually land on something."
+      },
+      {
+        "speaker": "Elena",
+        "text": "So the case for moving was mainly cost, right? The new provider's pricing looked like it could save us something like thirty percent a month."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Yeah, but I spent more time on the migration plan this week and, honestly, the more I dig in the scarier it looks. We're talking weeks of downtime risk and a ton of engineering time."
+      },
+      {
+        "speaker": "You",
+        "text": "How many weeks are we talking, like, ballpark? Because thirty percent savings sounds great until you factor in the cost of the migration itself."
+      },
+      {
+        "speaker": "Elena",
+        "text": "If everything goes smoothly, maybe six weeks of work. But migrations never go smoothly, so realistically I'd guess more like ten to twelve with buffer for surprises."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "And that's not even counting the risk if something breaks mid migration and we've got production data split across two systems. That keeps me up at night honestly."
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, that risk feels like it outweighs the savings, at least right now. Is there a version of this where we get some of the benefit without the full migration?"
+      },
+      {
+        "speaker": "Elena",
+        "text": "Actually, that's what I wanted to bring up. A chunk of our costs are from queries that are just poorly optimized, not from the provider's pricing being inherently bad."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Right, I pulled the slow query log and there's some low hanging fruit there, missing indexes, a couple queries doing full table scans that shouldn't be."
+      },
+      {
+        "speaker": "You",
+        "text": "So what if instead of migrating, we spend the next few weeks just optimizing those queries and see how much of the cost gap that closes?"
+      },
+      {
+        "speaker": "Elena",
+        "text": "I think that gets us most of the savings without any of the migration risk. I'd rather do that than bet six to twelve weeks on a provider switch."
+      },
+      {
+        "speaker": "Marcus",
+        "text": "Agreed, let's not migrate. I'll put together a list of the worst offending queries and we tackle them incrementally instead of doing anything drastic with the provider."
+      },
+      {
+        "speaker": "You",
+        "text": "Okay, so to be clear, we're not moving providers, we're optimizing the existing queries instead. Let's revisit the cost numbers in a month and see where we land."
+      },
+      {
+        "speaker": "Elena",
+        "text": "Sounds right to me. I'll help Marcus prioritize which queries to hit first based on which ones are costing us the most."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "database"
+        ],
+        [
+          "optimize",
+          "optimizing",
+          "optimization",
+          "tune",
+          "tuning"
+        ]
+      ],
+      "avoid": [
+        "decided to migrate",
+        "will migrate",
+        "agreed to move",
+        "switching providers"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "database",
+          "query",
+          "queries"
+        ]
+      ],
+      "avoid": [
+        "new provider"
+      ]
+    }
+  },
+  {
+    "name": "quarterly-roadmap-planning",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Alright, thanks everyone for blocking off the full hour, I know quarterly planning meetings are nobody's favorite but we've got three big things to get through today. Mobile offline mode, the pricing page redesign, and whether we hire a second designer this quarter."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Yeah, I've been looking forward to the offline mode conversation honestly, it's been requested so many times in the feedback board that I stopped counting a while back."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Same, and I actually did some technical scoping over the last week so I've got real numbers instead of just vibes, which should help us decide."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Nice. Should we just go in the order you listed, offline mode first, then pricing, then hiring? Or does it matter?"
+      },
+      {
+        "speaker": "You",
+        "text": "Doesn't matter much to me, let's just roughly split the hour into three chunks so we don't spend forty minutes on the first topic and rush through the other two."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Works for me, offline mode probably needs the most time anyway since there's real technical tradeoffs to walk through, not just a straightforward yes or no."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's do that order, yeah. Offline mode first since Deepak's got the most prep on it and I don't want that to go stale."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Cool, so, quick recap for anyone who wasn't following the earlier thread. Offline mode means users can keep working when they lose connectivity, and everything syncs up once they're back online."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Right, and the request mostly comes from people using the app on job sites or in areas with bad signal, construction, rural delivery routes, that kind of thing."
+      },
+      {
+        "speaker": "You",
+        "text": "Do we have actual quotes from the feedback board handy? I always find it easier to make the case for something when we can point to what a real user actually said."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Yeah, I pulled a few before the meeting. One person literally wrote, 'I lost twenty minutes of notes because I drove through a dead zone and the app just froze,' which is about as clear a signal as you can get."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "That's rough. Do we know roughly how many people are affected, or is it more anecdotal at this point, just a handful of loud voices in the feedback board?"
+      },
+      {
+        "speaker": "Deepak",
+        "text": "I actually pulled some usage data too, and it's not just anecdotal, we see a meaningful spike in app crashes and failed syncs from users in what look like low connectivity areas, so there's a real pattern underneath the complaints."
+      },
+      {
+        "speaker": "You",
+        "text": "Good, that's the kind of thing that'll help justify the engineering time if anyone upstream asks why we're prioritizing this over something else on the list."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Exactly. So I scoped two versions. The full version, where basically every feature works offline, and a limited version that just covers the core workflows, viewing and editing existing records."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "What's the time difference between those two? Because 'basically every feature' sounds like it could balloon pretty fast."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Huge difference actually. Full offline is something like four months of engineering time, because of all the sync conflict edge cases. The limited version is closer to six weeks."
+      },
+      {
+        "speaker": "You",
+        "text": "Six weeks versus four months is a massive gap. What do we actually lose with the limited version, like, what falls outside 'core workflows'?"
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Mostly the reporting and analytics screens, and anything involving file uploads. Those need a live connection anyway in most cases, so I don't think it's a huge loss for a first version."
+      },
+      {
+        "speaker": "Priya",
+        "text": "That tracks with the feedback too honestly, most people aren't asking to run reports offline, they're asking to not lose their work when they walk into a basement with no signal."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "How are we thinking about testing this before a full launch? I'd hate to ship offline mode broadly and then discover some edge case with sync conflicts that we didn't anticipate."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Yeah, I was going to propose a closed beta first, maybe fifty or so users who already told us in the feedback board that connectivity is a problem for them. We watch for sync issues for a couple weeks before opening it up to everyone."
+      },
+      {
+        "speaker": "You",
+        "text": "I like that, it de-risks the rollout without slowing down the actual build. Priya, can the beta group use the same UI you're sketching, or would that need to be simplified for a first pass?"
+      },
+      {
+        "speaker": "Priya",
+        "text": "Same UI should be fine, honestly the beta is more about catching sync edge cases than about testing the visual design, so I don't think we need a stripped down version just for that group."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Agreed. One more thing worth flagging, this does pull me off the notifications work for a chunk of the quarter, so that'll need to slip unless someone else can pick it up."
+      },
+      {
+        "speaker": "You",
+        "text": "Let's flag that as a tradeoff and revisit it in two weeks once we see how the offline build is tracking, rather than deciding right now how to resource around it."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Okay that makes the limited version feel like the obvious choice to me. Four months is a lot to bet on a feature we haven't even shipped a first version of yet."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed, let's do the limited version this quarter. We can always expand scope later once we see how people actually use it."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "That's what I was hoping you'd say honestly, six weeks fits way more comfortably into the quarter alongside everything else on the roadmap."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Should I start sketching what the offline state actually looks like in the UI? Like, do we show a banner, a little icon, something to make it obvious you're working offline?"
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Yeah, that'd be great, and also what a sync conflict looks like if two people edited the same record while offline, we'll need some kind of resolution screen."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Got it, I'll mock up a few options for the conflict screen too then, probably something like showing both versions side by side and letting the person pick which one wins, rather than trying to auto merge anything."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "That's probably safest honestly, auto merging text fields gets messy fast and I'd rather not build something clever there for a first version."
+      },
+      {
+        "speaker": "You",
+        "text": "Good, let's call that decided then. Limited offline mode, core workflows only, targeting this quarter, Deepak owns the technical build and Priya starts on the offline state designs."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Great, moving on then, should we get into pricing page next?"
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah let's do it. So, quick context for the room, conversion on the pricing page has been flat for like two quarters now despite traffic actually going up a bit."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I did a full audit of it last week and honestly the page is just confusing. We've got four tiers, and the difference between the middle two isn't clear at all from the copy."
+      },
+      {
+        "speaker": "Priya",
+        "text": "I remember that, yeah, when I usability tested it a while back people kept asking which tier they should pick, like the page wasn't actually helping them decide."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I also looked at a handful of competitor pricing pages while I was doing the audit, and honestly most of them do the three tier thing with a highlighted middle option, it's a pretty well worn pattern at this point."
+      },
+      {
+        "speaker": "You",
+        "text": "Do we know why we ended up at four tiers in the first place? Feels like something we should understand before just collapsing it down."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "From what I can tell it was mostly historical, we added a fourth tier a couple years ago for a specific enterprise deal and it just never got removed from the public page afterward."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "From an engineering side the page is also just old, it's not using any of our newer components, so a redesign would help with maintenance too, not just conversion."
+      },
+      {
+        "speaker": "You",
+        "text": "Okay so sounds like there's broad agreement a redesign is worth doing. Sofia, what's your actual proposal, like what would change?"
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Big ones are, cutting down to three tiers instead of four, adding a comparison table so people can actually see the differences at a glance, and putting a recommended badge on the middle tier."
+      },
+      {
+        "speaker": "Priya",
+        "text": "I like the recommended badge idea, that alone probably nudges a chunk of undecided people, it worked well on a couple other products I've tested."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "How big a lift is this from an engineering side, are we talking new components or mostly restyling what's there?"
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Mix of both honestly. The comparison table is new, everything else is more restyling existing stuff. I'd guess three weeks of design, then maybe two to three weeks of engineering after that."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Should we also revisit the tier names while we're in there, or is that a whole separate can of worms? I've always found 'Growth' and 'Scale' kind of interchangeable as names."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Honestly, yeah, that probably deserves its own pass, I don't want to bundle a naming exercise into this redesign and have it balloon in scope. Let's keep the current names for now and revisit naming separately."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed, let's not scope creep this. Should this go out as a straight replacement or do we want to A/B test it against the current page first, given how long it's been flat?"
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I'd lean toward a quick A/B test for a couple weeks just to confirm it's actually moving conversion before we fully commit, rather than assuming the new version is automatically better."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "That's easy enough to wire up on our side, we already have the experimentation framework in place from the last couple of tests we ran."
+      },
+      {
+        "speaker": "You",
+        "text": "Good. One more thing, what happens to existing customers on the fourth tier we're removing? We can't just leave them with a broken plan page."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I think we grandfather them in at their current price and terms, the page change is really about new signups, existing contracts shouldn't be affected by a marketing page redesign."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Agreed, that also avoids a support headache, the last thing we want is a wave of tickets from existing customers asking why their plan disappeared from the page."
+      },
+      {
+        "speaker": "You",
+        "text": "That's a reasonable size. Let's greenlight the redesign then, three tiers, comparison table, recommended badge on the middle tier, running as an A/B test first, with existing fourth-tier customers grandfathered. Sofia leads design, Deepak you'll pick it up for build after."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Sounds good, I'll have a first draft to share by early next week so we can get eyes on it before committing to anything final."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Works for me, I'll start thinking through which components we can reuse so the build doesn't take longer than it needs to."
+      },
+      {
+        "speaker": "You",
+        "text": "Perfect, last topic, hiring a second designer. Priya, you and Sofia have both been slammed lately, so I wanted to actually put this on the table properly instead of just talking about it in the hallway."
+      },
+      {
+        "speaker": "Priya",
+        "text": "Yeah, honestly it's overdue. Between the offline mode designs and the pricing redesign we just talked about, plus everything else in the backlog, we're stretched really thin."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "I've had to push back the timeline on two other projects just to make room for the pricing work, and that's not sustainable if we keep adding things to the roadmap."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "From the outside it does seem like design is the bottleneck right now more than engineering, so I'd support bringing someone else in."
+      },
+      {
+        "speaker": "You",
+        "text": "Do we actually have budget for this or does it need to go through a separate approval process first? I don't want to promise a req and then have it stall out."
+      },
+      {
+        "speaker": "Priya",
+        "text": "I believe it's within the headcount plan for this half already, there was a design hire pencilled in for later in the year, this would just be pulling it forward."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "That matches what I remember too from the planning doc, so hopefully it's more of a timing conversation than a whole new budget ask."
+      },
+      {
+        "speaker": "You",
+        "text": "Good, that makes this easier. Even so, hiring takes time, realistically how long before someone's actually starting, two months, three?"
+      },
+      {
+        "speaker": "Priya",
+        "text": "Probably two to three months from req approval to someone starting, if we move quickly on the process and don't have a slow stretch in scheduling interviews."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Is there a fallback in the meantime, like a contractor, in case the gap between now and someone starting causes real problems with the roadmap?"
+      },
+      {
+        "speaker": "You",
+        "text": "Let's keep a contractor as a backup option if we're still stretched in six weeks, but I'd rather not spin that up unless we actually need it."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed, I think the case is pretty clear. Let's open a req for a second product designer this quarter, ideally someone who can help cover both product surfaces and marketing pages."
+      },
+      {
+        "speaker": "Priya",
+        "text": "That would help a ton. Should I help write the job description, since I'd probably be doing a chunk of the interviewing anyway?"
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah please, that'd be great, you know better than anyone what the gaps actually are day to day. I'll get the req approved on my end this week."
+      },
+      {
+        "speaker": "Sofia",
+        "text": "Great, so to recap everything, limited offline mode this quarter, pricing page redesign with three tiers starting now, and we're opening a req for a second designer. Feels like a productive hour honestly."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "Agreed, feels good to actually land on decisions instead of leaving all three of these hanging like we did last quarter. Should someone write this up and share it more broadly with the rest of the team?"
+      },
+      {
+        "speaker": "You",
+        "text": "Yeah, I'll write up a short summary after this and post it, so anyone not in the room today knows what got decided and why."
+      },
+      {
+        "speaker": "Priya",
+        "text": "That'd be great, especially for the offline mode piece since a few people on support have been asking about it directly."
+      },
+      {
+        "speaker": "Deepak",
+        "text": "I can also drop a note in the engineering channel about the offline mode scoping specifically, in case anyone else has thoughts on the sync conflict approach before we're too deep into building it."
+      },
+      {
+        "speaker": "You",
+        "text": "Good call, better to get that feedback now than after Priya's already built out the conflict resolution screens."
+      },
+      {
+        "speaker": "You",
+        "text": "Agreed, thanks everyone, this was a good one. Let's check in on all three of these in two weeks and see how they're tracking."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "offline mode",
+          "offline",
+          "pricing page",
+          "pricing redesign",
+          "designer"
+        ]
+      ],
+      "avoid": []
+    },
+    "title": {
+      "mention": [
+        [
+          "roadmap",
+          "quarterly planning",
+          "quarter planning",
+          "planning meeting",
+          "offline mode",
+          "pricing page",
+          "designer"
+        ]
+      ],
+      "avoid": []
+    },
+    "wish": "The summary runs to 41 words: the outcome sentence lists all three decisions."
+  },
+  {
+    "name": "customer-interview-scheduling-app",
+    "turns": [
+      {
+        "speaker": "You",
+        "text": "Thanks so much for making time for this, Maria, I really appreciate it, I know running a bakery doesn't leave a ton of spare hours in the day."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Oh, of course, happy to help. Honestly I've got opinions about the scheduling app so this is kind of fun for me, in a nerdy small business owner kind of way."
+      },
+      {
+        "speaker": "You",
+        "text": "Ha, I love that. Okay, so before we get into specifics, can you just walk me through, like, day to day, how big is your team and how are you currently using the app?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Sure, so we're a pretty small shop, it's me and then about nine part time staff, mostly students and a couple people doing it as a second job. I use the app to build the weekly schedule every Sunday night."
+      },
+      {
+        "speaker": "You",
+        "text": "Nice, and how long has the bakery been open, and has the team size changed much over that time, or has it stayed pretty steady around nine?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "We opened about four years ago, and honestly the team's grown a lot, we started with basically me and two part timers, and it's just kept creeping up as we've gotten busier, especially since we started doing the weekend market stall too."
+      },
+      {
+        "speaker": "You",
+        "text": "Oh, a market stall on top of the shop, that's a whole extra scheduling wrinkle. Do you staff that separately or is it the same pool of people covering both?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Same pool, which honestly makes the scheduling more complicated, because now I'm juggling shop hours and market hours in the same week, and not everyone wants to do the early market mornings."
+      },
+      {
+        "speaker": "You",
+        "text": "That's helpful context, I wouldn't have thought about the market stall piece. How did you first find the scheduling app, was it a recommendation or did you go looking for something specific?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "A friend who runs a coffee shop recommended it, she'd been using it for like a year already and said it beat the spreadsheet I was using before, which, honestly, anything beats a spreadsheet at this point."
+      },
+      {
+        "speaker": "You",
+        "text": "Ha, fair. Got it. And when you're building that schedule, what does that actually look like, are you dragging people into slots, typing things in manually, some mix?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Mostly dragging people into slots, yeah. I've got kind of a template from the week before that I copy and then adjust based on who's told me they need time off."
+      },
+      {
+        "speaker": "You",
+        "text": "Okay that makes sense. Walk me through what happens after the schedule's published, like, once it's live, what's your involvement day to day?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "So this is where it gets messy honestly. Once it's published, people start requesting swaps, and that's the part of the app I actually struggle with the most."
+      },
+      {
+        "speaker": "You",
+        "text": "Tell me more about that, what specifically is hard about the swap piece?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "So right now if someone wants to swap a shift, they message me directly, like a text or a message through the app, and then I have to manually go find someone else who's available and update the schedule myself."
+      },
+      {
+        "speaker": "Maria",
+        "text": "It's not that the app doesn't have a swap feature, it does, but honestly none of my staff use it, they just find it easier to text me directly, which kind of defeats the purpose."
+      },
+      {
+        "speaker": "You",
+        "text": "Can you think of a specific example from recently, like an actual swap that happened last week or so? Sometimes a concrete case helps more than the general pattern."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Sure, actually, last Tuesday one of my students, Devon, texted me saying he had an exam conflict with his Thursday closing shift, and asked if anyone could take it. I texted two other people, one said yes, and I just updated the schedule myself in the app."
+      },
+      {
+        "speaker": "You",
+        "text": "And that whole thing happened over text, start to finish, with the app only coming in at the very end when you updated it?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Exactly, the app was basically just a record keeping step after the fact, all the actual coordinating happened over text messages between me and the two people I reached out to."
+      },
+      {
+        "speaker": "You",
+        "text": "Got it, that's a really concrete example, thank you, that helps a lot more than a general description would have."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Yeah, happy to dig up more examples if it helps, honestly this kind of thing happens often enough that I could probably think of a handful from just the last month alone."
+      },
+      {
+        "speaker": "You",
+        "text": "Interesting, so the feature exists but it's not actually where the behavior is happening. Do you have a sense of why people skip it and go straight to texting you?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "I think partly it's just habit, texting is what they're used to. But also, when I looked at the swap flow in the app myself, it felt like a lot of steps, like you have to post the shift, then wait for someone to claim it, then I still have to approve it."
+      },
+      {
+        "speaker": "You",
+        "text": "So it's slower than just asking around in person or over text, basically."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Exactly, and my staff are like eighteen to twenty five mostly, they will always take the faster option, they're not going to sit around waiting for an app notification when a group chat message gets a response in two minutes."
+      },
+      {
+        "speaker": "You",
+        "text": "That makes sense, speed really is everything for this age group. Do you ever get pushback from staff about the app in general, or is it mostly just this one swap flow that bothers people?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Mostly just the swap flow, honestly. People seem fine checking their upcoming shifts in the app, that part they actually do use, it's really only the swap request piece where everyone routes around it."
+      },
+      {
+        "speaker": "You",
+        "text": "That's really helpful, okay. What about the other direction, when someone can't come in at all, like calling in sick, how does that usually go?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Oh, that's honestly the worst part of my week when it happens. Someone texts me at like six a.m. saying they're sick and can't come in for their eight a.m. shift, and now I've got two hours to fix a hole in the schedule."
+      },
+      {
+        "speaker": "You",
+        "text": "And what do you actually do in that two hour window, walk me through it."
+      },
+      {
+        "speaker": "Maria",
+        "text": "I basically start texting people one by one asking if anyone can cover, starting with whoever I think is most likely to say yes, and just hoping someone responds in time. It's honestly stressful every single time it happens."
+      },
+      {
+        "speaker": "You",
+        "text": "Does the app help at all in that moment, or are you working completely outside of it when that happens?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Completely outside of it. The app doesn't really have anything for 'this shift is now uncovered, does anyone want it,' it's built assuming shifts get planned ahead of time, not this kind of emergency thing."
+      },
+      {
+        "speaker": "You",
+        "text": "That's a really useful distinction, planned swaps versus this emergency uncovered-shift situation. How often does the sick call thing happen, like roughly, once a week, more?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Honestly probably twice a week on average, sometimes more in winter when everyone's getting colds. It's frequent enough that I've kind of just accepted it as part of the job, but it's exhausting."
+      },
+      {
+        "speaker": "You",
+        "text": "That's really useful to know it's seasonal too. While we're on the topic of scheduling headaches, how do you handle planned time off, like vacation requests, is that also happening outside the app?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "That one's actually fine honestly, the app has a time off request feature and people mostly do use it, because it's planned in advance so there's no urgency pushing them toward texting me instead."
+      },
+      {
+        "speaker": "You",
+        "text": "Interesting, so the more planned something is, the more people actually use the built in flow, and the more urgent it is, the more they fall back to texting you directly."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Yeah, that's a really good way to put it actually, I hadn't thought about it in those terms but that's exactly the pattern. Urgency breaks the app for me, basically."
+      },
+      {
+        "speaker": "You",
+        "text": "That's a great insight, thank you. What about busier periods, like holidays, does the whole thing get worse around, say, the winter holidays when a bakery's probably slammed?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Oh, so much worse. December is brutal, everyone wants time off for the holidays themselves, but we're also the busiest we are all year, so I'm constantly negotiating who can take what days."
+      },
+      {
+        "speaker": "You",
+        "text": "Do you build the schedule differently during that stretch, or is it the same weekly process just under more pressure?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Same process, just way more back and forth beforehand. I usually start asking for holiday availability like six weeks out, and even then people's plans change and I'm redoing parts of it last minute."
+      },
+      {
+        "speaker": "You",
+        "text": "That makes sense. Are there other tools you use alongside the scheduling app, or is this pretty much the one system for everything staffing related?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "It's mostly just this app plus a group text for the whole team, honestly. We don't use anything else, I looked at a payroll integration once but it felt like overkill for a team our size."
+      },
+      {
+        "speaker": "You",
+        "text": "Got it, that's helpful context too, so anything we build should probably work well alongside a group text rather than trying to replace it outright."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Right, exactly, my staff aren't going to stop using the group chat, so it needs to fit into that world instead of fighting it."
+      },
+      {
+        "speaker": "You",
+        "text": "That makes a lot of sense. If I imagine a version of the app that actually solved this, what would that look like to you? Like, if you could wave a wand."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Honestly, something where the second someone marks themselves as sick, it automatically pings everyone who's qualified and available for that shift, instead of me manually texting one person at a time hoping they see it."
+      },
+      {
+        "speaker": "Maria",
+        "text": "And for the swap thing, I think it just needs to be faster, like one tap to propose a swap and one tap to accept it, not this multi-step posting and approving thing that nobody actually uses."
+      },
+      {
+        "speaker": "You",
+        "text": "That's super clear, thank you. Those are basically the two biggest pain points then, the manual one-by-one texting when someone's sick, and the swap flow being slower than just texting directly."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Yeah, exactly those two. Everything else about the app is honestly fine, I don't have complaints about the actual schedule building part, it's really just what happens after the schedule goes live."
+      },
+      {
+        "speaker": "You",
+        "text": "That's really helpful context, genuinely. It lines up with some of what we've heard from other shop owners too, but hearing the specifics from your week helps a lot."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Glad it's useful. Is this the kind of thing where you'll actually build something, or is it more just gathering information for now?"
+      },
+      {
+        "speaker": "You",
+        "text": "No, this is exactly the kind of thing that turns into something concrete. I want to put together a quick prototype of a faster swap flow and an automatic sick-call broadcast, based on what you just described."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Oh nice, I'd love to see that honestly. Would I be able to try it out, or is it more just a mockup at first?"
+      },
+      {
+        "speaker": "You",
+        "text": "Starts as a mockup, just so we can check the flow feels right before any actual engineering happens, but I'd love to get your eyes on it early since you clearly live this problem every week."
+      },
+      {
+        "speaker": "Maria",
+        "text": "For sure, send it whenever it's ready, I'll make time to look at it even if it's a busy week, this is the thing I complain about most so I'm invested."
+      },
+      {
+        "speaker": "You",
+        "text": "Great, one last thing, when you look at the prototype, what would make you feel like it's actually solving the problem versus just being a nice looking mockup that doesn't change anything?"
+      },
+      {
+        "speaker": "Maria",
+        "text": "Honestly, if I can picture handing my phone to Devon and having him understand it in ten seconds without me explaining anything, that's the bar. My staff won't read instructions, it has to just make sense."
+      },
+      {
+        "speaker": "You",
+        "text": "That's a really useful bar to design against, thank you. I'll make sure whatever I show you could survive that test before I even send it over."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Perfect, that's exactly the kind of thing that would actually get used instead of sitting there unused like the current swap feature does."
+      },
+      {
+        "speaker": "You",
+        "text": "Perfect, I'll put together the prototype and send it over to you, probably within the next week or two, and then maybe we grab fifteen minutes to walk through it together."
+      },
+      {
+        "speaker": "Maria",
+        "text": "Sounds great, thank you for actually digging into this instead of just letting it sit on a feedback list somewhere, I really do appreciate it."
+      },
+      {
+        "speaker": "You",
+        "text": "Of course, thank you for being so detailed, this was exactly the kind of conversation I was hoping for. I'll be in touch soon with that prototype."
+      }
+    ],
+    "summary": {
+      "mention": [
+        [
+          "scheduling",
+          "scheduling app",
+          "shift scheduling",
+          "shift",
+          "shifts",
+          "swap",
+          "swaps",
+          "sick-call",
+          "sick call"
+        ],
+        [
+          "prototype"
+        ]
+      ],
+      "avoid": [
+        "no prototype",
+        "decided not to build"
+      ]
+    },
+    "title": {
+      "mention": [
+        [
+          "scheduling",
+          "scheduling app",
+          "shift scheduling"
+        ]
+      ],
+      "avoid": [
+        "maria"
+      ]
+    },
+    "wish": "The summary runs to 41 words and the title is two (\"App Improvements\"), naming neither scheduling nor the shifts."
+  }
+]

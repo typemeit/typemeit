@@ -1,0 +1,23 @@
+*.xcodeproj
+xcuserdata/
+DerivedData/
+build/
+.build/
+.swiftpm/
+*.dmg
+.DS_Store
+
+# web
+web/node_modules/
+Scripts/cleanup-eval/eval
+.wrangler/
+
+# voice-names research outputs (embeddings of real meetings)
+docs/voice-names-research/out/
+
+# asr-eval
+__pycache__/
+Scripts/asr-eval/echofold/Sources/echofold/EchoBleedDetector.swift
+Scripts/asr-eval/echofold/Sources/echofold/EchoFold.swift
+Scripts/asr-eval/echofold/Sources/echofold/EchoLag.swift
+Scripts/asr-eval/echofold/Sources/echofold/ModelText.swift

@@ -1,0 +1,8 @@
+{
+  "name": "typemeit-r2-put",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "wrangler": "4.129.0"
+  }
+}

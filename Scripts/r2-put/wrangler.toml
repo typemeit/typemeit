@@ -1,0 +1,9 @@
+# Only for put.mjs: the release bucket as a remote binding, reached through
+# wrangler's login (or CLOUDFLARE_API_TOKEN), so uploads need no R2 S3 keys.
+name = "typemeit-r2-put"
+compatibility_date = "2026-07-01"
+
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "typemeit-releases"
+remote = true

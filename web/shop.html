@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shop · type me it</title>
+<meta name="description" content="Stickers, and a way to give to type me it.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="type me it">
+<meta property="og:title" content="shop · type me it">
+<meta property="og:description" content="Stickers, and a way to give to type me it.">
+<meta property="og:url" content="https://typeme.it/shop">
+<meta property="og:image" content="https://typeme.it/og.png">
+<meta property="og:video" content="https://typeme.it/og.mp4">
+<meta property="og:video:secure_url" content="https://typeme.it/og.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1920">
+<meta property="og:video:height" content="1008">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="shop · type me it">
+<meta name="twitter:description" content="Stickers, and a way to give to type me it.">
+<meta name="twitter:image" content="https://typeme.it/og.png">
+<link rel="canonical" href="https://typeme.it/shop">
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* Tokens: copied from web/styles/theme.css. */
+:root {
+  --tmi-paper: #ffffff;
+  --tmi-paper-sunk: #f7f7f7;
+  --tmi-paper-raised: #ffffff;
+  --tmi-ink: #0a0a0a;
+  --tmi-ink-2: #4a4a4a;
+  --tmi-ink-3: #6e6e6e;
+  --tmi-rule: #e4e4e4;
+  --tmi-rule-control: #949494;
+  --tmi-slab: #0a0a0a;
+  --tmi-on-slab: #ffffff;
+  --tmi-ink-a04: rgba(10, 10, 10, 0.04);
+  --tmi-ink-a08: rgba(10, 10, 10, 0.08);
+  --tmi-ink-a12: rgba(10, 10, 10, 0.12);
+  --tmi-ink-a20: rgba(10, 10, 10, 0.20);
+  --tmi-ink-a32: rgba(10, 10, 10, 0.32);
+  --tmi-ink-a48: rgba(10, 10, 10, 0.48);
+  --tmi-ink-a64: rgba(10, 10, 10, 0.64);
+  --tmi-ink-a88: rgba(10, 10, 10, 0.88);
+  --tmi-diff-add: #1a7f37;
+  --tmi-diff-remove: #cf222e;
+  --tmi-shadow-lift: 0 10px 24px -6px rgba(10, 10, 10, 0.18), 0 2px 6px -2px rgba(10, 10, 10, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tmi-paper: #0b0b0b;
+    --tmi-paper-sunk: #060606;
+    --tmi-paper-raised: #161616;
+    --tmi-ink: #fafafa;
+    --tmi-ink-2: #b4b4b4;
+    --tmi-ink-3: #8a8a8a;
+    --tmi-rule: #262626;
+    --tmi-rule-control: #6e6e6e;
+    --tmi-slab: #fafafa;
+    --tmi-on-slab: #0b0b0b;
+    --tmi-ink-a04: rgba(250, 250, 250, 0.05);
+    --tmi-ink-a08: rgba(250, 250, 250, 0.10);
+    --tmi-ink-a12: rgba(250, 250, 250, 0.15);
+    --tmi-ink-a20: rgba(250, 250, 250, 0.24);
+    --tmi-ink-a32: rgba(250, 250, 250, 0.36);
+    --tmi-ink-a48: rgba(250, 250, 250, 0.52);
+    --tmi-ink-a64: rgba(250, 250, 250, 0.68);
+    --tmi-ink-a88: rgba(250, 250, 250, 0.90);
+    --tmi-diff-add: #3fb950;
+    --tmi-diff-remove: #f85149;
+    --tmi-shadow-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.70), 0 2px 8px -2px rgba(0, 0, 0, 0.50);
+  }
+}
+
+:root[data-theme='dark'] {
+  --tmi-paper: #0b0b0b;
+  --tmi-paper-sunk: #060606;
+  --tmi-paper-raised: #161616;
+  --tmi-ink: #fafafa;
+  --tmi-ink-2: #b4b4b4;
+  --tmi-ink-3: #8a8a8a;
+  --tmi-rule: #262626;
+  --tmi-rule-control: #6e6e6e;
+  --tmi-slab: #fafafa;
+  --tmi-on-slab: #0b0b0b;
+  --tmi-ink-a04: rgba(250, 250, 250, 0.05);
+  --tmi-ink-a08: rgba(250, 250, 250, 0.10);
+  --tmi-ink-a12: rgba(250, 250, 250, 0.15);
+  --tmi-ink-a20: rgba(250, 250, 250, 0.24);
+  --tmi-ink-a32: rgba(250, 250, 250, 0.36);
+  --tmi-ink-a48: rgba(250, 250, 250, 0.52);
+  --tmi-ink-a64: rgba(250, 250, 250, 0.68);
+  --tmi-ink-a88: rgba(250, 250, 250, 0.90);
+  --tmi-diff-add: #3fb950;
+  --tmi-diff-remove: #f85149;
+  --tmi-shadow-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.70), 0 2px 8px -2px rgba(0, 0, 0, 0.50);
+}
+
+:root[data-theme='light'] {
+  --tmi-paper: #ffffff;
+  --tmi-paper-sunk: #f7f7f7;
+  --tmi-paper-raised: #ffffff;
+  --tmi-ink: #0a0a0a;
+  --tmi-ink-2: #4a4a4a;
+  --tmi-ink-3: #6e6e6e;
+  --tmi-rule: #e4e4e4;
+  --tmi-rule-control: #949494;
+  --tmi-slab: #0a0a0a;
+  --tmi-on-slab: #ffffff;
+  --tmi-ink-a04: rgba(10, 10, 10, 0.04);
+  --tmi-ink-a08: rgba(10, 10, 10, 0.08);
+  --tmi-ink-a12: rgba(10, 10, 10, 0.12);
+  --tmi-ink-a20: rgba(10, 10, 10, 0.20);
+  --tmi-ink-a32: rgba(10, 10, 10, 0.32);
+  --tmi-ink-a48: rgba(10, 10, 10, 0.48);
+  --tmi-ink-a64: rgba(10, 10, 10, 0.64);
+  --tmi-ink-a88: rgba(10, 10, 10, 0.88);
+  --tmi-diff-add: #1a7f37;
+  --tmi-diff-remove: #cf222e;
+  --tmi-shadow-lift: 0 10px 24px -6px rgba(10, 10, 10, 0.18), 0 2px 6px -2px rgba(10, 10, 10, 0.12);
+}
+
+:root {
+  color-scheme: light dark;
+  --font-display: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, 'Segoe UI', sans-serif;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-1: 120ms;
+  --duration-2: 180ms;
+  --bar: 56px;
+  --stick-gap: 24px;
+  --stick-top: calc(var(--bar) + var(--stick-gap));
+  --block-gap: 28px;
+  /* A dark window needs an edge on paper: a hairline, and in light the system's one lift. */
+  --frame: 0 0 0 1px var(--tmi-ink-a12), var(--tmi-shadow-lift);
+}
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; --frame: 0 0 0 1px var(--tmi-ink-a20); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --frame: 0 0 0 1px var(--tmi-ink-a20); }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  background: var(--tmi-paper);
+  color: var(--tmi-ink);
+  font: 400 16px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-padding-top: var(--stick-top);
+}
+body { margin: 0; font-size: 15px; line-height: 1.55; letter-spacing: -0.005em; }
+h1, h2, h3, p { margin: 0; font-weight: 400; }
+h1, h2 { text-wrap: balance; }
+p { text-wrap: pretty; }
+a { color: inherit; }
+::selection { background: var(--tmi-ink); color: var(--tmi-paper); }
+:focus-visible { outline: 2px solid var(--tmi-ink); outline-offset: 2px; }
+
+/* The scale: display-1/2/3 are DM Mono; title, heading and body are the ui face. */
+.d2 { font: 400 clamp(2.25rem, 5vw, 3.5rem)/1.05 var(--font-display); letter-spacing: -0.024em; }
+.d3 { font: 400 clamp(1.75rem, 3.5vw, 2.25rem)/1.1 var(--font-display); letter-spacing: -0.02em; }
+
+/* Button, from web/styles/app.css. */
+.icon { display: inline-block; width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
+.btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 26px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: 0;
+  font: 400 12px/1 var(--font-mono); letter-spacing: 0;
+  color: var(--tmi-ink); background: transparent;
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out);
+}
+.btn .icon { font-size: 14px; }
+.btn-sm { height: 24px; padding: 0 8px; font-size: 11px; }
+.btn-lg { height: 38px; padding: 0 16px; font-size: 14px; }
+.btn-lg .icon { font-size: 16px; }
+.btn-primary { background: var(--tmi-slab); color: var(--tmi-on-slab); border-color: var(--tmi-slab); }
+.btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+.btn-primary:active { background: color-mix(in srgb, var(--tmi-slab) 72%, transparent); }
+.btn-quiet { color: var(--tmi-ink-2); }
+
+/* Page frame. Everything shares one left edge; the bands run wider than the text. */
+.wrap { width: 100%; max-width: 1440px; margin-inline: auto; padding-inline: 24px; }
+
+/* The home page's bar, shown from the start: the small cloud back to the home page, and the download. */
+.bar {
+  position: fixed; inset: 0 0 auto; z-index: 10; height: var(--bar);
+  background: var(--tmi-paper); border-bottom: 1px solid var(--tmi-rule);
+}
+.bar .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; }
+/* The puff draws small inside its box; the box overflows the bar so the cloud sits about 30px across. */
+.spot { position: relative; width: 36px; height: 36px; }
+.spot canvas { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; transform: translate(-50%, -50%); pointer-events: none; }
+
+/* Bands: the words on one side, the picture on the other. Below lg they stack, words first. */
+.band { border-top: 1px solid var(--tmi-rule); padding-block: 72px; }
+.band-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.cell { min-width: 0; }
+.words { order: -1; }
+.pics { margin-top: 40px; }
+
+.cap h2 { margin: 0; }
+.cap h2 + p { margin-top: 20px; }
+.cap p { max-width: 520px; color: var(--tmi-ink-2); }
+.cap p + p { margin-top: 12px; }
+
+/* The shop: the four designs, then what each link buys. Prices are Stripe's:
+   change them in the Payment Link first, then here. */
+main { padding-top: var(--bar); }
+.head { padding: 96px 0 72px; }
+.stickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.pick { display: grid; gap: 10px; text-decoration: none; color: inherit; }
+.pick img { width: 100%; height: auto; display: block; transition: transform var(--duration-2) var(--ease-out); }
+.pick:hover img { transform: scale(1.03); }
+.price { font: 500 12px/1.35 var(--font-mono); letter-spacing: 0; color: var(--tmi-ink-3); text-align: center; transition: color var(--duration-1) var(--ease-out); }
+.pick:hover .price { color: var(--tmi-ink); }
+/* A purchase is the app's outline button drawn wide: an ink hairline that fills with the slab under the pointer. */
+.buy { display: grid; gap: 12px; margin-top: 32px; max-width: 520px; }
+.buy a {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  height: 44px; padding: 0 16px; border: 1px solid var(--tmi-ink);
+  font: 400 14px/1 var(--font-mono); letter-spacing: 0; text-decoration: none;
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out);
+}
+.buy a:hover { background: var(--tmi-slab); color: var(--tmi-on-slab); }
+.buy a .price { color: var(--tmi-ink-3); }
+.buy a:hover .price { color: inherit; }
+
+.foot { border-top: 1px solid var(--tmi-rule); padding: 28px 0 40px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; font: 400 12px/1.35 var(--font-mono); letter-spacing: 0; color: var(--tmi-ink-3); }
+.foot ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
+.foot a { text-decoration: none; transition: color var(--duration-1) var(--ease-out); }
+.foot a:hover { color: var(--tmi-ink); }
+
+@media (min-width: 768px) {
+  .wrap { padding-inline: 40px; }
+  .stickers { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .band { padding-block: 120px; }
+  .band-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(40px, 5vw, 80px); }
+  .words { order: 0; }
+  .pics { margin-top: 0; }
+  .stickers { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+}
+@media (max-width: 760px) {
+  .foot a { display: inline-block; padding: 12px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<nav class="bar" aria-label="type me it"><div class="wrap">
+  <a class="spot" href="/" aria-label="type me it"><canvas aria-hidden="true"></canvas></a>
+  <a class="btn btn-primary" href="/download"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>download</a>
+</div></nav>
+
+<main class="wrap">
+  <header class="head"><h1 class="d2">shop</h1></header>
+
+  <section class="band"><div class="band-grid">
+    <div class="cell words"><div class="cap">
+      <h2 class="d3">stickers</h2>
+      <p>5 cm round stickers. pay what you like above the minimum, which covers uk postage. stickers go out by royal mail within a week.</p>
+      <div class="buy"><a href="https://buy.stripe.com/3cIbIU7EGa164SM8oi00004">all four <span class="price">£5</span></a></div>
+    </div></div>
+    <div class="cell pics">
+      <div class="stickers">
+        <a class="pick" href="https://buy.stripe.com/bJedR21gic9e5WQ33Y00005"><img src="stickers/cloud-black.png" alt="The app icon's cloud on a black circle." width="480" height="480"><span class="price">£2</span></a>
+        <a class="pick" href="https://buy.stripe.com/3cI8wI1gi3CI5WQ33Y00006"><img src="stickers/cloud-white.png" alt="The app icon's cloud on a white circle." width="480" height="480"><span class="price">£2</span></a>
+        <a class="pick" href="https://buy.stripe.com/5kQ7sEbUW7SYetm33Y00007"><img src="stickers/ring-white.png" alt="The menu bar puff ringed by typeme.it on white." width="480" height="480"><span class="price">£2</span></a>
+        <a class="pick" href="https://buy.stripe.com/eVq4gs2km8X2gBugUO00008"><img src="stickers/ring-black.png" alt="The menu bar puff ringed by typeme.it on black." width="480" height="480"><span class="price">£2</span></a>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="band"><div class="band-grid">
+    <div class="cell words"><div class="cap">
+      <h2 class="d3">donate</h2>
+      <div class="buy"><a href="https://buy.stripe.com/aFa28ke34ehmgBu8oi00002">give what you like <span class="price">any amount</span></a></div>
+    </div></div>
+  </div></section>
+
+  <footer class="foot">
+    <span>type me it</span>
+    <ul><li><a href="/shop">shop</a></li><li><a href="/terms">terms</a></li><li><a href="/privacy">privacy</a></li><li><a href="mailto:hello@typeme.it">hello@typeme.it</a></li></ul>
+  </footer>
+</main>
+
+<!-- Generated from TypeMeIt/Overlay/Puff.metal by web/generate.py. -->
+<script src="puff.glsl.js"></script>
+<script src="puff-hero.js"></script>
+<script>
+"use strict";
+// The bar's cloud, at rest, in the theme's smoke: white on dark paper,
+// near-black on light.
+{
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  const puff = mountPuff(document.querySelector(".bar canvas"), { always: true, level: () => 0 });
+  const tint = () => { if (puff) puff.tint = dark.matches ? [1, 1, 1] : [0.08, 0.08, 0.08]; };
+  tint();
+  dark.addEventListener("change", tint);
+}
+</script>
+</body>
+</html>

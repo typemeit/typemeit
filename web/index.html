@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>type me it · offline dictation and meeting transcription</title>
+<meta name="description" content="A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.">
+<meta property="og:site_name" content="type me it">
+<meta property="og:title" content="type me it · offline dictation and meeting transcription">
+<meta property="og:description" content="A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://typeme.it/">
+<meta property="og:image" content="https://typeme.it/og.png">
+<meta property="og:image:width" content="4800">
+<meta property="og:image:height" content="2520">
+<meta property="og:image:alt" content="A puff of smoke growing from a dense wisp into a large cloud, left to right.">
+<meta property="og:video" content="https://typeme.it/og.mp4">
+<meta property="og:video:secure_url" content="https://typeme.it/og.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1920">
+<meta property="og:video:height" content="1008">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="type me it · offline dictation and meeting transcription">
+<meta name="twitter:description" content="A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.">
+<meta name="twitter:image" content="https://typeme.it/og.png">
+<link rel="canonical" href="https://typeme.it/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
+</script>
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* Tokens: copied from web/styles/theme.css. */
+:root {
+  --tmi-paper: #ffffff;
+  --tmi-paper-sunk: #f7f7f7;
+  --tmi-paper-raised: #ffffff;
+  --tmi-ink: #0a0a0a;
+  --tmi-ink-2: #4a4a4a;
+  --tmi-ink-3: #6e6e6e;
+  --tmi-rule: #e4e4e4;
+  --tmi-rule-control: #949494;
+  --tmi-slab: #0a0a0a;
+  --tmi-on-slab: #ffffff;
+  --tmi-ink-a04: rgba(10, 10, 10, 0.04);
+  --tmi-ink-a08: rgba(10, 10, 10, 0.08);
+  --tmi-ink-a12: rgba(10, 10, 10, 0.12);
+  --tmi-ink-a20: rgba(10, 10, 10, 0.20);
+  --tmi-ink-a32: rgba(10, 10, 10, 0.32);
+  --tmi-ink-a48: rgba(10, 10, 10, 0.48);
+  --tmi-ink-a64: rgba(10, 10, 10, 0.64);
+  --tmi-ink-a88: rgba(10, 10, 10, 0.88);
+  --tmi-diff-add: #1a7f37;
+  --tmi-diff-remove: #cf222e;
+  --tmi-shadow-lift: 0 10px 24px -6px rgba(10, 10, 10, 0.18), 0 2px 6px -2px rgba(10, 10, 10, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tmi-paper: #0b0b0b;
+    --tmi-paper-sunk: #060606;
+    --tmi-paper-raised: #161616;
+    --tmi-ink: #fafafa;
+    --tmi-ink-2: #b4b4b4;
+    --tmi-ink-3: #8a8a8a;
+    --tmi-rule: #262626;
+    --tmi-rule-control: #6e6e6e;
+    --tmi-slab: #fafafa;
+    --tmi-on-slab: #0b0b0b;
+    --tmi-ink-a04: rgba(250, 250, 250, 0.05);
+    --tmi-ink-a08: rgba(250, 250, 250, 0.10);
+    --tmi-ink-a12: rgba(250, 250, 250, 0.15);
+    --tmi-ink-a20: rgba(250, 250, 250, 0.24);
+    --tmi-ink-a32: rgba(250, 250, 250, 0.36);
+    --tmi-ink-a48: rgba(250, 250, 250, 0.52);
+    --tmi-ink-a64: rgba(250, 250, 250, 0.68);
+    --tmi-ink-a88: rgba(250, 250, 250, 0.90);
+    --tmi-diff-add: #3fb950;
+    --tmi-diff-remove: #f85149;
+    --tmi-shadow-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.70), 0 2px 8px -2px rgba(0, 0, 0, 0.50);
+  }
+}
+
+:root[data-theme='dark'] {
+  --tmi-paper: #0b0b0b;
+  --tmi-paper-sunk: #060606;
+  --tmi-paper-raised: #161616;
+  --tmi-ink: #fafafa;
+  --tmi-ink-2: #b4b4b4;
+  --tmi-ink-3: #8a8a8a;
+  --tmi-rule: #262626;
+  --tmi-rule-control: #6e6e6e;
+  --tmi-slab: #fafafa;
+  --tmi-on-slab: #0b0b0b;
+  --tmi-ink-a04: rgba(250, 250, 250, 0.05);
+  --tmi-ink-a08: rgba(250, 250, 250, 0.10);
+  --tmi-ink-a12: rgba(250, 250, 250, 0.15);
+  --tmi-ink-a20: rgba(250, 250, 250, 0.24);
+  --tmi-ink-a32: rgba(250, 250, 250, 0.36);
+  --tmi-ink-a48: rgba(250, 250, 250, 0.52);
+  --tmi-ink-a64: rgba(250, 250, 250, 0.68);
+  --tmi-ink-a88: rgba(250, 250, 250, 0.90);
+  --tmi-diff-add: #3fb950;
+  --tmi-diff-remove: #f85149;
+  --tmi-shadow-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.70), 0 2px 8px -2px rgba(0, 0, 0, 0.50);
+}
+
+:root {
+  color-scheme: light dark;
+  --font-display: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, 'Segoe UI', sans-serif;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-1: 120ms;
+  --duration-2: 180ms;
+  --bar: 56px;
+  --stick-gap: 24px;
+  --stick-top: calc(var(--bar) + var(--stick-gap));
+  --block-gap: 28px;
+  /* A dark window needs an edge on paper: a hairline, and in light the system's one lift. */
+  --frame: 0 0 0 1px var(--tmi-ink-a12), var(--tmi-shadow-lift);
+}
+:root[data-theme='dark'] { color-scheme: dark; --frame: 0 0 0 1px var(--tmi-ink-a20); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --frame: 0 0 0 1px var(--tmi-ink-a20); }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  background: var(--tmi-paper);
+  color: var(--tmi-ink);
+  font: 400 16px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-padding-top: var(--stick-top);
+}
+body { margin: 0; font-size: 15px; line-height: 1.55; letter-spacing: -0.005em; }
+h1, h2, h3, p { margin: 0; font-weight: 400; }
+h1, h2 { text-wrap: balance; }
+p { text-wrap: pretty; }
+a { color: inherit; }
+::selection { background: var(--tmi-ink); color: var(--tmi-paper); }
+:focus-visible { outline: 2px solid var(--tmi-ink); outline-offset: 2px; }
+
+/* The scale: display-1/2/3 are DM Mono; title, heading and body are the ui face. */
+.d2 { font: 400 clamp(2.25rem, 5vw, 3.5rem)/1.05 var(--font-display); letter-spacing: -0.024em; }
+.d3 { font: 400 clamp(1.75rem, 3.5vw, 2.25rem)/1.1 var(--font-display); letter-spacing: -0.02em; }
+
+/* Button, from web/styles/app.css. */
+.icon { display: inline-block; width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
+.btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 26px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: 0;
+  font: 400 12px/1 var(--font-mono); letter-spacing: 0;
+  color: var(--tmi-ink); background: transparent;
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out);
+}
+.btn .icon { font-size: 14px; }
+.btn-sm { height: 24px; padding: 0 8px; font-size: 11px; }
+.btn-lg { height: 38px; padding: 0 16px; font-size: 14px; }
+.btn-lg .icon { font-size: 16px; }
+.btn-primary { background: var(--tmi-slab); color: var(--tmi-on-slab); border-color: var(--tmi-slab); }
+.btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+.btn-primary:active { background: color-mix(in srgb, var(--tmi-slab) 72%, transparent); }
+.btn-quiet { color: var(--tmi-ink-2); }
+
+/* Keycap. The fn key keeps its globe and goes down while the demo speaks. */
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 22px; min-width: 22px; padding: 0 8px; margin-inline: 2px;
+  border: 1px solid var(--tmi-ink-a20); border-radius: var(--radius-sm);
+  background: var(--tmi-paper-raised); color: var(--tmi-ink);
+  font: 400 12px/1 var(--font-ui); letter-spacing: 0; vertical-align: middle;
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out), transform var(--duration-1) var(--ease-out);
+}
+.kbd svg { width: 12px; height: 12px; flex: none; }
+.kbd.down { background: var(--tmi-slab); color: var(--tmi-on-slab); border-color: var(--tmi-slab); transform: translateY(1px); }
+
+/* Page frame. Everything shares one left edge; the bands run wider than the text. */
+.wrap { width: 100%; max-width: 1440px; margin-inline: auto; padding-inline: 24px; }
+
+.top { position: absolute; inset: 0 0 auto; z-index: 6; }
+.top .wrap { padding-top: 24px; }
+.name { font: 400 14px/1.35 var(--font-mono); letter-spacing: 0; text-decoration: none; }
+
+/* Once the first screen's cloud has gone: a bar with a small cloud on the left and the download on the right. */
+.bar {
+  position: fixed; inset: 0 0 auto; z-index: 10; height: var(--bar);
+  background: var(--tmi-paper); border-bottom: 1px solid var(--tmi-rule);
+  opacity: 0; transform: translateY(-100%); visibility: hidden;
+  transition: opacity var(--duration-2) var(--ease-out), transform var(--duration-2) var(--ease-out), visibility 0s var(--duration-2);
+}
+.bar.shown { opacity: 1; transform: none; visibility: visible; transition: opacity var(--duration-2) var(--ease-out), transform var(--duration-2) var(--ease-out); }
+.bar .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; }
+/* The puff draws small inside its box; the box overflows the bar so the cloud sits about 30px across. */
+.spot { position: relative; width: 36px; height: 36px; }
+.spot canvas { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; transform: translate(-50%, -50%); pointer-events: none; }
+
+.first { min-height: 100vh; min-height: 100svh; display: grid; place-items: center; }
+.first canvas { --puff: clamp(440px, 66vmin, 600px); width: min(var(--puff), 100vw); height: min(var(--puff), 100vw); display: block; pointer-events: none; }
+
+/* Hero and opening text: one column. */
+.hero { padding: 24px 0 96px; }
+.hero .mark { width: 48px; height: 48px; margin-bottom: 32px; color: var(--tmi-ink); }
+.hero .mark svg { width: 100%; height: 100%; display: block; }
+.hero h1 { max-width: 24ch; }
+.hero p { margin-top: 24px; max-width: 560px; color: var(--tmi-ink-2); font-size: 17px; line-height: 1.4; letter-spacing: -0.012em; }
+.cta { margin-top: 32px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; }
+
+.opening { border-top: 1px solid var(--tmi-rule); padding-block: 80px; }
+.opening h2 { max-width: 36ch; margin-bottom: 32px; }
+.opening p { max-width: 560px; color: var(--tmi-ink-2); }
+.opening p + p { margin-top: 18px; }
+
+/* Bands: the words on one side, the picture on the other. Below lg they stack, words first.
+   Each grid cell holds one sticky column; the cell is where the column would sit if it did not stick. */
+.band { border-top: 1px solid var(--tmi-rule); padding-block: 72px; }
+.band-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.cell { min-width: 0; }
+.words { order: -1; }
+.pics { margin-top: 40px; }
+.pics .shot + .term { margin-top: var(--block-gap); }
+
+.cap h2 { margin: 0; }
+.cap h2 + p { margin-top: 20px; }
+.cap p { max-width: 520px; color: var(--tmi-ink-2); }
+.cap p + p { margin-top: 12px; }
+.cap .say { color: var(--tmi-ink); font-size: 17px; font-weight: 600; line-height: 1.35; letter-spacing: -0.012em; }
+.cap .say + p { margin-top: 12px; }
+.cap h3 { font: 500 17px/1.3 var(--font-mono); letter-spacing: -0.012em; }
+.cap h3 + p { margin-top: 8px; }
+.cap .note { margin-top: 10px; font-size: 13px; line-height: 1.35; letter-spacing: 0; color: var(--tmi-ink-3); }
+.stick > .cap + .cap { margin-top: var(--block-gap); padding-top: var(--block-gap); border-top: 1px solid var(--tmi-rule); }
+
+/* The prompt the app floats over everything when a call starts, drawn the
+   way SquarePrompt draws it: a 48pt slab with the lift, the people mark, the
+   message in mono centred, the record button inverted on the slab, and the
+   cross on a faint square of the slab's ink. */
+.prompt {
+  display: inline-flex; align-items: center; gap: 12px; margin-top: 24px;
+  height: 48px; min-width: 360px; max-width: 100%; padding: 0 10px 0 14px;
+  background: var(--tmi-slab); color: var(--tmi-on-slab);
+  box-shadow: var(--tmi-shadow-lift); white-space: nowrap;
+}
+.prompt .mark { width: 14px; height: 14px; flex: none; }
+.prompt .msg { flex: 1; padding: 0 6px; text-align: center; font: 400 13px/1 var(--font-mono); letter-spacing: 0; }
+.prompt .acts { display: flex; gap: 6px; }
+.prompt .record { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; background: var(--tmi-on-slab); color: var(--tmi-slab); font: 400 12px/1 var(--font-mono); }
+.prompt .cross { display: grid; place-items: center; width: 26px; height: 26px; background: color-mix(in srgb, var(--tmi-on-slab) 16%, transparent); }
+.prompt .cross svg { width: 12px; height: 12px; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 16px; }
+.tools code, .term .tool { font: 400 12px/1.5 var(--font-mono); color: var(--tmi-ink); border: 1px dashed var(--tmi-rule-control); padding: 1px 6px; }
+
+/* A code block: a square box on sunk paper. */
+.term { border: 1px solid var(--tmi-rule-control); background: var(--tmi-paper-sunk); color: var(--tmi-ink); }
+.term pre { margin: 0; padding: 20px 24px; font: 400 12px/1.75 var(--font-mono); letter-spacing: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.term .dim { color: var(--tmi-ink-3); }
+
+/* The demo and the screenshots. Each window's corner is 1% of its width. */
+.scene { position: relative; aspect-ratio: 2000 / 1254; container-type: inline-size; border-radius: 1% / 1.6%; box-shadow: var(--frame); }
+.scene img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.scene .typed, .scene .sent { opacity: 0; transition: opacity 140ms; }
+/* Each scene's own puff, where the app draws it, shown while it is held. */
+.scene .puff { position: absolute; left: 50%; top: 88%; width: 36%; aspect-ratio: 1; transform: translate(-50%, -50%); opacity: 0; transition: opacity 360ms; pointer-events: none; }
+/* Hides the screenshot's caret on alternate half seconds, as a text field blinks it. */
+.blink { position: absolute; pointer-events: none; animation: blink 1.06s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .blink { display: none; } }
+/* Phantom words: what the puff hears, rising out of it while fn is held. Sized in container widths so they scale with the screenshot. */
+.phantom { position: absolute; left: 50%; top: 80.5%; width: 0; height: 0; pointer-events: none; }
+.phantom span { position: absolute; left: 0; bottom: 0; white-space: nowrap; opacity: 0; font: 400 1.75cqw/1 var(--font-mono); letter-spacing: -0.01em; will-change: transform, opacity, filter; }
+.shot { margin: 0; }
+.shot img { width: 100%; height: auto; display: block; border-radius: 1% / 1.6%; box-shadow: var(--frame); }
+
+.end { border-top: 1px solid var(--tmi-rule); padding-block: 96px 120px; }
+.end h2 { max-width: 30ch; }
+
+/* Copy the scroll has not typed yet, in a text field's placeholder grey. */
+.w { color: var(--tmi-ink-a20); transition: color var(--duration-2) var(--ease-out); }
+.w.on { color: inherit; }
+
+.foot { border-top: 1px solid var(--tmi-rule); padding: 28px 0 40px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; font: 400 12px/1.35 var(--font-mono); letter-spacing: 0; color: var(--tmi-ink-3); }
+.foot ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
+.foot a { text-decoration: none; transition: color var(--duration-1) var(--ease-out); }
+.foot a:hover { color: var(--tmi-ink); }
+
+@media (min-width: 768px) {
+  .wrap { padding-inline: 40px; }
+  .hero { padding-bottom: 120px; }
+  .opening { padding-block: 96px; }
+}
+
+@media (min-width: 1024px) {
+  .band { padding-block: 120px; }
+  .band-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(40px, 5vw, 80px); }
+  .words { order: 0; }
+  .pics { margin-top: 0; }
+  /* The shorter column of each row stays under the bar while the taller one passes. */
+  .stick { position: sticky; top: var(--stick-top); }
+  .end { padding-block: 120px 160px; }
+}
+
+@media (max-width: 760px) {
+  /* A screenshot pans inside its own box rather than shrinking past reading. */
+  .shot { overflow-x: auto; border: 1px solid var(--tmi-ink-a20); }
+  .shot img { width: 880px; max-width: none; border-radius: 0; box-shadow: none; }
+  .foot a { display: inline-block; padding: 12px 0; }
+}
+@media (max-width: 480px) {
+  .prompt { min-width: 0; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">type me it</a></div></header>
+<nav class="bar" aria-label="type me it"><div class="wrap">
+  <span class="spot"><canvas aria-hidden="true"></canvas></span>
+  <a class="btn btn-primary" href="/download"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>download</a>
+</div></nav>
+<section class="first"><canvas id="puff" aria-hidden="true"></canvas></section>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="mark"><svg viewBox="2.45 1.45 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M 42.99 43.81 A 6.00 6.00 0 0 1 33.58 48.46 A 8.00 8.00 0 0 1 18.58 43.33 A 7.50 7.50 0 0 1 13.68 32.25 A 9.50 9.50 0 0 1 20.62 17.68 A 13.00 13.00 0 0 1 44.93 19.37 A 9.00 9.00 0 0 1 50.29 34.46 A 6.50 6.50 0 0 1 42.99 43.81 Z"/><path d="M 33.58 48.46 A 8.00 8.00 0 0 0 34.19 42.93"/><path d="M 13.68 32.25 A 9.50 9.50 0 0 0 21.67 36.62"/><path d="M 20.62 17.68 A 13.00 13.00 0 0 0 21.17 29.48"/><path d="M 44.93 19.37 A 9.00 9.00 0 0 0 34.88 26.66"/></svg></div>
+    <h1 class="d2">offline dictation and meeting transcription.</h1>
+    <p>a free mac app that runs the latest on-device models, with a local mcp server and voice embeddings for accurate speaker attribution.</p>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="/download"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>download for mac</a>
+    </div>
+  </section>
+
+  <section class="opening">
+    <h2 class="d3">a free alternative to granola and wispr flow for those who want to own their data.</h2>
+    <p>you’re in control of your data. meetings and dictations are some of the most sensitive data you own, so type me it keeps them on your mac: no account, no cloud, and no third parties. you can read, export, share or delete it.</p>
+    <p>hold <kbd class="kbd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd>, speak, and it types wherever your cursor is. apple intelligence tidies the text on your mac, and it learns your vocabulary from the corrections you make.</p>
+    <p>it matches names to voices in any meeting, not just third-party meetings like slack and google meet. voices are biometric data under gdpr, so that matching runs on your machine and never leaves it.</p>
+    <p>running nvidia’s parakeet and nemotron models on apple silicon, with quality close to the paid cloud tools. a local mcp server lets claude or any assistant you choose read your meetings and write summaries that know who said what, on your terms.</p>
+  </section>
+
+  <section class="band" id="dictation"><div class="band-grid">
+    <div class="cell words"><div class="stick">
+      <div class="cap">
+        <h2 class="d3">dictation</h2>
+        <p class="say">simply hold <kbd class="kbd" data-for="demo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd> and speak.</p>
+        <p>it types wherever your cursor is, like a slack message or a claude prompt. it adds punctuation and capitals, and can write digits, format lists and cut filler words.</p>
+      </div>
+    </div></div>
+    <div class="cell pics"><div class="stick">
+      <div class="scene" id="demo" data-scenes="slack claude">
+        <img class="empty" alt="a message box in slack, then in claude, empty">
+        <img class="typed" alt="the same message box with the dictated text typed in, with capitals and punctuation">
+        <img class="sent" alt="">
+        <canvas class="puff" aria-hidden="true"></canvas>
+      </div>
+    </div></div>
+  </div></section>
+
+  <section class="band" id="meetings"><div class="band-grid">
+    <div class="cell words"><div class="stick">
+      <div class="cap">
+        <h2 class="d3">meetings</h2>
+        <p>when a call starts in any app, type me it asks if you want to record it. it records your microphone and the call’s audio, and transcribes them when the call ends.</p>
+        <div class="prompt" role="img" aria-label="the prompt type me it shows when a call starts: record this meeting? with record and close"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.719 19.7519L16.0785 14.6279C15.8908 13.1266 14.6146 12 13.1017 12H12H10.8983C9.38538 12 8.10917 13.1266 7.92151 14.6279L7.28101 19.7519C7.1318 20.9456 8.06257 22 9.26556 22H12H14.7344C15.9374 22 16.8682 20.9456 16.719 19.7519Z"/><circle cx="12" cy="5" r="3"/><circle cx="4" cy="9" r="2"/><circle cx="20" cy="9" r="2"/><path d="M4 14H3.69425C2.71658 14 1.8822 14.7068 1.72147 15.6712L1.38813 17.6712C1.18496 18.8903 2.12504 20 3.36092 20H7"/><path d="M20 14H20.3057C21.2834 14 22.1178 14.7068 22.2785 15.6712L22.6119 17.6712C22.815 18.8903 21.8751 20 20.6392 20C19.4775 20 18.0952 20 17 20"/></svg><span class="msg">record this meeting?</span><span class="acts"><span class="record">record</span><span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 20L4 4m16 0L4 20"/></svg></span></span></div>
+      </div>
+      <div class="cap">
+        <h3>summary</h3>
+        <p>apple intelligence on your mac writes two sentences and a title for each meeting.</p>
+      </div>
+      <div class="cap">
+        <h3>sharing</h3>
+        <p>share a meeting as a file. any text editor reads it as markdown.</p>
+      </div>
+      <div class="cap">
+        <h3>speakers</h3>
+        <p>on a call it tells the voices apart and takes their names from the slack or meet window. in a room, start a recording from the menu bar or a shortcut and it splits one microphone into voices. a voice it doesn't know opens with a clip playing: type a name, pick someone from past calls, or merge it with a voice you've named.</p>
+        <p class="note">turn on learn voices and it suggests names from earlier meetings.</p>
+      </div>
+      <div class="cap">
+        <h3>mcp</h3>
+        <p>ask claude, codex or any ai app about your meetings. add type me it to any app that supports mcp, and it can list, read and search your transcripts.</p>
+        <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code></p>
+      </div>
+    </div></div>
+    <div class="cell pics"><div class="stick">
+      <figure class="shot"><img src="shots/meeting.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="a meeting's page: summary, transcript by speaker, talk share per person and the player"></figure>
+      <div class="term" role="img" aria-label="claude code answering a question from the meetings mcp"><pre><span class="dim">&gt;</span> what did sam say he'd send on friday?
+
+<span class="tool">search_meetings</span> <span class="dim">friday · 1 match</span>
+
+Sam said he'd send the revised numbers on Friday. That was in this morning's "Launch date and pricing" call.</pre></div>
+    </div></div>
+  </div></section>
+
+  <section class="band" id="insights"><div class="band-grid">
+    <div class="cell words"><div class="stick">
+      <div class="cap">
+        <h2 class="d3">insights</h2>
+        <p>words dictated, words per minute against typing, streaks and apps. for meetings: hours on calls and your share of the talk.</p>
+      </div>
+    </div></div>
+    <div class="cell pics"><div class="stick">
+      <figure class="shot"><img src="shots/insights.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="the insights page: words dictated, words per minute against typing, words by app, a daily streak, and time in meetings with your share of the talk"></figure>
+    </div></div>
+  </div></section>
+
+  <section class="end" id="download">
+    <h2 class="d2">try it on your next message, or your next meeting.</h2>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="/download"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>download for mac</a>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap"><div class="foot">
+  <span>type me it</span>
+  <ul><li><a href="/models">models</a></li><li><a href="/shop">shop</a></li><li><a href="/terms">terms</a></li><li><a href="/privacy">privacy</a></li><li><a href="mailto:hello@typeme.it">hello@typeme.it</a></li></ul>
+</div></footer>
+
+<script src="puff.glsl.js"></script>
+<script src="puff-hero.js"></script>
+<script src="scenes.js"></script>
+<script>
+"use strict";
+// The first screen's puff and the bar's, in white smoke on the dark page;
+// a click on a cloud sends lightning.
+{
+  const WHITE = [1, 1, 1];
+
+  const canvas = document.getElementById("puff");
+  const puff = mountPuff(canvas, { tint: WHITE });
+  const bar = document.querySelector(".bar");
+  const barCanvas = bar.querySelector("canvas");
+  // At rest, so it keeps to the bar; a click still sends lightning.
+  const barPuff = mountPuff(barCanvas, { always: true, level: () => 0, tint: WHITE });
+  const HIT = 90 / 440;  // a click this near a puff's centre, as a fraction of its canvas, is on the cloud
+
+  // The bar comes in once the big cloud has scrolled off the top, and its
+  // cloud draws only while the bar shows.
+  if (barPuff) barPuff.visible = false;
+  new IntersectionObserver(([en]) => {
+    const shown = !en.isIntersecting && en.boundingClientRect.top < 0;
+    bar.classList.toggle("shown", shown);
+    if (barPuff) barPuff.visible = shown;
+  }).observe(canvas);
+  const hit = (ev, c) => {
+    const box = c.getBoundingClientRect();
+    return Math.hypot(ev.clientX - (box.left + box.width / 2), ev.clientY - (box.top + box.height / 2)) < box.width * HIT;
+  };
+  addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    if (puff && hit(ev, canvas)) { puff.flash(); return; }
+    if (barPuff && bar.classList.contains("shown") && hit(ev, barCanvas)) barPuff.flash();
+  });
+  document.querySelector(".name").addEventListener("click", (ev) => { ev.preventDefault(); scrollTo(0, 0); });
+}
+
+// A column taller than the window sticks by its bottom edge instead of its
+// top, so the whole of it can be read while the other column passes.
+{
+  const gauge = document.createElement("div");
+  gauge.style.cssText = "position:absolute;top:0;left:0;width:0;visibility:hidden";
+  document.body.append(gauge);
+  const px = (length) => { gauge.style.height = length; return gauge.offsetHeight; };
+  const columns = [...document.querySelectorAll(".stick")];
+  const fit = () => {
+    const gap = px("var(--stick-gap)"), top = px("var(--stick-top)");
+    for (const column of columns) column.style.top = Math.min(top, innerHeight - column.offsetHeight - gap) + "px";
+  };
+  const resized = new ResizeObserver(fit);
+  for (const column of columns) resized.observe(column);
+  addEventListener("resize", fit);
+  fit();
+}
+
+// Scrolling types the copy, a word at a time. Each block starts typing when
+// its top comes up to FROM of the window and is typed by TO; a word fades in
+// from placeholder grey as it is typed and fades back out when you scroll
+// up. However fast the page moves, typing goes no faster than
+// WORDS_PER_SECOND, so it catches up rather than jumps, and one block at a
+// time: a block waits for the one above it to finish, and on the way back up
+// it holds until the one below has emptied. A block already scrolled past is
+// typed at once, so it never holds up the ones on screen. A block in a
+// sticky column is placed where the page would have put it had the column not
+// stuck, so it is typed as the picture beside it scrolls.
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const FROM = 0.92, TO = 0.55;
+  const WORDS_PER_SECOND = 40;
+
+  const blocks = [...document.querySelectorAll(".hero, .opening > h2, .opening > p, .band .cap, .end")].map((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: (t) => !t.data.trim() || t.parentElement.closest(".cta, .prompt, .tools, kbd") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const texts = [];
+    while (walker.nextNode()) texts.push(walker.currentNode);
+    const words = [];
+    for (const t of texts) {
+      const parts = document.createDocumentFragment();
+      for (const part of t.data.split(/(\s+)/)) {
+        if (!part) continue;
+        if (!part.trim()) { parts.append(part); continue; }
+        const w = Object.assign(document.createElement("span"), { className: "w", textContent: part });
+        parts.append(w);
+        words.push(w);
+      }
+      t.replaceWith(parts);
+    }
+    return { el, words, typed: 0, shown: 0, column: el.closest(".stick") };
+  });
+
+  /** How far a sticky column sits below where the page would put it. */
+  function stuckBy(block) {
+    return block.column ? block.column.getBoundingClientRect().top - block.column.parentElement.getBoundingClientRect().top : 0;
+  }
+
+  /** How many of a block's words the scroll has reached. */
+  function reached(b, max) {
+    const box = b.el.getBoundingClientRect();
+    if (box.bottom < 0) return b.words.length;
+    const top = box.top - stuckBy(b) + scrollY;
+    const start = top - innerHeight * FROM;
+    const end = Math.min(top - innerHeight * TO, max);
+    const p = end <= start ? Number(scrollY >= end) : Math.min(1, Math.max(0, (scrollY - start) / (end - start)));
+    return Math.round(p * b.words.length);
+  }
+
+  let running = false, last = null;
+  function frame(now) {
+    const dt = last === null ? 0 : Math.min((now - last) / 1000, 0.1);
+    last = now;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    // A block held for its neighbour moves once the neighbour has, so the
+    // loop runs until a frame changes nothing rather than until each block
+    // meets this frame's goal.
+    let changed = dt === 0;
+    const goals = blocks.map((b) => reached(b, max));
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      const above = blocks[i - 1], below = blocks[i + 1];
+      let goal = goals[i];
+      if (above && above.typed < above.words.length) goal = 0;
+      else if (below && below.typed > 0) goal = b.words.length;
+      const before = b.typed;
+      if (b.el.getBoundingClientRect().bottom < 0) b.typed = goal;
+      const step = WORDS_PER_SECOND * dt;
+      b.typed = goal > b.typed ? Math.min(goal, b.typed + step) : Math.max(goal, b.typed - step);
+      if (b.typed !== before) changed = true;
+      const n = Math.round(b.typed);
+      for (let w = Math.min(n, b.shown); w < Math.max(n, b.shown); w++) b.words[w].classList.toggle("on", w < n);
+      b.shown = n;
+    }
+    if (changed) requestAnimationFrame(frame);
+    else { running = false; last = null; }
+  }
+  const go = () => { if (!running) { running = true; requestAnimationFrame(frame); } };
+  addEventListener("scroll", go, { passive: true });
+  addEventListener("resize", go);
+  go();
+}
+</script>
+</body>
+</html>
