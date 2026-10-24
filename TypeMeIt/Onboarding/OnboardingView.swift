@@ -54,10 +54,10 @@ struct OnboardingView: View {
                 Spacer()
                 if step == .tryIt, !dictated {
                     Button("skip") { finished() }
-                        .buttonStyle(InkButtonStyle(quiet: true))
+                        .buttonStyle(SquareButtonStyle(kind: .quiet))
                 }
                 Button(step == .tryIt ? "finish" : "continue") { advance() }
-                    .buttonStyle(InkButtonStyle(primary: true))
+                    .buttonStyle(SquareButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canContinue)
             }
@@ -96,7 +96,7 @@ struct OnboardingView: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .model:
-            SettingsGroup { ModelDownloadRows() }
+            SquareRows { ModelDownloadRows() }
         case .microphone:
             permission("microphone", granted: micGranted, grant: {
                 if AVCaptureDevice.authorizationStatus(for: .audio) == .denied { return false }
@@ -110,19 +110,19 @@ struct OnboardingView: View {
                 return true
             }, missing: { !AXIsProcessTrusted() }, settings: SecureInput.accessibilitySettingsURL)
         case .globeKey:
-            SettingsGroup {
-                SettingsRow(label: "press 🌐 key to", subtitle: fnNeedsSettings && !fnOK ? "keyboard settings, the row below." : nil, last: true) {
+            SquareRows {
+                SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings, the row below." : nil) {
                     if fnOK {
                         Status("do nothing", done: true)
                     } else if fnNeedsSettings {
                         Button("keyboard settings") { NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
-                            .buttonStyle(InkButtonStyle(primary: true))
+                            .buttonStyle(SquareButtonStyle(kind: .primary))
                     } else {
                         Button("set to do nothing") {
                             fnOK = SecureInput.setFnKeyToDoNothing()
                             if !fnOK { fnNeedsSettings = true; NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
                         }
-                        .buttonStyle(InkButtonStyle(primary: true))
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 }
             }
@@ -133,22 +133,22 @@ struct OnboardingView: View {
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
                 .padding(.top, 12)
         case .cleanup:
-            SettingsGroup {
+            SquareRows {
                 switch availability {
                 case .available:
-                    SettingsRow(label: "apple intelligence", last: true) { Status("on", done: true) }
+                    SquareSettingsRow(label: "apple intelligence") { Status("on", done: true) }
                 case .unavailable(.appleIntelligenceNotEnabled):
-                    SettingsRow(label: "apple intelligence", subtitle: "turn it on in system settings. this page moves on by itself once it is on.", last: true) {
-                        Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(InkButtonStyle(primary: true))
+                    SquareSettingsRow(label: "apple intelligence", help: "turn it on in system settings. this page moves on by itself once it is on.") {
+                        Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 case .unavailable(.modelNotReady):
-                    SettingsRow(label: "apple intelligence", subtitle: "the download is in system settings. skip and it turns on by itself once done.", last: true) {
+                    SquareSettingsRow(label: "apple intelligence", help: "the download is in system settings. skip and it turns on by itself once done.") {
                         Status("downloading…")
                     }
                 case .unavailable(.deviceNotEligible):
-                    SettingsRow(label: "apple intelligence", last: true) { Status("not available on this mac") }
+                    SquareSettingsRow(label: "apple intelligence") { Status("not available on this mac") }
                 case .unavailable:
-                    SettingsRow(label: "apple intelligence", last: true) { Status("not available right now") }
+                    SquareSettingsRow(label: "apple intelligence") { Status("not available right now") }
                 }
             }
         case .tryIt:
@@ -179,8 +179,8 @@ struct OnboardingView: View {
     }
 
     private func permission(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL) -> some View {
-        SettingsGroup {
-            permissionRow(label, granted: granted, grant: grant, missing: missing, settings: settings, last: true)
+        SquareRows {
+            permissionRow(label, granted: granted, grant: grant, missing: missing, settings: settings)
         }
     }
 
@@ -190,14 +190,14 @@ struct OnboardingView: View {
     /// `missing` and this app is still active, meaning no dialog took the
     /// focus, the prompt was used up on an earlier launch: the button becomes
     /// "system settings" and opens the pane straight away.
-    private func permissionRow(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL, last: Bool) -> some View {
+    private func permissionRow(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL) -> some View {
         let current = step
         let viaSettings = needsSettings.contains(current)
-        return SettingsRow(label: label, subtitle: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil, last: last) {
+        return SquareSettingsRow(label: label, help: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil) {
             if granted {
                 Status("granted", done: true)
             } else if viaSettings {
-                Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(InkButtonStyle(primary: true))
+                Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(SquareButtonStyle(kind: .primary))
             } else {
                 Button("grant") {
                     if !grant() { needsSettings.insert(current); NSWorkspace.shared.open(settings); return }
@@ -209,7 +209,7 @@ struct OnboardingView: View {
                             NSWorkspace.shared.open(settings)
                         }
                     }
-                }.buttonStyle(InkButtonStyle(primary: true))
+                }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         }
     }
