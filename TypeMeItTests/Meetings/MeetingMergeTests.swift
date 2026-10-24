@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import Testing
 @testable import TypeMeIt
@@ -79,32 +78,24 @@ struct MeetingMergeTests {
     }
 
     @Test func theAudioJoinsWithSilenceBetween() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let dir = tempDir()
         let a = dir.appendingPathComponent("a", isDirectory: true), b = dir.appendingPathComponent("b", isDirectory: true)
         try FileManager.default.createDirectory(at: a, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: b, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        func write(_ url: URL, value: Float, ms: Int) throws {
-            let w = try TrackWriter(url: url)
-            w.append([Float](repeating: value, count: ms * Meeting.framesPerMs))
-            _ = w.finish()
-        }
         var earlier = call(0, seconds: 1)
         earlier.durationMs = 1000
         earlier.tracks = [Meeting.Track(role: .mic, file: "mic.caf", frames: 1000 * Meeting.framesPerMs)]
         var later = call(1.5, seconds: 1)
         later.durationMs = 1000
         later.tracks = [Meeting.Track(role: .mic, file: "mic.caf", frames: 1000 * Meeting.framesPerMs)]
-        try write(a.appendingPathComponent("mic.caf"), value: 0.5, ms: 1000)
-        try write(b.appendingPathComponent("mic.caf"), value: -0.5, ms: 1000)
+        try writeTrack([Float](repeating: 0.5, count: 1000 * Meeting.framesPerMs), to: a.appendingPathComponent("mic.caf"))
+        try writeTrack([Float](repeating: -0.5, count: 1000 * Meeting.framesPerMs), to: b.appendingPathComponent("mic.caf"))
 
         let written = try MeetingMerge.joinAudio(earlier, in: a, later, in: b, gapMs: 500)
         #expect(written[.mic]?.frames == 2500 * Meeting.framesPerMs)
 
-        let file = try AVAudioFile(forReading: a.appendingPathComponent("mic.caf"))
-        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))!
-        try file.read(into: buffer)
-        let pcm = Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+        let pcm = try readSamples(at: a.appendingPathComponent("mic.caf"))
         let at = { (ms: Int) in pcm[ms * Meeting.framesPerMs] }
         #expect(abs(at(999) - 0.5) < 0.001)
         #expect(at(1250) == 0)

@@ -25,17 +25,10 @@ enum QuestionLog {
         var answer: Answer? = nil
     }
 
-    nonisolated static let url = Store.directory.appendingPathComponent("question-log.jsonl")
-
-    private static let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = [.sortedKeys]
-        return e
-    }()
+    nonisolated static let url = SupportPaths.directory.appendingPathComponent("question-log.jsonl")
 
     static func append(_ entry: Entry) {
-        guard var line = try? encoder.encode(entry) else { return }
+        guard var line = try? StoredJSON.lineEncoder.encode(entry) else { return }
         line.append(UInt8(ascii: "\n"))
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
@@ -50,9 +43,7 @@ enum QuestionLog {
 
     static func read() -> [Entry] {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return text.split(separator: "\n").compactMap { try? decoder.decode(Entry.self, from: Data($0.utf8)) }
+        return text.split(separator: "\n").compactMap { try? StoredJSON.decoder.decode(Entry.self, from: Data($0.utf8)) }
     }
 
     /// The user's own yes and no answers, newest first and at most `limit` of

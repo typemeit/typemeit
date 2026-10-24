@@ -16,6 +16,19 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// Frames per millisecond of a 16 kHz track: `frames == durationMs × 16`.
     static let framesPerMs = Int(AudioCapture.targetFormat.sampleRate) / 1000
 
+    /// `45s` under a minute (whole seconds, so never `60s`), then `8m`,
+    /// `45m`, `1h20m`, rounded to the nearest minute. Folder names, insights
+    /// and the MCP server all show this one label.
+    static func durationLabel(_ duration: Duration) -> String {
+        let seconds = duration / .seconds(1)
+        guard seconds >= 60 else { return "\(Int(seconds))s" }
+        let totalMinutes = Int((seconds / 60).rounded())
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        guard hours > 0 else { return "\(minutes)m" }
+        return "\(hours)h\(minutes)m"
+    }
+
     enum Kind: String, Codable, Sendable { case call, room }
     enum TitleSource: String, Codable, Sendable { case app, user, generated, roster }
     enum Echo: String, Codable, Sendable { case notMeasured, clean, affected }
@@ -210,24 +223,11 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// The hooks run on the meeting since it ended. Nil when none.
     var hookRuns: [HookRun]? = nil
 
-    static let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return e
-    }()
-
-    static let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
-
     /// Unknown keys are ignored. A file written by a later schema is nil,
     /// with a log line, so this build never rewrites what it cannot read.
     static func decode(_ data: Data) -> Meeting? {
         do {
-            let meeting = try decoder.decode(Meeting.self, from: data)
+            let meeting = try StoredJSON.decoder.decode(Meeting.self, from: data)
             guard meeting.schema <= currentSchema else {
                 Log.meetings.error("meeting.json schema \(meeting.schema) is newer than \(currentSchema); left alone")
                 return nil
@@ -239,7 +239,7 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         }
     }
 
-    func encoded() throws -> Data { try Meeting.encoder.encode(self) }
+    func encoded() throws -> Data { try StoredJSON.fileEncoder.encode(self) }
 
     // MARK: Derived
 

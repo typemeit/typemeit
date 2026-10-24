@@ -1,38 +1,7 @@
 import Foundation
 import Observation
 
-struct HistoryEntry: Codable, Identifiable, Sendable, Equatable {
-    var id: UUID = UUID()
-    var timestamp: Date
-    var starred: Bool = false
-    /// Engine output after local cleanup (custom words, fillers, normalisation).
-    var transcript: String
-    /// Apple Intelligence output; nil when off, skipped, rejected or failed.
-    var postProcessed: String?
-    var postProcessRequested: Bool
-    /// What was typed into the app: the transcript, or Apple Intelligence's
-    /// output, after the local clean-up and the writing styles. nil on
-    /// entries from before it was kept, which showed `postProcessed`.
-    var typed: String?
-    var edited: String?
-    var editedAt: Date?
-    var durationMs: Int?
-    /// Wall-clock time the speech engine took, in milliseconds.
-    var transcribeMs: Int?
-    /// Wall-clock time Apple Intelligence took, in milliseconds; nil when it was not requested.
-    var postProcessMs: Int?
-    var appId: String?
-    var appName: String?
-    var windowTitle: String?
-    var dictionaryFixes: Int
-    /// File name in `RecordingArchive.directory`; nil when audio was not kept.
-    var recordingFile: String?
-    /// A dictation that asked Claude by name ("TMI, …?"), so nothing was
-    /// typed: the request, and Claude's answer or what the user did instead.
-    var question: Meeting.Question?
-
-    var displayText: String { edited ?? typed ?? postProcessed ?? transcript }
-
+extension HistoryEntry {
     /// The words history shows for it, which insights total by day too.
     var wordCount: Int { Insights.wordCount(displayText) }
 }
@@ -61,39 +30,17 @@ final class Store {
     private(set) var revision = 0
     private(set) var learned: [LearnedWord] = []
 
-    /// TYPEMEIT_SUPPORT_DIR points a build at another store, so a screenshot
-    /// run can show made-up history without touching the real one.
-    nonisolated static let directory: URL = {
-        if let dir = ProcessInfo.processInfo.environment["TYPEMEIT_SUPPORT_DIR"] {
-            return URL(fileURLWithPath: dir, isDirectory: true)
-        }
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("TypeMeIt", isDirectory: true)
-    }()
-    private var historyURL: URL { Store.directory.appendingPathComponent("history.json") }
-    private var learnedURL: URL { Store.directory.appendingPathComponent("learned-words.json") }
-
-    private let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return e
-    }()
-    private let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
+    private var learnedURL: URL { SupportPaths.directory.appendingPathComponent("learned-words.json") }
 
     private init() {
-        try? FileManager.default.createDirectory(at: Store.directory, withIntermediateDirectories: true)
-        history = load(historyURL) ?? []
+        try? FileManager.default.createDirectory(at: SupportPaths.directory, withIntermediateDirectories: true)
+        history = load(SupportPaths.historyFile) ?? []
         learned = load(learnedURL) ?? []
     }
 
     private func load<T: Decodable>(_ url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        do { return try decoder.decode(T.self, from: data) } catch {
+        do { return try StoredJSON.decoder.decode(T.self, from: data) } catch {
             Log.store.error("Could not read \(url.lastPathComponent): \(error.localizedDescription)")
             return nil
         }
@@ -101,7 +48,7 @@ final class Store {
 
     private func save<T: Encodable>(_ value: T, to url: URL) {
         do {
-            let data = try encoder.encode(value)
+            let data = try StoredJSON.fileEncoder.encode(value)
             try data.write(to: url, options: .atomic)
         } catch {
             Log.store.error("Could not write \(url.lastPathComponent): \(error.localizedDescription)")
@@ -115,7 +62,7 @@ final class Store {
         guard limit >= 0 else { return }
         history.append(entry)
         prune(limit: limit)
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     /// A limit of 0 keeps everything.
@@ -135,7 +82,7 @@ final class Store {
     func update(_ entry: HistoryEntry) {
         guard let i = history.firstIndex(where: { $0.id == entry.id }) else { return }
         history[i] = entry
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     func delete(id: UUID) {
@@ -145,7 +92,7 @@ final class Store {
     func delete(ids: Set<UUID>) {
         RecordingArchive.delete(history.filter { ids.contains($0.id) }.compactMap(\.recordingFile))
         history.removeAll { ids.contains($0.id) }
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     /// Deletes a dictation's audio and keeps its text.
@@ -153,33 +100,33 @@ final class Store {
         guard let i = history.firstIndex(where: { $0.id == id }), let file = history[i].recordingFile else { return }
         RecordingArchive.delete([file])
         history[i].recordingFile = nil
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     func deleteAllHistory() {
         history.removeAll()
         RecordingArchive.deleteAll()
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     func toggleStar(id: UUID) {
         guard let i = history.firstIndex(where: { $0.id == id }) else { return }
         history[i].starred.toggle()
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     func setEdited(id: UUID, text: String) {
         guard let i = history.firstIndex(where: { $0.id == id }) else { return }
         history[i].edited = text
         history[i].editedAt = Date()
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     /// What became of the question a dictation asked by name.
     func setQuestion(_ question: Meeting.Question, onDictation id: UUID) {
         guard let i = history.firstIndex(where: { $0.id == id }) else { return }
         history[i].question = question
-        save(history, to: historyURL)
+        save(history, to: SupportPaths.historyFile)
     }
 
     var newest: HistoryEntry? { history.last }

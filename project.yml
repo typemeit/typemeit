@@ -234,6 +234,15 @@ targets:
       - path: TypeMeIt/MCPDefaults.swift
       # Meeting.names is declared here.
       - path: TypeMeIt/Meetings/SpeakerNaming.swift
+      # Search that finds what the app's own search boxes find.
+      - path: TypeMeIt/TextSearch.swift
+      # Where the app keeps history.json and the meetings, and the JSON it
+      # writes them in.
+      - path: TypeMeIt/SupportPaths.swift
+      - path: TypeMeIt/StoredJSON.swift
+      - path: TypeMeIt/HistoryEntry.swift
+      # Timestamps as the transcript writes them.
+      - path: TypeMeIt/Meetings/TranscriptRender.swift
       # Meeting.dataReminder's text.
       - path: TypeMeIt/Meetings/MeetingDataReminder.swift
     settings:
