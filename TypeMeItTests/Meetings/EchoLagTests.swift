@@ -2,29 +2,6 @@ import Foundation
 import Testing
 @testable import TypeMeIt
 
-/// A far end that speaks one second in two, its level rising and falling
-/// like syllables, and a mic that hears it `lagMs` later at `gain`: an
-/// echo's envelopes at 100 Hz.
-enum EchoSignal {
-    static let hz = 100
-    static let quiet: Float = 0.0005
-
-    static func farEnd(seconds: Int) -> [Float] {
-        (0 ..< seconds * hz).map { k in
-            guard (k / hz) % 2 == 0 else { return quiet }
-            return Float(0.02 + 0.08 * abs(sin(Double(k) * 2 * .pi / 37) * sin(Double(k) * 2 * .pi / 11)))
-        }
-    }
-
-    /// `lagMs` takes the meeting time in ms, so a test can move the lag mid-call.
-    static func mic(hearing farEnd: [Float], gain: Float, lagMs: (Int) -> Int) -> [Float] {
-        farEnd.indices.map { k in
-            let source = k - lagMs(k * 1000 / hz) * hz / 1000
-            return quiet + gain * (farEnd.indices.contains(source) ? farEnd[source] : quiet)
-        }
-    }
-}
-
 struct EchoLagTests {
     @Test func readsTheLagAndGainOfAnEcho() throws {
         let farEnd = EchoSignal.farEnd(seconds: 60)
