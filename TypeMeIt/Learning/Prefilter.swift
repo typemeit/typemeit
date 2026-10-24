@@ -2,32 +2,8 @@
 // model about. Everything the dictionary documentation says is never learned
 // is dropped here, so the model only sees plausible vocabulary and a
 // rewritten sentence costs one dropped edit instead of a batch of calls.
-//
-// The token-level diff that produces the hunks lives here too (the Rust
-// `learning/diff.rs`): tokens are compared on their match key (alphanumeric,
-// lowercased) so that punctuation and capitalisation differences do not
-// register as changes on their own. Runs of changed tokens become hunks; a
-// hunk with both a removed and an inserted side is a replacement, the only
-// shape learning cares about.
 
 import Foundation
-
-/// One run of changed tokens between the original and the edited text.
-struct Hunk: Sendable, Equatable {
-    /// Tokens removed from the original, in order. Empty for a pure insertion.
-    var removed: [String]
-    /// Tokens inserted by the edit, in order. Empty for a pure deletion.
-    var inserted: [String]
-
-    init(removed: [String], inserted: [String]) {
-        self.removed = removed
-        self.inserted = inserted
-    }
-
-    var isReplacement: Bool {
-        !removed.isEmpty && !inserted.isEmpty
-    }
-}
 
 enum Prefilter {
     /// Most tokens on either side of a candidate.
@@ -38,9 +14,6 @@ enum Prefilter {
     static let maxCandidatesPerEdit = 4
     /// More hunks than this and the edit is a rewrite, not a set of corrections.
     static let maxHunksPerEdit = 6
-    /// Longest input, in tokens, that is diffed at all. Beyond this an edit is
-    /// treated as a rewrite rather than a correction.
-    static let maxDiffTokens = 400
 
     /// Speech fillers that never count as vocabulary.
     static let fillerWords: Set<String> = [
@@ -74,86 +47,13 @@ enum Prefilter {
         case denied
     }
 
-    // MARK: Diff
-
-    /// Lowercased alphanumeric characters of `token`, the same key the custom
-    /// words matcher uses.
-    static func matchKey(_ token: String) -> String {
-        var key = ""
-        for scalar in token.unicodeScalars where isAlphanumeric(scalar) {
-            key += String(scalar).lowercased()
-        }
-        return key
-    }
-
-    private static func tokens(_ text: String) -> [String] {
-        text.split(whereSeparator: \.isWhitespace).map(String.init)
-    }
-
-    /// All hunks between `original` and `edited`, or nil when either side is
-    /// too long to diff. Classic LCS over match keys; when a token can be
-    /// taken from either side, the removal comes first.
-    static func hunks(original: String, edited: String) -> [Hunk]? {
-        let a = tokens(original)
-        let b = tokens(edited)
-        if a.count > maxDiffTokens || b.count > maxDiffTokens {
-            return nil
-        }
-        let ka = a.map(matchKey)
-        let kb = b.map(matchKey)
-
-        let n = ka.count
-        let m = kb.count
-        let width = m + 1
-        var lcs = [Int](repeating: 0, count: (n + 1) * width)
-        for i in stride(from: n - 1, through: 0, by: -1) {
-            for j in stride(from: m - 1, through: 0, by: -1) {
-                lcs[i * width + j] = ka[i] == kb[j]
-                    ? lcs[(i + 1) * width + j + 1] + 1
-                    : max(lcs[(i + 1) * width + j], lcs[i * width + j + 1])
-            }
-        }
-
-        var out: [Hunk] = []
-        var current: Hunk?
-        var i = 0
-        var j = 0
-        while i < n || j < m {
-            let matched = i < n && j < m && ka[i] == kb[j]
-            if matched {
-                if let hunk = current {
-                    out.append(hunk)
-                    current = nil
-                }
-                i += 1
-                j += 1
-                continue
-            }
-            if current == nil {
-                current = Hunk(removed: [], inserted: [])
-            }
-            let takeFromA = j >= m || (i < n && lcs[(i + 1) * width + j] >= lcs[i * width + j + 1])
-            if takeFromA {
-                current?.removed.append(a[i])
-                i += 1
-            } else {
-                current?.inserted.append(b[j])
-                j += 1
-            }
-        }
-        if let hunk = current {
-            out.append(hunk)
-        }
-        return out
-    }
-
     // MARK: Rules
 
     /// Trim punctuation from the ends of a phrase while keeping inner marks
     /// such as `R&D`, `CI/CD` or `GPT-4`.
     static func trimOuterPunctuation(_ phrase: String) -> String {
         let outer = phrase.unicodeScalars.trimming { scalar in
-            !isAlphanumeric(scalar) && scalar != "&" && scalar != "/" && scalar != "-" && scalar != "'"
+            !TokenDiff.isAlphanumeric(scalar) && scalar != "&" && scalar != "/" && scalar != "-" && scalar != "'"
         }
         let inner = outer.trimming { scalar in
             scalar == "-" || scalar == "/" || scalar == "'"
@@ -162,20 +62,20 @@ enum Prefilter {
     }
 
     private static func phraseKey(_ tokens: [String]) -> String {
-        tokens.map(matchKey).joined()
+        tokens.map(TokenDiff.matchKey).joined()
     }
 
     private static func allIn(_ list: Set<String>, _ tokens: [String]) -> Bool {
-        tokens.allSatisfy { list.contains(matchKey($0)) }
+        tokens.allSatisfy { list.contains(TokenDiff.matchKey($0)) }
     }
 
     private static func anyIn(_ list: Set<String>, _ tokens: [String]) -> Bool {
-        tokens.contains { list.contains(matchKey($0)) }
+        tokens.contains { list.contains(TokenDiff.matchKey($0)) }
     }
 
     /// Apply the rules to one replacement hunk.
     static func candidate(
-        _ hunk: Hunk,
+        _ hunk: TokenDiff.Hunk,
         knownKeys: [String],
         deniedKeys: [String]
     ) -> Result<Candidate, Dropped> {
@@ -208,14 +108,9 @@ enum Prefilter {
     static func keys(_ words: [String]) -> [String] {
         words
             .map { word in
-                word.split(whereSeparator: \.isWhitespace).map { matchKey(String($0)) }.joined()
+                TokenDiff.tokens(word).map(TokenDiff.matchKey).joined()
             }
             .filter { !$0.isEmpty }
-    }
-
-    /// Unicode `Alphabetic` or `Numeric`, matching Rust's `char::is_alphanumeric`.
-    static func isAlphanumeric(_ scalar: Unicode.Scalar) -> Bool {
-        scalar.properties.isAlphabetic || scalar.properties.numericType != nil
     }
 }
 
