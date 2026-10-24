@@ -65,7 +65,7 @@ struct PillView: View {
         case .learned(_, let words):
             // The word itself in medium, kept as the user spelt it, since that
             // spelling is what was added.
-            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") { model.onOpenDictionary?() },
+            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") { model.closeNow = true; model.onOpenDictionary?() },
                          message: words.count == 1 ? Text("added \(Text(words[0]).fontWeight(.medium)) to dictionary") : Text("learned \(counted(words.count, "word"))"),
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onKeep?() }, minWidth: width) {
                 Button("undo") { model.onUndo?() }.buttonStyle(SquareButtonStyle(kind: .primary))
