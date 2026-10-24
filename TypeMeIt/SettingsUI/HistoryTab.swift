@@ -92,11 +92,11 @@ struct WhenFilter {
 
 /// What the list works out from each dictation, kept until the history
 /// changes rather than redone on every keystroke: its words for the day
-/// totals, and its text and transcript lowercased for search.
+/// totals, and its text and transcript folded for search.
 @MainActor private final class HistoryIndex {
     private var revision = -1
     private var words: [UUID: Int] = [:]
-    private var texts: [UUID: [UInt8]] = [:]
+    private var texts: [UUID: TextSearch.Folded] = [:]
     private var listKey: ListKey?
     private var list: (rows: [HistoryEntry], lines: [HistoryTab.Line]) = ([], [])
 
@@ -140,19 +140,13 @@ struct WhenFilter {
         return n
     }
 
-    /// Whether the entry's text or transcript holds `query`, lowercased UTF-8.
-    func matches(_ entry: HistoryEntry, _ query: [UInt8], store: Store) -> Bool {
+    /// Whether the entry's searched text holds `query`.
+    func matches(_ entry: HistoryEntry, _ query: TextSearch.Folded, store: Store) -> Bool {
         current(store)
-        let text: [UInt8]
-        if let known = texts[entry.id] {
-            text = known
-        } else {
-            text = Array("\(entry.displayText)\n\(entry.transcript)".lowercased().utf8)
-            texts[entry.id] = text
-        }
-        return text.withUnsafeBytes { hay in
-            query.withUnsafeBytes { q in memmem(hay.baseAddress, hay.count, q.baseAddress, q.count) != nil }
-        }
+        if let known = texts[entry.id] { return known.contains(query) }
+        let text = TextSearch.Folded(HistoryTab.searchedText(of: entry))
+        texts[entry.id] = text
+        return text.contains(query)
     }
 }
 
@@ -300,19 +294,21 @@ struct HistoryTab: View {
     // MARK: Filtering
 
     private var filtered: [HistoryEntry] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         let time = WhenFilter(when, from: from, to: to)
-        let query = Array(q.utf8)
+        let query = TextSearch.Folded(search.trimmingCharacters(in: .whitespaces))
         return store.history.reversed().filter { e in
             if let app, HistoryTab.app(of: e) != app { return false }
             if let askedClaude, (e.question != nil) != askedClaude { return false }
             if !time.contains(e.timestamp) { return false }
-            if !query.isEmpty, !index.matches(e, query, store: store) { return false }
+            if !query.bytes.isEmpty, !index.matches(e, query, store: store) { return false }
             return true
         }
     }
 
     static func app(of entry: HistoryEntry) -> String { entry.appName?.lowercased() ?? "unknown" }
+
+    /// What the search looks in: what was typed, and what was heard.
+    nonisolated static func searchedText(of entry: HistoryEntry) -> String { "\(entry.displayText)\n\(entry.transcript)" }
 
     /// Every dictation, those that asked Claude by name, and those typed.
     private var claudeItems: [(value: Bool?, item: SquareMenuList.Item)] {

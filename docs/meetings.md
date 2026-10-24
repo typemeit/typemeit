@@ -105,11 +105,11 @@ change any of them; the default is what gets built.
   `transcript.md` is rendered from it.** Foundation has no YAML parser and the
   app never parses a file the user may edit. The Markdown carries flat front
   matter for grep and Obsidian; the JSON carries everything.
-- **D9. Meetings are staged under `Store.directory` and published to a
+- **D9. Meetings are staged under `SupportPaths.directory` and published to a
   folder setting.** Raw tracks and the in-progress record live in
-  `Store.directory/Meetings/.in-progress/<id>/`, excluded from backup. When a
+  `SupportPaths.directory/Meetings/.in-progress/<id>/`, excluded from backup. When a
   meeting is transcribed its folder moves to `Settings.meetingsFolder`, which
-  defaults to `Store.directory/Meetings`. The Meetings tab has `show` and
+  defaults to `SupportPaths.directory/Meetings`. The Meetings tab has `show` and
   `change`; a folder chosen in the open panel is where Spotlight and Obsidian
   users put it, and the row's subtitle says `icloud drive` when the folder is
   inside iCloud Drive's container (`~/Library/Mobile Documents/com~apple~CloudDocs`).
@@ -168,7 +168,7 @@ change any of them; the default is what gets built.
   voices" (8.7), far-end and room speaker embeddings exist for one
   transcription pass, in memory, and are never written to disk or to
   `meeting.json`. With it, each transcribed meeting's clip embeddings go to
-  `Store.directory/Voices`, never the meeting folder, and turning it off
+  `SupportPaths.directory/Voices`, never the meeting folder, and turning it off
   deletes them. The user's dictation print stays under D15.
 - **D20. A meeting keeps the minute before the user says yes.** Capture
   starts when an owner becomes a candidate, into memory only. On `record`
@@ -353,7 +353,7 @@ Sources: the macOS 27.0 SDK headers, `insidegui/AudioCap`,
   `ModelStore.modelURL`.
 - `RecordingArchive.save` encodes a whole `[Float]` through one
   `AVAudioPCMBuffer`; there is no file-to-file path. `RecordingPlayer.toggle`
-  takes a `HistoryEntry` and resolves under `Store.directory/Recordings`.
+  takes a `HistoryEntry` and resolves under `SupportPaths.directory/Recordings`.
 - `Store.prune` and the History tab's keep picker cover dictations only.
 - `MediaPause.playingProcesses()` walks the process object list and reads
   `PID`, `BundleID` and `IsRunningOutput` (since PR #149).
@@ -385,7 +385,7 @@ Sources: the macOS 27.0 SDK headers, `insidegui/AudioCap`,
   (`docs/app-store.md`; no store target exists yet): `Sandbox.isActive`
   detects the container, `Sandbox.readsOtherApps` gates every Accessibility
   read of another app, and `SettingsTab.available` hides the insights tab
-  there. `Store.directory` is `~/Library/Application Support/TypeMeIt`
+  there. `SupportPaths.directory` is `~/Library/Application Support/TypeMeIt`
   (or `TYPEMEIT_SUPPORT_DIR` when set), hidden in Finder and not surfaced
   by Spotlight.
 - The app's only entitlement is `com.apple.security.device.audio-input`;
@@ -561,7 +561,7 @@ for folding whole words out.
 ## 6. Spikes
 
 Each spike is a launch argument on the dev app, writes to `DebugLog` and to
-files under `Store.directory/Meetings/probe/`, and is deleted once its line
+files under `SupportPaths.directory/Meetings/probe/`, and is deleted once its line
 below is filled in. Order: S1's detection half (`-meetingProbe`) and S4 run
 against origin/main with nothing else built. S1's capture half needs 7.5's
 aggregate, `TrackWriter`'s CAF header and the `NSAudioCaptureUsageDescription`
@@ -1247,7 +1247,7 @@ verified in S1).
 | `meetingKeepAudio` | Bool | true | Meetings tab footer: `keep the audio` |
 | `meetingLimit` | Int | 0 (everything) | Meetings tab footer: `keep` picker like History's |
 | `meetingsMCP` | Bool | false | Meetings tab footer: `mcp` (7.15) |
-| `meetingsFolder` | URL? | nil (= `Store.directory/Meetings`) | Meetings tab footer: `meetings folder` |
+| `meetingsFolder` | URL? | nil (= `SupportPaths.directory/Meetings`) | Meetings tab footer: `meetings folder` |
 | `recordRoomShortcut` | KeyCombo? | nil | main tab, phase 2 |
 | `voicePrintEnabled` | Bool | false | main tab, phase 3 |
 | `rosterEnabled` | Bool | false | main tab, phase 2: names from the meeting's window (8.6, 9.2) |
@@ -1300,9 +1300,9 @@ Echo detector constants are the lifted file's own.
 
 ### 7.9 Storage
 
-Staging: `Store.directory/Meetings/.in-progress/<uuid>/`, created at record
+Staging: `SupportPaths.directory/Meetings/.in-progress/<uuid>/`, created at record
 with `isExcludedFromBackup = true`. Published: `Settings.meetingsFolder ??
-Store.directory.appendingPathComponent("Meetings")`. The folder moves from
+SupportPaths.directory.appendingPathComponent("Meetings")`. The folder moves from
 staging to published as the last step of transcription. A published folder
 picked outside `~/Library` needs the folder usage strings in `Info.plist`
 (7.12) for the case where the app lists a folder it did not create (the
@@ -1796,7 +1796,7 @@ a small source list rather than a copy:
   (derived from its own path, so the dev build reads
   `it.typeme.typemeit.dev`), and with `meetingsMCP` false every tool returns
   one error telling the user where the setting is. Default false.
-- **Scope.** Only `Settings.meetingsFolder ?? Store.directory/Meetings`, its
+- **Scope.** Only `Settings.meetingsFolder ?? SupportPaths.directory/Meetings`, its
   own published folders, and only `transcript.md`, `meeting.json` and the
   folder names. It resolves every path and refuses anything that lands
   outside, symlinks included. It never reads the audio, the history, the
@@ -1961,7 +1961,7 @@ and `MCPTests`: a shared meeting is not counted.
   on a module map, the cause is a second static-library xcframework; see 3.3.
 - `DiarizerModelStore`, modelled on `ModelStore`: one `.tar` of both speaker
   models, hash-pinned, downloaded from typeme.it/models. It unpacks to two
-  folders under `DiarizerModelStore.directory`: `speaker-diarization/`
+  folders under `DiarizerModelSupportPaths.directory`: `speaker-diarization/`
   holding the offline pipeline's `Segmentation.mlmodelc`, `FBank.mlmodelc`,
   `Embedding.mlmodelc`, `PldaRho.mlmodelc` and `plda-parameters.json` (3.3),
   which is what FluidAudio's `Repo.diarizer.folderName` resolves to; and
@@ -1991,7 +1991,7 @@ and `MCPTests`: a shared meeting is not counted.
   `OfflineDiarizerManager.prepareModels`: its catch path deletes the whole
   `speaker-diarization` folder on any load error, offline or not, which would
   destroy the pinned archive. Load with
-  `OfflineDiarizerModels.load(from: DiarizerModelStore.directory, configuration:)`
+  `OfflineDiarizerModels.load(from: DiarizerModelSupportPaths.directory, configuration:)`
   then `manager.initialize(models:)`, and
   `Nemotron3Models.load(config: .offline, directory: DiarizerModelStore.nemotronFolder)`,
   and keep both for the life of the process. S3 checks the first three.
@@ -2221,7 +2221,7 @@ far end; a user rename survives re-alignment.
 Off by default: `Settings.meetingLearnVoices`, the "learn voices" row under
 meetings. Turning it on learns every done meeting whose audio was kept;
 turning it off asks first, saying how many of the learned meetings have no
-audio to learn them from again, then deletes `Store.directory/Voices`. Deleting a meeting deletes
+audio to learn them from again, then deletes `SupportPaths.directory/Voices`. Deleting a meeting deletes
 its voices.
 
 - **Learning** (`VoiceLibrary.learn`), after a transcription pass and before
@@ -2288,7 +2288,7 @@ and a stranger not; one speaker per name, and names already taken skipped.
 ### 9.1 You, in a room
 
 `VoicePrint` (enum plus a Codable `Print { centroid: [Float]; count: Int; updated: Date }`
-stored at `Store.directory/voiceprint.json`):
+stored at `SupportPaths.directory/voiceprint.json`):
 
 - When `Settings.voicePrintEnabled` turns on: decode up to
   `Fixed.meetingVoicePrintTargetSamples` (50) of the newest kept dictation
@@ -2385,7 +2385,7 @@ Not in this plan, written down so they are not re-derived:
   speaker column; a new row type).
 - Speaker names remembered across meetings (a speaker database keyed by
   embedding, the rest of meeting-transcriber's `SpeakerMatcher`). When it is
-  built it lives under `Store.directory`, never in a published folder, behind
+  built it lives under `SupportPaths.directory`, never in a published folder, behind
   a setting, and `deleteAllHistory()` deletes it (D18). CAM++ as a dedicated
   embedding model if the pipeline's embeddings prove weak.
 - One-click `connect` for MCP clients: merging our entry into Claude
@@ -2401,7 +2401,7 @@ Not in this plan, written down so they are not re-derived:
   input so a notification sound does not count.
 - MCP writes — rename a speaker, retranscribe, delete. They need the app
   running to keep the tab honest, so the binary would become a pump to a Unix
-  socket in `Store.directory` and fall back to read-only when the app is
+  socket in `SupportPaths.directory` and fall back to read-only when the app is
   closed (7.15). Still no port.
 - Streaming dictation.
 - A store build. It would also take the MCP binary with it: a sandboxed

@@ -62,7 +62,7 @@ enum MeetingTranscriber {
                 let cuts = ChunkCutter.cuts(peaks: envelopes.peaks, frameMs: peakEnvelopeMs, maxChunkMs: Fixed.meetingChunkSeconds * 1000,
                                             overlapMs: Fixed.meetingChunkOverlapSeconds * 1000, searchMs: Fixed.meetingChunkSearchSeconds * 1000)
                 let scratch = folder.appendingPathComponent("words-\(track.role.rawValue).json")
-                var words = (try? Data(contentsOf: scratch)).flatMap { try? Meeting.decoder.decode(TrackWords.self, from: $0) } ?? TrackWords(role: speakerID(for: track.role), words: [])
+                var words = (try? Data(contentsOf: scratch)).flatMap { try? StoredJSON.decoder.decode(TrackWords.self, from: $0) } ?? TrackWords(role: speakerID(for: track.role), words: [])
                 let already = meeting.transcription.done[track.role.rawValue] ?? 0
                 let file = try AVAudioFile(forReading: url)
                 for (index, range) in cuts.enumerated() where index >= already {
@@ -80,7 +80,7 @@ enum MeetingTranscriber {
                     let longest = Duration.milliseconds(Fixed.meetingLongestWordMs)
                     let trimmed = transcribed.map { Transcriber.Word(text: $0.text, confidence: $0.confidence, start: $0.start, end: min($0.end, $0.start + longest)) }
                     words.words = ChunkStitch.append(trimmed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
-                    try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
+                    try StoredJSON.fileEncoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1
                     progress(.transcribing(Double(doneChunks) / Double(max(totalChunks, 1))))

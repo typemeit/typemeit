@@ -210,24 +210,11 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// The hooks run on the meeting since it ended. Nil when none.
     var hookRuns: [HookRun]? = nil
 
-    static let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return e
-    }()
-
-    static let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
-
     /// Unknown keys are ignored. A file written by a later schema is nil,
     /// with a log line, so this build never rewrites what it cannot read.
     static func decode(_ data: Data) -> Meeting? {
         do {
-            let meeting = try decoder.decode(Meeting.self, from: data)
+            let meeting = try StoredJSON.decoder.decode(Meeting.self, from: data)
             guard meeting.schema <= currentSchema else {
                 Log.meetings.error("meeting.json schema \(meeting.schema) is newer than \(currentSchema); left alone")
                 return nil
@@ -239,7 +226,7 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         }
     }
 
-    func encoded() throws -> Data { try Meeting.encoder.encode(self) }
+    func encoded() throws -> Data { try StoredJSON.fileEncoder.encode(self) }
 
     // MARK: Derived
 

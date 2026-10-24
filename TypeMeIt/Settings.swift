@@ -124,7 +124,7 @@ final class Settings {
     /// and read published meetings and dictations (D22). The binary reads
     /// this key itself; it keeps its first name from when it covered meetings
     /// only, so the switch stays as people set it.
-    var mcpEnabled: Bool { didSet { defaults.set(mcpEnabled, forKey: "meetingsMCP") } }
+    var mcpEnabled: Bool { didSet { defaults.set(mcpEnabled, forKey: MCPDefaults.enabledKey) } }
     var mcpOffTools: [String] { didSet { defaults.set(mcpOffTools, forKey: MCPDefaults.offToolsKey) } }
     /// Keeps a meeting's tracks, compressed, beside its transcript.
     var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
@@ -146,7 +146,7 @@ final class Settings {
     /// The user's own system prompt, added after the app's on every ask.
     /// Prompts run on a finished meeting, in order, from its pill or page.
     /// Also written by `typemeit-mcp` from its own process; `hooksObservation` brings those writes in.
-    var meetingHooks: [MeetingHook] { didSet { defaults.set(try? JSONEncoder().encode(meetingHooks), forKey: MeetingHook.defaultsKey) } }
+    var meetingHooks: [MeetingHook] { didSet { MeetingHook.store(meetingHooks, in: defaults) } }
     var askClaudeSystemPrompt: String { didSet { defaults.set(askClaudeSystemPrompt, forKey: MCPDefaults.systemPromptKey) } }
     /// Claude Code's `--permission-mode`, one of `ClaudeRun.permissionModes`.
     var askClaudePermissionMode: String { didSet { defaults.set(askClaudePermissionMode, forKey: "askClaudePermissionMode") } }
@@ -201,7 +201,7 @@ final class Settings {
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
         meetingPreRoll = bool("meetingPreRoll", true)
-        mcpEnabled = bool("meetingsMCP", false)
+        mcpEnabled = bool(MCPDefaults.enabledKey, false)
         mcpOffTools = d.stringArray(forKey: MCPDefaults.offToolsKey) ?? []
         meetingKeepAudio = bool("meetingKeepAudio", true)
         meetingLearnVoices = bool("meetingLearnVoices", false)
@@ -209,7 +209,7 @@ final class Settings {
         meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
         askClaude = bool("askClaude", Updates.isDevBuild)
         askClaudeSystemPrompt = d.string(forKey: MCPDefaults.systemPromptKey) ?? ""
-        meetingHooks = Settings.storedHooks(d)
+        meetingHooks = MeetingHook.stored(in: d)
         askClaudePermissionMode = d.string(forKey: "askClaudePermissionMode") ?? "auto"
         askClaudeFolder = d.string(forKey: "askClaudeFolder") ?? FileManager.default.homeDirectoryForCurrentUser.path
         askClaudeTools = d.stringArray(forKey: "askClaudeTools") ?? []
@@ -229,14 +229,10 @@ final class Settings {
             Task { @MainActor in
                 guard let self else { return }
                 // Our own write comes back here too; only an outside one differs.
-                let stored = Settings.storedHooks(self.defaults)
+                let stored = MeetingHook.stored(in: self.defaults)
                 if stored != self.meetingHooks { self.meetingHooks = stored }
             }
         }
-    }
-
-    private static func storedHooks(_ defaults: UserDefaults) -> [MeetingHook] {
-        defaults.data(forKey: MeetingHook.defaultsKey).flatMap { try? JSONDecoder().decode([MeetingHook].self, from: $0) } ?? []
     }
 
     func addCustomWord(_ word: String) {

@@ -26,16 +26,6 @@ enum MCPTools {
     static let defaultListLimit = 40
     static let defaultSearchLimit = 20
 
-    /// docs/meetings.md 7.9: the staging folder inside the published root,
-    /// never listed as a meeting. Mirrors `MeetingFolder.stagingRoot`'s
-    /// literal (TypeMeIt/Meetings/MeetingFolder.swift), not shared directly
-    /// since that file pulls in AppKit, `Store` and `TranscriptRender`.
-    private static let stagingFolderName = ".in-progress"
-    /// Mirrors `MeetingFolder.meetingFile` (docs/meetings.md 7.9).
-    private static let meetingFile = "meeting.json"
-    /// Mirrors `MeetingFolder.transcriptFile` (docs/meetings.md 7.9).
-    private static let transcriptFile = "transcript.md"
-
     struct MeetingSummary: Codable, Equatable, Sendable {
         var id: String
         var title: String
@@ -132,7 +122,7 @@ enum MCPTools {
         guard let entry = meetings(under: root).first(where: { $0.meeting.id.uuidString == id }) else {
             return .failure(.notFound)
         }
-        let transcriptURL = entry.folder.appendingPathComponent(transcriptFile)
+        let transcriptURL = entry.folder.appendingPathComponent(SupportPaths.transcriptFile)
         guard isInScope(transcriptURL, root: root), let text = try? String(contentsOf: transcriptURL, encoding: .utf8) else {
             return .failure(.notFound)
         }
@@ -148,21 +138,18 @@ enum MCPTools {
 
     // MARK: search_meetings
 
-    /// Case- and diacritic-insensitive literal search over every meeting's
-    /// paragraphs (docs/meetings.md 7.15).
+    /// `TextSearch` over every meeting's paragraphs (docs/meetings.md 7.15).
     static func searchMeetings(root: URL, query: String, limit: Int = defaultSearchLimit) -> [SearchHit] {
         guard !query.isEmpty, limit > 0 else { return [] }
-        let foldedQuery = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
         var hits: [SearchHit] = []
         for entry in meetings(under: root) {
             for paragraph in entry.meeting.paragraphs {
-                let folded = paragraph.text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-                guard folded.contains(foldedQuery) else { continue }
+                guard TextSearch.matches(paragraph.text, query) else { continue }
                 hits.append(SearchHit(
                     meetingId: entry.meeting.id.uuidString,
                     meetingTitle: entry.meeting.title,
                     speaker: entry.meeting.speakerName(paragraph.speaker),
-                    timestamp: timestampLabel(ms: paragraph.startMs),
+                    timestamp: TranscriptRender.timestamp(ms: paragraph.startMs),
                     paragraph: paragraph.text))
                 if hits.count >= limit { return hits }
             }
@@ -267,62 +254,42 @@ enum MCPTools {
 
     static func listDictations(history: URL, from: Date? = nil, to: Date? = nil, app: String? = nil, limit: Int = defaultListLimit) -> [DictationSummary] {
         dictations(in: history)
-            .filter { record in
-                if let from, record.timestamp < from { return false }
-                if let to, record.timestamp > to { return false }
-                if let app, record.appName?.caseInsensitiveCompare(app) != .orderedSame { return false }
+            .filter { entry in
+                if let from, entry.timestamp < from { return false }
+                if let to, entry.timestamp > to { return false }
+                if let app, entry.appName?.caseInsensitiveCompare(app) != .orderedSame { return false }
                 return true
             }
             .prefix(max(0, limit))
-            .map(\.summary)
+            .map(summary(of:))
     }
 
     // MARK: search_dictations
 
-    /// Case- and diacritic-insensitive literal search over what each
-    /// dictation typed, newest first.
+    /// `TextSearch` over what each dictation typed, newest first.
     static func searchDictations(history: URL, query: String, limit: Int = defaultSearchLimit) -> [DictationSummary] {
         guard !query.isEmpty, limit > 0 else { return [] }
-        let foldedQuery = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
         return dictations(in: history)
-            .filter { $0.text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil).contains(foldedQuery) }
+            .filter { TextSearch.matches($0.displayText, query) }
             .prefix(limit)
-            .map(\.summary)
+            .map(summary(of:))
     }
 
     static func renderDictations(_ dictations: [DictationSummary]) -> String {
         "\(dictationReminder)\n\n\(encodeJSON(dictations))"
     }
 
-    /// The fields of the app's `HistoryEntry` (TypeMeIt/Store.swift) these
-    /// tools read; the rest of each entry is left undecoded.
-    private struct HistoryRecord: Decodable {
-        var id: UUID
-        var timestamp: Date
-        var transcript: String
-        var postProcessed: String?
-        var typed: String?
-        var edited: String?
-        var appName: String?
-        var windowTitle: String?
-
-        /// Mirrors `HistoryEntry.displayText`: the user's edit, else what was typed.
-        var text: String { edited ?? typed ?? postProcessed ?? transcript }
-
-        var summary: DictationSummary {
-            DictationSummary(id: id.uuidString, time: timestamp, app: appName, window: windowTitle, text: text)
-        }
+    private static func summary(of entry: HistoryEntry) -> DictationSummary {
+        DictationSummary(id: entry.id.uuidString, time: entry.timestamp, app: entry.appName, window: entry.windowTitle, text: entry.displayText)
     }
 
-    /// Every dictation in `history`, newest first; none when the file is
-    /// missing, as it is when the app keeps no dictations.
-    private static func dictations(in history: URL) -> [HistoryRecord] {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard let data = try? Data(contentsOf: history), let records = try? decoder.decode([HistoryRecord].self, from: data) else {
+    /// Every dictation in `history`, newest first, read as `Store` reads it;
+    /// none when the file is missing, as it is when the app keeps no dictations.
+    private static func dictations(in history: URL) -> [HistoryEntry] {
+        guard let data = try? Data(contentsOf: history), let entries = try? StoredJSON.decoder.decode([HistoryEntry].self, from: data) else {
             return []
         }
-        return records.sorted { $0.timestamp > $1.timestamp }
+        return entries.sorted { $0.timestamp > $1.timestamp }
     }
 
     // MARK: scope
@@ -352,10 +319,10 @@ enum MCPTools {
         }
         var results: [FolderMeeting] = []
         for entry in entries {
-            guard entry.lastPathComponent != stagingFolderName else { continue }
+            guard entry.lastPathComponent != SupportPaths.stagingFolderName else { continue }
             guard isInScope(entry, root: root) else { continue }
             guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
-            let meetingURL = entry.appendingPathComponent(meetingFile)
+            let meetingURL = entry.appendingPathComponent(SupportPaths.meetingFile)
             guard isInScope(meetingURL, root: root),
                   let data = try? Data(contentsOf: meetingURL),
                   let meeting = Meeting.decode(data)
@@ -401,25 +368,7 @@ enum MCPTools {
         return "\(hours)h\(minutes)m"
     }
 
-    /// Mirrors `TranscriptRender.timestamp(ms:)` (TypeMeIt/Meetings/TranscriptRender.swift):
-    /// `m:ss`, or `h:mm:ss` past an hour.
-    private static func timestampLabel(ms: Int) -> String {
-        let totalSeconds = ms / 1000
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-        guard hours > 0 else { return String(format: "%d:%02d", minutes, seconds) }
-        return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-    }
-
-    private static let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
-        return encoder
-    }()
-
     private static func encodeJSON(_ value: some Encodable) -> String {
-        (try? jsonEncoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        (try? StoredJSON.lineEncoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
     }
 }
