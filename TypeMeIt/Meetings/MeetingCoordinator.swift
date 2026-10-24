@@ -149,6 +149,7 @@ final class MeetingCoordinator {
         store.republishPending()
         if Settings.shared.meetingLearnVoices { store.learnVoices() }
         observeModel()
+        ClaudeCheck.shared.watch()
     }
 
     /// Meetings that waited for the speech model go when it lands.
@@ -188,6 +189,17 @@ final class MeetingCoordinator {
         model.onRunHooks = { [weak self] id in self?.dismissToast(); self?.runHooks(id) }
         Pipeline.shared.shortcuts.onReturn = { [weak self] in self?.askDictatedOnReturn() ?? false }
         model.onOpenAsk = { [weak self] in self?.openAsk() }
+        model.onShowClaudeCheck = { [weak self] in
+            self?.dismissToast()
+            AppState.shared.revealSection = .assistant
+            AppState.shared.settingsTab = .settings
+            NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+        }
+        ClaudeCheck.shared.onUnaskedFailure = { [weak self] in
+            // An answer or prompt standing in the pill is left alone; settings shows the failure.
+            guard let self, !self.overlay.model.state.isStanding else { return }
+            self.toast(.claudeCheckFailed)
+        }
     }
 
     /// Opens the dictation that asked the last question, else its meeting,
@@ -801,6 +813,7 @@ final class MeetingCoordinator {
         guard runningHooks[id] == nil, var source = store.meeting(id), source.isDone else { return }
         let hooks = hooksToRun
         guard let first = hooks.first else { return }
+        ClaudeCheck.shared.recheckIfStale()
         runningHooks[id] = RunningHook(runID: UUID(), name: first.name)
         cancelledHooks.remove(id)
         // Earlier runs' output is not the meeting.
@@ -1028,6 +1041,7 @@ final class MeetingCoordinator {
     private func askClaude(_ question: String, heardAt: TimeInterval? = nil, prompt: String? = nil) {
         // Asked while another answer is coming: the new one wins.
         if askRun != nil || self.asking != nil { cancelAsk() }
+        ClaudeCheck.shared.recheckIfStale()
         toastTask?.cancel()
         var asking = OverlayModel.State.meetingAsking(text: question)
         overlay.showMeeting(asking)

@@ -14,6 +14,20 @@ final class ClaudeRun: @unchecked Sendable {
         let failed: Bool
         /// What `claude --resume` takes to pick the run up again.
         var sessionID: String? = nil
+        /// What Claude Code says it ran with; nil when it printed no start event.
+        var setup: Setup? = nil
+    }
+
+    /// The run's start event and the result's thinking count, which
+    /// `ClaudeCheck` holds against the flags the run was given.
+    struct Setup: Sendable, Equatable {
+        var version: String?
+        var permissionMode: String?
+        var model: String?
+        var tools: [String] = []
+        var mcpServers: [String] = []
+        /// Nil when the result does not report it.
+        var thinkingTokens: Int?
     }
 
     /// `--permission-mode` choices that run without anyone to answer a
@@ -127,12 +141,17 @@ final class ClaudeRun: @unchecked Sendable {
                   input: transcript.map { "The meeting's transcript so far:\n\n\($0)\n" } ?? "", folder: folder, timeoutSeconds: answerTimeoutSeconds)
     }
 
+    static let questionModel = "haiku"
+    /// Left out of `answering` and `hook`: a background agent ends the run with a
+    /// second turn whose result replaces the answer ("Already reported").
+    static let disallowedTool = "Agent"
+
     /// Haiku with no tools, MCP servers, settings, Claude Code system prompt or thinking, which writes out the
     /// transcript's latest question for `answering` to take. Thinking made it 4–6 s
     /// of model time against about 1 s without, for the same question.
     static func latestQuestion(in transcript: String) -> ClaudeRun? {
         ClaudeRun(arguments: ["-p", "Write out the latest question asked in this meeting transcript as one standalone question, with any context it needs from earlier. Reply with the question only.",
-                              "--output-format", "stream-json", "--verbose", "--model", "haiku",
+                              "--output-format", "stream-json", "--verbose", "--model", questionModel,
                               "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence",
                               "--disable-slash-commands", "--system-prompt", "You extract questions from transcripts."],
                   input: transcript, folder: FileManager.default.temporaryDirectory, timeoutSeconds: answerTimeoutSeconds,
@@ -146,13 +165,14 @@ final class ClaudeRun: @unchecked Sendable {
                   input: "The meeting's transcript:\n\n\(transcript)\n", folder: folder, timeoutSeconds: hookTimeoutSeconds)
     }
 
-    static let testPrompt = "Reply with OK."
+    static let testPrompt = "Reply with the code from your instructions."
 
     /// A run with the user's folder, model, permissions and system prompt
-    /// that only replies, so settings can show whether a hook would start.
-    static func test(folder: URL, model: String, allowedTools: [String], permissionMode: String, userSystemPrompt: String) -> ClaudeRun? {
-        ClaudeRun(arguments: arguments(prompt: testPrompt, instructions: "Check that Claude Code runs. Use no tools.", model: model,
-                                       allowedTools: allowedTools, permissionMode: permissionMode, userSystemPrompt: userSystemPrompt),
+    /// that only replies with `code`, which reaches Claude only through the
+    /// appended system prompt, so a reply without it means that was dropped.
+    static func test(code: String, folder: URL, model: String, allowedTools: [String], permissionMode: String, userSystemPrompt: String) -> ClaudeRun? {
+        ClaudeRun(arguments: arguments(prompt: testPrompt, instructions: "Check that Claude Code runs. Use no tools. Reply with the code \(code) and nothing else.",
+                                       model: model, allowedTools: allowedTools, permissionMode: permissionMode, userSystemPrompt: userSystemPrompt),
                   input: "", folder: folder, timeoutSeconds: answerTimeoutSeconds)
     }
 
@@ -163,9 +183,7 @@ final class ClaudeRun: @unchecked Sendable {
                 "--output-format", "stream-json", "--verbose",
                 "--permission-mode", permissionMode,
                 "--append-system-prompt", systemPrompt,
-                // A background agent ends the run with a second turn whose result
-                // replaces the answer ("Already reported").
-                "--disallowedTools", "Agent"]
+                "--disallowedTools", disallowedTool]
             + (model == defaultModel ? [] : ["--model", model])
             + (allowedTools.isEmpty ? [] : ["--allowedTools"] + allowedTools)
     }
@@ -251,29 +269,49 @@ final class ClaudeRun: @unchecked Sendable {
     /// the result's text or `errors`, else what it printed to stderr, so the
     /// run's output shows why it failed.
     static func parse(_ output: Data, errors: Data = Data(), seconds: Double, exitStatus: Int32) -> Answer {
+        struct Usage: Decodable {
+            struct Details: Decodable { let thinking_tokens: Int? }
+            let output_tokens_details: Details?
+        }
+        struct MCPServer: Decodable { let name: String }
         struct Result: Decodable {
             let type: String
+            let subtype: String?
             let result: String?
             let is_error: Bool?
             let errors: [String]?
             let total_cost_usd: Double?
             let session_id: String?
+            let usage: Usage?
+            // The start event's.
+            let claude_code_version: String?
+            let permissionMode: String?
+            let model: String?
+            let tools: [String]?
+            let mcp_servers: [MCPServer]?
         }
         let stderr = String(decoding: errors, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        // The stream ends with the result event.
+        // The stream starts with the system init event and ends with the result event.
         let events = output.split(separator: UInt8(ascii: "\n")).compactMap { try? JSONDecoder().decode(Result.self, from: Data($0)) }
-        guard let result = events.last(where: { $0.type == "result" }) else {
+        let start = events.first { $0.type == "system" && $0.subtype == "init" }
+        let result = events.last { $0.type == "result" }
+        let setup = start.map { start in
+            Setup(version: start.claude_code_version, permissionMode: start.permissionMode, model: start.model, tools: start.tools ?? [],
+                  mcpServers: start.mcp_servers?.map(\.name) ?? [], thinkingTokens: result?.usage?.output_tokens_details?.thinking_tokens)
+        }
+        guard let result else {
             let text = exitStatus == 0 ? "Claude Code gave no answer." : "Claude Code stopped before answering, exit \(exitStatus)."
-            return Answer(text: stderr.isEmpty ? text : "\(text)\n\(stderr)", seconds: seconds, costUSD: nil, failed: true)
+            return Answer(text: stderr.isEmpty ? text : "\(text)\n\(stderr)", seconds: seconds, costUSD: nil, failed: true, setup: setup)
         }
         let text = result.result ?? ""
         if text.contains("Failed to authenticate") || text.contains("Not logged in") {
-            return Answer(text: "Log in to Claude Code: run claude in a terminal and type /login.", seconds: seconds, costUSD: nil, failed: true)
+            return Answer(text: "Log in to Claude Code: run claude in a terminal and type /login.", seconds: seconds, costUSD: nil, failed: true, setup: setup)
         }
         let failed = result.is_error == true || text.isEmpty || exitStatus != 0
         let shown = [text, result.errors?.joined(separator: "\n") ?? "", failed ? stderr : ""]
             .filter { !$0.isEmpty }.joined(separator: "\n")
-        return Answer(text: shown.isEmpty ? "Claude gave no answer." : shown, seconds: seconds, costUSD: result.total_cost_usd, failed: failed, sessionID: result.session_id)
+        return Answer(text: shown.isEmpty ? "Claude gave no answer." : shown, seconds: seconds, costUSD: result.total_cost_usd, failed: failed,
+                      sessionID: result.session_id, setup: setup)
     }
 }
 
