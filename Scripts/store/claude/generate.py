@@ -11,16 +11,17 @@ sidebar rows and the composer placeholder match the capture to the pixel in
 width and height. Constants are device px measured on base.png.
 """
 import os
-import subprocess
+import sys
 
-import numpy as np
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+from paint import Painter
+
 OUT = os.path.join(HERE, "out")
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-DSF = 2
 FONT_URL = f"file://{HERE}/fonts/sans.ttf"
+PAINT = Painter(OUT, dsf=2, text_width=700)
 
 # Sidebar "Chats and tasks" list: ink of the first title starts here and the
 # rows repeat every 55 px; the list is clipped by the footer's rule.
@@ -37,37 +38,6 @@ CARET_H, CARET_GAP = 40, 4
 # The "Active" list of scheduled runs under the composer, cleared to the
 # main pane's background.
 ACTIVE_BOX = (1290, 1190, 2540, 2000)
-
-
-def chrome(html, out, w, h):
-    path = os.path.join(OUT, "page.html")
-    with open(path, "w") as f:
-        f.write(html)
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    f"--force-device-scale-factor={DSF}", f"--window-size={w},{h}",
-                    f"--screenshot={out}", f"file://{path}"], capture_output=True, check=True)
-    return Image.open(out).convert("RGB")
-
-
-def text(label, size, color, bg):
-    """Render one line; returns the image and the ink bbox."""
-    html = (f'<!doctype html><meta charset=utf-8><style>@font-face{{font-family:A;src:url({FONT_URL})}}'
-            f'html,body{{margin:0;background:{bg}}}.m{{position:absolute;left:5px;top:10px;font:{size}px/1.2 A;'
-            f'color:{color};-webkit-font-smoothing:antialiased;white-space:nowrap}}</style><div class=m>{label}</div>')
-    im = chrome(html, os.path.join(OUT, "text.png"), 700, 60)
-    lum = np.array(im.convert("L")).astype(int)
-    bg_lum = int(np.array(Image.new("RGB", (1, 1), bg).convert("L"))[0, 0])
-    ys, xs = np.where(np.abs(lum - bg_lum) > 60)
-    return im, (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
-
-
-def paste_text(dst, label, size, color, bg, x, cap_top, clip=None):
-    im, (x0, y0, x1, y1) = text(label, size, color, bg)
-    piece = im.crop((x0 - 2, y0 - 3, x1 + 2, y1 + 3))
-    if clip is not None:
-        piece = piece.crop((0, 0, min(piece.width, clip[0] - (x - 2)), min(piece.height, clip[1] - (cap_top - 3))))
-    dst.paste(piece, (x - 2, cap_top - 3))
-    return x + (x1 - x0)
 
 
 def hexstr(rgb):
@@ -92,11 +62,11 @@ def generate(chats, prompt, out_path):
 
     sidebar = hexstr(src.getpixel(LIST_BOX[:2]))
     for i, title in enumerate(chats):
-        paste_text(src, title, LIST_SIZE, LIST_COLOR, sidebar, LIST_X, LIST_CAP + i * LIST_PITCH,
+        PAINT.paste_text(src, title, FONT_URL, LIST_SIZE, LIST_COLOR, sidebar, LIST_X, LIST_CAP + i * LIST_PITCH,
                    clip=(LIST_BOX[2], LIST_BOX[3]))
 
     field = hexstr(src.getpixel(COMPOSER_BOX[:2]))
-    end = paste_text(src, prompt, COMPOSER_SIZE, COMPOSER_COLOR, field, COMPOSER_X, COMPOSER_CAP)
+    end = PAINT.paste_text(src, prompt, FONT_URL, COMPOSER_SIZE, COMPOSER_COLOR, field, COMPOSER_X, COMPOSER_CAP)
     top = COMPOSER_CAP - (CARET_H - 31) // 2
     draw.rectangle((end + CARET_GAP, top, end + CARET_GAP + 1, top + CARET_H), fill=COMPOSER_COLOR)
 

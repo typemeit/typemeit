@@ -1,5 +1,0 @@
-module CLlama {
-    header "shim.h"
-    link "llama"
-    export *
-}

@@ -20,18 +20,6 @@ enum MeetingFolder {
         return formatter
     }
 
-    /// `8m`, `45m`, `1h20m`, rounded to the nearest minute; a duration under
-    /// a minute is `0m`.
-    static func durationLabel(_ duration: Duration) -> String {
-        let seconds = duration.timeInterval
-        guard seconds >= 60 else { return "0m" }
-        let totalMinutes = Int((seconds / 60).rounded())
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        guard hours > 0 else { return "\(minutes)m" }
-        return "\(hours)h\(minutes)m"
-    }
-
     /// Replaces `/` and `:` with `-`, drops non-whitespace control
     /// characters, collapses whitespace (newlines included) to one space,
     /// trims, strips leading dots and precomposes to NFC. `#` stays.
@@ -79,7 +67,7 @@ enum MeetingFolder {
     }
 
     /// Whether `token` is a duration label this module could have produced:
-    /// `(\d+h)?\d+m`.
+    /// `\d+s` or `(\d+h)?\d+m`.
     private static func isDurationLabel(_ token: String) -> Bool {
         var chars = Substring(token)
         func digits() -> Bool {
@@ -88,6 +76,7 @@ enum MeetingFolder {
             return chars.count < before
         }
         guard digits() else { return false }
+        if chars == "s" { return true }
         if chars.first == "h" {
             chars.removeFirst()
             guard digits() else { return false }
@@ -121,7 +110,7 @@ enum MeetingFolder {
     /// folder's current names) by appending ` 2`, ` 3`, … .
     static func name(started: Date, zone: TimeZone, duration: Duration?, title: String, existing: [String]) -> String {
         let timePart = timeFormatter(zone: zone).string(from: started)
-        let durationPart = duration.map(durationLabel)
+        let durationPart = duration.map(Meeting.durationLabel)
         var titlePart = sanitised(title)
         if titlePart.isEmpty { titlePart = "meeting" }
 

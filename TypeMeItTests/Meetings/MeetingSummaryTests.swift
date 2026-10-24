@@ -4,12 +4,9 @@ import Testing
 
 struct MeetingSummaryTests {
     private func turns(_ paragraphs: [(String, String)]) -> [MeetingSummary.Turn] {
-        Meeting(
-            id: UUID(), kind: .call, started: Date(timeIntervalSince1970: 0), timeZone: "UTC", ended: nil,
-            durationMs: 0, recordedMs: 0, firstHostTime: nil, app: nil, title: "t", titleSource: .app, published: true,
-            tracks: [], audio: nil, echo: .notMeasured, bothSilentMs: 0, dictations: [],
+        MeetingFixtures.meeting(
             speakers: [Meeting.Speaker(id: "you", name: "You", isYou: true, talkMs: 0), Meeting.Speaker(id: "s1", name: "Ana", isYou: false, talkMs: 0)],
-            transcription: Meeting.Transcription(state: .done), paragraphs: paragraphs.map { Meeting.Paragraph(speaker: $0.0, startMs: 0, endMs: 0, text: $0.1) }).turns
+            paragraphs: paragraphs.map { Meeting.Paragraph(speaker: $0.0, startMs: 0, endMs: 0, text: $0.1) }).turns
     }
 
     @Test func aShortTranscriptIsOnePartOfNamedLines() {

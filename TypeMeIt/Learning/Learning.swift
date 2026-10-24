@@ -109,7 +109,7 @@ enum Learning {
     /// Candidates from an edit, before the model is consulted. Empty when the
     /// edit is a rewrite, too long to diff, or contains nothing learnable.
     static func candidates(original: String, edited: String, context: LearnContext) -> [Candidate] {
-        guard let hunks = Prefilter.hunks(original: original, edited: edited) else {
+        guard let hunks = TokenDiff.hunks(original: original, edited: edited) else {
             return []
         }
         if hunks.count > Prefilter.maxHunksPerEdit {
