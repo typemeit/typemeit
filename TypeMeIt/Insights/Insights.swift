@@ -187,19 +187,13 @@ enum Insights {
     /// Typing speed the spoken rate and the time saved are measured against.
     static let typingWPM = 40.0
 
-    /// Unicode `White_Space`, ASCII answered without the property table,
-    /// which is most of the cost of counting a whole history.
-    static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {
-        scalar.isASCII ? scalar == " " || (0x09...0x0D).contains(scalar.value) : scalar.properties.isWhitespace
-    }
-
     /// Whitespace-separated tokens, as Rust's `str::split_whitespace`: split
     /// on Unicode `White_Space` scalars, empty pieces dropped.
     static func wordCount(_ text: String) -> Int {
         var count = 0
         var inWord = false
         for scalar in text.unicodeScalars {
-            if isWhitespace(scalar) {
+            if ModelText.isWhitespace(scalar) {
                 inWord = false
             } else if !inWord {
                 inWord = true
@@ -215,7 +209,7 @@ enum Insights {
         if raw.unicodeScalars.elementsEqual(corrected.unicodeScalars) {
             return 0
         }
-        switch TokenDiff.hunks(raw, corrected) {
+        switch TokenDiff.hunks(original: raw, edited: corrected) {
         case .some(let hunks): return hunks.count
         // Too long to diff token by token; the texts differ, so count one.
         case .none: return 1
@@ -227,7 +221,7 @@ enum Insights {
         if raw.unicodeScalars.elementsEqual(processed.unicodeScalars) {
             return 0
         }
-        switch TokenDiff.hunks(raw, processed) {
+        switch TokenDiff.hunks(original: raw, edited: processed) {
         case .some(let hunks):
             return hunks.reduce(0) { $0 + max($1.removed.count, $1.inserted.count) }
         case .none:
@@ -464,133 +458,5 @@ enum Insights {
             cursor = day.adding(days: -1, calendar: calendar)
         }
         return (current, longest)
-    }
-}
-
-// MARK: - Token diff
-
-/// Token-level alignment of a transcript against an edited version, the port
-/// of `learning::diff`. It lives here until the Learning module is ported;
-/// move it there and drop this copy at that point.
-///
-/// Tokens are compared on their match key (alphanumeric, lowercased) so that
-/// punctuation and capitalisation differences do not register as changes on
-/// their own. Runs of changed tokens become hunks; a hunk with both a removed
-/// and an inserted side is a replacement.
-enum TokenDiff {
-    /// Longest input, in tokens, that is diffed at all. Beyond this an edit is
-    /// treated as a rewrite rather than a correction.
-    static let maxTokens = 400
-
-    struct Hunk: Equatable, Sendable {
-        /// Tokens removed from the original, in order. Empty for a pure insertion.
-        var removed: [String]
-        /// Tokens inserted by the edit, in order. Empty for a pure deletion.
-        var inserted: [String]
-
-        var isReplacement: Bool {
-            !removed.isEmpty && !inserted.isEmpty
-        }
-    }
-
-    /// Lowercased alphanumeric characters of `token`, the same key the custom
-    /// words matcher uses. Alphanumeric is Rust's `char::is_alphanumeric`:
-    /// the `Alphabetic` property or a `N*` general category.
-    static func matchKey(_ token: String) -> String {
-        var key = ""
-        for scalar in token.unicodeScalars where isAlphanumeric(scalar) {
-            key += scalar.properties.lowercaseMapping
-        }
-        return key
-    }
-
-    private static func isAlphanumeric(_ scalar: Unicode.Scalar) -> Bool {
-        if scalar.properties.isAlphabetic {
-            return true
-        }
-        switch scalar.properties.generalCategory {
-        case .decimalNumber, .letterNumber, .otherNumber: return true
-        default: return false
-        }
-    }
-
-    /// Rust's `str::split_whitespace`: split on Unicode `White_Space` scalars,
-    /// empty pieces dropped.
-    static func tokens(_ text: String) -> [String] {
-        var out: [String] = []
-        var current = String.UnicodeScalarView()
-        for scalar in text.unicodeScalars {
-            if Insights.isWhitespace(scalar) {
-                if !current.isEmpty {
-                    out.append(String(current))
-                    current = String.UnicodeScalarView()
-                }
-            } else {
-                current.append(scalar)
-            }
-        }
-        if !current.isEmpty {
-            out.append(String(current))
-        }
-        return out
-    }
-
-    /// All hunks between `original` and `edited`, or `nil` when either side is
-    /// too long to diff.
-    static func hunks(_ original: String, _ edited: String) -> [Hunk]? {
-        let a = tokens(original)
-        let b = tokens(edited)
-        if a.count > maxTokens || b.count > maxTokens {
-            return nil
-        }
-        // Keys as scalar arrays so equality is code-point equality, not
-        // canonical equivalence.
-        let ka = a.map { Array(matchKey($0).unicodeScalars) }
-        let kb = b.map { Array(matchKey($0).unicodeScalars) }
-
-        // Classic LCS table over match keys, flattened row-major with
-        // `(m + 1)` columns.
-        let n = ka.count
-        let m = kb.count
-        let width = m + 1
-        var lcs = [Int](repeating: 0, count: (n + 1) * width)
-        for i in stride(from: n - 1, through: 0, by: -1) {
-            for j in stride(from: m - 1, through: 0, by: -1) {
-                lcs[i * width + j] = ka[i] == kb[j]
-                    ? lcs[(i + 1) * width + (j + 1)] + 1
-                    : max(lcs[(i + 1) * width + j], lcs[i * width + (j + 1)])
-            }
-        }
-
-        var out: [Hunk] = []
-        var current: Hunk? = nil
-        var i = 0
-        var j = 0
-        while i < n || j < m {
-            let matched = i < n && j < m && ka[i] == kb[j]
-            if matched {
-                if let hunk = current {
-                    out.append(hunk)
-                    current = nil
-                }
-                i += 1
-                j += 1
-                continue
-            }
-            var hunk = current ?? Hunk(removed: [], inserted: [])
-            let takeFromA = j >= m || (i < n && lcs[(i + 1) * width + j] >= lcs[i * width + (j + 1)])
-            if takeFromA {
-                hunk.removed.append(a[i])
-                i += 1
-            } else {
-                hunk.inserted.append(b[j])
-                j += 1
-            }
-            current = hunk
-        }
-        if let hunk = current {
-            out.append(hunk)
-        }
-        return out
     }
 }

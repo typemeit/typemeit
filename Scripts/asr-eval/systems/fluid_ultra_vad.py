@@ -3,7 +3,6 @@ long audio itself. Each chunk is at most CHUNK_SECONDS, under Ultra's 15 s windo
 (ASRConstants.maxModelSamples = 240,000 samples), so every chunk is one encoder pass.
 Variants: fluid-ultra-vad (14.5 s) and fluid-ultra-vad10 (10 s)."""
 import json, os, subprocess, tempfile
-import store
 from . import cohere, fluid_common
 
 NAME = 'fluid-ultra-vad'
@@ -35,10 +34,7 @@ def transcribe_chunked(name, chunk_seconds, items, vad_overrides=None, version='
                               'audioSeconds': manifest[c]['audioSeconds']})
             timings[kind] = {'peakBytes': result['peakBytes'], 'loadSeconds': result['loadSeconds'], 'clips': clips,
                              'chunks': {c: len(manifest[c]['paths']) for c in ids}}
-    path = store.sub('timings') / f'{name}.json'
-    merged = store.read_json(path, {})
-    merged.update(timings)
-    store.write_json(path, merged)
+    fluid_common.save_timings(name, timings)
     return texts
 
 def transcribe(items):

@@ -29,6 +29,14 @@ def run_group(command, items):
         subprocess.run(command + [listing, out], check=True)
         return json.load(open(out))
 
+def save_timings(name, timings):
+    """Merges timings ({kind: {...}}, kind 'dictation' or 'meeting') into timings/<name>.json, so a
+    run of one kind keeps the other kind's figures."""
+    path = store.sub('timings') / f'{name}.json'
+    merged = store.read_json(path, {})
+    merged.update(timings)
+    store.write_json(path, merged)
+
 def transcribe_with(version, name, items):
     cli = binary()
     return transcribe_by(lambda kind: [cli, version], name, items)
@@ -45,8 +53,5 @@ def transcribe_by(command_for, name, items):
             texts[clip['id']] = clip['text']
         timings[kind] = {'peakBytes': result['peakBytes'], 'loadSeconds': result['loadSeconds'],
                          'clips': [{k: c[k] for k in ('id', 'ms', 'audioSeconds')} for c in result['clips']]}
-    path = store.sub('timings') / f'{name}.json'
-    merged = store.read_json(path, {})
-    merged.update(timings)
-    store.write_json(path, merged)
+    save_timings(name, timings)
     return texts

@@ -117,7 +117,7 @@ enum ReadBackText {
         func words(_ text: String) -> Set<String> {
             var set = Set<String>()
             for token in text.split(whereSeparator: \.isWhitespace) {
-                let trimmed = token.unicodeScalars.trimming { !Prefilter.isAlphanumeric($0) }
+                let trimmed = token.unicodeScalars.trimming { !TokenDiff.isAlphanumeric($0) }
                 let word = String(trimmed).lowercased()
                 if !word.isEmpty {
                     set.insert(word)
