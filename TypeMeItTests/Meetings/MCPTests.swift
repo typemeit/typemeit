@@ -89,9 +89,7 @@ private func writeHistory(to history: URL) throws {
         HistoryEntry(timestamp: iso("2026-02-03T10:00:00Z"), transcript: "draft the cafe menu", postProcessRequested: false,
                      typed: "Draft the café menu.", edited: "Draft the café menu today.", appName: "Notes", dictionaryFixes: 0),
     ]
-    let encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .iso8601
-    try encoder.encode(entries).write(to: history)
+    try StoredJSON.fileEncoder.encode(entries).write(to: history)
 }
 
 /// Splits `text` where `get_meeting` would: at `maxBytes` UTF-8 bytes, on a
@@ -303,6 +301,16 @@ final class MCPTests {
         ])
     }
 
+    @Test func aSearchHitPastAnHourIsTimedAsTheTranscriptIs() throws {
+        let lateMs = 3_725_000
+        let long = MeetingFixtures.meeting(
+            kind: .room, started: iso("2026-02-02T09:00:00Z"), durationMs: 4_000_000, app: nil, title: "Room",
+            speakers: [Meeting.Speaker(id: "you", name: "You", isYou: true, talkMs: 1000)],
+            paragraphs: [Meeting.Paragraph(speaker: "you", startMs: lateMs, endMs: lateMs + 1000, text: "One last thing.")])
+        try MeetingFolder.write(long, to: root.appendingPathComponent("Long Meeting", isDirectory: true))
+        #expect(MCPTools.searchMeetings(root: root, query: "last thing").map(\.timestamp) == [TranscriptRender.timestamp(ms: lateMs)])
+    }
+
     // MARK: meeting_stats
 
     @Test func meetingStatsCountsDurationAndTalkTimeOverARange() throws {
@@ -392,7 +400,25 @@ final class MCPTests {
         #expect(MCPTools.listDictations(history: history).isEmpty)
     }
 
+    @Test func aDictationThatAskedClaudeReadsBackAsTheStoreWroteIt() throws {
+        let question = Meeting.Question(atMs: 0, text: "What is on today?", answer: "Two calls.", outcome: .asked, runID: nil, sessionID: nil)
+        let entry = HistoryEntry(timestamp: iso("2026-02-04T11:00:00Z"), transcript: "tmi what is on today", postProcessed: "TMI, what is on today?",
+                                 postProcessRequested: true, appName: "Notes", dictionaryFixes: 0, question: question)
+        try StoredJSON.fileEncoder.encode([entry]).write(to: history)
+        #expect(MCPTools.listDictations(history: history) == [MCPTools.DictationSummary(
+            id: entry.id.uuidString, time: iso("2026-02-04T11:00:00Z"), app: "Notes", window: nil, text: entry.displayText)])
+    }
+
     // MARK: hooks
+
+    @Test func hooksTheAppStoresAreTheHooksTheServerReads() throws {
+        let suite = "MCPTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let hooks = [MeetingHook(name: "summary", prompt: "Summarise it."), MeetingHook(name: "actions", prompt: "List the actions.", on: false)]
+        MeetingHook.store(hooks, in: defaults)
+        #expect(MeetingHook.stored(in: defaults) == hooks)
+    }
 
     @Test func aHookAnAssistantAddsArrivesSwitchedOff() throws {
         let box = HookBox()

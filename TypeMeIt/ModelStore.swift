@@ -28,7 +28,7 @@ final class ModelStore: PinnedDownload {
         return URL(string: "https://typeme.it/models/\(fileName)")!
     }
 
-    nonisolated static let modelsDirectory = Store.directory.appendingPathComponent("models", isDirectory: true)
+    nonisolated static let modelsDirectory = SupportPaths.directory.appendingPathComponent("models", isDirectory: true)
     /// One folder per speech model version.
     nonisolated static let asrDirectory = modelsDirectory.appendingPathComponent("asr", isDirectory: true)
     /// What `AsrModels.loadLocal(from:version:)` reads.

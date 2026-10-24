@@ -276,7 +276,7 @@ extension Settings {
         static let undoneWords = StoredSetting.strings("undoneWords")
         static let meetingAsk = StoredSetting.bool("meetingAsk", default: true)
         static let meetingPreRoll = StoredSetting.bool("meetingPreRoll", default: true)
-        static let mcpEnabled = StoredSetting.bool("meetingsMCP", default: false)
+        static let mcpEnabled = StoredSetting.bool(MCPDefaults.enabledKey, default: false)
         static let mcpOffTools = StoredSetting.strings(MCPDefaults.offToolsKey)
         static let meetingKeepAudio = StoredSetting.bool("meetingKeepAudio", default: true)
         static let meetingLearnVoices = StoredSetting.bool("meetingLearnVoices", default: false)
@@ -284,7 +284,8 @@ extension Settings {
         static let meetingLimit = StoredSetting.int("meetingLimit", default: 0)
         static let askClaude = StoredSetting.bool("askClaude", default: Updates.isDevBuild)
         static let askClaudeSystemPrompt = StoredSetting.string(MCPDefaults.systemPromptKey, default: "")
-        static let meetingHooks = StoredSetting.json(MeetingHook.defaultsKey, default: [MeetingHook]())
+        static let meetingHooks = StoredSetting<[MeetingHook]>(
+            load: { MeetingHook.stored(in: $0) }, save: { MeetingHook.store($0, in: $1) })
         static let askClaudePermissionMode = StoredSetting.string("askClaudePermissionMode", default: "auto")
         static let askClaudeFolder = StoredSetting.string("askClaudeFolder", default: FileManager.default.homeDirectoryForCurrentUser.path)
         static let askClaudeTools = StoredSetting.strings("askClaudeTools")

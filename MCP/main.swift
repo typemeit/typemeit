@@ -6,17 +6,6 @@ import Foundation
 // bad input, and neither does this loop — a read or decode failure just
 // produces an error reply or is skipped, not a crash.
 
-/// `~/Library/Application Support/TypeMeIt`, or `TYPEMEIT_SUPPORT_DIR` when
-/// set. Mirrors `Store.directory` (TypeMeIt/Store.swift), which this target
-/// does not share.
-private func supportDirectory() -> URL {
-    if let dir = ProcessInfo.processInfo.environment["TYPEMEIT_SUPPORT_DIR"] {
-        return URL(fileURLWithPath: dir, isDirectory: true)
-    }
-    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    return base.appendingPathComponent("TypeMeIt", isDirectory: true)
-}
-
 /// The bundle id of the `.app` two directories above this executable
 /// (`Contents/MacOS/typemeit-mcp`), so the switch reads the same
 /// `UserDefaults` domain the host app's `UserDefaults.standard` does.
@@ -54,28 +43,25 @@ private func hostDefaults(bundleID: String) -> UserDefaults? {
 
 /// Whether the switch is on, read fresh so a setting change in the app
 /// takes effect without restarting this process (docs/meetings.md 7.15).
-/// The key is named for meetings, which it once covered alone.
 private func mcpEnabled(bundleID: String?) -> Bool {
     guard let bundleID, let defaults = hostDefaults(bundleID: bundleID) else { return false }
-    return defaults.bool(forKey: "meetingsMCP")
+    return defaults.bool(forKey: MCPDefaults.enabledKey)
 }
 
 let bundleID = hostBundleID()
 if bundleID == nil {
     writeStandardError("typemeit-mcp: could not find the host app's bundle id; mcp will read as off")
 }
-let meetingsRoot = supportDirectory().appendingPathComponent("Meetings", isDirectory: true)
 /// The app's hooks, read and written in its own UserDefaults; the app
 /// observes the key, so a write shows in its settings at once.
 let hookStore = MCPTools.HookStore(
     read: {
-        guard let bundleID, let defaults = hostDefaults(bundleID: bundleID),
-              let stored = defaults.data(forKey: MeetingHook.defaultsKey) else { return [] }
-        return (try? JSONDecoder().decode([MeetingHook].self, from: stored)) ?? []
+        guard let bundleID, let defaults = hostDefaults(bundleID: bundleID) else { return [] }
+        return MeetingHook.stored(in: defaults)
     },
     write: { hooks in
         guard let bundleID, let defaults = hostDefaults(bundleID: bundleID) else { return }
-        defaults.set(try? JSONEncoder().encode(hooks), forKey: MeetingHook.defaultsKey)
+        MeetingHook.store(hooks, in: defaults)
     })
 let systemPromptStore = MCPTools.PromptStore(
     read: { bundleID.flatMap { hostDefaults(bundleID: $0)?.string(forKey: MCPDefaults.systemPromptKey) } ?? "" },
@@ -87,12 +73,9 @@ let systemPromptStore = MCPTools.PromptStore(
 private func offTools(bundleID: String?) -> Set<String> {
     Set(bundleID.flatMap { hostDefaults(bundleID: $0)?.stringArray(forKey: MCPDefaults.offToolsKey) } ?? [])
 }
-/// Mirrors `Store`'s `historyURL` (TypeMeIt/Store.swift).
-let historyFile = supportDirectory().appendingPathComponent("history.json")
-
 while let line = readLine(strippingNewline: true) {
     guard !line.isEmpty else { continue }
-    if let reply = MCPServer.handle(line, root: meetingsRoot, history: historyFile, hooks: hookStore, enabled: mcpEnabled(bundleID: bundleID),
+    if let reply = MCPServer.handle(line, root: SupportPaths.meetingsRoot, history: SupportPaths.historyFile, hooks: hookStore, enabled: mcpEnabled(bundleID: bundleID),
                                     systemPrompt: systemPromptStore, off: offTools(bundleID: bundleID)) {
         writeStandardOut(reply)
     }
