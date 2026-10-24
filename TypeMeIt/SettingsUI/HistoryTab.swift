@@ -135,7 +135,7 @@ struct WhenFilter {
     func words(in entry: HistoryEntry, store: Store) -> Int {
         current(store)
         if let n = words[entry.id] { return n }
-        let n = HistoryTab.words(in: entry)
+        let n = entry.wordCount
         words[entry.id] = n
         return n
     }
@@ -347,7 +347,7 @@ struct HistoryTab: View {
 
     /// The rows under a line for each day, newest first, the day saying how
     /// much it held.
-    static func lines(_ rows: [HistoryEntry], wordsIn: (HistoryEntry) -> Int = HistoryTab.words, calendar: Calendar = .current) -> [Line] {
+    static func lines(_ rows: [HistoryEntry], wordsIn: (HistoryEntry) -> Int = \.wordCount, calendar: Calendar = .current) -> [Line] {
         var out: [Line] = []
         var i = rows.startIndex
         while i < rows.endIndex {
@@ -364,8 +364,6 @@ struct HistoryTab: View {
         }
         return out
     }
-
-    nonisolated static func words(in entry: HistoryEntry) -> Int { Insights.wordCount(entry.displayText) }
 
     /// "today" over "thursday 24 september"; an older day by its weekday,
     /// over its date.
@@ -526,7 +524,7 @@ private struct HistoryRow: View {
                     HStack(spacing: 6) { CharDelta(heard: entry.transcript, typed: entry.displayText) }
                         .font(Square.mono(11))
                         .frame(width: HistoryColumns.changes, alignment: .trailing)
-                    Text(HistoryTab.words(in: entry).formatted())
+                    Text(entry.wordCount.formatted())
                         .font(Square.mono(12))
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Colors.ink)

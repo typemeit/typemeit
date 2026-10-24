@@ -11,7 +11,11 @@ import Foundation
 /// The columns of one history entry the insights need.
 struct InsightRow: Sendable {
     var timestamp: Date
+    /// What was said, which the speaking rate and time saved count.
     var transcript: String
+    /// The words history shows for it (`HistoryEntry.wordCount`), which the
+    /// totals count; nil counts the transcript.
+    var shownWords: Int? = nil
     var postProcessed: String? = nil
     var postProcessRequested: Bool = false
     var durationMs: Int? = nil
@@ -21,6 +25,15 @@ struct InsightRow: Sendable {
     var appId: String? = nil
     var appName: String? = nil
     var windowTitle: String? = nil
+}
+
+extension InsightRow {
+    init(_ entry: HistoryEntry) {
+        self.init(timestamp: entry.timestamp, transcript: entry.transcript, shownWords: entry.wordCount, postProcessed: entry.postProcessed,
+                  postProcessRequested: entry.postProcessRequested, durationMs: entry.durationMs,
+                  transcribeMs: entry.transcribeMs, postProcessMs: entry.postProcessMs,
+                  dictionaryFixes: entry.dictionaryFixes, appId: entry.appId, appName: entry.appName, windowTitle: entry.windowTitle)
+    }
 }
 
 struct CategoryUsage: Sendable, Equatable {
@@ -272,7 +285,7 @@ enum Insights {
         let previousMonthSoFar = Self.previousMonthSoFar(now: now, calendar: calendar)
 
         for row in rows {
-            let words = wordCount(row.transcript)
+            let words = row.shownWords ?? wordCount(row.transcript)
             totalWords += words
             dictationWords.append(words)
 
@@ -286,7 +299,7 @@ enum Insights {
             byDay[day, default: (0, 0, 0)].words += words
 
             if let ms = row.durationMs, ms > 0 {
-                timedWords += words
+                timedWords += wordCount(row.transcript)
                 timedMs += ms
                 timedDictations += 1
                 audioLengths.append(ms)

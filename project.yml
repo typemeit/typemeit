@@ -243,6 +243,8 @@ targets:
       - path: TypeMeIt/HistoryEntry.swift
       # Timestamps as the transcript writes them.
       - path: TypeMeIt/Meetings/TranscriptRender.swift
+      # Meeting.dataReminder's text.
+      - path: TypeMeIt/Meetings/MeetingDataReminder.swift
     settings:
       base:
         # Its own products folder: in the app's, FluidAudio's modules sit
@@ -266,6 +268,9 @@ targets:
       - TypeMeIt/KeyCombo.swift
       - TypeMeIt/MenuBarIcon.swift
       - TypeMeIt/Plural.swift
+      # LiveClaude reads Claude Code's stream as the app does.
+      - TypeMeIt/Meetings/ClaudeStream.swift
+      - TypeMeIt/Meetings/MeetingDataReminder.swift
       - TypeMeIt/Overlay/PuffView.swift
       - TypeMeIt/Overlay/Puff.metal
       - TypeMeIt/Resources/Assets.xcassets

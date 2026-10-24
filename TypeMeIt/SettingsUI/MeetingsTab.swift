@@ -520,7 +520,8 @@ private struct MeetingRow: View {
     /// The summary, or while it transcribes how far it has got and a pause,
     /// or what the meeting is waiting for.
     @ViewBuilder private var state: some View {
-        if let run = coordinator.transcribing, run.id == meeting.id {
+        switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: diarizer) {
+        case .transcribing(let run):
             HStack(spacing: 10) {
                 Text(stopping ? "pausing…" : run.progress.label)
                     .font(Square.mono(11))
@@ -532,23 +533,25 @@ private struct MeetingRow: View {
                     if !stopping { stopButton }
                 }
             }
-        } else if coordinator.queued.contains(meeting.id) {
+        case .queued:
             HStack(spacing: 10) {
-                Text("waiting to transcribe").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+                Text(MeetingPhase.queuedLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
                 stopButton
             }
-        } else if coordinator.summarising.contains(meeting.id) {
-            Text("summarising").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
-        } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: diarizer) {
+        case .summarising:
+            Text(MeetingPhase.summarisingLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+        case .needs:
             MeetingChips(meeting: meeting)
-        } else if meeting.isDone, case let unknown = SpeakerAssign.unknown(in: meeting).count, unknown > 0 {
+        case .unknownSpeakers(let unknown):
             Button(counted(unknown, "unknown speaker"), action: name)
                 .buttonStyle(SquareButtonStyle(small: true))
-        } else if let summary = meeting.summary, !summary.isEmpty {
+        case .summary(let summary):
             Text(summary)
                 .font(Square.sans(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .lineLimit(1)
+        case .none:
+            EmptyView()
         }
     }
 
@@ -562,10 +565,43 @@ private struct MeetingRow: View {
     }
 }
 
+/// What the list and the page say about a meeting under its title, first
+/// that applies: its transcription running, waiting its turn, its summary
+/// being written, what it needs, speakers left to name, its summary.
+enum MeetingPhase: Equatable {
+    case transcribing(MeetingCoordinator.Transcribing)
+    case queued
+    case summarising
+    /// `MeetingChips` has something to show.
+    case needs
+    case unknownSpeakers(Int)
+    case summary(String)
+    case none
+
+    static let queuedLabel = "waiting to transcribe"
+    static let summarisingLabel = "summarising…"
+}
+
 /// What a finished or stalled meeting still needs, as the list and the page
 /// show it: transcribe one that was put off, add speakers, the failure and
 /// retry, the missing speech model, an unavailable folder.
 enum MeetingState {
+    @MainActor
+    static func phase(_ m: Meeting, coordinator: MeetingCoordinator, store: MeetingStore, diarizer: DiarizerModelStore) -> MeetingPhase {
+        phase(m, transcribing: coordinator.transcribing, queued: coordinator.queued.contains(m.id), summarising: coordinator.summarising.contains(m.id),
+              hasChips: hasChips(m, coordinator: coordinator, store: store, diarizer: diarizer))
+    }
+
+    static func phase(_ m: Meeting, transcribing: MeetingCoordinator.Transcribing?, queued: Bool, summarising: Bool, hasChips: Bool) -> MeetingPhase {
+        if let transcribing, transcribing.id == m.id { return .transcribing(transcribing) }
+        if queued { return .queued }
+        if summarising { return .summarising }
+        if hasChips { return .needs }
+        if m.isDone, case let unknown = SpeakerAssign.unknown(in: m).count, unknown > 0 { return .unknownSpeakers(unknown) }
+        if let summary = m.summary, !summary.isEmpty { return .summary(summary) }
+        return .none
+    }
+
     @MainActor
     static func hasChips(_ m: Meeting, coordinator: MeetingCoordinator, store: MeetingStore, diarizer: DiarizerModelStore) -> Bool {
         waitingForModel(m) || coordinator.isWaiting(m.id) || canAddSpeakers(m, coordinator: coordinator, diarizer: diarizer)

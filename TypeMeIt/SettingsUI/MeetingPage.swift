@@ -348,7 +348,8 @@ struct MeetingPage: View {
 
     /// How far its transcription has got, what it still needs, or its summary.
     @ViewBuilder private var state: some View {
-        if let run = coordinator.transcribing, run.id == meeting.id {
+        switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .transcribing(let run):
             HStack(spacing: 12) {
                 Text(pausing ? "pausing…" : run.progress.label)
                     .font(Square.mono(12))
@@ -368,17 +369,24 @@ struct MeetingPage: View {
                 }
             }
             .onChange(of: coordinator.transcribing?.id) { _, running in if running != meeting.id { pausing = false } }
-        } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .queued:
+            Text(MeetingPhase.queuedLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .summarising:
+            Text(MeetingPhase.summarisingLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .needs:
             MeetingChips(meeting: meeting)
-        } else if let summary = meeting.summary, !summary.isEmpty {
-            Text(summary)
-                .font(Square.sans(15))
-                .lineSpacing(6)
-                .foregroundStyle(DesignTokens.Colors.ink)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else if coordinator.summarising.contains(meeting.id) {
-            Text("summarising…").font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        // The rail names unknown speakers here, so the summary shows over them.
+        case .unknownSpeakers, .summary:
+            if let summary = meeting.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(Square.sans(15))
+                    .lineSpacing(6)
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .none:
+            EmptyView()
         }
     }
 

@@ -101,22 +101,40 @@ enum EchoBleedDetector {
         }
     }
 
-    /// The RMS envelope step, factored out so a caller reading a track's
-    /// samples once (docs/meetings.md 7.10 step 2) computes both this and
-    /// the 100 ms peak envelope for `ChunkCutter` in the same pass.
-    static func rmsEnvelope(_ pcm: [Float], sampleRate: Int, hz: Int = 100) -> [Float] {
-        let samplesPerFrame = sampleRate / hz
-        guard samplesPerFrame > 0 else { return [] }
-        let frames = pcm.count / samplesPerFrame
-        var out = [Float](repeating: 0, count: frames)
-        for f in 0 ..< frames {
-            var acc: Float = 0
-            for i in (f * samplesPerFrame) ..< ((f + 1) * samplesPerFrame) {
-                acc += pcm[i] * pcm[i]
-            }
-            out[f] = (acc / Float(samplesPerFrame)).squareRoot()
+    /// The RMS envelope step, fed a sample at a time so a caller reading a
+    /// track's samples once (docs/meetings.md 7.10 step 2) computes both
+    /// this and the 100 ms peak envelope for `ChunkCutter` in the same pass.
+    /// A part frame left at the end is the RMS of the samples it holds.
+    struct RMSEnvelope {
+        private let samplesPerFrame: Int
+        private var frames: [Float] = []
+        private var sumOfSquares: Float = 0
+        private var samplesInFrame = 0
+
+        init(sampleRate: Int, hz: Int = 100) {
+            samplesPerFrame = sampleRate / hz
         }
-        return out
+
+        mutating func add(_ sample: Float) {
+            guard samplesPerFrame > 0 else { return }
+            sumOfSquares += sample * sample
+            samplesInFrame += 1
+            if samplesInFrame == samplesPerFrame {
+                frames.append((sumOfSquares / Float(samplesPerFrame)).squareRoot())
+                sumOfSquares = 0
+                samplesInFrame = 0
+            }
+        }
+
+        var envelope: [Float] {
+            samplesInFrame > 0 ? frames + [(sumOfSquares / Float(samplesInFrame)).squareRoot()] : frames
+        }
+    }
+
+    static func rmsEnvelope(_ pcm: [Float], sampleRate: Int, hz: Int = 100) -> [Float] {
+        var envelope = RMSEnvelope(sampleRate: sampleRate, hz: hz)
+        for sample in pcm { envelope.add(sample) }
+        return envelope.envelope
     }
 
     /// Returns `nil` when no honest verdict is possible: either track

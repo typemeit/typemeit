@@ -228,7 +228,7 @@ struct DictationPage: View {
     }
 
     private var lengthLine: String {
-        let words = counted(HistoryTab.words(in: entry), "word")
+        let words = counted(entry.wordCount, "word")
         guard let ms = entry.durationMs else { return words }
         return "\(DictationPage.length(ms)) · \(words)"
     }
