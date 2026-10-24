@@ -122,7 +122,7 @@ struct InsightsTab: View {
                          m.meetings == 0 ? empty : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
                 statCard("you talked", m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
                          m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
-                statCard("typical meeting", m.medianMs.map { MeetingFolder.durationLabel(.milliseconds($0)) } ?? "–",
+                statCard("typical meeting", m.medianMs.map { Meeting.durationLabel(.milliseconds($0)) } ?? "–",
                          typicalCaption(m))
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -133,7 +133,7 @@ struct InsightsTab: View {
     private func typicalCaption(_ m: MeetingStats) -> String {
         guard let longest = m.longestMs else { return empty }
         let most = m.topApp.map { " · most on \($0.lowercased())" } ?? ""
-        return "longest \(MeetingFolder.durationLabel(.milliseconds(longest)))" + most
+        return "longest \(Meeting.durationLabel(.milliseconds(longest)))" + most
     }
 
     private func monthCaption(_ s: InsightsStats) -> String {

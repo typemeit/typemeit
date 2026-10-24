@@ -246,18 +246,22 @@ struct MeetingsTab: View {
     }
 
     private var filtered: [Meeting] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = search.trimmingCharacters(in: .whitespaces)
         let time = WhenFilter(when, from: from, to: to)
         return store.meetings.filter { m in
             if let place, MeetingsTab.app(of: m) != place, MeetingsTab.channel(of: m) != place { return false }
             if !people.isEmpty, !people.isSubset(of: Set(MeetingsTab.others(in: m))) { return false }
             if !time.contains(m.started) { return false }
-            if !q.isEmpty {
-                let text = ([m.title, m.summary ?? ""] + m.speakers.map(\.name)).joined(separator: " ").lowercased()
-                if !text.contains(q), !m.paragraphs.contains(where: { $0.text.lowercased().contains(q) }) { return false }
-            }
+            if !q.isEmpty, !MeetingsTab.matches(m, q) { return false }
             return true
         }
+    }
+
+    /// Whether the search finds `query` in the meeting's title, summary,
+    /// speakers' names or what was said.
+    nonisolated static func matches(_ meeting: Meeting, _ query: String) -> Bool {
+        let fields = [meeting.title, meeting.summary ?? ""] + meeting.speakers.map(\.name) + meeting.paragraphs.map(\.text)
+        return fields.contains { TextSearch.matches($0, query) }
     }
 
     /// The meeting's app, as the list and the where filter name it.

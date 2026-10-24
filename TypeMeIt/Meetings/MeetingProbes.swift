@@ -6,7 +6,7 @@ import Foundation
 import SwiftUI
 
 /// The spikes in docs/meetings.md section 6, as launch arguments on the dev
-/// app. Each writes to the debug log and to `Store.directory/Meetings/probe/`,
+/// app. Each writes to the debug log and to `SupportPaths.meetingsRoot/probe/`,
 /// and goes once its pass/fail line in the spec is filled in.
 ///
 ///     -meetingProbe                         log every process object on every fire and every second (S1)
@@ -29,7 +29,7 @@ import SwiftUI
 ///     -dumpMeetingPages <meeting id>...     open each meeting's page in settings and write a window dump (WindowDump)
 @MainActor
 enum MeetingProbes {
-    nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
+    nonisolated static let directory = SupportPaths.meetingsRoot.appendingPathComponent("probe", isDirectory: true)
 
     static func runIfAsked() {
         let args = CommandLine.arguments

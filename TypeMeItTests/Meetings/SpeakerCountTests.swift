@@ -4,13 +4,6 @@ import Testing
 struct SpeakerCountTests {
     private static let minimumMs = 10_000
 
-    /// Back-to-back half-second words from `startMs` to `endMs`.
-    private func words(_ startMs: Int, _ endMs: Int) -> [Transcriber.Word] {
-        stride(from: startMs, to: endMs, by: 500).map {
-            Transcriber.Word(text: "word", confidence: 1, start: .milliseconds($0), end: .milliseconds($0 + 500))
-        }
-    }
-
     private func span(_ name: String, _ startMs: Int, _ endMs: Int) -> MeetingNames.Span {
         MeetingNames.Span(name: name, startMs: startMs, endMs: endMs)
     }
