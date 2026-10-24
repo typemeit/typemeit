@@ -490,7 +490,7 @@ Rules for every task below:
 | `Meetings/EchoFold.swift` | On an affected call, drops the later copy of a run of words both tracks share at the same instant, and far-end speech left on the mic (pure) |
 | `Meetings/EchoLag.swift` | The echo's lag and loudness through a call, read from the two tracks' envelopes (pure) |
 | `Meetings/MeetingTranscriber.swift` | The end-of-meeting pipeline: read tracks, chunk, transcribe, (phase 2) diarize, echo, merge, write, transcode, publish |
-| `Meetings/DiarizerModelStore.swift` (phase 2) | Download and pin the FluidAudio model archive, modelled on `ModelStore` |
+| `Meetings/DiarizerModelStore.swift` (phase 2) | Pin the speaker model archive; `PinnedDownload` downloads it as it does `ModelStore`'s |
 | `Meetings/Diarizer.swift` (phase 2) | FluidAudio offline pipeline behind two functions |
 | `Meetings/VoicePrint.swift` (phase 3) | The user's centroid; matching |
 | `Meetings/Roster.swift` (phase 2) | Names, speaking spans and caption lines from the accessibility tree, the Meet page over Apple Events, or the screen |
@@ -1959,7 +1959,7 @@ and `MCPTests`: a shared meeting is not counted.
   `https://github.com/FluidInference/FluidAudio`, pinned to the exact version
   S3 built with. If `xcodebuild` ever fails with "Multiple commands produce"
   on a module map, the cause is a second static-library xcframework; see 3.3.
-- `DiarizerModelStore`, modelled on `ModelStore`: one `.tar` of both speaker
+- `DiarizerModelStore`, a `PinnedDownload` like `ModelStore`: one `.tar` of both speaker
   models, hash-pinned, downloaded from typeme.it/models. It unpacks to two
   folders under `DiarizerModelStore.directory`: `speaker-diarization/`
   holding the offline pipeline's `Segmentation.mlmodelc`, `FBank.mlmodelc`,
@@ -1969,10 +1969,12 @@ and `MCPTests`: a shared meeting is not counted.
   `Nemotron3Diarizer_offline.mlmodelc` and `learnable_sil_emb.bin`, with the
   README that carries its OpenMDW-1.1 licence. `isInstalled` checks every
   file, so an install from before Nemotron downloads the new tar.
-  The download lands in a temporary directory, is hash-checked, untarred
-  there and moved into place with one rename, so an interrupted download or
-  extraction leaves nothing behind; a failed check deletes the temporary
-  directory. Makefile targets `diarizer-model` (download the pinned Hugging
+  `PinnedDownload` saves the download in the models folder, hash-checks
+  it, untars it in a scratch folder there and moves each folder into place
+  with one rename, so an interrupted download or extraction leaves the
+  installed models as they were; a failed check deletes the scratch folder.
+  A stall of 15 s, a dropped connection or an error page is retried up to
+  five times, resuming where the download stopped. Makefile targets `diarizer-model` (download the pinned Hugging
   Face revision into `build/`, tar it with the upstream `NOTICE.md`
   unchanged, print the constants), `diarizer-model-verify`,
   `diarizer-model-publish` and `diarizer-model-verify-url`, mirroring the
