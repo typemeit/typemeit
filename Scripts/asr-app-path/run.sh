@@ -20,7 +20,7 @@ app = root / "TypeMeIt"
 sources = scratch / "Sources/appasr"
 sources.mkdir(parents=True, exist_ok=True)
 for name in ["Transcriber.swift", "Log.swift", "DebugLog.swift", "CustomWordMatcher.swift", "EnglishWord.swift", "LocalCleanup.swift", "ModelText.swift",
-             "Plural.swift", "Meetings/ChunkStitch.swift", "Meetings/ChunkCutter.swift", "Meetings/QuietSpeech.swift"]:
+             "Plural.swift", "ClockTime.swift", "Digits.swift", "WritingStyle.swift", "Meetings/ChunkStitch.swift", "Meetings/ChunkCutter.swift", "Meetings/QuietSpeech.swift"]:
     shutil.copy(app / name, sources / pathlib.Path(name).name)
 shutil.copy(here / "Sources/appasr/main.swift", sources / "main.swift")
 shutil.copy(here / "Sources/appasr/Boost.swift", sources / "Boost.swift")
