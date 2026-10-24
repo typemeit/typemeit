@@ -7,7 +7,6 @@ the model once; per-clip ms is transcribe-cli's mel + encode + decode, and CPU %
 utilisation are sampled once a second while each process runs."""
 import json, os, pathlib, re, subprocess, tempfile, threading, wave
 import numpy as np
-import store
 from . import fluid_common, vad
 
 NAME = 'granite-nar'
@@ -89,9 +88,8 @@ def cut(wav_path, clip_id, out_dir):
     with wave.open(wav_path) as source:
         rate = source.getframerate()
         audio = np.frombuffer(source.readframes(source.getnframes()), dtype=np.int16).astype(np.float32) / PCM_SCALE
-    vad.MAX_CHUNK_SECONDS = CHUNK_SECONDS
     paths = []
-    for n, piece in enumerate(vad.split_long(audio)):
+    for n, piece in enumerate(vad.split_long(audio, CHUNK_SECONDS, rate)):
         piece = np.pad(piece, (0, max(0, rate - len(piece))))
         path = os.path.join(out_dir, f'{clip_id}~{n:04d}.wav')
         with wave.open(path, 'wb') as target:
@@ -125,8 +123,5 @@ def transcribe(items):
             busy_s = sum(c['ms'] for c in clip_timings) / 1000
             print(f"{NAME} {kind}: {audio_s / max(busy_s, 1e-9):.0f}x realtime, peak {peak_bytes / 2**30 if peak_bytes else 0:.2f} GiB, "
                   f"CPU {load['cpuPercent']}, GPU {load['gpuPercent']}")
-    path = store.sub('timings') / f'{NAME}.json'
-    merged = store.read_json(path, {})
-    merged.update(timings)
-    store.write_json(path, merged)
+    fluid_common.save_timings(NAME, timings)
     return texts
