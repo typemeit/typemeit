@@ -149,7 +149,7 @@ struct SquareGallery: View {
             ("field", AnyView(SquareFieldSpecimen())),
             ("settings row", AnyView(SquareSettingsRowSpecimen())),
             ("group", AnyView(SquareGroupSpecimen())),
-            ("list row", AnyView(SquareListRowSpecimen())),
+            ("list head", AnyView(SquareListHeadSpecimen())),
             ("status", AnyView(SquareStatusSpecimen())),
             ("sidebar", AnyView(SquareSidebarSpecimen())),
             ("page header", AnyView(SquarePageHeaderSpecimen())),
