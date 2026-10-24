@@ -407,6 +407,7 @@ final class MeetingCoordinator {
             // After the meeting just recorded is queued, so its own pass goes first.
             resumeTranscribingAfterRecording()
         }
+        let filedWhileLive = [recordingMeeting?.id, snapshotID].compactMap { $0.flatMap(store.meeting)?.folder }.first
         discardSnapshot()
         guard var meeting = recordingMeeting else { return }
         let folder = MeetingFolder.staged(meeting.id)
@@ -431,6 +432,7 @@ final class MeetingCoordinator {
             meeting.continues = earlier.id
             DebugLog.write("Meeting \(meeting.id) is a rejoin of \(earlier.id); joining them")
         }
+        meeting.folder = filedWhileLive ?? Meeting.seriesFolder(for: meeting, among: store.meetings)
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
         if settings.meetingAskBeforeTranscribing, !stoppedForDisk { askBeforeTranscribing(meeting.id) } else { enqueue(meeting) }
@@ -682,6 +684,27 @@ final class MeetingCoordinator {
         }
     }
 
+    /// Meetings a folder is being suggested for, for the page's placeholder.
+    private(set) var suggestingFolder: Set<UUID> = []
+
+    /// Asks the model where a meeting with a summary and no folder belongs:
+    /// an existing folder or a new one's name (`MeetingFolderPick.suggestion`).
+    /// The answer waits on the meeting's page and in the move menu; nothing
+    /// is filed until the user takes it.
+    func suggestFolder(_ id: UUID) {
+        guard let meeting = store.meeting(id), meeting.folder == nil, meeting.folderSuggestion == nil,
+              let summary = meeting.summary, !summary.isEmpty, !suggestingFolder.contains(id) else { return }
+        let folders = meeting.folderChoices(store.folderCounts.map(\.name), among: store.meetings)
+        suggestingFolder.insert(id)
+        Task {
+            let suggestion = await MeetingFolderPick.suggestion(title: meeting.title, summary: summary, among: folders)
+            suggestingFolder.remove(id)
+            guard let suggestion else { return }
+            store.suggestFolder(suggestion, for: id)
+            DebugLog.write("Meeting \(id) has a folder suggestion, from \(counted(folders.count, "folder"))")
+        }
+    }
+
     private static func titleIsPlaceholder(_ meeting: Meeting) -> Bool {
         meeting.titleSource == .app || meeting.titleSource == .roster
     }
@@ -774,6 +797,7 @@ final class MeetingCoordinator {
             } else {
                 toast(.meetingFolderUnavailable)
             }
+            suggestFolder(meeting.id)
         case .failed:
             toast(.meetingFailed(id: meeting.id))
         case .pending, .running:

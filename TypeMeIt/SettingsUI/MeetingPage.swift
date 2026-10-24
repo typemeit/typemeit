@@ -243,6 +243,7 @@ struct MeetingPage: View {
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .padding(.top, 10)
+            folderSuggestion
             state.padding(.top, 20)
             asking
             hooks
@@ -334,6 +335,34 @@ struct MeetingPage: View {
                 .tracking(-0.6)
                 .foregroundStyle(DesignTokens.Colors.ink)
                 .textSelection(.enabled)
+        }
+    }
+
+    /// For a meeting in no folder: the model's folder suggestion to take or
+    /// leave, "new folder" when no meeting is in it yet, or the link that
+    /// asks for one when it has a summary.
+    @ViewBuilder private var folderSuggestion: some View {
+        if let suggestion = meeting.openFolderSuggestion {
+            HStack(spacing: 8) {
+                Text(store.folderCounts.contains { $0.name == suggestion } ? "folder: \(suggestion)?" : "new folder: \(suggestion)?")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                Button("yes") { store.file(ids: [meeting.id], in: suggestion) }
+                    .buttonStyle(SquareButtonStyle(small: true))
+                Button("no") { store.file(ids: [meeting.id], in: nil) }
+                    .buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
+            }
+            .padding(.top, 10)
+        } else if meeting.folder == nil {
+            if coordinator.suggestingFolder.contains(meeting.id) {
+                Text("suggesting a folder…")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .padding(.top, 10)
+            } else if meeting.isDone, !live, !(meeting.summary ?? "").isEmpty {
+                SquareLink(title: "suggest a folder", size: 12, color: DesignTokens.Colors.ink2) { coordinator.suggestFolder(meeting.id) }
+                    .padding(.top, 10)
+            }
         }
     }
 
