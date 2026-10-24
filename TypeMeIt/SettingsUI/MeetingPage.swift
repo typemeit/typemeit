@@ -784,7 +784,7 @@ private struct MeetingTranscript: View {
 
     private func marked(_ text: String, paragraph: Int) -> AttributedString {
         var marked = AttributedString(text)
-        for range in TranscriptFind.ranges(of: find, in: text) {
+        for range in TextSearch.ranges(of: find, in: text) {
             guard let run = Range(range, in: marked) else { continue }
             if current == TranscriptFind.Hit(paragraph: paragraph, range: range) {
                 marked[run].backgroundColor = DesignTokens.Colors.slab

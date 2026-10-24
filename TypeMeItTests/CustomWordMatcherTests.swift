@@ -161,10 +161,15 @@ final class CustomWordMatcherTests: XCTestCase {
         let heard = [("say", 0.99), ("type", 0.5), ("me", 0.6), ("it,", 0.7), ("now", 0.99)].enumerated().map { i, word in
             Transcriber.Word(text: word.0, confidence: Float(word.1), start: .milliseconds(i * 100), end: .milliseconds(i * 100 + 80))
         }
-        XCTAssertEqual(MeetingTranscriber.matched(heard, terms: [.init("typeme.it")]), [
+        XCTAssertEqual(MeetingTranscriber.matched(heard, terms: [.init("typeme.it")], isKnownWord: { _ in false }), [
             heard[0],
             Transcriber.Word(text: "typeme.it,", confidence: 0.5, start: .milliseconds(100), end: .milliseconds(380)),
             heard[4],
         ])
+    }
+
+    func testAMeetingKeepsAnUnsureDictionaryWordHeardOnSoundAlone() {
+        let heard = [Transcriber.Word(text: "faster", confidence: 0.6, start: .zero, end: .milliseconds(300))]
+        XCTAssertEqual(MeetingTranscriber.matched(heard, terms: [.init("Fastor")], isKnownWord: { $0 == "faster" }), heard)
     }
 }
