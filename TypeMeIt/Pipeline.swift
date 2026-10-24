@@ -34,6 +34,7 @@ final class Pipeline {
 
     private init() {
         shortcuts.onEvent = { [weak self] event in self?.handle(event) }
+        SquareShortcutRecorder.listeningChanged = { [weak self] listening in self?.shortcuts.pauseHotKeys(listening) }
         capture.onLevel = { [weak self] level in
             Task { @MainActor in self?.overlay.setLevel(level) }
         }
@@ -71,7 +72,7 @@ final class Pipeline {
         if settings.postProcessingEnabled, settings.screenContextEnabled { Task.detached { await ScreenContext.prewarm() } }
         // Loading the model takes seconds; done here, the first dictation does not pay for it.
         if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
-        MeetingCoordinator.shared.start()
+        if Sandbox.hasMeetings { MeetingCoordinator.shared.start() }
     }
 
     /// A meeting is being recorded: the output stays unmuted and unpaused,

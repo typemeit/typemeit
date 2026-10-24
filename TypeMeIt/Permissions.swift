@@ -19,7 +19,8 @@ enum MissingPermission: CaseIterable {
     var consequence: String {
         switch self {
         case .microphone: "type me it can't record"
-        case .accessibility: "type me it can't see the fn key or type where your cursor is"
+        case .accessibility:
+            Sandbox.watchesFn ? "type me it can't see the fn key or type where your cursor is" : "type me it can't type where your cursor is"
         }
     }
 

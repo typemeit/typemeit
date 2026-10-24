@@ -112,6 +112,10 @@ final class Settings {
     var copyLastShortcut: KeyCombo? {
         didSet { defaults.set(copyLastShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "copyLastShortcut") }
     }
+    /// The key held to dictate where there is no Fn (`Sandbox.watchesFn`).
+    var dictationShortcut: KeyCombo {
+        didSet { defaults.set(try? JSONEncoder().encode(dictationShortcut), forKey: "dictationShortcut") }
+    }
     /// Words removed by the learned-words toast's Undo. Never learned again.
     var undoneWords: [String] { didSet { defaults.set(undoneWords, forKey: "undoneWords") } }
     /// Ask to record when another app opens the microphone. Off, the menu
@@ -188,7 +192,9 @@ final class Settings {
         keepRecordings = bool("keepRecordings", Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
         autoUpdate = bool("autoUpdate", true)
         askBeforeUpdating = bool("askBeforeUpdating", true)
-        launchAtLogin = bool("launchAtLogin", true)
+        // App Review refuses an app that adds itself to login items without
+        // being asked (guideline 2.4.5), so the store build starts with it off.
+        launchAtLogin = bool("launchAtLogin", !Sandbox.isActive)
         appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
         cloudColorEnabled = bool("cloudColorEnabled", false)
         cloudColor = CloudColor(rawValue: d.string(forKey: "cloudColor") ?? "") ?? .coral
@@ -198,6 +204,7 @@ final class Settings {
         onboardingComplete = bool("onboardingComplete", false)
         speechModelVersion = d.string(forKey: "speechModelVersion")
         copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
+        dictationShortcut = d.data(forKey: "dictationShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) } ?? .optionSpace
         undoneWords = d.stringArray(forKey: "undoneWords") ?? []
         meetingAsk = bool("meetingAsk", true)
         meetingPreRoll = bool("meetingPreRoll", true)
@@ -266,11 +273,14 @@ enum AppVersion {
 
 enum Fixed {
     static let websiteURL = URL(string: "https://typeme.it")!
+    static let privacyURL = websiteURL.appending(path: "privacy")
     static let contactEmail = "hello@typeme.it"
     static let contactURL = URL(string: "mailto:\(contactEmail)")!
     /// The GitHub release page for a version, linked from the about row.
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
     static let holdThresholdMs = 300
+    /// How often a held hotkey's modifiers are checked for release.
+    static let holdPollMs = 20.0
     /// The microphone stays open this long after a dictation is stopped, so
     /// a last word said as Fn goes up is not cut off.
     static let recordingTail: Duration = .milliseconds(300)

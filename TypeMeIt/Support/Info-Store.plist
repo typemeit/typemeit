@@ -31,7 +31,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>type me it records your voice while you hold the Fn key so it can transcribe it.</string>
+	<string>type me it records your voice while you hold the dictation shortcut, and transcribes it on this Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

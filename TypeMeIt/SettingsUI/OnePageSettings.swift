@@ -8,10 +8,13 @@ enum SettingsSection: String, CaseIterable {
     /// What the group is for, over its rows when it opens.
     var blurb: String? {
         switch self {
-        case .onThisMac: "dictations, meetings and their audio are stored on this mac and nowhere else."
+        case .onThisMac: Sandbox.hasMeetings ? "dictations, meetings and their audio are stored on this mac and nowhere else." : "dictations and their audio are stored on this mac and nowhere else."
         default: nil
         }
     }
+
+    /// The groups this build shows.
+    static var available: [SettingsSection] { allCases.filter { $0 != .meetings || Sandbox.hasMeetings } }
 }
 
 /// How many dictations or meetings are kept: the last n, everything (0),
@@ -90,7 +93,7 @@ struct OnePageSettings: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(SettingsSection.allCases, id: \.self) { section in
+                    ForEach(SettingsSection.available, id: \.self) { section in
                         SquareGroup(title: section.rawValue, summary: summary(section), blurb: section.blurb, open: binding(section)) {
                             rows(section)
                         }
@@ -240,6 +243,12 @@ struct OnePageSettings: View {
             }
             SquareSettingsRow(label: "mute audio", help: "mutes your speakers while you dictate · not during meetings") { toggle("mute audio", $settings.muteWhileRecording) }
             SquareSettingsRow(label: "pause audio", help: "pauses music or video while you dictate · not during meetings") { toggle("pause audio", $settings.pauseWhileRecording) }
+            if !Sandbox.watchesFn {
+                SquareSettingsRow(label: "hold to talk") {
+                    SquareShortcutRecorder(combo: Binding(get: { settings.dictationShortcut }, set: { if let c = $0 { settings.dictationShortcut = c } }), clearable: false)
+                }
+                SquareSettingsRow(label: "pin", help: "\(settings.dictationShortcut.inline) again to finish") { SquareKeycap("space") }
+            }
             SquareSettingsRow(label: "check audio", help: "tests your mic and speakers · writes the results to the debug log and your clipboard · plays a short tone · includes device and app names") {
                 Button(checkingAudio ? "running" : "run") {
                     checkingAudio = true
@@ -351,23 +360,27 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "delete all") {
                 deleteAll(store.history.count, "dictation", showing: $deletingDictations) { store.deleteAllHistory() }
             }
-            SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
-            SquareSettingsRow(label: "keep", help: "only transcribed meetings count") {
-                SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
-            }
-            SquareSettingsRow(label: "keep the audio", help: "replay meetings and relearn voices · off: deleted after transcribing") {
-                toggle("keep the meetings' audio", $settings.meetingKeepAudio)
-            }
-            SquareSettingsRow(label: "delete all") {
-                // A meeting still recording is left alone; it can be deleted once it stops.
-                let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
-                deleteAll(ids.count, "meeting", showing: $deletingMeetings) { meetings.delete(ids: ids) }
-            }
-            SquareSettingsRow(label: "folder", caption: folderPath) {
-                Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
-                    .buttonStyle(SquareButtonStyle())
-                    .disabled(!meetings.folderAvailable)
-            }
+            if Sandbox.hasMeetings { meetingStorageRows }
+        }
+    }
+
+    @ViewBuilder private var meetingStorageRows: some View {
+        SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
+        SquareSettingsRow(label: "keep", help: "only transcribed meetings count") {
+            SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
+        }
+        SquareSettingsRow(label: "keep the audio", help: "replay meetings and relearn voices · off: deleted after transcribing") {
+            toggle("keep the meetings' audio", $settings.meetingKeepAudio)
+        }
+        SquareSettingsRow(label: "delete all") {
+            // A meeting still recording is left alone; it can be deleted once it stops.
+            let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
+            deleteAll(ids.count, "meeting", showing: $deletingMeetings) { meetings.delete(ids: ids) }
+        }
+        SquareSettingsRow(label: "folder", caption: folderPath) {
+            Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
+                .buttonStyle(SquareButtonStyle())
+                .disabled(!meetings.folderAvailable)
         }
     }
 
@@ -435,6 +448,12 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "website") {
                 SquareLink(title: "typeme.it", size: 12) { NSWorkspace.shared.open(Fixed.websiteURL) }
             }
+            // App Review wants the privacy policy reachable in the app (5.1.1(i)).
+            if Sandbox.isStoreBuild {
+                SquareSettingsRow(label: "privacy") {
+                    SquareLink(title: "typeme.it/privacy", size: 12) { NSWorkspace.shared.open(Fixed.privacyURL) }
+                }
+            }
             SquareSettingsRow(label: "contact") {
                 Button(Fixed.contactEmail) { NSWorkspace.shared.open(Fixed.contactURL) }.buttonStyle(SquareButtonStyle())
             }
@@ -460,7 +479,7 @@ struct OnePageSettings: View {
     private func summary(_ section: SettingsSection) -> String {
         switch section {
         case .dictation:
-            return OnePageSettings.join(microphoneName(settings.microphoneUID ?? ""),
+            return OnePageSettings.join(Sandbox.watchesFn ? nil : settings.dictationShortcut.inline, microphoneName(settings.microphoneUID ?? ""),
                                         settings.muteWhileRecording ? "mutes audio" : settings.pauseWhileRecording ? "pauses audio" : nil,
                                         settings.cloudChoice.label, settings.cloudPosition.label, settings.audioFeedback ? "sounds on" : "sounds off")
         case .cleanUp:
@@ -480,9 +499,10 @@ struct OnePageSettings: View {
             let assistantSummary = OnePageSettings.join(ask, hooks, settings.mcpEnabled ? "mcp on" : nil)
             return assistantSummary.isEmpty ? "off" : assistantSummary
         case .onThisMac:
-            let keeps = [KeepLimit.dictations.summary(settings.historyLimit), KeepLimit.meetings.summary(settings.meetingLimit)].compactMap { $0 }
+            let meetingKeep = Sandbox.hasMeetings ? KeepLimit.meetings.summary(settings.meetingLimit) : nil
+            let keeps = [KeepLimit.dictations.summary(settings.historyLimit), meetingKeep].compactMap { $0 }
             return OnePageSettings.join(keeps.isEmpty ? "keeps everything" : keeps.joined(separator: " · "),
-                                        meetingsUsage.map { "meetings use \($0)" })
+                                        Sandbox.hasMeetings ? meetingsUsage.map { "meetings use \($0)" } : nil)
         case .app:
             return OnePageSettings.join(AppVersion.current, updateSummary, settings.launchAtLogin ? "opens at login" : nil,
                                         settings.appearance == .system ? nil : settings.appearance.label)
@@ -704,8 +724,9 @@ struct OnePageSettings: View {
     }
 
     private var updateSummary: String {
-        if Updates.isDevBuild { return "dev build · never updates" }
+        // Store first, so a dev build previewing the store says what the store build does.
         if !Sandbox.updatesItself { return "updated by the app store" }
+        if Updates.isDevBuild { return "dev build · never updates" }
         switch updates.state {
         case .checking: return "checking…"
         case .upToDate: return "up to date"

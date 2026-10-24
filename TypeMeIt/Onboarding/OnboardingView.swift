@@ -9,21 +9,29 @@ struct OnboardingView: View {
 
     enum Step: Int, CaseIterable { case model, microphone, accessibility, cleanup, globeKey, tryIt }
 
+    /// The steps this build shows: the 🌐 key matters only where Fn is the
+    /// dictation key.
+    static let steps = Step.allCases.filter { $0 != .globeKey || Sandbox.watchesFn }
+
     /// Opens on the first step that is not yet satisfied, so a permission
     /// lost since the last launch (a reinstall, a signature change, a TCC
     /// reset) lands straight on its page.
     @State private var step: Step = OnboardingView.firstUnsatisfiedStep()
     @State private var modelStore = ModelStore.shared
-    @State private var micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    private var micGranted: Bool { micStatus == .authorized }
     @State private var axGranted = AXIsProcessTrusted()
     @State private var fnOK = SecureInput.fnKeyDoesNothing
     /// The one-click fix did not take, so the button opens Keyboard settings.
     @State private var fnNeedsSettings = false
     @State private var availability = PostProcessor.availability
     @State private var dictated = false
-    /// Steps whose grant click did not produce a permission. macOS shows the
-    /// prompt once per app, so the button on these steps opens System Settings.
+    /// Steps whose grant or continue press did not bring up the macOS
+    /// prompt. macOS shows it once per app, so these steps offer System
+    /// Settings instead.
     @State private var needsSettings: Set<Step> = []
+    /// Store build: permission steps whose prompt has been asked for on this run.
+    @State private var asked: Set<Step> = []
     @State private var scratch = ""
     @FocusState private var scratchFocused: Bool
     @State private var store = Store.shared
@@ -32,7 +40,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("step \(step.rawValue + 1) of \(Step.allCases.count)")
+                Text("step \(position + 1) of \(Self.steps.count)")
                     .font(DesignTokens.Fonts.micro.monospaced())
                     .foregroundStyle(DesignTokens.Colors.ink3)
                 Text(title)
@@ -50,16 +58,16 @@ struct OnboardingView: View {
                 .transition(.opacity)
             Spacer(minLength: 0)
             HStack(spacing: 8) {
-                StepDots(current: step.rawValue, count: Step.allCases.count)
+                StepDots(current: position, count: Self.steps.count)
                 Spacer()
                 if step == .tryIt, !dictated {
                     Button("skip") { finished() }
                         .buttonStyle(InkButtonStyle(quiet: true))
                 }
-                Button(step == .tryIt ? "finish" : "continue") { advance() }
+                Button(step == .tryIt ? "finish" : "continue") { continuePressed() }
                     .buttonStyle(InkButtonStyle(primary: true))
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!canContinue)
+                    .disabled(!canContinue && !(Sandbox.isStoreBuild && isPermissionStep))
             }
         }
         .padding(28)
@@ -84,12 +92,16 @@ struct OnboardingView: View {
 
     private var body_: String {
         switch step {
-        case .model: "hold the fn key, speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
-        case .microphone: "type me it needs the microphone."
-        case .accessibility: "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+        case .model: "hold \(Sandbox.watchesFn ? "the fn key" : Shortcuts.holdKeyName), speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
+        case .microphone:
+            Sandbox.isStoreBuild ? "type me it listens only while you dictate. the audio stays on this mac." : "type me it needs the microphone."
+        case .accessibility:
+            Sandbox.watchesFn
+                ? "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+                : "lets type me it paste your words where your cursor is."
         case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
         case .cleanup: "apple intelligence tidies your words on this mac."
-        case .tryIt: "hold fn and say something. let go when you are done."
+        case .tryIt: "hold \(Shortcuts.holdKeyName) and say something. let go when you are done."
         }
     }
 
@@ -97,10 +109,14 @@ struct OnboardingView: View {
         switch step {
         case .model:
             SettingsGroup { ModelDownloadRows() }
+        case .microphone where Sandbox.isStoreBuild:
+            storePermission("microphone", granted: micGranted, refused: micStatus == .denied, settings: SecureInput.microphoneSettingsURL)
+        case .accessibility where Sandbox.isStoreBuild:
+            storePermission("accessibility", granted: axGranted, refused: false, settings: SecureInput.accessibilitySettingsURL)
         case .microphone:
             permission("microphone", granted: micGranted, grant: {
                 if AVCaptureDevice.authorizationStatus(for: .audio) == .denied { return false }
-                AVCaptureDevice.requestAccess(for: .audio) { ok in Task { @MainActor in micGranted = ok } }
+                AVCaptureDevice.requestAccess(for: .audio) { _ in Task { @MainActor in refresh() } }
                 return true
             }, missing: { AVCaptureDevice.authorizationStatus(for: .audio) != .authorized }, settings: SecureInput.microphoneSettingsURL)
         case .accessibility:
@@ -214,6 +230,60 @@ struct OnboardingView: View {
         }
     }
 
+    /// The store build's permission row: state only. Asking is the continue
+    /// button's job, since App Review wants the press that brings up a
+    /// permission prompt to read "continue" (guideline 5.1.1(iv)). Once
+    /// macOS has been answered, or will not ask again, the row offers
+    /// System Settings.
+    private func storePermission(_ label: String, granted: Bool, refused: Bool, settings: URL) -> some View {
+        let unasked = needsSettings.contains(step)
+        let subtitle: String? = granted ? nil : refused ? "off. turn it on in system settings." : unasked ? "macos did not ask, so turn it on in system settings" : nil
+        return SettingsGroup {
+            SettingsRow(label: label, subtitle: subtitle, last: true) {
+                if granted {
+                    Status("granted", done: true)
+                } else if refused || unasked {
+                    Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(InkButtonStyle(primary: true))
+                }
+            }
+        }
+    }
+
+    private var isPermissionStep: Bool { step == .microphone || step == .accessibility }
+
+    /// In the store build, on a permission step not yet granted, the first
+    /// press asks macOS. A refusal moves on, and a later press moves on
+    /// whatever the answer: App Review wants the refusal respected.
+    private func continuePressed() {
+        guard Sandbox.isStoreBuild else { advance(); return }
+        switch step {
+        case .microphone where micStatus == .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { ok in
+                Task { @MainActor in
+                    refresh()
+                    // A grant moves on through `advanceWhenSettled`, after the check shows.
+                    if !ok, step == .microphone { advance() }
+                }
+            }
+        case .accessibility where !axGranted && !asked.contains(.accessibility):
+            asked.insert(.accessibility)
+            let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+            axGranted = AXIsProcessTrustedWithOptions(opts)
+            // No dialog took the focus: macOS used the prompt up on an
+            // earlier launch, so the pane opens instead.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                refresh()
+                if step == .accessibility, !axGranted, NSApp.isActive {
+                    needsSettings.insert(.accessibility)
+                    NSWorkspace.shared.open(SecureInput.accessibilitySettingsURL)
+                }
+            }
+        default:
+            advance()
+        }
+    }
+
     private var canContinue: Bool {
         switch step {
         case .model: modelStore.state == .installed
@@ -227,10 +297,12 @@ struct OnboardingView: View {
 
     private func advance() {
         if step == .tryIt { finished(); return }
-        let next = Step(rawValue: step.rawValue + 1) ?? .tryIt
+        let next = Self.steps.first { $0.rawValue > step.rawValue } ?? .tryIt
         if next == .tryIt { startRunning() }
         move(to: next)
     }
+
+    private var position: Int { Self.steps.firstIndex(of: step) ?? 0 }
 
     private func move(to next: Step) {
         step = next
@@ -261,12 +333,12 @@ struct OnboardingView: View {
         guard Settings.shared.onboardingComplete, ModelStore.isInstalled else { return .model }
         if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized { return .microphone }
         if !AXIsProcessTrusted() { return .accessibility }
-        if !SecureInput.fnKeyDoesNothing { return .globeKey }
+        if Sandbox.watchesFn, !SecureInput.fnKeyDoesNothing { return .globeKey }
         return .model
     }
 
     private func refresh() {
-        micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         axGranted = AXIsProcessTrusted()
         fnOK = SecureInput.fnKeyDoesNothing
         availability = PostProcessor.availability

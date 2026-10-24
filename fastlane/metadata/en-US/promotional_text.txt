@@ -1,1 +1,1 @@
-hold fn, speak, let go.
+hold ⌥ space, speak, let go.
