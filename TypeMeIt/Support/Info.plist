@@ -41,24 +41,26 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>type me it records the other side of a call when you ask it to record a meeting.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>type me it shows your camera through the type me it camera, with Claude's answers when you ask.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>type me it keeps your meetings in the folder you chose.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>type me it keeps your meetings in the folder you chose.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>type me it keeps your meetings in the folder you chose.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>type me it records your voice while you hold the Fn key so it can transcribe it.</string>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>type me it records the other side of a call when you ask it to record a meeting.</string>
-	<key>NSDocumentsFolderUsageDescription</key>
-	<string>type me it keeps your meetings in the folder you chose.</string>
-	<key>NSDesktopFolderUsageDescription</key>
-	<string>type me it keeps your meetings in the folder you chose.</string>
-	<key>NSDownloadsFolderUsageDescription</key>
-	<string>type me it keeps your meetings in the folder you chose.</string>
-	<key>NSRemovableVolumesUsageDescription</key>
-	<string>type me it keeps your meetings in the folder you chose.</string>
 	<key>NSNetworkVolumesUsageDescription</key>
 	<string>type me it keeps your meetings in the folder you chose.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>type me it keeps your meetings in the folder you chose.</string>
 	<key>SUAutomaticallyUpdate</key>
 	<true/>
 	<key>SUEnableAutomaticChecks</key>

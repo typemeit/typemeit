@@ -72,6 +72,11 @@ final class Pipeline {
         // Loading the model takes seconds; done here, the first dictation does not pay for it.
         if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
         MeetingCoordinator.shared.start()
+        if !Sandbox.isActive {
+            CameraFeed.shared.start()
+            // Where the camera stands, for its settings row; after an update, a newer camera replaces the old one.
+            CameraInstaller.shared.refresh(update: settings.askClaudeOnCamera)
+        }
     }
 
     /// A meeting is being recorded: the output stays unmuted and unpaused,

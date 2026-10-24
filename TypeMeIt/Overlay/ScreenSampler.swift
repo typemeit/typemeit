@@ -36,7 +36,12 @@ enum ScreenSampler {
         config.showsCursor = false
         config.captureResolution = .nominal
         guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else { return nil }
-        return luminance(of: image).map { $0 > 0.5 ? .light : .dark }
+        return luminance(of: image).map(backdrop(luminance:))
+    }
+
+    /// Light or dark, for a mean luminance from `luminance(of:)`.
+    static func backdrop(luminance: Double) -> Backdrop {
+        luminance > 0.5 ? .light : .dark
     }
 
     /// Mean relative luminance across the image, 0 to 1. Nil if the pixels

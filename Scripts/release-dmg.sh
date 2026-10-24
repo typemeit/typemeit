@@ -49,6 +49,11 @@ cat > "$BUILD/ExportOptions-developer-id.plist" <<PLIST
   <string>manual</string>
   <key>signingCertificate</key>
   <string>Developer ID Application</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>it.typeme.typemeit</key>
+    <string>it.typeme.typemeit Developer ID</string>
+  </dict>
 </dict>
 </plist>
 PLIST
@@ -91,11 +96,16 @@ grep -q "Developer ID Application" <<<"$info" || { echo "not signed with a Devel
 grep -q "Timestamp=" <<<"$info" || { echo "no secure timestamp; notarization rejects that"; exit 1; }
 grep -q "flags=0x10000(runtime)" <<<"$info" || { echo "hardened runtime is not enabled"; exit 1; }
 
-# The signed entitlements can grow without a change to TypeMeIt.entitlements:
-# a capability toggled in Xcode, a build setting, a dependency's advice. The
-# microphone is the only one the app needs, so a set with anything else in it
-# fails here, before notarization.
-EXPECTED_ENTITLEMENTS="com.apple.security.device.audio-input"
+# The signed entitlements can grow without a change to TypeMeIt-Release.entitlements:
+# a capability toggled in Xcode, a build setting, a dependency's advice. The app
+# needs the microphone, the camera, adding the type me it camera, and the two
+# its provisioning profile brings, so a set with anything else in it fails
+# here, before notarization.
+EXPECTED_ENTITLEMENTS="com.apple.application-identifier
+com.apple.developer.system-extension.install
+com.apple.developer.team-identifier
+com.apple.security.device.audio-input
+com.apple.security.device.camera"
 entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null | plutil -convert xml1 -o - - 2>/dev/null | sed -n 's|.*<key>\(.*\)</key>.*|\1|p' | sort || true)"
 if [ "$entitlements" != "$EXPECTED_ENTITLEMENTS" ]; then
   echo "the app's entitlements are not the expected set"

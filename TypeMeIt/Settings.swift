@@ -158,6 +158,12 @@ final class Settings {
     /// them, in its `--allowedTools` syntax. Empty leaves every action to the
     /// classifier.
     var askClaudeTools: [String] { didSet { defaults.set(askClaudeTools, forKey: "askClaudeTools") } }
+    /// The cloud and Claude's answers show on the type me it camera while a
+    /// meeting records. Off, it shows the plain camera.
+    var askClaudeOnCamera: Bool { didSet { defaults.set(askClaudeOnCamera, forKey: "askClaudeOnCamera") } }
+    /// The camera `CameraFeed` shows through the type me it camera: a
+    /// capture device's unique id, or empty for the Mac's default camera.
+    var meetingCamera: String { didSet { defaults.set(meetingCamera, forKey: "meetingCamera") } }
     /// Starts and stops a room recording. Nil means no shortcut.
     var recordRoomShortcut: KeyCombo? {
         didSet { defaults.set(recordRoomShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "recordRoomShortcut") }
@@ -214,6 +220,8 @@ final class Settings {
         askClaudeFolder = d.string(forKey: "askClaudeFolder") ?? FileManager.default.homeDirectoryForCurrentUser.path
         askClaudeTools = d.stringArray(forKey: "askClaudeTools") ?? []
         askClaudeModel = d.string(forKey: "askClaudeModel") ?? ClaudeRun.defaultModel
+        askClaudeOnCamera = bool("askClaudeOnCamera", false)
+        meetingCamera = d.string(forKey: "meetingCamera") ?? ""
         recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         debugLogs = bool("debugLogs", false)
         DebugLog.enabled = debugLogs

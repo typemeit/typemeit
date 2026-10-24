@@ -308,7 +308,7 @@ struct InkProgress: View {
 }
 
 /// One square per step: ink for the steps reached, ink-a08 for the rest.
-private struct StepDots: View {
+struct StepDots: View {
     var current: Int
     var count: Int
 

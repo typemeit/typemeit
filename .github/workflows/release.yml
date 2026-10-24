@@ -33,6 +33,8 @@ jobs:
         env:
           DEVELOPER_ID_CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
           DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          # Made by Scripts/signing-profiles.swift; adding the type me it camera needs it.
+          MAC_DEVELOPER_ID_PROFILE: ${{ secrets.MAC_DEVELOPER_ID_PROFILE }}
         run: |
           KEYCHAIN="$RUNNER_TEMP/devid.keychain-db"
           security create-keychain -p "" "$KEYCHAIN"
@@ -42,6 +44,8 @@ jobs:
           echo "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
           security import "$RUNNER_TEMP/devid.p12" -k "$KEYCHAIN" -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$MAC_DEVELOPER_ID_PROFILE" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/typemeit-developer-id.provisionprofile"
       - name: Write App Store Connect API key
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
