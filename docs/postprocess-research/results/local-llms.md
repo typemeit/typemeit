@@ -1,6 +1,6 @@
 # Local LLMs in place of the Apple model
 
-Variant GL (`Scripts/postprocess-lab/variants/GL.patch`) is G with the conservative
+Variant GL ([`Scripts/postprocess-lab/variants/GL.patch`](https://github.com/typemeit/typemeit/blob/65f3bd5/Scripts/postprocess-lab/variants/GL.patch)) is G with the conservative
 gate, but the model call goes to `llama-server` on localhost instead of
 `LanguageModelSession`: same instructions as the system message, same prompt as the
 user message, greedy (temperature 0), the same response-token cap, thinking turned
@@ -11,7 +11,7 @@ Server: llama.cpp build 10809, Metal, all layers on the GPU, 8192-token context,
 `--parallel 1 --cache-reuse 256` (with more than one slot, requests landed on a
 cold slot and the instructions were prefilled again every call). Q4 GGUFs. One run
 at a time, cold eval mode, M4 24 GB with other apps running. Harness:
-`Scripts/postprocess-lab/llm/eval-model.sh`.
+[`Scripts/postprocess-lab/llm/eval-model.sh`](https://github.com/typemeit/typemeit/blob/65f3bd5/Scripts/postprocess-lab/llm/eval-model.sh).
 
 | model | eval | words only | wishes (words) | p50 ms | p90 | p95 | mean | decode ms/token | prompt tokens prefilled per call |
 |---|---|---|---|---|---|---|---|---|---|

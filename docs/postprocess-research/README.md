@@ -11,7 +11,7 @@ Layout:
 - `results/` — measured numbers. Eval runs in full (`results/eval/`, synthetic
   cases); real dictations and recordings as aggregates only, since they are private.
 - `notes/` — research reports with sources, one per topic.
-- `Scripts/postprocess-lab/` — the rig: a timed copy of the eval runner, every
+- [`Scripts/postprocess-lab/`](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/postprocess-lab) — the rig: a timed copy of the eval runner, every
   variant as a patch against `main` (6f5ca86), the Parakeet-heard eval set
   (`sets/`), and the speech-recognition, punctuation, screen-term, local-LLM,
   AssemblyAI and unit-test harnesses.
@@ -49,7 +49,7 @@ author's settings instead. On the eval as updated alongside it
 335/335 with 6 of 22 wishes; `main` on the same cases passed 334/335 with 4. The
 wish `main` granted and G7 does not attempt is "let's meet at five actually six":
 nothing in it calls the model. The lab patches still apply to the clean-up sources
-at 6f5ca86, which `Scripts/postprocess-lab/run.sh` reads from git.
+at 6f5ca86, which [`Scripts/postprocess-lab/run.sh`](https://github.com/typemeit/typemeit/blob/65f3bd5/Scripts/postprocess-lab/run.sh) reads from git.
 
 **Bugs in `main` before this change:**
 
@@ -80,7 +80,7 @@ at 6f5ca86, which `Scripts/postprocess-lab/run.sh` reads from git.
   mode (new session per run, as `make eval` does today) unless noted.
 - Parakeet-heard eval: the same cases with each input replaced by what the app's
   recogniser heard when the input was spoken (`say -v Daniel`), with the
-  recogniser's word confidences (`Scripts/postprocess-lab/sets/`).
+  recogniser's word confidences ([`Scripts/postprocess-lab/sets/`](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/postprocess-lab/sets)).
 - Real use: 150 of the author's dictations from `history.json`, seeded sample,
   replayed with their writing styles and custom words, in prewarm mode (the app
   prewarms the session while the user speaks). Code-only passes over all 1,177.
@@ -279,6 +279,8 @@ On real sentences with Parakeet's punctuation as the answer key, sherpa-onnx
 - Apple SpeechTranscriber / DictationTranscriber on the same recordings.
 
 ## Reproducing
+
+The rig is no longer on `main`; run these from a checkout of 65f3bd5.
 
 ```sh
 Scripts/postprocess-lab/run.sh baseline main-cold          # the stock eval, timed

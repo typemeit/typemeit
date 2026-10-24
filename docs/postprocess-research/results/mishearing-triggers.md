@@ -16,7 +16,7 @@ carry a mishearing the model fixes.
 
 ## Word confidence from the recogniser
 
-transcribe.cpp reports a confidence per word (`Scripts/postprocess-lab/tcpp`).
+transcribe.cpp reports a confidence per word ([`Scripts/postprocess-lab/tcpp`](https://github.com/typemeit/typemeit/tree/684b4a3/Scripts/postprocess-lab/tcpp)).
 Across the 135 recordings: p5 0.89, p10 0.90, p25 0.95, median 0.99.
 
 | flag a dictation when a word is below | dictations flagged | model word changes caught |
@@ -30,7 +30,7 @@ usable trigger.
 
 ## macOS grammar checker
 
-`NSSpellChecker` grammar checking (`Scripts/postprocess-lab/grammar/`) on each
+`NSSpellChecker` grammar checking ([`Scripts/postprocess-lab/grammar/`](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/postprocess-lab/grammar)) on each
 transcript: 0 flags on 172 punctuated eval inputs and 0 on 150 real transcripts,
 including the one where the model later fixed "where" to "were". Not a trigger.
 

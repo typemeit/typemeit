@@ -50,7 +50,7 @@ Foundation Models framework][wwdc26-241], [Michael Tsai's round-up][mjtsai]
   for apps under two million lifetime downloads. Not on-device, so out of scope
   for this note.
 
-Everything measured below is the macOS 26 model. Rerun `Scripts/llm-bench` on
+Everything measured below is the macOS 26 model. Rerun `make eval` on
 macOS 27 before deciding anything; the recommendation at the end assumes the
 macOS 26 numbers.
 
@@ -133,11 +133,11 @@ times slower and should not ship.
 
 ## Measured, September 2026
 
-`make bench MODELS="..."` runs the cases in `Scripts/cleanup-eval/cases.json`
+The bench ([`Scripts/llm-bench` at 65f3bd5](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/llm-bench), since removed) ran the cases in `Scripts/cleanup-eval/cases.json`
 through each GGUF in-process via libllama with Metal, greedy sampling and a JSON grammar pinning the output
 to one field, which is the closest equivalent of guided generation. Machine: M4
-(base), 24 GB, macOS 26.6.1, llama.cpp 0.4.0, Q4_K_M weights. The prompt is read
-from `PostProcessor.swift`, so these are the app's live instructions.
+(base), 24 GB, macOS 26.6.1, llama.cpp 0.4.0, Q4_K_M weights. The prompt was read
+from `PostProcessor.swift`, so these were the app's instructions at the time.
 
 | Engine | File | Load | Resident with weights | Cases | Mean case | Generation tok/s |
 |---|---|---|---|---|---|---|

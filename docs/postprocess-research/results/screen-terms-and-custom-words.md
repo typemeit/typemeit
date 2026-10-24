@@ -7,7 +7,7 @@ without screen terms, and their model-call rates leave out every call the
 screen-term gate would make, and they ran without the author's learned aliases.
 This file measures both gaps and the fixes.
 
-Harness: `Scripts/postprocess-lab/screen/` (`run.sh rules|gate|replace|spell`).
+Harness: [`Scripts/postprocess-lab/screen/`](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/postprocess-lab/screen) (`run.sh rules|gate|replace|spell`).
 Real dictations are the author's 1,200 in `history.json`; only counts are stored.
 
 ## 1. The spell checker hides foreign names

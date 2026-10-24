@@ -38,7 +38,7 @@ Each row is one run of the 335 eval cases plus 14 wishes (`Scripts/cleanup-eval/
 The eval's inputs are typed, mostly lowercase and unpunctuated. Parakeet's output
 is punctuated and cased in ~77% of real dictations, so a second set replaces each
 input with what the app's recogniser (transcribe.cpp, parakeet-unified) heard when
-the input was spoken by `say -v Daniel`: `Scripts/postprocess-lab/sets/cases-parakeet-audio.json`,
+the input was spoken by `say -v Daniel`: [`Scripts/postprocess-lab/sets/cases-parakeet-audio.json`](https://github.com/typemeit/typemeit/blob/65f3bd5/Scripts/postprocess-lab/sets/cases-parakeet-audio.json),
 built by `parakeet-audio-cases.py`. 23 of 132 inputs came back unpunctuated.
 Expected outputs are unchanged. The first three rows count every word as
 confident (the eval default), so a sound-alike custom word is a hint for the
