@@ -2,17 +2,9 @@ import Foundation
 import XCTest
 @testable import TypeMeIt
 
-/// Gregorian calendar in UTC, so every date in these tests is a fixed
-/// instant regardless of the machine's zone.
-private let utc: Calendar = {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    return calendar
-}()
-
 /// 10:00 UTC on the given day, or the given hour.
 private func day(_ year: Int, _ month: Int, _ day: Int, hour: Int = 10) -> Date {
-    utc.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+    utcCalendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
 }
 
 private func row(_ date: Date, _ text: String) -> InsightRow {
@@ -20,7 +12,7 @@ private func row(_ date: Date, _ text: String) -> InsightRow {
 }
 
 private func compute(_ rows: [InsightRow], today: Date) -> InsightsStats {
-    Insights.compute(rows, now: today, calendar: utc)
+    Insights.compute(rows, now: today, calendar: utcCalendar)
 }
 
 // MARK: - Category
@@ -152,10 +144,10 @@ final class InsightsTests: XCTestCase {
         // 23:30 UTC on 2 September is already 3 September in Tokyo.
         var tokyo = Calendar(identifier: .gregorian)
         tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
-        let lateEvening = utc.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 23, minute: 30))!
+        let lateEvening = utcCalendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 23, minute: 30))!
         let rows = [row(lateEvening, "one two")]
 
-        let inUtc = Insights.compute(rows, now: day(2026, 9, 3), calendar: utc)
+        let inUtc = Insights.compute(rows, now: day(2026, 9, 3), calendar: utcCalendar)
         XCTAssertEqual(inUtc.activity, [DayActivity(date: "2026-09-02", dictations: 1, words: 2)])
         XCTAssertFalse(inUtc.activeToday)
 
@@ -366,7 +358,7 @@ final class InsightsTests: XCTestCase {
             InsightMeeting(started: day(2026, 9, 3), appId: "us.zoom.xos", appName: "zoom.us"),
             InsightMeeting(started: day(2026, 9, 3), appId: nil, appName: nil),
         ]
-        let stats = Insights.compute([dictation], meetings: meetings, now: day(2026, 9, 3), calendar: utc)
+        let stats = Insights.compute([dictation], meetings: meetings, now: day(2026, 9, 3), calendar: utcCalendar)
 
         XCTAssertEqual(stats.topApps, [
             AppUsage(name: "Slack", dictations: 1, words: 3, meetings: 1),

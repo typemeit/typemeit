@@ -2,39 +2,12 @@ import Foundation
 import Testing
 @testable import TypeMeIt
 
-private func tempRoot() -> URL {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    return dir
-}
-
-private func iso(_ string: String) -> Date { ISO8601DateFormatter().date(from: string)! }
-
-/// A minimally-filled `Meeting`: the fields `MCPTools` never reads (audio,
-/// dictations, transcription, tracks, echo) are fixed placeholders so every
-/// fixture meeting only has to spell out what the test cares about.
-private func makeMeeting(
-    id: UUID, kind: Meeting.Kind, started: Date, durationMs: Int,
-    app: Meeting.App?, title: String, speakers: [Meeting.Speaker],
-    paragraphs: [Meeting.Paragraph]
-) -> Meeting {
-    Meeting(
-        id: id, kind: kind, started: started, timeZone: "UTC",
-        ended: started.addingTimeInterval(Double(durationMs) / 1000),
-        durationMs: durationMs, recordedMs: durationMs, firstHostTime: nil,
-        app: app, title: title, titleSource: .app, published: true,
-        tracks: [], audio: nil, echo: .notMeasured, bothSilentMs: 0,
-        dictations: [], speakers: speakers,
-        transcription: Meeting.Transcription(state: .done, error: nil, asr: "test", diarizer: nil, tookMs: 0, done: [:]),
-        paragraphs: paragraphs)
-}
-
 private let slackID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
 private let zoomID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
 private let roomID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
 
 private func slackMeeting() -> Meeting {
-    makeMeeting(
+    MeetingFixtures.meeting(
         id: slackID, kind: .call, started: iso("2026-01-10T09:00:00Z"), durationMs: 2_400_000,
         app: Meeting.App(bundleId: "com.tinyspeck.slackmacgap", name: "Slack"), title: "Slack",
         speakers: [
@@ -48,7 +21,7 @@ private func slackMeeting() -> Meeting {
 }
 
 private func zoomMeeting() -> Meeting {
-    makeMeeting(
+    MeetingFixtures.meeting(
         id: zoomID, kind: .call, started: iso("2026-01-15T09:00:00Z"), durationMs: 1_500_000,
         app: Meeting.App(bundleId: "us.zoom.xos", name: "Zoom"), title: "Zoom",
         speakers: [
@@ -71,7 +44,7 @@ private func roomMeeting(paragraphCount: Int) -> Meeting {
             startMs: index * 2000, endMs: index * 2000 + 1500,
             text: "This is paragraph number \(index) about the migration plan, covering steps, risks and owners.")
     }
-    return makeMeeting(
+    return MeetingFixtures.meeting(
         id: roomID, kind: .room, started: iso("2026-02-01T09:00:00Z"), durationMs: 5_400_000,
         app: nil, title: "Room",
         speakers: [
@@ -81,20 +54,17 @@ private func roomMeeting(paragraphCount: Int) -> Meeting {
         paragraphs: paragraphs)
 }
 
-/// Writes the three meetings above under a fresh temporary root, plus a
-/// fourth meeting inside `.in-progress` that a correct scan never surfaces.
-private func writeFixture() throws -> URL {
-    let root = tempRoot()
+/// Writes the three meetings above under `root`, plus a fourth meeting
+/// inside `.in-progress` that a correct scan never surfaces.
+private func writeFixture(in root: URL) throws {
     try MeetingFolder.write(slackMeeting(), to: root.appendingPathComponent("Slack Meeting", isDirectory: true))
     try MeetingFolder.write(zoomMeeting(), to: root.appendingPathComponent("Zoom Meeting", isDirectory: true))
     try MeetingFolder.write(roomMeeting(paragraphCount: 300), to: root.appendingPathComponent("Room Meeting", isDirectory: true))
 
-    let staged = makeMeeting(
+    let staged = MeetingFixtures.meeting(
         id: UUID(), kind: .call, started: iso("2026-03-01T09:00:00Z"), durationMs: 60_000,
         app: nil, title: "Staged", speakers: [], paragraphs: [])
     try MeetingFolder.write(staged, to: root.appendingPathComponent(".in-progress/staged-uuid", isDirectory: true))
-
-    return root
 }
 
 /// Hooks held in memory, where the real server keeps them in the app's UserDefaults.
@@ -108,9 +78,9 @@ private func memoryHooks(_ box: HookBox = HookBox()) -> MCPTools.HookStore {
 
 private let releaseDictationID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
 
-/// Three dictations in `history.json` under `root`, written as the app's
-/// `Store` writes them, out of time order: the edited one is the newest.
-private func writeHistory(in root: URL) throws -> URL {
+/// Three dictations written to `history` as the app's `Store` writes
+/// them, out of time order: the edited one is the newest.
+private func writeHistory(to history: URL) throws {
     let entries = [
         HistoryEntry(id: releaseDictationID, timestamp: iso("2026-02-01T09:00:00Z"), transcript: "ship the release on friday", postProcessRequested: false,
                      typed: "Ship the release on Friday.", appName: "Slack", windowTitle: "release-planning", dictionaryFixes: 0),
@@ -121,9 +91,7 @@ private func writeHistory(in root: URL) throws -> URL {
     ]
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
-    let history = root.appendingPathComponent("history.json")
     try encoder.encode(entries).write(to: history)
-    return history
 }
 
 /// Splits `text` where `get_meeting` would: at `maxBytes` UTF-8 bytes, on a
@@ -149,19 +117,28 @@ private func decodeJSONValue(_ line: String?) -> JSONValue? {
     return try? JSONDecoder().decode(JSONValue.self, from: data)
 }
 
-struct MCPTests {
+final class MCPTests {
+    private let root = tempDir()
+    private var history: URL { root.appendingPathComponent("history.json") }
+
+    deinit { try? FileManager.default.removeItem(at: root) }
+
+    /// One line through the server, reading this test's root and history.
+    private func handle(_ line: String, hooks: MCPTools.HookStore = memoryHooks(), enabled: Bool,
+                        systemPrompt: MCPTools.PromptStore = .init(read: { "" }, write: { _ in }), off: Set<String> = []) -> String? {
+        MCPServer.handle(line, root: root, history: history, hooks: hooks, enabled: enabled, systemPrompt: systemPrompt, off: off)
+    }
+
     // MARK: framing
 
     /// The page's summary stays on the page: the transcript the MCP
     /// returns is the one without it, and its words are not searchable.
     @Test func theSummaryIsNeverServed() throws {
-        let root = tempRoot()
         var meeting = slackMeeting()
         let plain = TranscriptRender.markdown(meeting)
         meeting.summary = "Pelicans migrate in November."
         try MeetingFolder.write(meeting, to: root.appendingPathComponent("Slack Meeting", isDirectory: true))
 
-        defer { try? FileManager.default.removeItem(at: root) }
         #expect(MCPTools.getMeeting(root: root, id: slackID.uuidString) == .success("\(Meeting.dataReminder)\n\n\(plain)"))
         #expect(MCPTools.searchMeetings(root: root, query: "Pelicans").isEmpty)
     }
@@ -169,36 +146,27 @@ struct MCPTests {
     /// Settings explains each tool by name; a tool added to the server
     /// without one there would go unexplained.
     @Test func settingsNamesEveryTool() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reply = MCPServer.handle(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false)
+        let reply = handle(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#, enabled: false)
         let served = decodeJSONValue(reply)?.objectValue?["result"]?.objectValue?["tools"]?.arrayValue?.compactMap { $0.objectValue?["name"]?.stringValue }
         #expect(served == MCPToolList.tools.map(\.name))
     }
 
     /// A tool switched off in settings is not listed, and calling it is refused.
     @Test func aToolSwitchedOffIsHiddenAndRefused() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let history = root.appendingPathComponent("history.json")
-        let list = MCPServer.handle(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#, root: root, history: history, hooks: memoryHooks(), enabled: true, off: ["add_hook"])
+        let list = handle(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#, enabled: true, off: ["add_hook"])
         let served = decodeJSONValue(list)?.objectValue?["result"]?.objectValue?["tools"]?.arrayValue?.compactMap { $0.objectValue?["name"]?.stringValue }
         #expect(served == MCPToolList.tools.map(\.name).filter { $0 != "add_hook" })
-        let call = MCPServer.handle(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add_hook","arguments":{"name":"n","prompt":"p"}}}"#,
-                                    root: root, history: history, hooks: memoryHooks(), enabled: true, off: ["add_hook"])
+        let call = handle(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add_hook","arguments":{"name":"n","prompt":"p"}}}"#, enabled: true, off: ["add_hook"])
         let result = decodeJSONValue(call)?.objectValue?["result"]?.objectValue
         #expect(result?["isError"] == .bool(true))
         #expect(result?["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue == MCPTools.toolOffMessage)
     }
 
     @Test func theSystemPromptIsReadAndReplaced() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let history = root.appendingPathComponent("history.json")
         nonisolated(unsafe) var stored = "Read origin/main."
         let prompt = MCPTools.PromptStore(read: { stored }, write: { stored = $0 })
         func text(_ line: String) -> String? {
-            decodeJSONValue(MCPServer.handle(line, root: root, history: history, hooks: memoryHooks(), enabled: true, systemPrompt: prompt))?
+            decodeJSONValue(handle(line, enabled: true, systemPrompt: prompt))?
                 .objectValue?["result"]?.objectValue?["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue
         }
         #expect(text(#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_system_prompt"}}"#) == "Read origin/main.")
@@ -207,9 +175,7 @@ struct MCPTests {
     }
 
     @Test func pingRequestGetsAMatchingResponse() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reply = MCPServer.handle(#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false)
+        let reply = handle(#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#, enabled: false)
         #expect(decodeJSONValue(reply) == .object([
             "jsonrpc": .string("2.0"),
             "id": .number(1),
@@ -225,9 +191,7 @@ struct MCPTests {
         ("2026-07-28", "2025-11-25"),
     ])
     func initializeAnswersWithAVersionItSpeaks(requested: String, answered: String) throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reply = MCPServer.handle(#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"\#(requested)"}}"#, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false)
+        let reply = handle(#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"\#(requested)"}}"#, enabled: false)
         #expect(decodeJSONValue(reply) == .object([
             "jsonrpc": .string("2.0"),
             "id": .number(0),
@@ -240,15 +204,11 @@ struct MCPTests {
     }
 
     @Test func aNotificationGetsNoReply() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        #expect(MCPServer.handle(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false) == nil)
+        #expect(handle(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#, enabled: false) == nil)
     }
 
     @Test func anUnknownMethodIsMethodNotFound() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reply = MCPServer.handle(#"{"jsonrpc":"2.0","id":"a","method":"nonsense"}"#, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false)
+        let reply = handle(#"{"jsonrpc":"2.0","id":"a","method":"nonsense"}"#, enabled: false)
         #expect(decodeJSONValue(reply) == .object([
             "jsonrpc": .string("2.0"),
             "id": .string("a"),
@@ -259,43 +219,37 @@ struct MCPTests {
     // MARK: list_meetings
 
     @Test func listMeetingsReturnsEveryPublishedMeetingNewestFirstAndSkipsStaging() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let ids = MCPTools.listMeetings(root: root).map(\.id)
         #expect(ids == [roomID.uuidString, zoomID.uuidString, slackID.uuidString])
     }
 
     @Test func listMeetingsFiltersByDate() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let ids = MCPTools.listMeetings(root: root, from: iso("2026-01-12T00:00:00Z"), to: iso("2026-01-31T23:59:59Z")).map(\.id)
         #expect(ids == [zoomID.uuidString])
     }
 
     @Test func listMeetingsFiltersByApp() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let ids = MCPTools.listMeetings(root: root, app: "zoom").map(\.id)
         #expect(ids == [zoomID.uuidString])
     }
 
     @Test func listMeetingsFiltersBySpeaker() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let ids = MCPTools.listMeetings(root: root, speaker: "ana").map(\.id)
         #expect(ids == [zoomID.uuidString])
     }
 
     @Test func listMeetingsFiltersByKind() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let ids = MCPTools.listMeetings(root: root, kind: "room").map(\.id)
         #expect(ids == [roomID.uuidString])
     }
 
     @Test func listMeetingsSummaryMatchesTheMeeting() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let summaries = MCPTools.listMeetings(root: root, app: "slack")
         #expect(summaries == [
             MCPTools.MeetingSummary(
@@ -307,16 +261,14 @@ struct MCPTests {
     // MARK: get_meeting
 
     @Test func getMeetingReturnsTheWholeTranscriptWhenItFitsTheBudget() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let raw = try String(contentsOf: root.appendingPathComponent("Slack Meeting/transcript.md"), encoding: .utf8)
         let result = MCPTools.getMeeting(root: root, id: slackID.uuidString)
         #expect(result == .success("\(Meeting.dataReminder)\n\n\(raw)"))
     }
 
     @Test func getMeetingSplitsAndReassemblesALargeTranscript() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let raw = try String(contentsOf: root.appendingPathComponent("Room Meeting/transcript.md"), encoding: .utf8)
         #expect(raw.utf8.count > MCPTools.meetingMCPBudgetBytes)
 
@@ -332,16 +284,14 @@ struct MCPTests {
     }
 
     @Test func getMeetingWithAPathTraversalIDIsRefused() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         #expect(MCPTools.getMeeting(root: root, id: "../../../../etc/passwd") == .failure(.notFound))
     }
 
     // MARK: search_meetings
 
     @Test func searchMeetingsFindsAWordAcrossTwoMeetingsWithTheRightSpeakerAndTimestamp() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let hits = MCPTools.searchMeetings(root: root, query: "deploy")
         #expect(hits == [
             MCPTools.SearchHit(
@@ -356,8 +306,7 @@ struct MCPTests {
     // MARK: meeting_stats
 
     @Test func meetingStatsCountsDurationAndTalkTimeOverARange() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
         #expect(stats == MCPTools.Stats(
             count: 2, totalDuration: "1h5m",
@@ -365,8 +314,7 @@ struct MCPTests {
     }
 
     @Test func meetingStatsLeavesOutAMeetingSomeoneShared() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         var shared = slackMeeting()
         shared.id = UUID()
         shared.sharedBy = "Edie"
@@ -380,8 +328,7 @@ struct MCPTests {
     // MARK: the switch
 
     @Test func everyToolReturnsTheSameErrorWhenTheSwitchIsOff() throws {
-        let root = try writeFixture()
-        defer { try? FileManager.default.removeItem(at: root) }
+        try writeFixture(in: root)
         let calls: [(String, String)] = [
             ("list_meetings", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_meetings","arguments":{}}}"#),
             ("get_meeting", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_meeting","arguments":{"id":"x"}}}"#),
@@ -394,9 +341,9 @@ struct MCPTests {
             ("update_hook", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"update_hook","arguments":{"id":"x"}}}"#),
             ("remove_hook", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"remove_hook","arguments":{"id":"x"}}}"#),
         ]
-        _ = try writeHistory(in: root)
+        try writeHistory(to: history)
         for (name, line) in calls {
-            let reply = MCPServer.handle(line, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(), enabled: false)
+            let reply = handle(line, enabled: false)
             #expect(
                 decodeJSONValue(reply) == .object([
                     "jsonrpc": .string("2.0"),
@@ -413,9 +360,7 @@ struct MCPTests {
     // MARK: dictations
 
     @Test func listDictationsIsNewestFirstAndFiltersByAppAndDate() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let history = try writeHistory(in: root)
+        try writeHistory(to: history)
         #expect(MCPTools.listDictations(history: history).map(\.text) == ["Draft the café menu today.", "Ship the release on Friday.", "check the build"])
         #expect(MCPTools.listDictations(history: history, app: "slack").map(\.text) == ["Ship the release on Friday."])
         #expect(MCPTools.listDictations(history: history, from: iso("2026-02-02T00:00:00Z")).map(\.text) == ["Draft the café menu today."])
@@ -423,26 +368,20 @@ struct MCPTests {
     }
 
     @Test func aDictationSummaryCarriesItsAppAndWindow() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let history = try writeHistory(in: root)
+        try writeHistory(to: history)
         #expect(MCPTools.listDictations(history: history, app: "Slack") == [MCPTools.DictationSummary(
             id: releaseDictationID.uuidString, time: iso("2026-02-01T09:00:00Z"), app: "Slack", window: "release-planning",
             text: "Ship the release on Friday.")])
     }
 
     @Test func searchDictationsMatchesTheShownTextIgnoringCaseAndAccents() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let history = try writeHistory(in: root)
+        try writeHistory(to: history)
         #expect(MCPTools.searchDictations(history: history, query: "CAFE MENU TODAY").map(\.text) == ["Draft the café menu today."])
         #expect(MCPTools.searchDictations(history: history, query: "draft the cafe menu.").isEmpty)
     }
 
     @Test func noHistoryFileMeansNoDictations() {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        #expect(MCPTools.listDictations(history: root.appendingPathComponent("history.json")).isEmpty)
+        #expect(MCPTools.listDictations(history: history).isEmpty)
     }
 
     // MARK: hooks
@@ -481,11 +420,9 @@ struct MCPTests {
     }
 
     @Test func addHookOverTheProtocolSaysItIsOff() throws {
-        let root = tempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
         let box = HookBox()
         let line = #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_hook","arguments":{"name":"summary","prompt":"Summarise it."}}}"#
-        let reply = MCPServer.handle(line, root: root, history: root.appendingPathComponent("history.json"), hooks: memoryHooks(box), enabled: true)
+        let reply = handle(line, hooks: memoryHooks(box), enabled: true)
         let hook = try #require(box.hooks.first)
         #expect(decodeJSONValue(reply) == .object([
             "jsonrpc": .string("2.0"),
