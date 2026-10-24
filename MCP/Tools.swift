@@ -105,7 +105,7 @@ enum MCPTools {
                     id: entry.meeting.id.uuidString,
                     title: entry.meeting.title,
                     started: entry.meeting.started,
-                    duration: durationLabel(entry.meeting.durationMs),
+                    duration: Meeting.durationLabel(.milliseconds(entry.meeting.durationMs)),
                     kind: entry.meeting.kind.rawValue,
                     app: entry.meeting.app?.name,
                     call: entry.meeting.names?.name,
@@ -195,8 +195,8 @@ enum MCPTools {
         }
         return Stats(
             count: filtered.count,
-            totalDuration: durationLabel(totalDurationMs),
-            talkBySpeaker: talkMsBySpeaker.mapValues(durationLabel))
+            totalDuration: Meeting.durationLabel(.milliseconds(totalDurationMs)),
+            talkBySpeaker: talkMsBySpeaker.mapValues { Meeting.durationLabel(.milliseconds($0)) })
     }
 
     static func renderStats(_ stats: Stats) -> String {
@@ -386,19 +386,6 @@ enum MCPTools {
         }
         if !current.isEmpty { parts.append(current) }
         return parts
-    }
-
-    /// Mirrors `MeetingFolder.durationLabel` (TypeMeIt/Meetings/MeetingFolder.swift):
-    /// `8m`, `45m`, `1h20m`, rounded to the minute. Not shared directly since
-    /// that file pulls in AppKit, `Store` and `TranscriptRender`, none of
-    /// which this target has any other use for.
-    private static func durationLabel(_ durationMs: Int) -> String {
-        let totalMinutes = Int((Double(durationMs) / 60_000).rounded())
-        guard totalMinutes > 0 else { return "0m" }
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        guard hours > 0 else { return "\(minutes)m" }
-        return "\(hours)h\(minutes)m"
     }
 
     /// Mirrors `TranscriptRender.timestamp(ms:)` (TypeMeIt/Meetings/TranscriptRender.swift):

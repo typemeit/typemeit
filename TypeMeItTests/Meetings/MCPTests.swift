@@ -325,6 +325,14 @@ final class MCPTests {
             talkBySpeaker: ["You": "28m", "Them": "23m", "Ana": "13m"]))
     }
 
+    @Test func meetingStatsShowsAMeetingUnderAMinuteAsItsFolderDoes() throws {
+        let short = MeetingFixtures.meeting(
+            started: iso("2026-01-10T09:00:00Z"), durationMs: 45_000, title: "Short", speakers: [], paragraphs: [])
+        try MeetingFolder.write(short, to: root.appendingPathComponent("Short", isDirectory: true))
+        let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
+        #expect(stats.totalDuration == "45s")
+    }
+
     // MARK: the switch
 
     @Test func everyToolReturnsTheSameErrorWhenTheSwitchIsOff() throws {

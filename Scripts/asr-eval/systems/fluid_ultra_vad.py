@@ -24,7 +24,7 @@ def transcribe_chunked(name, chunk_seconds, items, vad_overrides=None, version='
             pieces = [{'id': f'{c}~{n:04d}', 'path': p} for c in ids for n, p in enumerate(manifest[c]['paths'])]
             if not pieces:
                 continue
-            result = fluid_common.run_group(cli, version, pieces)
+            result = fluid_common.run_group([cli, version], pieces)
             by_piece = {c['id']: c for c in result['clips']}
             clips = []
             for c in ids:
