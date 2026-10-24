@@ -216,7 +216,8 @@ struct SquareMenuLines: View {
     }
 }
 
-private struct SquareMenuLine: View {
+/// One line of a menu: its box, ticked when checked, the label, and a count.
+struct SquareMenuLine: View {
     let item: SquareMenuList.Item
     let pick: () -> Void
     @Environment(\.squarePose) private var pose
@@ -235,9 +236,9 @@ private struct SquareMenuLine: View {
                     .italic(item.italic)
                     .foregroundStyle(DesignTokens.Colors.ink)
                     .centredLetters(item.label)
-                Spacer(minLength: 12)
+                Spacer(minLength: 0)
                 if let count = item.count {
-                    Text(count).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3)
+                    Text(count).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3).padding(.leading, 12)
                 }
             }
             .padding(.leading, item.indent ? 32 : 12)
@@ -337,6 +338,30 @@ struct SquareDeleteConfirm: View {
         SquareConfirm(title: title, detail: detail) {
             Button("cancel", action: cancel).buttonStyle(SquareButtonStyle())
             Button(confirm, action: delete).buttonStyle(SquareButtonStyle(kind: .primary))
+        }
+    }
+}
+
+/// The delete of something whose audio can go on its own: while there is
+/// audio, it says how much and offers it alone beside everything.
+struct SquareAudioDeleteConfirm: View {
+    let title: String
+    /// How long the kept audio runs, such as "11m 04s"; nil when none was kept.
+    let audio: String?
+    let cancel: () -> Void
+    let deleteAudio: () -> Void
+    let deleteEverything: () -> Void
+
+    private static let width: CGFloat = 300
+
+    var body: some View {
+        SquareConfirm(title: title, detail: audio.map { "it has \($0) of audio." }, width: SquareAudioDeleteConfirm.width) {
+            Button("cancel", action: cancel).buttonStyle(SquareButtonStyle())
+            if audio != nil {
+                Button("audio only", action: deleteAudio).buttonStyle(SquareButtonStyle())
+            }
+            Button(audio == nil ? "delete" : "everything", action: deleteEverything)
+                .buttonStyle(SquareButtonStyle(kind: .primary))
         }
     }
 }
@@ -486,11 +511,7 @@ struct SquareConfirmSpecimen: View {
                 SquareDeleteConfirm(title: "delete all 1,201 dictations?", detail: SquareDeleteConfirm.gone(1201), confirm: "delete all", cancel: {}, delete: {})
             }
             SquareSpecimenLine(name: "with audio") {
-                SquareConfirm(title: "delete this meeting?", detail: "it has 11m 04s of audio.", width: 300) {
-                    Button("cancel") {}.buttonStyle(SquareButtonStyle())
-                    Button("audio only") {}.buttonStyle(SquareButtonStyle())
-                    Button("everything") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-                }
+                SquareAudioDeleteConfirm(title: "delete this meeting?", audio: "11m 04s", cancel: {}, deleteAudio: {}, deleteEverything: {})
             }
             SquareSpecimenLine(name: "help") {
                 HStack(spacing: 6) {

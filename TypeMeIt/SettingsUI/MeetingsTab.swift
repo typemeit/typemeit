@@ -23,9 +23,7 @@ struct MeetingsTab: View {
     @State private var whereOpen = false
     @State private var whoOpen = false
     @State private var whenOpen = false
-    @State private var selected: Set<UUID> = []
-    /// The row a range is measured from: the last one whose box was clicked.
-    @State private var anchor: UUID?
+    @State private var selection = ListSelection()
     /// Meetings whose stop was clicked, until their transcription lets go.
     @State private var stopping: Set<UUID> = []
     @State private var deletingPicked = false
@@ -64,7 +62,7 @@ struct MeetingsTab: View {
         }
         .onChange(of: store.meetings.map(\.id)) { _, ids in
             if let id = open, !ids.contains(id) { open = nil }
-            selected.formIntersection(ids)
+            selection.picked.formIntersection(ids)
         }
         .onChange(of: coordinator.transcribing?.id) { _, running in stopping = stopping.filter { $0 == running } }
     }
@@ -94,15 +92,16 @@ struct MeetingsTab: View {
                     }
                 }
             } else {
-                MeetingColumns.head.padding(.horizontal, MeetingColumns.page)
+                MeetingColumns.head.padding(.horizontal, SquareListColumns.page)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(MeetingsTab.lines(rows)) { line in
                             switch line {
                             case .day(_, let day, let date, let total):
-                                MeetingDayRow(day: day, date: date, total: total)
+                                SquareDayHeader(day: day, date: date, total: total, totalWidth: MeetingColumns.total, trailing: MeetingColumns.trail)
                             case .row(let meeting):
-                                MeetingRow(meeting: meeting, picked: picked(meeting.id), picking: !selected.isEmpty,
+                                MeetingRow(meeting: meeting, picked: $selection.box(meeting.id) { filtered.map(\.id) },
+                                           picking: !selection.picked.isEmpty,
                                            stopping: stopping.contains(meeting.id),
                                            open: {
                                                nameOnOpen = false
@@ -119,7 +118,7 @@ struct MeetingsTab: View {
                             }
                         }
                     }
-                    .padding(.horizontal, MeetingColumns.page)
+                    .padding(.horizontal, SquareListColumns.page)
                     .padding(.bottom, 20)
                 }
             }
@@ -134,7 +133,7 @@ struct MeetingsTab: View {
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .padding(.top, 40)
-                .padding(.leading, MeetingColumns.page + MeetingColumns.lead)
+                .padding(.leading, SquareListColumns.page + SquareListColumns.lead)
             Spacer(minLength: 0)
         }
     }
@@ -170,19 +169,19 @@ struct MeetingsTab: View {
                     .foregroundStyle(DesignTokens.Colors.ink2)
                 Button("clear", action: clearFilters).buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
             }
-            if !selected.isEmpty {
-                let doomed = selected.subtracting(coordinator.liveIDs)
-                Button("delete \(selected.count)") { deletingPicked.toggle() }
+            if !selection.picked.isEmpty {
+                let doomed = selection.picked.subtracting(coordinator.liveIDs)
+                Button("delete \(selection.picked.count)") { deletingPicked.toggle() }
                     .buttonStyle(SquareButtonStyle())
                     .squareConfirmDelete(isPresented: $deletingPicked, title: "delete \(counted(doomed.count, "meeting"))?",
                                          detail: SquareDeleteConfirm.gone(doomed.count)) {
                         store.delete(ids: doomed)
-                        selected = []
+                        selection.picked = []
                     }
             }
         }
         .padding(.top, 16)
-        .padding(.horizontal, MeetingColumns.page)
+        .padding(.horizontal, SquareListColumns.page)
         .padding(.bottom, 14)
     }
 
@@ -190,13 +189,13 @@ struct MeetingsTab: View {
     /// stop. It names no one.
     private func liveBand(_ live: MeetingCoordinator.Live) -> some View {
         SquareLiveBand(place: live.kind == .room ? "the room" : store.meeting(live.id)?.app?.name.lowercased() ?? "a call",
-                       time: SquareScrubber.clock(max(0, now.timeIntervalSince(live.started))),
+                       time: TranscriptRender.timestamp(ms: Int(max(0, now.timeIntervalSince(live.started)) * 1000)),
                        you: Double(coordinator.levels.mic),
                        call: coordinator.levels.others.map(Double.init),
                        stop: { coordinator.stopMeeting() },
                        transcribeNow: { coordinator.transcribeNow() },
                        transcribeBusy: coordinator.snapshotting)
-            .padding(.horizontal, MeetingColumns.page)
+            .padding(.horizontal, SquareListColumns.page)
             .padding(.bottom, 12)
     }
 
@@ -211,20 +210,20 @@ struct MeetingsTab: View {
                     .foregroundStyle(DesignTokens.Colors.ink2)
                 SquareBar(fraction: fraction)
             }
-            .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+            .padding(.horizontal, SquareListColumns.page + SquareListColumns.lead)
             .padding(.bottom, 12)
         case .verifying:
             Text("checking the speaker model")
                 .font(Square.mono(11))
                 .foregroundStyle(DesignTokens.Colors.ink2)
-                .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+                .padding(.horizontal, SquareListColumns.page + SquareListColumns.lead)
                 .padding(.bottom, 12)
         case .failed:
             HStack(spacing: 10) {
                 SquareFailure(text: "the speaker model didn't download")
                 Button("retry") { diarizer.download() }.buttonStyle(SquareButtonStyle(small: true))
             }
-            .padding(.horizontal, MeetingColumns.page + MeetingColumns.lead)
+            .padding(.horizontal, SquareListColumns.page + SquareListColumns.lead)
             .padding(.bottom, 12)
         case .missing, .installed:
             EmptyView()
@@ -319,36 +318,12 @@ struct MeetingsTab: View {
 
     // MARK: Rows
 
-    enum Line: Identifiable {
-        case day(id: Date, day: String, date: String, total: String)
-        case row(Meeting)
-
-        var id: String {
-            switch self {
-            case .day(let id, _, _, _): "day-\(id.timeIntervalSinceReferenceDate)"
-            case .row(let meeting): meeting.id.uuidString
-            }
-        }
-    }
-
     /// The meetings under a line for each day, newest first, the day saying
     /// how many there were and how long they ran.
-    static func lines(_ rows: [Meeting], calendar: Calendar = .current) -> [Line] {
-        var out: [Line] = []
-        var i = rows.startIndex
-        while i < rows.endIndex {
-            let day = calendar.startOfDay(for: rows[i].started)
-            var j = i
-            while j < rows.endIndex, calendar.isDate(rows[j].started, inSameDayAs: day) { j += 1 }
-            let same = rows[i..<j]
-            let ms = same.reduce(0) { $0 + $1.durationMs }
-            let label = HistoryTab.dayLabel(day, calendar: calendar)
-            out.append(.day(id: day, day: label.day, date: label.date,
-                            total: "\(counted(same.count, "meeting")) · \(MeetingsTab.length(ms))"))
-            out.append(contentsOf: same.map(Line.row))
-            i = j
-        }
-        return out
+    static func lines(_ rows: [Meeting], calendar: Calendar = .current) -> [DayLine<Meeting>] {
+        DayLine.lines(rows, on: \.started, total: { day in
+            "\(counted(day.count, "meeting")) · \(MeetingsTab.length(day.reduce(0) { $0 + $1.durationMs }))"
+        }, calendar: calendar)
     }
 
     /// "11m", or "1h 12m" past the hour.
@@ -356,90 +331,27 @@ struct MeetingsTab: View {
         let minutes = Int((Double(ms) / 60_000).rounded())
         return minutes >= 60 ? String(format: "%dh %02dm", minutes / 60, minutes % 60) : "\(minutes)m"
     }
-
-    private func picked(_ id: UUID) -> Binding<Bool> {
-        Binding(get: { selected.contains(id) }, set: { _ in select(id) })
-    }
-
-    private func select(_ id: UUID) {
-        selected = HistorySelection.clicked(id, extending: NSEvent.modifierFlags.contains(.shift),
-                                            anchor: anchor, in: filtered.map(\.id), selected: selected)
-        anchor = id
-    }
 }
 
-/// The list's columns: the select box, time, the meeting, who, where and
+/// The meetings list's own columns beside the shared ones: who, where and
 /// its length. The head, the days and the rows share them.
 enum MeetingColumns {
-    static let page: CGFloat = 20
-    static let tick: CGFloat = 22
-    static let time: CGFloat = 60
     static let who: CGFloat = 170
     static let place: CGFloat = 80
     static let length: CGFloat = 48
-    static let gap: CGFloat = 16
-    /// Between the select box and the row.
-    static let edge: CGFloat = 4
-    /// How far the columns sit inside the row's own edges.
-    static let inset: CGFloat = 8
+    /// How far the columns sit inside the row's right edge.
     static let trail: CGFloat = 12
-    /// Where the time column starts, from the list's edge.
-    static var lead: CGFloat { tick + edge + inset }
+    /// A day's total sits over who, where and the length.
+    static var total: CGFloat { who + place + length + 2 * SquareListColumns.gap }
 
     static var head: some View {
-        HStack(spacing: edge) {
-            Color.clear.frame(width: tick, height: 1)
-            HStack(spacing: gap) {
-                Text("time").frame(width: time, alignment: .leading)
-                Text("meeting").frame(maxWidth: .infinity, alignment: .leading)
-                Text("who").frame(width: who, alignment: .leading)
-                Text("where").frame(width: place, alignment: .leading)
-                Text("length").frame(width: length, alignment: .trailing)
-            }
-            .padding(.leading, inset)
-            .padding(.trailing, trail)
+        SquareListHead(trailing: trail) {
+            Text("time").frame(width: SquareListColumns.time, alignment: .leading)
+            Text("meeting").frame(maxWidth: .infinity, alignment: .leading)
+            Text("who").frame(width: who, alignment: .leading)
+            Text("where").frame(width: place, alignment: .leading)
+            Text("length").frame(width: length, alignment: .trailing)
         }
-        .font(Square.mono(11))
-        .foregroundStyle(DesignTokens.Colors.ink3)
-        .padding(.bottom, 8)
-    }
-}
-
-/// A day in the list: an ink rule, the day under the time, its date under
-/// the meetings, and how much it held under who, where and length.
-private struct MeetingDayRow: View {
-    let day: String
-    let date: String
-    let total: String
-
-    var body: some View {
-        HStack(spacing: MeetingColumns.edge) {
-            Color.clear.frame(width: MeetingColumns.tick, height: 1)
-            HStack(alignment: .firstTextBaseline, spacing: MeetingColumns.gap) {
-                // "yesterday" is wider than the time column; it runs into the gap.
-                Text(day)
-                    .font(Square.mono(12, weight: .medium))
-                    .foregroundStyle(DesignTokens.Colors.ink)
-                    .fixedSize()
-                    .frame(width: MeetingColumns.time, alignment: .leading)
-                Text(date)
-                    .font(Square.mono(11))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(total)
-                    .font(Square.mono(11))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .frame(width: MeetingColumns.who + MeetingColumns.place + MeetingColumns.length + 2 * MeetingColumns.gap, alignment: .trailing)
-            }
-            .padding(.leading, MeetingColumns.inset)
-            .padding(.trailing, MeetingColumns.trail)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-        }
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
-        .padding(.top, 6)
     }
 }
 
@@ -463,19 +375,19 @@ private struct MeetingRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: MeetingColumns.edge) {
+        HStack(spacing: SquareListColumns.edge) {
             Toggle("select", isOn: $picked)
                 .toggleStyle(SquareTickStyle(faint: true))
                 .labelsHidden()
-                .frame(width: MeetingColumns.tick)
+                .frame(width: SquareListColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
                 .help(picked ? "deselect" : "select · shift-click for a range")
-            HStack(alignment: .center, spacing: MeetingColumns.gap) {
+            HStack(alignment: .center, spacing: SquareListColumns.gap) {
                 Text(meeting.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                     .font(Square.mono(12))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
-                    .frame(width: MeetingColumns.time, alignment: .leading)
+                    .frame(width: SquareListColumns.time, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(meeting.title)
                         .font(Square.sans(13.5))
@@ -500,7 +412,7 @@ private struct MeetingRow: View {
                     .foregroundStyle(DesignTokens.Colors.ink)
                     .frame(width: MeetingColumns.length, alignment: .trailing)
             }
-            .padding(.leading, MeetingColumns.inset)
+            .padding(.leading, SquareListColumns.inset)
             .padding(.trailing, MeetingColumns.trail)
             .padding(.vertical, 11)
             .contentShape(Rectangle())
