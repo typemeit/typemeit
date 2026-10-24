@@ -16,6 +16,19 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// Frames per millisecond of a 16 kHz track: `frames == durationMs × 16`.
     static let framesPerMs = Int(AudioCapture.targetFormat.sampleRate) / 1000
 
+    /// `45s` under a minute (whole seconds, so never `60s`), then `8m`,
+    /// `45m`, `1h20m`, rounded to the nearest minute. Folder names, insights
+    /// and the MCP server all show this one label.
+    static func durationLabel(_ duration: Duration) -> String {
+        let seconds = duration / .seconds(1)
+        guard seconds >= 60 else { return "\(Int(seconds))s" }
+        let totalMinutes = Int((seconds / 60).rounded())
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        guard hours > 0 else { return "\(minutes)m" }
+        return "\(hours)h\(minutes)m"
+    }
+
     enum Kind: String, Codable, Sendable { case call, room }
     enum TitleSource: String, Codable, Sendable { case app, user, generated, roster }
     enum Echo: String, Codable, Sendable { case notMeasured, clean, affected }

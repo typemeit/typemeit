@@ -12,15 +12,16 @@ struct MeetingFolderTests {
     // MARK: durationLabel
 
     @Test func durationLabelRoundsToTheNearestMinute() {
-        #expect(MeetingFolder.durationLabel(.seconds(480)) == "8m")
-        #expect(MeetingFolder.durationLabel(.seconds(2_700)) == "45m")
-        #expect(MeetingFolder.durationLabel(.seconds(4_800)) == "1h20m")
+        #expect(Meeting.durationLabel(.seconds(480)) == "8m")
+        #expect(Meeting.durationLabel(.seconds(2_700)) == "45m")
+        #expect(Meeting.durationLabel(.seconds(4_800)) == "1h20m")
     }
 
-    @Test func durationLabelUnderAMinuteIsZero() {
-        #expect(MeetingFolder.durationLabel(.seconds(30)) == "0m")
-        #expect(MeetingFolder.durationLabel(.seconds(59)) == "0m")
-        #expect(MeetingFolder.durationLabel(.seconds(60)) == "1m")
+    @Test func durationLabelUnderAMinuteIsInSeconds() {
+        #expect(Meeting.durationLabel(.zero) == "0s")
+        #expect(Meeting.durationLabel(.seconds(45)) == "45s")
+        #expect(Meeting.durationLabel(.milliseconds(59_900)) == "59s")
+        #expect(Meeting.durationLabel(.seconds(60)) == "1m")
     }
 
     // MARK: sanitised
@@ -104,6 +105,11 @@ struct MeetingFolderTests {
 
         let withDuration = MeetingFolder.name(started: Self.jan15Noon, zone: Self.utc, duration: .seconds(480), title: "Standup", existing: [])
         #expect(MeetingFolder.titlePart(of: withDuration) == "Standup")
+
+        let short = MeetingFolder.name(started: Self.jan15Noon, zone: Self.utc, duration: .seconds(45), title: "Standup", existing: [])
+        #expect(short == "2026-01-15 1200 45s Standup")
+        #expect(MeetingFolder.titlePart(of: short) == "Standup")
+        #expect(MeetingFolder.titlePart(of: "2026-01-15 1200 0m Standup") == "Standup")
     }
 
     @Test func keptAudioIsOpusOfTheSameLength() throws {

@@ -377,6 +377,17 @@ struct MCPTests {
             talkBySpeaker: ["You": "28m", "Them": "23m", "Ana": "13m"]))
     }
 
+    @Test func meetingStatsShowsAMeetingUnderAMinuteAsItsFolderDoes() throws {
+        let root = tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let started = iso("2026-01-10T09:00:00Z")
+        let short = makeMeeting(id: UUID(), kind: .call, started: started, durationMs: 45_000,
+                                app: nil, title: "Short", speakers: [], paragraphs: [])
+        try MeetingFolder.write(short, to: root.appendingPathComponent("Short", isDirectory: true))
+        let stats = MCPTools.meetingStats(root: root, from: iso("2026-01-01T00:00:00Z"), to: iso("2026-01-31T23:59:59Z"))
+        #expect(stats.totalDuration == "45s")
+    }
+
     // MARK: the switch
 
     @Test func everyToolReturnsTheSameErrorWhenTheSwitchIsOff() throws {
