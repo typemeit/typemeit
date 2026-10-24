@@ -54,6 +54,14 @@ final class ClaudeRun: @unchecked Sendable {
         meeting's page under its title, date and people, so don't repeat them.
         """
 
+    /// The app draws a ``` block fixed-width and unwrapped (`ClaudeReplyPart`),
+    /// and renders only inline Markdown everywhere else.
+    private static let formatting = """
+        Your reply shows in the app, which renders only inline Markdown (bold, links, code): \
+        no headings or Markdown tables. Draw any table or diagram with ASCII characters \
+        (+, -, |) inside a ``` block, so it lines up in a fixed-width font.
+        """
+
     /// Where Claude Code installs itself, then where Homebrew puts it. An app
     /// opened from the Finder does not get the shell's PATH, so it is not searched.
     static var executable: URL? {
@@ -101,12 +109,12 @@ final class ClaudeRun: @unchecked Sendable {
     var onLine: (@Sendable (String) -> Void)?
 
     /// Nil when Claude Code is not installed.
-    init?(arguments: [String], input: String, folder: URL, timeoutSeconds: Double) {
+    init?(arguments: [String], input: String, folder: URL, timeoutSeconds: Double, extraEnvironment: [String: String] = [:]) {
         guard let executable = Self.executable else { return nil }
         process.executableURL = executable
         process.currentDirectoryURL = folder
         process.arguments = arguments
-        process.environment = Self.environment
+        process.environment = Self.environment.merging(extraEnvironment) { _, extra in extra }
         self.input = Data(input.utf8)
         self.timeoutSeconds = timeoutSeconds
     }
@@ -119,14 +127,16 @@ final class ClaudeRun: @unchecked Sendable {
                   input: transcript.map { "The meeting's transcript so far:\n\n\($0)\n" } ?? "", folder: folder, timeoutSeconds: answerTimeoutSeconds)
     }
 
-    /// Haiku with no tools, MCP servers, settings or Claude Code system prompt, which writes out the
-    /// transcript's latest question for `answering` to take.
+    /// Haiku with no tools, MCP servers, settings, Claude Code system prompt or thinking, which writes out the
+    /// transcript's latest question for `answering` to take. Thinking made it 4–6 s
+    /// of model time against about 1 s without, for the same question.
     static func latestQuestion(in transcript: String) -> ClaudeRun? {
         ClaudeRun(arguments: ["-p", "Write out the latest question asked in this meeting transcript as one standalone question, with any context it needs from earlier. Reply with the question only.",
                               "--output-format", "stream-json", "--verbose", "--model", "haiku",
                               "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence",
                               "--disable-slash-commands", "--system-prompt", "You extract questions from transcripts."],
-                  input: transcript, folder: FileManager.default.temporaryDirectory, timeoutSeconds: answerTimeoutSeconds)
+                  input: transcript, folder: FileManager.default.temporaryDirectory, timeoutSeconds: answerTimeoutSeconds,
+                  extraEnvironment: ["MAX_THINKING_TOKENS": "0"])
     }
 
     /// `transcript` is the meeting's whole Markdown transcript.
@@ -148,10 +158,11 @@ final class ClaudeRun: @unchecked Sendable {
 
     private static func arguments(prompt: String, instructions: String, model: String, allowedTools: [String], permissionMode: String, userSystemPrompt: String) -> [String] {
         let trimmed = userSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let systemPrompt = [instructions, formatting, trimmed].filter { !$0.isEmpty }.joined(separator: "\n\n")
         return ["-p", prompt,
                 "--output-format", "stream-json", "--verbose",
                 "--permission-mode", permissionMode,
-                "--append-system-prompt", trimmed.isEmpty ? instructions : instructions + "\n\n" + trimmed,
+                "--append-system-prompt", systemPrompt,
                 // A background agent ends the run with a second turn whose result
                 // replaces the answer ("Already reported").
                 "--disallowedTools", "Agent"]

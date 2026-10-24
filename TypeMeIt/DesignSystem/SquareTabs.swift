@@ -173,16 +173,29 @@ struct SquareClaudeThread: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .clipped()
         case .text(let source):
-            // Inline markdown only, so list markers are drawn here.
-            let markdown = source.split(separator: "\n", omittingEmptySubsequences: false)
-                .map { $0.hasPrefix("- ") || $0.hasPrefix("* ") ? "•  " + $0.dropFirst(2) : String($0) }
-                .joined(separator: "\n")
-            Text((try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(markdown))
-                .font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink).lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(ClaudeReplyPart.parts(of: source).enumerated()), id: \.offset) { _, part in
+                    switch part {
+                    case .prose(let prose): self.prose(prose)
+                    case .drawing(let drawing):
+                        // Scrolls sideways rather than wrap, which would break its lines apart.
+                        ScrollView(.horizontal) { mono(drawing, DesignTokens.Colors.ink).fixedSize() }
+                    }
+                }
+            }
         case .error(let text):
             mono("✗ \(text)", DesignTokens.Colors.diffRemove)
         }
+    }
+
+    private func prose(_ source: String) -> some View {
+        // Inline markdown only, so list markers are drawn here.
+        let markdown = source.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.hasPrefix("- ") || $0.hasPrefix("* ") ? "•  " + $0.dropFirst(2) : String($0) }
+            .joined(separator: "\n")
+        return Text((try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(markdown))
+            .font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink).lineSpacing(5)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func mono(_ text: String, _ colour: Color) -> some View {
@@ -244,6 +257,7 @@ struct SquareClaudeThreadSpecimen: View {
         VStack(alignment: .leading, spacing: 40) {
             SquareClaudeThread(lines: start + [.call("linear save_issue \"Unify call log\"", result: nil)], status: .running, footer: "12 s")
             SquareClaudeThread(lines: start + [.text("Decisions made:\n\n1. **Unify call tracking this week**, decided by Alex.\n2. **Link out from the inquiry feed**, decided by Sam.")], status: .done, footer: "done · 4 s · 20:34")
+            SquareClaudeThread(lines: start + [.text("Calls by surface:\n\n```\n+--------------+-------+\n| surface      | calls |\n+--------------+-------+\n| call log     |    41 |\n| inquiry feed |    17 |\n+--------------+-------+\n```\n\nThe call log takes most of them.")], status: .done, footer: "done · 6 s · 20:34")
             SquareClaudeThread(lines: start + [.error("claude code timed out after 120 s")], status: .failed, footer: "failed · 120 s · 20:34")
         }
     }
