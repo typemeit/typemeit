@@ -133,7 +133,7 @@ times slower and should not ship.
 
 ## Measured, September 2026
 
-The bench ([`Scripts/llm-bench` at 65f3bd5](https://github.com/typemeit/typemeit/tree/65f3bd5/Scripts/llm-bench), since removed) ran the cases in `Scripts/cleanup-eval/cases.json`
+The bench (`Scripts/llm-bench`, since removed) ran the cases in `Scripts/cleanup-eval/cases.json`
 through each GGUF in-process via libllama with Metal, greedy sampling and a JSON grammar pinning the output
 to one field, which is the closest equivalent of guided generation. Machine: M4
 (base), 24 GB, macOS 26.6.1, llama.cpp 0.4.0, Q4_K_M weights. The prompt was read
