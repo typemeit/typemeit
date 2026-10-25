@@ -151,6 +151,8 @@ struct SquareGallery: View {
             ("group", AnyView(SquareGroupSpecimen())),
             ("box", AnyView(SquareBoxSpecimen())),
             ("stat", AnyView(SquareStatSpecimen())),
+            ("player", AnyView(SquarePlayerSpecimen())),
+            ("layouts", AnyView(SquareLayoutsSpecimen())),
             ("list head", AnyView(SquareListHeadSpecimen())),
             ("status", AnyView(SquareStatusSpecimen())),
             ("sidebar", AnyView(SquareSidebarSpecimen())),
