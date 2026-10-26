@@ -148,10 +148,14 @@ final class Pipeline {
             MeetingCoordinator.shared.dictationBegan(hostTime: mach_absolute_time())
         } catch {
             Log.audio.error("Could not start capture: \(error.localizedDescription)")
+            DebugLog.write("Dictation not started: the mic failed to start: \(error.localizedDescription)")
             phase = .idle
             shortcuts.setPhase(.idle)
             OutputMute.restore()
             MediaPause.resume()
+            // A toast still up from before would block this one.
+            if overlay.model.state != .hidden { overlay.model.closeNow = true; overlay.hide() }
+            showToast(.micFailed)
             return
         }
         overlay.show(.arming)
