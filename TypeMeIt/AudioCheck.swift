@@ -165,7 +165,7 @@ enum AudioCheck {
 
     /// The dictation mic, opened as a dictation opens it.
     private static func micTest() async -> String {
-        let uid = Settings.shared.microphoneUID
+        let uid = Settings.shared.connectedMicrophoneUID()
         let name = uid.flatMap(AudioCapture.deviceID(forUID:)).flatMap(MeetingCapture.device)?.name
             ?? MeetingCapture.defaultDevice(input: true).flatMap(MeetingCapture.device)?.name ?? "default input"
         let before = bluetoothOutputRates()
@@ -183,7 +183,7 @@ enum AudioCheck {
     /// plays a quiet tone: which device clocks it and whether the far end
     /// carries the tone at its own pitch.
     private static func captureTest() async -> String {
-        guard let mic = MeetingCapture.microphone(preferredUID: Settings.shared.microphoneUID),
+        guard let mic = MeetingCapture.microphone(preferredUID: Settings.shared.connectedMicrophoneUID()),
               let object = AudioProcesses.objectID(forPID: ProcessInfo.processInfo.processIdentifier) else {
             return "capture test: no microphone or no process object"
         }

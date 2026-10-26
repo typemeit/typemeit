@@ -303,7 +303,7 @@ final class MeetingCoordinator {
         discardPreRoll()
         guard settings.meetingPreRoll, settings.meetingAsk else { return }
         let objects = watch.holders.first { $0.owner == owner }?.objectIDs ?? []
-        guard !objects.isEmpty, let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID) else { return }
+        guard !objects.isEmpty, let mic = MeetingCapture.microphone(preferredUID: settings.connectedMicrophoneUID()) else { return }
         let held = PreRoll(owner: owner, seconds: Fixed.meetingPreRollSeconds, tap: true)
         do {
             preRoll = (held, try MeetingCapture(mic: mic, tapProcesses: objects, sink: held))
@@ -334,7 +334,7 @@ final class MeetingCoordinator {
         } else {
             kind = .room
         }
-        guard let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID, room: owner == nil) else {
+        guard let mic = MeetingCapture.microphone(preferredUID: settings.connectedMicrophoneUID(), room: owner == nil) else {
             Log.meetings.error("No microphone to record the meeting with")
             abandonRecording()
             return
@@ -904,7 +904,7 @@ final class MeetingCoordinator {
     /// Taps our own process while a cue plays and reports whether signal
     /// arrived: the only check there is for the grant (docs/meetings.md D13).
     func testSystemAudio() {
-        guard systemAudioTest != .testing, let mic = MeetingCapture.microphone(preferredUID: settings.microphoneUID),
+        guard systemAudioTest != .testing, let mic = MeetingCapture.microphone(preferredUID: settings.connectedMicrophoneUID()),
               let object = AudioProcesses.objectID(forPID: ProcessInfo.processInfo.processIdentifier) else { return }
         systemAudioTest = .testing
         let probe = SystemAudioProbe()

@@ -123,6 +123,8 @@ struct OnePageSettings: View {
             availability = PostProcessor.availability
             screenGranted = CGPreflightScreenCaptureAccess()
             cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+            let pickedUID = settings.microphoneUID
+            if settings.connectedMicrophoneUID() != pickedUID { devices = AudioCapture.inputDevices() }
         }
     }
 
@@ -714,7 +716,10 @@ struct OnePageSettings: View {
 
     /// The chosen microphone's id, "" for the system default.
     private var microphoneID: Binding<String> {
-        Binding(get: { settings.microphoneUID ?? "" }, set: { settings.microphoneUID = $0.isEmpty ? nil : $0 })
+        Binding(get: { settings.microphoneUID ?? "" }, set: { id in
+            settings.microphoneUID = id.isEmpty ? nil : id
+            settings.microphoneName = AudioCapture.deviceID(forUID: id).flatMap(MeetingCapture.device)?.name
+        })
     }
 
     private func microphoneName(_ id: String) -> String {
