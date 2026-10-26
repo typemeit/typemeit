@@ -7,7 +7,7 @@ enum SettingsTab: String, CaseIterable {
     /// The tabs this build shows. Insights are built on window titles, which
     /// the sandbox cannot read, so a sandboxed build has no insights page.
     static var available: [SettingsTab] {
-        allCases.filter { $0 != .insights || Sandbox.readsOtherApps }
+        allCases.filter { ($0 != .insights || Sandbox.readsOtherApps) && ($0 != .meetings || Sandbox.hasMeetings) }
     }
 
     var title: String { self == .history ? "dictations" : rawValue }
@@ -89,7 +89,8 @@ struct SettingsView: View {
                 level: coordinator.levels.mic,
                 tint: cloudTint,
                 record: { coordinator.recordRoom() },
-                stop: { coordinator.stopMeeting() }
+                stop: { coordinator.stopMeeting() },
+                showsFoot: Sandbox.hasMeetings
             )
         }
         .safeAreaPadding(.top, SettingsView.markDrop)
@@ -163,7 +164,12 @@ struct SettingsView: View {
 
     private func takeRequestedTab() {
         guard let requested = appState.settingsTab else { return }
-        tab = requested
+        if requested == .settings, let section = appState.revealSection {
+            open(section)
+            appState.revealSection = nil
+        } else {
+            tab = requested
+        }
         appState.settingsTab = nil
     }
 }

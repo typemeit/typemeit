@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -98,7 +99,7 @@ struct KeyCombo: Codable, Equatable, Sendable {
             guard keyLabel.count == 1, let c = keyLabel.lowercased().first else { return nil }
             key = KeyEquivalent(c)
         }
-        var mods: EventModifiers = []
+        var mods: SwiftUI.EventModifiers = []
         if modifiers.contains(.command) { mods.insert(.command) }
         if modifiers.contains(.option) { mods.insert(.option) }
         if modifiers.contains(.control) { mods.insert(.control) }
@@ -108,6 +109,33 @@ struct KeyCombo: Codable, Equatable, Sendable {
 
     /// The parts as keycaps: modifiers first, then the key.
     var caps: [String] { modifiers.symbols + [keyLabel] }
+
+    /// For running text and menu items: "⌥ space", "⌃⌥D".
+    var inline: String {
+        modifiers.symbols.joined() + (keyLabel.count > 1 ? " " : "") + keyLabel
+    }
+
+    static let optionSpace = space(with: .option)
+    static let escape = KeyCombo(keyCode: UInt16(kVK_Escape), modifiers: [])
+
+    static func space(with modifiers: Modifiers) -> KeyCombo {
+        KeyCombo(keyCode: UInt16(kVK_Space), modifiers: modifiers)
+    }
+
+    /// A combo whose key has a fixed label, like space or esc.
+    private init(keyCode: UInt16, modifiers: Modifiers) {
+        self.init(keyCode: keyCode, modifiers: modifiers, keyLabel: KeyCombo.specialKeys[keyCode] ?? "")
+    }
+
+    /// The modifiers as `RegisterEventHotKey` takes them.
+    var carbonModifiers: UInt32 {
+        var m = 0
+        if modifiers.contains(.command) { m |= cmdKey }
+        if modifiers.contains(.option) { m |= optionKey }
+        if modifiers.contains(.control) { m |= controlKey }
+        if modifiers.contains(.shift) { m |= shiftKey }
+        return UInt32(m)
+    }
 
     private static let specialKeys: [UInt16: String] = [
         36: "↩", 48: "⇥", 49: "space", 51: "⌫", 53: "esc", 76: "⌤", 117: "⌦",

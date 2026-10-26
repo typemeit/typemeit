@@ -12,15 +12,16 @@ struct MeetingFolderTests {
     // MARK: durationLabel
 
     @Test func durationLabelRoundsToTheNearestMinute() {
-        #expect(MeetingFolder.durationLabel(.seconds(480)) == "8m")
-        #expect(MeetingFolder.durationLabel(.seconds(2_700)) == "45m")
-        #expect(MeetingFolder.durationLabel(.seconds(4_800)) == "1h20m")
+        #expect(Meeting.durationLabel(.seconds(480)) == "8m")
+        #expect(Meeting.durationLabel(.seconds(2_700)) == "45m")
+        #expect(Meeting.durationLabel(.seconds(4_800)) == "1h20m")
     }
 
-    @Test func durationLabelUnderAMinuteIsZero() {
-        #expect(MeetingFolder.durationLabel(.seconds(30)) == "0m")
-        #expect(MeetingFolder.durationLabel(.seconds(59)) == "0m")
-        #expect(MeetingFolder.durationLabel(.seconds(60)) == "1m")
+    @Test func durationLabelUnderAMinuteIsInSeconds() {
+        #expect(Meeting.durationLabel(.zero) == "0s")
+        #expect(Meeting.durationLabel(.seconds(45)) == "45s")
+        #expect(Meeting.durationLabel(.milliseconds(59_900)) == "59s")
+        #expect(Meeting.durationLabel(.seconds(60)) == "1m")
     }
 
     // MARK: sanitised
@@ -104,21 +105,23 @@ struct MeetingFolderTests {
 
         let withDuration = MeetingFolder.name(started: Self.jan15Noon, zone: Self.utc, duration: .seconds(480), title: "Standup", existing: [])
         #expect(MeetingFolder.titlePart(of: withDuration) == "Standup")
+
+        let short = MeetingFolder.name(started: Self.jan15Noon, zone: Self.utc, duration: .seconds(45), title: "Standup", existing: [])
+        #expect(short == "2026-01-15 1200 45s Standup")
+        #expect(MeetingFolder.titlePart(of: short) == "Standup")
+        #expect(MeetingFolder.titlePart(of: "2026-01-15 1200 0m Standup") == "Standup")
     }
 
     @Test func keptAudioIsOpusOfTheSameLength() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let raw = dir.appendingPathComponent("mic.caf"), kept = dir.appendingPathComponent("mic" + Meeting.keptAudioSuffix)
-        let writer = try TrackWriter(url: raw)
-        let frames = 3 * Int(AudioCapture.targetFormat.sampleRate)
-        writer.append((0..<frames).map { Float(sin(Double($0) * 0.05)) * 0.3 })
-        _ = writer.finish()
+        let samples = sine(seconds: 3)
+        try writeTrack(samples, to: raw)
 
         #expect(try MeetingFolder.transcode(from: raw, to: kept))
         let file = try AVAudioFile(forReading: kept)
         #expect(file.fileFormat.streamDescription.pointee.mFormatID == kAudioFormatOpus)
-        #expect(file.length == AVAudioFramePosition(frames))
+        #expect(file.length == AVAudioFramePosition(samples.count))
     }
 }

@@ -22,7 +22,7 @@ model to update it.
 | Role | Model | Configured at | Eval that proves "better" |
 |---|---|---|---|
 | Speech recognition | FluidAudio Parakeet Ultra (Core ML, Neural Engine), HF revision `95eaa59a`, via FluidAudio 0.17.6 | `TypeMeIt/ModelStore.swift`, `Scripts/asr-model.sh`, `project.yml` | `make asr-eval` (Scripts/asr-eval): WER against an AssemblyAI reference with disagreements hand-checked; add the candidate as one file in `systems/` |
-| Clean-up | Apple Foundation Models, permissive guardrails | `TypeMeIt/PostProcessor.swift` | `make eval` (Scripts/cleanup-eval); `make bench MODELS=...` for local GGUF |
+| Clean-up | Apple Foundation Models, permissive guardrails | `TypeMeIt/PostProcessor.swift` | `make eval` (Scripts/cleanup-eval) |
 | Meeting summaries and titles | Apple Foundation Models | `TypeMeIt/Meetings/MeetingSummary.swift` | `make meeting-eval` |
 | Meeting folder suggestion: existing folder, else a new folder name | Apple Foundation Models (on-device): one guided call per folder, then one for a name | `TypeMeIt/Meetings/MeetingFolderPick.swift` | `make folder-eval` |
 | Opening "Can" check | Apple Foundation Models | `TypeMeIt/OpeningCan.swift` | `make eval` cases |
@@ -292,7 +292,9 @@ run, not a model card. If the role has no eval, build it in `Scripts/` first
 and link it.
 
 The same entry carries the fields typeme.it/models leads with, which are
-public: `name` (the model as a reader would search for it), `group` and
+public: `name` (the model as a reader would search for it), `url` (its
+Hugging Face card, vendor page or repo, checked to load; null for a trial of
+the app's own code), `group` and
 `status` (the values `Scripts/model-trials.py` lists), and `summary`, one line
 with the decisive numbers and no paths, branches or people. Then run
 `make model-trials`, which rewrites `docs/model-trials.md`, `web/models.html`

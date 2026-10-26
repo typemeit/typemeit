@@ -20,7 +20,11 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 APP = os.path.join(ROOT, "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev")
-TABS = ["insights", "intelligence", "history", "settings"]  # sidebar order
+TABS = ["history", "dictionary", "settings"]  # sidebar order in the store build
+# The settings groups opened for the capture, by position in the page
+# (dictation, clean-up, ...), bottom one first so the positions above it
+# hold. Dictation holds the store build's hotkey.
+OPEN_GROUPS = [1]
 # By path: the dev app is not sandboxed, but a container for its bundle id
 # exists, and `defaults` would otherwise write to the plist in there instead.
 DEFAULTS = os.path.expanduser("~/Library/Preferences/it.typeme.typemeit.dev.plist")
@@ -55,21 +59,49 @@ def osascript(pid, script):
                    check=True, capture_output=True)
 
 
+def sidebar_buttons(pid):
+    """The sidebar's page buttons, top to bottom: the window's buttons that
+    sit at its left edge (the window is placed at x = 0)."""
+    out = subprocess.run(["osascript", "-e", f'tell application "System Events" to tell (first process whose unix id is {pid}) to get position of every button of group 1 of window "settings"'],
+                         check=True, capture_output=True, text=True).stdout
+    numbers = [int(n) for n in out.replace(",", " ").split()]
+    positions = list(zip(numbers[0::2], numbers[1::2]))
+    return [i + 1 for i, (x, y) in sorted(enumerate(positions), key=lambda p: p[1][1]) if x == 0]
+
+
+def clone_model():
+    """Without the speech model the app opens on onboarding, not settings.
+    An APFS clone of the installed one costs no download and no disk."""
+    asr = os.path.join(HERE, "store", "models", "asr")
+    if not os.path.isdir(asr) or not os.listdir(asr):
+        installed = os.path.expanduser("~/Library/Application Support/TypeMeIt/models/asr")
+        os.makedirs(asr, exist_ok=True)
+        for version in os.listdir(installed):
+            subprocess.run(["cp", "-c", "-R", os.path.join(installed, version), asr], check=True)
+
+
 def main(tabs):
     subprocess.run([sys.executable, os.path.join(HERE, "seed.py")], check=True)
+    clone_model()
     env = dict(os.environ, TYPEMEIT_SUPPORT_DIR=os.path.join(HERE, "store"))
     # The dev app's own preferences are read as it launches; the keep limit
     # only prunes on the next dictation, so the seeded count stands.
     keep_before = default("historyLimit")
     set_default("historyLimit", KEEP)
-    app = subprocess.Popen([APP], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Looks like the store build: its hotkey in place of Fn, no insights tab.
+    app = subprocess.Popen([APP, "-previewStore", "1"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(6)
+        # A launch restores the windows open at the last quit, which may be
+        # none; opening the running bundle again brings settings up.
+        subprocess.run(["open", APP.split("/Contents/MacOS/")[0]], check=True)
+        time.sleep(2)
         osascript(app.pid, 'set position of window "settings" to {0, 33}')
         osascript(app.pid, 'set size of window "settings" to {1512, 949}')
         wid = subprocess.run(["swift", "-e", WINDOW_ID, str(app.pid)], capture_output=True, text=True, check=True).stdout.split()[0]
+        pages = sidebar_buttons(app.pid)
         for tab in tabs:
-            osascript(app.pid, f'click button {TABS.index(tab) + 1} of group 1 of splitter group 1 of group 1 of window "settings"')
+            osascript(app.pid, f'click button {pages[TABS.index(tab)]} of group 1 of window "settings"')
             # Clicking through System Events can leave the app behind another
             # window; only the key window has the full shadow and coloured
             # traffic lights.
@@ -77,12 +109,12 @@ def main(tabs):
             time.sleep(1.5)
             osascript(app.pid, "set frontmost to true")  # again, in case a click elsewhere took it back
             time.sleep(0.3)
-            if tab == "history":
-                # Open the first row's "heard" panel so the capture shows what
-                # was heard against what was typed. Screen points: the chip
-                # sits at (351, 229) in the window, which is placed at y=33.
-                subprocess.run(["cliclick", "c:351,262"], check=True)
-                time.sleep(1)
+            if tab == "settings":
+                for group in OPEN_GROUPS:
+                    osascript(app.pid, f'click button {group} of scroll area 1 of group 1 of window "settings"')
+                    time.sleep(0.5)
+                osascript(app.pid, "set frontmost to true")
+                time.sleep(0.5)
             out = os.path.join(HERE, f"{tab}.png")
             subprocess.run(["screencapture", "-l", wid, "-x", out], check=True)
             if Image.open(out).size != (3248, 2122):

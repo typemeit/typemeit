@@ -93,20 +93,42 @@ enum TranscriptRender {
         case question(Int)
     }
 
-    /// The turns in order, each question after the last turn that started
-    /// before it was heard.
+    /// The turns in order, each by its first paragraph (`rows`), each
+    /// question after the last turn that started before it was heard.
     static func entries(_ meeting: Meeting) -> [Entry] {
         let questions = Array((meeting.questions ?? []).enumerated()).sorted { $0.element.atMs < $1.element.atMs }
         var next = 0
         var entries: [Entry] = []
-        for (i, paragraph) in meeting.paragraphs.enumerated() {
-            while next < questions.count, questions[next].element.atMs < paragraph.startMs {
+        for row in rows(meeting.paragraphs) {
+            while next < questions.count, questions[next].element.atMs < meeting.paragraphs[row[0]].startMs {
                 entries.append(.question(questions[next].offset))
                 next += 1
             }
-            entries.append(.paragraph(i))
+            entries.append(.paragraph(row[0]))
         }
         return entries + questions[next...].map { .question($0.offset) }
+    }
+
+    /// Each turn as the page and the Markdown show it, as indices into
+    /// `paragraphs`: a paragraph, then the asides said inside it, each
+    /// followed by the rest of that turn.
+    static func rows(_ paragraphs: [Meeting.Paragraph]) -> [[Int]] {
+        var rows: [[Int]] = []
+        for i in paragraphs.indices {
+            let continues = i > 0 && paragraphs[i - 1].aside == true && rows.last.map { paragraphs[$0[0]].speaker == paragraphs[i].speaker } == true
+            if !rows.isEmpty, paragraphs[i].aside == true || continues {
+                rows[rows.count - 1].append(i)
+            } else {
+                rows.append([i])
+            }
+        }
+        return rows
+    }
+
+    /// Whether paragraph `i` of `row` is shown in brackets under its own
+    /// speaker's name: an aside by someone other than the turn's speaker.
+    static func bracketed(_ i: Int, in row: [Int], of paragraphs: [Meeting.Paragraph]) -> Bool {
+        i != row[0] && paragraphs[i].aside == true && paragraphs[i].speaker != paragraphs[row[0]].speaker
     }
 
     /// What became of a question, as the transcript and the meeting's page say it.
@@ -119,11 +141,17 @@ enum TranscriptRender {
         }
     }
 
-    /// One `**speaker** · timestamp` / text block per paragraph, blank-line
-    /// separated.
+    /// One `**speaker** · timestamp` / text block per turn, blank-line
+    /// separated, with each aside in it as `[speaker: text]`.
     static func paragraphs(_ meeting: Meeting) -> String {
-        meeting.paragraphs
-            .map { "**\(meeting.speakerName($0.speaker))** · \(timestamp(ms: $0.startMs))\n\($0.text)" }
-            .joined(separator: "\n\n")
+        let paragraphs = meeting.paragraphs
+        return rows(paragraphs).map { row in
+            let first = paragraphs[row[0]]
+            let text = row.map { i in
+                bracketed(i, in: row, of: paragraphs) ? "[\(meeting.speakerName(paragraphs[i].speaker)): \(paragraphs[i].text)]" : paragraphs[i].text
+            }.joined(separator: " ")
+            return "**\(meeting.speakerName(first.speaker))** · \(timestamp(ms: first.startMs))\n\(text)"
+        }
+        .joined(separator: "\n\n")
     }
 }

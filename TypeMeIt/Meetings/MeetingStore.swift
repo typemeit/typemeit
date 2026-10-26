@@ -26,7 +26,7 @@ final class MeetingStore {
     @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
     @ObservationIgnored private var watchedPath: String?
 
-    var publishedRoot: URL { MeetingFolder.defaultPublishedRoot }
+    var publishedRoot: URL { SupportPaths.meetingsRoot }
 
     private init() {
         reload()

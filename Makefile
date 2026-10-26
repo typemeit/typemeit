@@ -12,7 +12,6 @@
 #   make asr-eval ARGS=...  score speech models and diarizers against AssemblyAI (Scripts/asr-eval/README.md)
 #   make asr-eval-test      unit tests for the asr-eval scoring
 #   make model-trials       build docs/model-trials.md and typeme.it/models from docs/model-trials.json
-#   make bench MODELS=...   score the same cases on local GGUF models
 #   make globe-key-image    rebuild the onboarding 🌐 key image from design/onboarding
 #   make diarizer-model     fetch both speaker models' files and tar them
 #   make diarizer-model-sums    print the DiarizerModelStore.swift constants for the tar
@@ -128,10 +127,6 @@ asr-eval-test:
 # the web page from it.
 model-trials:
 	python3 Scripts/model-trials.py
-
-# The same cases on local GGUF models, e.g. make bench MODELS="a.gguf b.gguf".
-bench:
-	Scripts/llm-bench/run.sh $(MODELS)
 
 # The onboarding image for the 🌐 key step, light and dark, from the
 # screenshots in design/onboarding.

@@ -166,106 +166,79 @@ private struct SquareGroupSign: View {
     }
 }
 
-/// A list row: its time on the left, what it is, and a fact on the right,
-/// with a hairline above. The pointer washes it and selected it inverts to
-/// the slab. With `picked`, a select box shows at its start under the
-/// pointer, or always once `picking`.
-struct SquareListRow: View {
-    let time: String
-    let title: String
-    var detail: String?
-    var selected = false
-    var picked: Binding<Bool>?
-    var picking = false
-    var open: () -> Void = {}
-    @Environment(\.squarePose) private var pose
-    @State private var hovering = false
+/// The columns every list by day shares: the page's margin, the select box,
+/// the time, and the gaps between. Each list adds its own columns after the
+/// time.
+enum SquareListColumns {
+    static let page: CGFloat = 20
+    static let tick: CGFloat = 22
+    static let time: CGFloat = 60
+    static let gap: CGFloat = 16
+    /// Between the select box and the row.
+    static let edge: CGFloat = 4
+    /// How far the columns sit inside the row's left edge.
+    static let inset: CGFloat = 8
+    /// Where the time column starts, from the list's edge.
+    static var lead: CGFloat { tick + edge + inset }
+}
+
+/// A list's column names in ink-3 over its rows, clear of the select box,
+/// `trailing` in from the row's end.
+struct SquareListHead<Columns: View>: View {
+    let trailing: CGFloat
+    @ViewBuilder var columns: Columns
 
     var body: some View {
-        let hot = pose.hot(hovering)
-        HStack(spacing: 4) {
-            if let picked {
-                Toggle("select", isOn: picked)
-                    .toggleStyle(SquareTickStyle(faint: true))
-                    .labelsHidden()
-                    .frame(width: 22)
-                    .opacity(hot || picking || picked.wrappedValue ? 1 : 0)
-            }
-            Button(action: open) {
-                HStack(spacing: 16) {
-                    Text(time)
-                        .font(Square.mono(11))
-                        .monospacedDigit()
-                        .frame(width: 48, alignment: .leading)
-                        .foregroundStyle(meta)
-                    Text(title)
-                        .font(Square.sans(13))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if let detail {
-                        Text(detail).font(Square.mono(11)).foregroundStyle(meta)
-                    }
-                }
-                .foregroundStyle(selected ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+        HStack(spacing: SquareListColumns.edge) {
+            Color.clear.frame(width: SquareListColumns.tick, height: 1)
+            HStack(spacing: SquareListColumns.gap) { columns }
+                .padding(.leading, SquareListColumns.inset)
+                .padding(.trailing, trailing)
         }
-        .background(Rectangle().fill(selected ? DesignTokens.Colors.slab : (hot ? DesignTokens.Colors.inkA04 : .clear)))
-        .overlay(alignment: .top) { SquareRule() }
-        .onHover { hovering = $0 }
-    }
-
-    private var meta: Color {
-        selected ? DesignTokens.Colors.onSlab.opacity(0.72) : DesignTokens.Colors.ink2
+        .font(Square.mono(11))
+        .foregroundStyle(DesignTokens.Colors.ink3)
+        .padding(.bottom, 8)
     }
 }
 
-/// The row for what records now: the slab, when it started, where, and the
-/// time so far.
-struct SquareLiveRow: View {
-    let started: String
-    let label: String
-    let time: String
-
-    var body: some View {
-        HStack(spacing: 16) {
-            Text(started)
-                .font(Square.mono(11))
-                .monospacedDigit()
-                .opacity(0.72)
-                .frame(width: 48, alignment: .leading)
-            Text(label).font(Square.mono(12)).frame(maxWidth: .infinity, alignment: .leading)
-            Text(time).font(Square.mono(12)).monospacedDigit()
-        }
-        .foregroundStyle(DesignTokens.Colors.onSlab)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(DesignTokens.Colors.slab)
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.onSlab.opacity(0.2)) }
-    }
-}
-
-/// A day in a list: an ink rule, the day in mono 12 medium, its date, and how
-/// much it held on the right.
+/// A day in a list: an ink rule, the day under the time, its date beside
+/// it, and how much it held, right-aligned over the last `totalWidth` of
+/// the columns and `trailing` in from the row's end.
 struct SquareDayHeader: View {
     let day: String
     let date: String
-    var total: String?
+    let total: String
+    let totalWidth: CGFloat
+    let trailing: CGFloat
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(day).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink)
-            Text(date).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3)
-            Spacer()
-            if let total { Text(total).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3) }
+        HStack(spacing: SquareListColumns.edge) {
+            Color.clear.frame(width: SquareListColumns.tick, height: 1)
+            HStack(alignment: .firstTextBaseline, spacing: SquareListColumns.gap) {
+                // "yesterday" is wider than the time column; it runs into the gap.
+                Text(day)
+                    .font(Square.mono(12, weight: .medium))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .fixedSize()
+                    .frame(width: SquareListColumns.time, alignment: .leading)
+                Text(date)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(total)
+                    .font(Square.mono(11))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: totalWidth, alignment: .trailing)
+            }
+            .padding(.leading, SquareListColumns.inset)
+            .padding(.trailing, trailing)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
         .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
+        .padding(.top, 6)
     }
 }
 
@@ -311,21 +284,48 @@ struct SquareLiveBand: View {
     }
 }
 
-/// How far along something is: a 2 pt ink line on an ink-a12 track.
+/// How far along something is: a 2 pt ink line on an ink-a12 track. With
+/// no width it runs as wide as it is given.
 struct SquareBar: View {
     let fraction: Double
-    var width: CGFloat = 120
+    var width: CGFloat? = 120
     var height: CGFloat = 2
     var track = DesignTokens.Colors.inkA12
     var fill = DesignTokens.Colors.ink
 
     var body: some View {
+        if let width {
+            bar(width)
+        } else {
+            GeometryReader { geo in bar(geo.size.width) }
+                .frame(height: height)
+        }
+    }
+
+    private func bar(_ width: CGFloat) -> some View {
         Rectangle()
             .fill(track)
             .frame(width: width, height: height)
             .overlay(alignment: .leading) {
                 Rectangle().fill(fill).frame(width: width * min(max(fraction, 0), 1))
             }
+    }
+}
+
+/// A mono status line. Done carries a check in ink; pending is ink-2 with no icon.
+struct SquareStatus: View {
+    var text: String
+    var done = false
+    init(_ text: String, done: Bool = false) { self.text = text; self.done = done }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if done {
+                Image("akar-circle-check").resizable().frame(width: 13, height: 13)
+            }
+            Text(text).font(Square.mono(12))
+        }
+        .foregroundStyle(done ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
     }
 }
 
@@ -415,20 +415,21 @@ struct SquareGroupSpecimen: View {
     }
 }
 
-struct SquareListRowSpecimen: View {
-    @State private var picked = false
+struct SquareListHeadSpecimen: View {
+    private static let length: CGFloat = 48
 
     var body: some View {
         SquareSpecimen {
             VStack(spacing: 0) {
-                SquareDayHeader(day: "today", date: "24 september", total: "3 meetings · 1h 12m")
-                SquareListRow(time: "10:21", title: "pricing page review", detail: "11m")
-                SquareListRow(time: "10:21", title: "pricing page review", detail: "11m").environment(\.squarePose, .hover)
-                SquareListRow(time: "10:21", title: "pricing page review", detail: "11m", selected: true)
-                SquareLiveRow(started: "10:48", label: "recording · slack huddle", time: "12:04")
-                SquareListRow(time: "09:02", title: "select box, under the pointer", detail: "4m", picked: $picked)
-                    .environment(\.squarePose, .hover)
-                SquareListRow(time: "08:47", title: "select box, picked", detail: "2m", picked: .constant(true), picking: true)
+                SquareListHead(trailing: SquareListColumns.inset) {
+                    Text("time").frame(width: SquareListColumns.time, alignment: .leading)
+                    Text("meeting").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("length").frame(width: SquareListHeadSpecimen.length, alignment: .trailing)
+                }
+                SquareDayHeader(day: "today", date: "thursday 24 september", total: "3 meetings · 1h 12m",
+                                totalWidth: SquareListHeadSpecimen.length, trailing: SquareListColumns.inset)
+                SquareDayHeader(day: "yesterday", date: "wednesday 23 september", total: "1 meeting · 11m",
+                                totalWidth: SquareListHeadSpecimen.length, trailing: SquareListColumns.inset)
             }
             .frame(width: 520)
         }
@@ -445,6 +446,11 @@ struct SquareStatusSpecimen: View {
                 Text("transcribing · 64%").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
                 SquareBar(fraction: 0.64)
             }
+            SquareSpecimenLine(name: "download") {
+                SquareBar(fraction: 0.4, width: nil, height: 6, track: DesignTokens.Colors.inkA08).frame(width: 300)
+            }
+            SquareSpecimenLine(name: "done") { SquareStatus("installed", done: true) }
+            SquareSpecimenLine(name: "pending") { SquareStatus("checking the model…") }
             SquareSpecimenLine(name: "running") {
                 SquareSpinner()
                 Text("checking the last 10 dictations").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink)
@@ -455,6 +461,6 @@ struct SquareStatusSpecimen: View {
 
 #Preview("settings row") { SquareSettingsRowSpecimen() }
 #Preview("group") { SquareGroupSpecimen() }
-#Preview("list row") { SquareListRowSpecimen() }
+#Preview("list head") { SquareListHeadSpecimen() }
 #Preview("status") { SquareStatusSpecimen() }
 #endif
