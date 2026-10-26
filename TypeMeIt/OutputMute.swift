@@ -47,7 +47,11 @@ enum OutputMute {
     }
 
     static func mute() {
-        guard previous == nil, let id = MeetingCapture.defaultDevice(input: false), let device = MeetingCapture.device(id), let was = isMuted(id) else { return }
+        guard previous == nil, let id = MeetingCapture.defaultDevice(input: false), let device = MeetingCapture.device(id), let reads = isMuted(id) else { return }
+        // A mute of ours that has not been lifted yet, while an unmute is
+        // still retrying, is not the user's: it is lifted at the end of
+        // this dictation like any other.
+        let was = reads && UserDefaults.standard.string(forKey: leftMutedKey) != device.uid
         previous = (device.uid, was)
         guard !was else { return }
         UserDefaults.standard.set(device.uid, forKey: leftMutedKey)
@@ -84,14 +88,27 @@ enum OutputMute {
     }
 
     /// A device that is not connected keeps its UID in UserDefaults, for the
-    /// next launch to try again.
-    private static func unmute(uid: String) {
+    /// next launch to try again. One that still reads muted, as a Bluetooth
+    /// headset can while it switches profile, is tried again a few times;
+    /// a new dictation's mute ends the retries, and its own restore lifts it.
+    private static func unmute(uid: String, attempt: Int = 1) {
         guard let id = AudioCapture.deviceID(forUID: uid) else {
             DebugLog.write("Mute: muted device not connected; left for the next launch")
             return
         }
         setMuted(id, false)
-        UserDefaults.standard.removeObject(forKey: leftMutedKey)
-        DebugLog.write("Mute: device \(id) unmuted, reads \(describe(id))")
+        guard isMuted(id) == true else {
+            UserDefaults.standard.removeObject(forKey: leftMutedKey)
+            DebugLog.write("Mute: device \(id) unmuted, reads \(describe(id))\(attempt > 1 ? " on try \(attempt)" : "")")
+            return
+        }
+        guard attempt < Fixed.unmuteTries else {
+            DebugLog.write("Mute: device \(id) still reads muted after \(counted(attempt, "try", "tries")); left for the next launch")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Fixed.unmuteRetryInterval) {
+            guard previous == nil else { return }
+            unmute(uid: uid, attempt: attempt + 1)
+        }
     }
 }

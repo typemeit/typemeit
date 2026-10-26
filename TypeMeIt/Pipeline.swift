@@ -133,6 +133,7 @@ final class Pipeline {
             AppDelegate.shared?.showUpgrade()
             return
         }
+        MissingPermission.refreshMicrophone()
         generation += 1
         phase = .recording
         pinned = false

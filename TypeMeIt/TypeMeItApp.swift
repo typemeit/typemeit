@@ -344,6 +344,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observePipeline()
         previewToastIfAsked()
         MeetingProbes.runIfAsked()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in MissingPermission.refreshMicrophone() }
+        }
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let owner = SecureInput.owner
