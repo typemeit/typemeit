@@ -34,7 +34,7 @@ struct CameraAnswerCard: View {
             .padding(.vertical, 20)
             Rectangle().fill(Self.onSlab.opacity(0.16)).frame(height: 1)
             let lead = Self.lead(of: answer)
-            Text(AnswerPill.rendered(lead))
+            Text((try? AttributedString(markdown: lead, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(lead))
                 .font(.system(size: Self.answerSize(for: lead), weight: .medium))
                 .lineSpacing(8)
                 .foregroundStyle(Self.onSlab)

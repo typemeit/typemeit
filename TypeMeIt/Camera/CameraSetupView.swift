@@ -41,10 +41,10 @@ struct CameraSetupView: View {
                 StepDots(current: step.rawValue, count: Step.allCases.count)
                 Spacer()
                 if step != .pick {
-                    Button("later", action: close).buttonStyle(InkButtonStyle(quiet: true))
+                    Button("later", action: close).buttonStyle(SquareButtonStyle(kind: .quiet))
                 }
                 Button(step == .pick ? "done" : "continue") { advance() }
-                    .buttonStyle(InkButtonStyle(primary: true))
+                    .buttonStyle(SquareButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canContinue)
             }
@@ -79,8 +79,8 @@ struct CameraSetupView: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .add:
-            SettingsGroup {
-                SettingsRow(label: "type me it camera", last: true) { addControl }
+            SquareRows {
+                SquareSettingsRow(label: "type me it camera") { addControl }
             }
             if case .failed(let reason) = installer.status, !Self.added {
                 Text(reason)
@@ -92,38 +92,38 @@ struct CameraSetupView: View {
         case .allow:
             VStack(alignment: .leading, spacing: 16) {
                 SystemSettingsPicture()
-                SettingsGroup {
-                    SettingsRow(label: "media extension", last: true) {
+                SquareRows {
+                    SquareSettingsRow(label: "media extension") {
                         if feed.installed {
-                            Status("on", done: true)
+                            SquareStatus("on", done: true)
                         } else {
                             Button("system settings") { NSWorkspace.shared.open(CameraInstaller.loginItemsSettings) }
-                                .buttonStyle(InkButtonStyle(primary: true))
+                                .buttonStyle(SquareButtonStyle(kind: .primary))
                         }
                     }
                 }
             }
         case .access:
-            SettingsGroup {
-                SettingsRow(label: "camera", last: true) {
+            SquareRows {
+                SquareSettingsRow(label: "camera") {
                     switch access {
                     case .authorized:
-                        Status("granted", done: true)
+                        SquareStatus("granted", done: true)
                     case .notDetermined:
                         Button("grant") {
                             Task { _ = await AVCaptureDevice.requestAccess(for: .video); access = AVCaptureDevice.authorizationStatus(for: .video) }
                         }
-                        .buttonStyle(InkButtonStyle(primary: true))
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
                     default:
                         Button("system settings") { NSWorkspace.shared.open(SecureInput.cameraSettingsURL) }
-                            .buttonStyle(InkButtonStyle(primary: true))
+                            .buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 }
             }
         case .pick:
-            SettingsGroup {
-                SettingsRow(label: "meeting app", last: true) {
-                    if feed.watched { Status("showing type me it", done: true) } else { Status("not showing it yet") }
+            SquareRows {
+                SquareSettingsRow(label: "meeting app") {
+                    if feed.watched { SquareStatus("showing type me it", done: true) } else { SquareStatus("not showing it yet") }
                 }
             }
         }
@@ -131,16 +131,16 @@ struct CameraSetupView: View {
 
     @ViewBuilder private var addControl: some View {
         if Self.added {
-            Status("added", done: true)
+            SquareStatus("added", done: true)
         } else if !CameraInstaller.canAdd {
-            Status("dev build: scripts/install-camera.sh")
+            SquareStatus("dev build: scripts/install-camera.sh")
         } else if !CameraInstaller.inApplications {
-            Status("move type me it to applications first")
+            SquareStatus("move type me it to applications first")
         } else if installer.status == .adding {
-            Status("adding…")
+            SquareStatus("adding…")
         } else {
             Button(installer.status == .unknown || installer.status == .notAdded ? "add" : "try again") { installer.add() }
-                .buttonStyle(InkButtonStyle(primary: true))
+                .buttonStyle(SquareButtonStyle(kind: .primary))
         }
     }
 
