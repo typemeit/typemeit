@@ -80,6 +80,9 @@ struct PillView: View {
         case .updateFailed(let v):
             SquarePrompt(mark: .icon("akar-sparkles"), message: Text("version \(v) didn't download"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onKeep?() }, minWidth: width) {}
+        case .micFailed:
+            SquarePrompt(mark: .icon("akar-microphone"), message: Text("mic didn't start"), failed: true,
+                         dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onKeep?() }, minWidth: width) {}
         case .meetingPrompt:
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("record this meeting?"),
                          dismiss: "not now", onDismiss: { model.closeNow = true; model.onDeclineMeeting?() }, minWidth: width) {
