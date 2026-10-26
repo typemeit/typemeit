@@ -50,22 +50,30 @@ enum TranscriptMerge {
         let turns = order.flatMap { speaker in
             self.turns(of: bySpeaker[speaker]!.sorted { $0.start < $1.start }, gap: gap).map { (speaker: speaker, words: $0) }
         }.filter { !$0.words.allSatisfy(isFiller) }
+        // A short turn inside another speaker's ("yeah" under a sentence) is
+        // an aside: that turn is cut where it starts, however short the
+        // halves, so the aside sits where it was said and not after the turn.
         var paragraphs: [Meeting.Paragraph] = []
         for turn in turns {
-            let cuts = turns.filter { $0.speaker != turn.speaker }.map { $0.words[0].start }
-            for words in split(turn.words, at: cuts) {
+            let others = turns.indices.filter { turns[$0].speaker != turn.speaker }
+            let saidInside = others.contains { isAside(turn.words, within: turns[$0].words) }
+            let cuts = others.map { turns[$0].words[0].start }
+            let asideCuts = others.filter { isAside(turns[$0].words, within: turn.words) }.map { turns[$0].words[0].start }
+            for words in split(turn.words, at: cuts, always: asideCuts) {
                 paragraphs.append(Meeting.Paragraph(
                     speaker: turn.speaker, startMs: words[0].start.milliseconds, endMs: words[words.count - 1].end.milliseconds,
-                    text: words.map(\.text).joined(separator: " ")))
+                    text: words.map(\.text).joined(separator: " "), aside: saidInside ? true : nil))
             }
         }
         // A pause alone never starts a paragraph: one speaker's paragraphs
-        // with nobody else's between them are one.
+        // with nobody else's between them are one. An aside comes before
+        // the rest of the turn it was said in when both start together.
         var joined: [Meeting.Paragraph] = []
-        for paragraph in paragraphs.sorted(by: { $0.startMs < $1.startMs }) {
+        for paragraph in paragraphs.sorted(by: { ($0.startMs, $0.aside == true ? 0 : 1) < ($1.startMs, $1.aside == true ? 0 : 1) }) {
             if let last = joined.last, last.speaker == paragraph.speaker {
                 joined[joined.count - 1] = Meeting.Paragraph(
-                    speaker: last.speaker, startMs: last.startMs, endMs: max(last.endMs, paragraph.endMs), text: last.text + " " + paragraph.text)
+                    speaker: last.speaker, startMs: last.startMs, endMs: max(last.endMs, paragraph.endMs), text: last.text + " " + paragraph.text,
+                    aside: last.aside == true && paragraph.aside == true ? true : nil)
             } else {
                 joined.append(paragraph)
             }
@@ -88,21 +96,40 @@ enum TranscriptMerge {
     }
 
     /// `words` cut before the first word starting at or after each of
-    /// `cuts`, where both halves last `minimumSplitMs`.
-    private static func split(_ words: [Transcriber.Word], at cuts: [Duration]) -> [[Transcriber.Word]] {
+    /// `cuts`, where both halves last `minimumSplitMs`, and at each of
+    /// `always` whatever the halves last.
+    private static func split(_ words: [Transcriber.Word], at cuts: [Duration], always: [Duration]) -> [[Transcriber.Word]] {
         let minimum = Duration.milliseconds(minimumSplitMs)
-        var pending = cuts.filter { $0 > words[0].start && $0 < words[words.count - 1].end }.sorted()
+        let within = { (cut: Duration) in cut > words[0].start && cut < words[words.count - 1].end }
+        var pending = cuts.filter(within).sorted()
+        var pendingAlways = always.filter(within).sorted()
         var pieces: [[Transcriber.Word]] = [[]]
         for word in words {
-            if let cut = pending.first, word.start >= cut, let first = pieces[pieces.count - 1].first,
-               let last = pieces[pieces.count - 1].last, last.end - first.start >= minimum,
-               words[words.count - 1].end - word.start >= minimum {
-                pieces.append([])
+            if let first = pieces[pieces.count - 1].first, let last = pieces[pieces.count - 1].last {
+                let forced = pendingAlways.first.map { word.start >= $0 } ?? false
+                let long = last.end - first.start >= minimum && words[words.count - 1].end - word.start >= minimum
+                if forced || (pending.first.map { word.start >= $0 } ?? false) && long { pieces.append([]) }
             }
             pending.removeAll { $0 <= word.start }
+            pendingAlways.removeAll { $0 <= word.start }
             pieces[pieces.count - 1].append(word)
         }
         return pieces
+    }
+
+    /// `turn` is shorter than `minimumSplitMs`, reads as a sentence of its
+    /// own, and `host`, another speaker's turn, has words before it starts,
+    /// from then on, and past its end. A sentence starts with a capital and
+    /// ends in ".", "?" or "!": a fragment ("the", "and then") is the
+    /// diarizer flickering mid-sentence. On a 67-minute room recording that
+    /// kept 32 of 104 short turns, the replies ("Yeah.", "Sorry, what?").
+    private static func isAside(_ turn: [Transcriber.Word], within host: [Transcriber.Word]) -> Bool {
+        let start = turn[0].start
+        let end = turn[turn.count - 1].end
+        return end - start < .milliseconds(minimumSplitMs)
+            && turn[0].text.first?.isUppercase == true && turn[turn.count - 1].text.last.map(".?!".contains) == true
+            && host[0].start < start && host[host.count - 1].end > end
+            && host.contains { $0.start >= start }
     }
 
     /// "um", "uh," and the like, by the clean-up's rule.
@@ -118,25 +145,28 @@ enum TranscriptMerge {
         ms >= span.startMs && ms < span.endMs
     }
 
-    /// The segment containing `word`'s midpoint (nearer centre wins when
-    /// segments overlap); failing that, the nearest segment within
-    /// `nearestSegmentMs`; failing that, `fallback` (the previous word's
-    /// speaker, or the track's own role for the track's first word).
+    /// The speaker whose segments cover most of `word`; failing that, the
+    /// nearest segment to its midpoint within `nearestSegmentMs`; failing
+    /// that, `fallback` (the previous word's speaker, or the track's own role
+    /// for the track's first word). Most coverage beat the segment holding
+    /// the midpoint on all 13 recordings checked against AssemblyAI on 21
+    /// October (487 words under the wrong speaker against 499, of 53,397).
     private static func speaker(for word: Transcriber.Word, segments: [SpeakerSegment], fallback: String) -> String {
-        let mid = midpoint(of: word)
-        let containing = segments.filter { mid >= $0.startMs && mid < $0.endMs }
-        if let nearestCentre = containing.min(by: { centreDistance($0, mid) < centreDistance($1, mid) }) {
-            return nearestCentre.speaker
+        let start = word.start.milliseconds
+        let end = word.end.milliseconds
+        var covered: [String: Int] = [:]
+        for segment in segments where segment.startMs < end && segment.endMs > start {
+            covered[segment.speaker, default: 0] += min(segment.endMs, end) - max(segment.startMs, start)
         }
+        if let most = covered.max(by: { ($0.value, $1.key) < ($1.value, $0.key) }) {
+            return most.key
+        }
+        let mid = midpoint(of: word)
         if let nearest = segments.min(by: { edgeDistance(mid, $0) < edgeDistance(mid, $1) }),
            edgeDistance(mid, nearest) <= nearestSegmentMs {
             return nearest.speaker
         }
         return fallback
-    }
-
-    private static func centreDistance(_ segment: SpeakerSegment, _ ms: Int) -> Int {
-        abs((segment.startMs + segment.endMs) / 2 - ms)
     }
 
     private static func edgeDistance(_ ms: Int, _ segment: SpeakerSegment) -> Int {

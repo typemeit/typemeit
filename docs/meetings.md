@@ -2040,10 +2040,26 @@ and `MCPTests`: a shared meeting is not counted.
   agreement with AssemblyAI on the 0831 room from 87% to 69%. A tile shared
   by two people (a meeting room on one laptop) is counted as one, and they
   merge.
-- `TranscriptMerge` assigns each far-end word to the segment containing its
-  midpoint; if none, to the nearest segment within 1 s; else to the previous
-  word's speaker. Tests: a word between two segments, a word before the first
-  segment, overlapping segments (the one whose centre is nearer wins).
+- `TranscriptMerge` assigns each far-end word to the speaker whose segments
+  cover most of it; if none touches it, to the segment nearest its midpoint
+  within 1 s; else to the previous word's speaker. On 13 recordings against
+  AssemblyAI (21 October) most coverage put 487 of 53,397 words under the
+  wrong speaker where the midpoint put 499, and was worse on none. Tests: a
+  word between two segments, a word before the first segment, a word whose
+  midpoint is in one segment and most of it in another.
+- Turns stay one speaker at a time. Keeping every Nemotron slot above the
+  threshold, so turns overlap where two people talk at once, made it worse
+  on the same recordings (565 wrong words with most coverage, 875 with the
+  midpoint): on one mixed track the speech model writes the louder voice,
+  which is the likelier slot.
+- A turn shorter than 2 s that reads as a sentence (a capital, then ".",
+  "?" or "!" at the end), inside another speaker's turn that carries on
+  after it ("Yeah.", "Exactly."), is an aside (`Paragraph.aside`): the longer
+  turn is cut where it starts, however short the halves, and the page and
+  the Markdown show it inside that turn as `[name: text]`
+  (`TranscriptRender.rows`). Without the sentence test, 104 short turns on
+  a 67-minute room recording became asides, most of them single words the
+  diarizer gave the wrong speaker mid-sentence ("the", "of"); with it, 32.
 - `transcription.diarizer` records the pipeline name and version.
 - **People beside the user on a call (`RoomVoices`).** Someone who joins
   the call muted on their own device and talks into the user's laptop is in
