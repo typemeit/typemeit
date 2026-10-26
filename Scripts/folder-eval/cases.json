@@ -1,0 +1,2355 @@
+[
+  {
+    "name": "topic-match-under-a-new-title",
+    "folders": [
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      },
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Load Balancer Switch Timing",
+      "summary": "You and Dmitri planned when to move traffic to the new load balancer in the cloud account. You will switch staging on Thursday and production the week after."
+    },
+    "expect": "infra migration"
+  },
+  {
+    "name": "recurring-one-on-one-under-a-new-title",
+    "folders": [
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "1:1 Priya",
+        "meetings": [
+          {
+            "title": "Feedback on Team Demo",
+            "summary": "You gave Priya feedback on her demo at the team meeting, and she asked for more time to prepare slides next time. You agreed she will present again next month."
+          },
+          {
+            "title": "Weekly Priorities Catch-up",
+            "summary": "Priya walked you through her week and flagged that the API docs are behind. You agreed she should spend Friday on them."
+          },
+          {
+            "title": "Career Growth Check-in",
+            "summary": "You and Priya talked about her goal to lead the payments project next quarter. You will ask Sam whether she can shadow the current lead."
+          },
+          {
+            "title": "Goals for the Half",
+            "summary": "You and Priya set her goals for the next six months, including mentoring a new engineer. You will review them together in a month."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Promotion Case Discussion",
+      "summary": "You and Priya went through what her promotion case needs before the review cycle. She will draft examples from her payments work and you will review them next week."
+    },
+    "expect": "1:1 Priya"
+  },
+  {
+    "name": "one-on-one-with-someone-else",
+    "folders": [
+      {
+        "name": "1:1 Priya",
+        "meetings": [
+          {
+            "title": "Feedback on Team Demo",
+            "summary": "You gave Priya feedback on her demo at the team meeting, and she asked for more time to prepare slides next time. You agreed she will present again next month."
+          },
+          {
+            "title": "Weekly Priorities Catch-up",
+            "summary": "Priya walked you through her week and flagged that the API docs are behind. You agreed she should spend Friday on them."
+          },
+          {
+            "title": "Career Growth Check-in",
+            "summary": "You and Priya talked about her goal to lead the payments project next quarter. You will ask Sam whether she can shadow the current lead."
+          },
+          {
+            "title": "Goals for the Half",
+            "summary": "You and Priya set her goals for the next six months, including mentoring a new engineer. You will review them together in a month."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Growth Plan Check-in",
+      "summary": "You and Tomasz talked about his wish to move into the data team next year. You will set up a chat with the data team's lead."
+    },
+    "expect": null
+  },
+  {
+    "name": "hiring-not-onboarding",
+    "folders": [
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Designer Offer Decision",
+      "summary": "You and Leah agreed to make an offer to the product designer after her final interview. Leah will call her tomorrow with the salary range."
+    },
+    "expect": "hiring"
+  },
+  {
+    "name": "onboarding-not-hiring",
+    "folders": [
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Welcome Plan for Marcus",
+      "summary": "You and Leah planned Marcus's first two weeks after he starts on Monday, including who he will pair with and which accounts he needs on day one. Leah will send him the welcome pack on Friday."
+    },
+    "expect": "onboarding"
+  },
+  {
+    "name": "quick-sync-about-the-client",
+    "folders": [
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Quick Sync",
+      "summary": "You and Owen went over Acme's request to extend their pilot by a month. Owen will send Acme a revised timeline and price by Wednesday."
+    },
+    "expect": "Acme account"
+  },
+  {
+    "name": "quick-sync-same-person-other-topic",
+    "folders": [
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Quick Sync",
+      "summary": "You and Owen checked whether the office move date still works with the new lease. Owen will confirm the movers for the fourteenth."
+    },
+    "expect": null
+  },
+  {
+    "name": "catch-up-about-the-show",
+    "folders": [
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Catch Up",
+      "summary": "You and Zara picked the next three guests for the show and agreed to record the interview with a pastry chef on Tuesday. Zara will book the studio."
+    },
+    "expect": "podcast"
+  },
+  {
+    "name": "only-folder-shares-a-word",
+    "folders": [
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Revenue Dashboard Fix",
+      "summary": "You and Kofi fixed the revenue dashboard, which was counting refunds twice. Kofi will add a test so its totals match the finance export."
+    },
+    "expect": null
+  },
+  {
+    "name": "only-folder-fits",
+    "folders": [
+      {
+        "name": "wedding",
+        "meetings": [
+          {
+            "title": "Venue Visit Debrief",
+            "summary": "You met the wedding planner, Sophie, at the barn venue and liked it, but the catering is extra. Sophie will ask for a full quote."
+          },
+          {
+            "title": "Caterer Tasting",
+            "summary": "You and Sophie tasted three menus from the caterer and picked the summer menu. You will confirm numbers by the end of the month."
+          },
+          {
+            "title": "Guest List Draft",
+            "summary": "You and Sophie cut the guest list to ninety people. Sophie will send save-the-dates next week."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Flowers and Seating Plan",
+      "summary": "You and Sophie chose the flowers for the tables and drafted the seating plan for the reception. Sophie will send the florist the order."
+    },
+    "expect": "wedding"
+  },
+  {
+    "name": "same-client-redesign-not-support",
+    "folders": [
+      {
+        "name": "Northwind support",
+        "meetings": [
+          {
+            "title": "Monthly Support Call",
+            "summary": "You and Grace went through this month's support tickets for the current Northwind site. You fixed four and two are waiting on their content team."
+          },
+          {
+            "title": "Search Bug Triage",
+            "summary": "Grace reported that site search returns no results for product codes. You traced it to the search index and will rebuild it tonight."
+          },
+          {
+            "title": "Hosting Renewal Check",
+            "summary": "You and Grace checked that Northwind's hosting and domain renew next month. You will update the card on file."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "Northwind redesign",
+        "meetings": [
+          {
+            "title": "Navigation Sketches Review",
+            "summary": "You and Grace from Northwind reviewed sketches for the new site navigation. Grace prefers the version with fewer top-level items."
+          },
+          {
+            "title": "Redesign Kickoff",
+            "summary": "You and Grace kicked off Northwind's website redesign and agreed on a launch in March. You will send a project plan with three design rounds."
+          },
+          {
+            "title": "Brand Colours Workshop",
+            "summary": "You and Grace chose a new colour palette for the Northwind site. You will apply it to the homepage mockup."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Homepage Hero Options",
+      "summary": "You and Grace compared three layouts for the top of Northwind's new homepage. Grace will get sign-off on the second one from her director."
+    },
+    "expect": "Northwind redesign"
+  },
+  {
+    "name": "same-client-support-not-redesign",
+    "folders": [
+      {
+        "name": "Northwind redesign",
+        "meetings": [
+          {
+            "title": "Navigation Sketches Review",
+            "summary": "You and Grace from Northwind reviewed sketches for the new site navigation. Grace prefers the version with fewer top-level items."
+          },
+          {
+            "title": "Redesign Kickoff",
+            "summary": "You and Grace kicked off Northwind's website redesign and agreed on a launch in March. You will send a project plan with three design rounds."
+          },
+          {
+            "title": "Brand Colours Workshop",
+            "summary": "You and Grace chose a new colour palette for the Northwind site. You will apply it to the homepage mockup."
+          }
+        ]
+      },
+      {
+        "name": "Northwind support",
+        "meetings": [
+          {
+            "title": "Monthly Support Call",
+            "summary": "You and Grace went through this month's support tickets for the current Northwind site. You fixed four and two are waiting on their content team."
+          },
+          {
+            "title": "Search Bug Triage",
+            "summary": "Grace reported that site search returns no results for product codes. You traced it to the search index and will rebuild it tonight."
+          },
+          {
+            "title": "Hosting Renewal Check",
+            "summary": "You and Grace checked that Northwind's hosting and domain renew next month. You will update the card on file."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Contact Form Not Sending",
+      "summary": "Grace reported that the contact form on Northwind's site stopped sending emails on Saturday. You found the mail key had expired and will replace it today."
+    },
+    "expect": "Northwind support"
+  },
+  {
+    "name": "personal-call-among-work-folders",
+    "folders": [
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Holiday Plans",
+      "summary": "You and Dan talked about where to spend the holidays and settled on the coast. Dan will look for a cottage to rent."
+    },
+    "expect": null
+  },
+  {
+    "name": "new-project-no-folder-yet",
+    "folders": [
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      },
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Mobile App Kickoff",
+      "summary": "You and Lina kicked off the new mobile app and agreed on a first release in six weeks. Lina will write the scope document."
+    },
+    "expect": null
+  },
+  {
+    "name": "team-means-another-team",
+    "folders": [
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Five-a-side Fixtures",
+      "summary": "You and Rob sorted out the fixtures for your five-a-side football team's autumn league. Rob will collect the fees from the players."
+    },
+    "expect": null
+  },
+  {
+    "name": "postmortem-goes-to-on-call",
+    "folders": [
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      },
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Checkout Errors Postmortem",
+      "summary": "You and Dmitri went through Tuesday's checkout errors, which came from a bad config change. You agreed to roll out config changes to one server first."
+    },
+    "expect": "on-call"
+  },
+  {
+    "name": "monthly-catch-up-with-the-bookkeeper",
+    "folders": [
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Monthly Catch-up",
+      "summary": "You and Mei went through September's expenses and two client invoices that are still unpaid. Mei will chase the clients and file the receipts."
+    },
+    "expect": "invoices"
+  },
+  {
+    "name": "client-shoot-not-the-show",
+    "folders": [
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      },
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Menu Photo Shoot",
+      "summary": "You and Hannah planned the photo shoot for Bluebird's new winter menu. Hannah will bake the cakes for Thursday morning."
+    },
+    "expect": "Bluebird Bakery"
+  },
+  {
+    "name": "weekly-check-in-about-the-move",
+    "folders": [
+      {
+        "name": "wedding",
+        "meetings": [
+          {
+            "title": "Venue Visit Debrief",
+            "summary": "You met the wedding planner, Sophie, at the barn venue and liked it, but the catering is extra. Sophie will ask for a full quote."
+          },
+          {
+            "title": "Caterer Tasting",
+            "summary": "You and Sophie tasted three menus from the caterer and picked the summer menu. You will confirm numbers by the end of the month."
+          },
+          {
+            "title": "Guest List Draft",
+            "summary": "You and Sophie cut the guest list to ninety people. Sophie will send save-the-dates next week."
+          }
+        ]
+      },
+      {
+        "name": "school",
+        "meetings": [
+          {
+            "title": "Parents Evening Notes",
+            "summary": "You and Chris met Leo's teacher, Ms Patel, who said he is doing well in maths but needs help with reading. You will read with him every evening."
+          },
+          {
+            "title": "School Trip Planning",
+            "summary": "You and two other parents organised lifts for the class trip to the science museum. You will drive four children."
+          }
+        ]
+      },
+      {
+        "name": "house move",
+        "meetings": [
+          {
+            "title": "Removals Quotes",
+            "summary": "You and Chris compared three quotes from removal companies and picked the cheapest one with insurance. Chris will pay the deposit."
+          },
+          {
+            "title": "Mortgage Broker Call",
+            "summary": "You and Chris went through mortgage offers with the broker, Paul, and chose the five-year fixed rate. Paul will submit the application."
+          },
+          {
+            "title": "Survey Results",
+            "summary": "You and Chris read the survey on the new house, which found damp in the cellar. You will ask the seller to fix it before completion."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Weekly Check-in",
+      "summary": "You and Chris went over the moving date and the rooms still to pack. Chris will book the van for the twenty-eighth."
+    },
+    "expect": "house move"
+  },
+  {
+    "name": "teacher-meeting-goes-to-school",
+    "folders": [
+      {
+        "name": "house move",
+        "meetings": [
+          {
+            "title": "Removals Quotes",
+            "summary": "You and Chris compared three quotes from removal companies and picked the cheapest one with insurance. Chris will pay the deposit."
+          },
+          {
+            "title": "Mortgage Broker Call",
+            "summary": "You and Chris went through mortgage offers with the broker, Paul, and chose the five-year fixed rate. Paul will submit the application."
+          },
+          {
+            "title": "Survey Results",
+            "summary": "You and Chris read the survey on the new house, which found damp in the cellar. You will ask the seller to fix it before completion."
+          }
+        ]
+      },
+      {
+        "name": "wedding",
+        "meetings": [
+          {
+            "title": "Venue Visit Debrief",
+            "summary": "You met the wedding planner, Sophie, at the barn venue and liked it, but the catering is extra. Sophie will ask for a full quote."
+          },
+          {
+            "title": "Caterer Tasting",
+            "summary": "You and Sophie tasted three menus from the caterer and picked the summer menu. You will confirm numbers by the end of the month."
+          },
+          {
+            "title": "Guest List Draft",
+            "summary": "You and Sophie cut the guest list to ninety people. Sophie will send save-the-dates next week."
+          }
+        ]
+      },
+      {
+        "name": "school",
+        "meetings": [
+          {
+            "title": "Parents Evening Notes",
+            "summary": "You and Chris met Leo's teacher, Ms Patel, who said he is doing well in maths but needs help with reading. You will read with him every evening."
+          },
+          {
+            "title": "School Trip Planning",
+            "summary": "You and two other parents organised lifts for the class trip to the science museum. You will drive four children."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Reading Support Plan",
+      "summary": "You and Ms Patel agreed on extra reading sessions for Leo twice a week. She will send home a reading log."
+    },
+    "expect": "school"
+  },
+  {
+    "name": "work-meeting-among-home-folders",
+    "folders": [
+      {
+        "name": "school",
+        "meetings": [
+          {
+            "title": "Parents Evening Notes",
+            "summary": "You and Chris met Leo's teacher, Ms Patel, who said he is doing well in maths but needs help with reading. You will read with him every evening."
+          },
+          {
+            "title": "School Trip Planning",
+            "summary": "You and two other parents organised lifts for the class trip to the science museum. You will drive four children."
+          }
+        ]
+      },
+      {
+        "name": "house move",
+        "meetings": [
+          {
+            "title": "Removals Quotes",
+            "summary": "You and Chris compared three quotes from removal companies and picked the cheapest one with insurance. Chris will pay the deposit."
+          },
+          {
+            "title": "Mortgage Broker Call",
+            "summary": "You and Chris went through mortgage offers with the broker, Paul, and chose the five-year fixed rate. Paul will submit the application."
+          },
+          {
+            "title": "Survey Results",
+            "summary": "You and Chris read the survey on the new house, which found damp in the cellar. You will ask the seller to fix it before completion."
+          }
+        ]
+      },
+      {
+        "name": "wedding",
+        "meetings": [
+          {
+            "title": "Venue Visit Debrief",
+            "summary": "You met the wedding planner, Sophie, at the barn venue and liked it, but the catering is extra. Sophie will ask for a full quote."
+          },
+          {
+            "title": "Caterer Tasting",
+            "summary": "You and Sophie tasted three menus from the caterer and picked the summer menu. You will confirm numbers by the end of the month."
+          },
+          {
+            "title": "Guest List Draft",
+            "summary": "You and Sophie cut the guest list to ninety people. Sophie will send save-the-dates next week."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Quarterly Sales Review",
+      "summary": "You and Aisha went through the quarter's sales by region and found the north behind target. Aisha will draft a plan for the north team."
+    },
+    "expect": null
+  },
+  {
+    "name": "party-planning-is-not-the-wedding",
+    "folders": [
+      {
+        "name": "wedding",
+        "meetings": [
+          {
+            "title": "Venue Visit Debrief",
+            "summary": "You met the wedding planner, Sophie, at the barn venue and liked it, but the catering is extra. Sophie will ask for a full quote."
+          },
+          {
+            "title": "Caterer Tasting",
+            "summary": "You and Sophie tasted three menus from the caterer and picked the summer menu. You will confirm numbers by the end of the month."
+          },
+          {
+            "title": "Guest List Draft",
+            "summary": "You and Sophie cut the guest list to ninety people. Sophie will send save-the-dates next week."
+          }
+        ]
+      },
+      {
+        "name": "school",
+        "meetings": [
+          {
+            "title": "Parents Evening Notes",
+            "summary": "You and Chris met Leo's teacher, Ms Patel, who said he is doing well in maths but needs help with reading. You will read with him every evening."
+          },
+          {
+            "title": "School Trip Planning",
+            "summary": "You and two other parents organised lifts for the class trip to the science museum. You will drive four children."
+          }
+        ]
+      },
+      {
+        "name": "house move",
+        "meetings": [
+          {
+            "title": "Removals Quotes",
+            "summary": "You and Chris compared three quotes from removal companies and picked the cheapest one with insurance. Chris will pay the deposit."
+          },
+          {
+            "title": "Mortgage Broker Call",
+            "summary": "You and Chris went through mortgage offers with the broker, Paul, and chose the five-year fixed rate. Paul will submit the application."
+          },
+          {
+            "title": "Survey Results",
+            "summary": "You and Chris read the survey on the new house, which found damp in the cellar. You will ask the seller to fix it before completion."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Birthday Party Planning",
+      "summary": "You and Chris planned Leo's seventh birthday party at the climbing centre. Chris will send the invitations to his friends."
+    },
+    "expect": null
+  },
+  {
+    "name": "titles-only-folder-other-client",
+    "folders": [
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review"
+          },
+          {
+            "title": "Acme Renewal Pricing"
+          },
+          {
+            "title": "Acme Integration Kickoff"
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Globex Contract Review",
+      "summary": "You and Owen went through Globex's contract and pushed back on its payment terms. Owen will send Globex the changes."
+    },
+    "expect": null
+  },
+  {
+    "name": "titles-only-folder-same-client",
+    "folders": [
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review"
+          },
+          {
+            "title": "Acme Renewal Pricing"
+          },
+          {
+            "title": "Acme Integration Kickoff"
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Single Sign-on Rollout",
+      "summary": "You and Owen planned the single sign-on rollout for Acme's staff. Owen will confirm the date with Acme's IT lead."
+    },
+    "expect": "Acme account"
+  },
+  {
+    "name": "fundraising-not-board",
+    "folders": [
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "fundraising",
+        "meetings": [
+          {
+            "title": "Series A Pipeline Review",
+            "summary": "You and Helen went through the twenty investors you have pitched and the six still interested. Helen will chase the three who asked for the data room."
+          },
+          {
+            "title": "Investor Pitch Practice",
+            "summary": "You rehearsed the Series A pitch with Helen, who said the market slide runs too long. You will cut it to one chart."
+          },
+          {
+            "title": "Data Room Setup",
+            "summary": "You and Helen set up the data room with the financial model and customer contracts. Helen will add the cap table."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Term Sheet Questions",
+      "summary": "You and Helen went through the lead investor's questions on the Series A term sheet. Helen will ask the lawyers about the liquidation preference."
+    },
+    "expect": "fundraising"
+  },
+  {
+    "name": "board-not-fundraising",
+    "folders": [
+      {
+        "name": "fundraising",
+        "meetings": [
+          {
+            "title": "Series A Pipeline Review",
+            "summary": "You and Helen went through the twenty investors you have pitched and the six still interested. Helen will chase the three who asked for the data room."
+          },
+          {
+            "title": "Investor Pitch Practice",
+            "summary": "You rehearsed the Series A pitch with Helen, who said the market slide runs too long. You will cut it to one chart."
+          },
+          {
+            "title": "Data Room Setup",
+            "summary": "You and Helen set up the data room with the financial model and customer contracts. Helen will add the cap table."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Next Meeting Agenda",
+      "summary": "You and Helen drafted the agenda for next month's board meeting, with the cloud cost plan as the main item. Helen will send the pre-read a week ahead."
+    },
+    "expect": "board"
+  },
+  {
+    "name": "fifteen-folders-clear-match",
+    "folders": [
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      },
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "Northwind support",
+        "meetings": [
+          {
+            "title": "Monthly Support Call",
+            "summary": "You and Grace went through this month's support tickets for the current Northwind site. You fixed four and two are waiting on their content team."
+          },
+          {
+            "title": "Search Bug Triage",
+            "summary": "Grace reported that site search returns no results for product codes. You traced it to the search index and will rebuild it tonight."
+          },
+          {
+            "title": "Hosting Renewal Check",
+            "summary": "You and Grace checked that Northwind's hosting and domain renew next month. You will update the card on file."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "1:1 Priya",
+        "meetings": [
+          {
+            "title": "Feedback on Team Demo",
+            "summary": "You gave Priya feedback on her demo at the team meeting, and she asked for more time to prepare slides next time. You agreed she will present again next month."
+          },
+          {
+            "title": "Weekly Priorities Catch-up",
+            "summary": "Priya walked you through her week and flagged that the API docs are behind. You agreed she should spend Friday on them."
+          },
+          {
+            "title": "Career Growth Check-in",
+            "summary": "You and Priya talked about her goal to lead the payments project next quarter. You will ask Sam whether she can shadow the current lead."
+          },
+          {
+            "title": "Goals for the Half",
+            "summary": "You and Priya set her goals for the next six months, including mentoring a new engineer. You will review them together in a month."
+          }
+        ]
+      },
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      },
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      },
+      {
+        "name": "fundraising",
+        "meetings": [
+          {
+            "title": "Series A Pipeline Review",
+            "summary": "You and Helen went through the twenty investors you have pitched and the six still interested. Helen will chase the three who asked for the data room."
+          },
+          {
+            "title": "Investor Pitch Practice",
+            "summary": "You rehearsed the Series A pitch with Helen, who said the market slide runs too long. You will cut it to one chart."
+          },
+          {
+            "title": "Data Room Setup",
+            "summary": "You and Helen set up the data room with the financial model and customer contracts. Helen will add the cap table."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "Northwind redesign",
+        "meetings": [
+          {
+            "title": "Navigation Sketches Review",
+            "summary": "You and Grace from Northwind reviewed sketches for the new site navigation. Grace prefers the version with fewer top-level items."
+          },
+          {
+            "title": "Redesign Kickoff",
+            "summary": "You and Grace kicked off Northwind's website redesign and agreed on a launch in March. You will send a project plan with three design rounds."
+          },
+          {
+            "title": "Brand Colours Workshop",
+            "summary": "You and Grace chose a new colour palette for the Northwind site. You will apply it to the homepage mockup."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Episode Edit Notes",
+      "summary": "You and Zara listened back to the interview with the climate researcher and cut ten minutes. Zara will publish it on Monday."
+    },
+    "expect": "podcast"
+  },
+  {
+    "name": "fifteen-folders-generic-title",
+    "folders": [
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      },
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "Northwind support",
+        "meetings": [
+          {
+            "title": "Monthly Support Call",
+            "summary": "You and Grace went through this month's support tickets for the current Northwind site. You fixed four and two are waiting on their content team."
+          },
+          {
+            "title": "Search Bug Triage",
+            "summary": "Grace reported that site search returns no results for product codes. You traced it to the search index and will rebuild it tonight."
+          },
+          {
+            "title": "Hosting Renewal Check",
+            "summary": "You and Grace checked that Northwind's hosting and domain renew next month. You will update the card on file."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "1:1 Priya",
+        "meetings": [
+          {
+            "title": "Feedback on Team Demo",
+            "summary": "You gave Priya feedback on her demo at the team meeting, and she asked for more time to prepare slides next time. You agreed she will present again next month."
+          },
+          {
+            "title": "Weekly Priorities Catch-up",
+            "summary": "Priya walked you through her week and flagged that the API docs are behind. You agreed she should spend Friday on them."
+          },
+          {
+            "title": "Career Growth Check-in",
+            "summary": "You and Priya talked about her goal to lead the payments project next quarter. You will ask Sam whether she can shadow the current lead."
+          },
+          {
+            "title": "Goals for the Half",
+            "summary": "You and Priya set her goals for the next six months, including mentoring a new engineer. You will review them together in a month."
+          }
+        ]
+      },
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      },
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      },
+      {
+        "name": "fundraising",
+        "meetings": [
+          {
+            "title": "Series A Pipeline Review",
+            "summary": "You and Helen went through the twenty investors you have pitched and the six still interested. Helen will chase the three who asked for the data room."
+          },
+          {
+            "title": "Investor Pitch Practice",
+            "summary": "You rehearsed the Series A pitch with Helen, who said the market slide runs too long. You will cut it to one chart."
+          },
+          {
+            "title": "Data Room Setup",
+            "summary": "You and Helen set up the data room with the financial model and customer contracts. Helen will add the cap table."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "Northwind redesign",
+        "meetings": [
+          {
+            "title": "Navigation Sketches Review",
+            "summary": "You and Grace from Northwind reviewed sketches for the new site navigation. Grace prefers the version with fewer top-level items."
+          },
+          {
+            "title": "Redesign Kickoff",
+            "summary": "You and Grace kicked off Northwind's website redesign and agreed on a launch in March. You will send a project plan with three design rounds."
+          },
+          {
+            "title": "Brand Colours Workshop",
+            "summary": "You and Grace chose a new colour palette for the Northwind site. You will apply it to the homepage mockup."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Quick Chat",
+      "summary": "You and Ravi worked through the account setup for the three people starting next week. Ravi will create their logins on Friday."
+    },
+    "expect": "onboarding"
+  },
+  {
+    "name": "fifteen-folders-no-fit",
+    "folders": [
+      {
+        "name": "on-call",
+        "meetings": [
+          {
+            "title": "Pager Handover Notes",
+            "summary": "You handed the pager to Ines and went through the two alerts that fired overnight. Ines will tune the disk space alert so it stops waking people."
+          },
+          {
+            "title": "Payments Outage Retro",
+            "summary": "You and Dmitri went through Monday's payments outage, caused by an expired certificate. You agreed to add expiry alerts for every certificate."
+          },
+          {
+            "title": "On-call Rota Changes",
+            "summary": "You and Ines reworked the on-call rota so nobody covers two weekends in a row. The new rota starts next month."
+          }
+        ]
+      },
+      {
+        "name": "Acme account",
+        "meetings": [
+          {
+            "title": "Acme Quarterly Review",
+            "summary": "You and Owen presented the quarter's usage numbers to Acme's team, who asked for better reporting. Owen will send them a reporting roadmap."
+          },
+          {
+            "title": "Acme Renewal Pricing",
+            "summary": "You and Owen agreed on a ten percent discount for Acme's two-year renewal. Owen will send the contract to their procurement team."
+          },
+          {
+            "title": "Acme Integration Kickoff",
+            "summary": "You and Owen kicked off the integration with Acme's billing system with their engineers. Their team will share API access next week."
+          }
+        ]
+      },
+      {
+        "name": "podcast",
+        "meetings": [
+          {
+            "title": "Episode 14 Guest Prep",
+            "summary": "You and Zara prepared questions for the episode 14 guest, a climate researcher. Zara will send the guest the topics in advance."
+          },
+          {
+            "title": "Podcast Audio Fixes",
+            "summary": "You and Zara fixed the echo in last week's recording and picked a new microphone. Zara will order it today."
+          },
+          {
+            "title": "Season Two Planning",
+            "summary": "You and Zara planned season two of the show with ten episodes and a new intro. You will write the intro script."
+          }
+        ]
+      },
+      {
+        "name": "hiring",
+        "meetings": [
+          {
+            "title": "Backend Candidate Debrief",
+            "summary": "You and Leah compared notes on the two backend candidates from this week's interviews. You agreed to move the second candidate to the final round."
+          },
+          {
+            "title": "Interview Loop Planning",
+            "summary": "You and Leah set up the interview loop for the senior designer role, with a portfolio review and a paired exercise. Leah will brief the interviewers."
+          },
+          {
+            "title": "Recruiter Pipeline Sync",
+            "summary": "You and the recruiter, Femi, went through the twelve candidates in the pipeline for the open roles. Femi will source more data engineers."
+          }
+        ]
+      },
+      {
+        "name": "Northwind support",
+        "meetings": [
+          {
+            "title": "Monthly Support Call",
+            "summary": "You and Grace went through this month's support tickets for the current Northwind site. You fixed four and two are waiting on their content team."
+          },
+          {
+            "title": "Search Bug Triage",
+            "summary": "Grace reported that site search returns no results for product codes. You traced it to the search index and will rebuild it tonight."
+          },
+          {
+            "title": "Hosting Renewal Check",
+            "summary": "You and Grace checked that Northwind's hosting and domain renew next month. You will update the card on file."
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "meetings": [
+          {
+            "title": "Q3 Board Deck Prep",
+            "summary": "You and Helen drafted the board deck for the third quarter, focused on revenue growth and runway. Helen will send it to the board on Monday."
+          },
+          {
+            "title": "Board Meeting Q2",
+            "summary": "You presented the second quarter results to the board, who asked for a plan to cut cloud costs. You will bring that plan to the next meeting."
+          },
+          {
+            "title": "Board Pack Review",
+            "summary": "You and Helen checked the board pack's financial tables against the accounts. Helen will fix the headcount numbers."
+          }
+        ]
+      },
+      {
+        "name": "1:1 Priya",
+        "meetings": [
+          {
+            "title": "Feedback on Team Demo",
+            "summary": "You gave Priya feedback on her demo at the team meeting, and she asked for more time to prepare slides next time. You agreed she will present again next month."
+          },
+          {
+            "title": "Weekly Priorities Catch-up",
+            "summary": "Priya walked you through her week and flagged that the API docs are behind. You agreed she should spend Friday on them."
+          },
+          {
+            "title": "Career Growth Check-in",
+            "summary": "You and Priya talked about her goal to lead the payments project next quarter. You will ask Sam whether she can shadow the current lead."
+          },
+          {
+            "title": "Goals for the Half",
+            "summary": "You and Priya set her goals for the next six months, including mentoring a new engineer. You will review them together in a month."
+          }
+        ]
+      },
+      {
+        "name": "infra migration",
+        "meetings": [
+          {
+            "title": "Load Test Results Review",
+            "summary": "You and Dmitri went over the load test on the new cloud cluster, which held twice the usual traffic. You agreed the database is ready to move next."
+          },
+          {
+            "title": "Database Cutover Planning",
+            "summary": "You and Dmitri planned the weekend cutover of the main database to the new cloud provider. Dmitri will write the rollback steps by Friday."
+          },
+          {
+            "title": "Kubernetes Cluster Move",
+            "summary": "You and Ines moved the first three services onto the new Kubernetes cluster. Ines will move the billing service once the logs are fixed."
+          },
+          {
+            "title": "Migration Kickoff",
+            "summary": "You, Dmitri and Ines agreed to leave the old data centre by the end of the year. Dmitri will list every service that has to move."
+          }
+        ]
+      },
+      {
+        "name": "Bluebird Bakery",
+        "meetings": [
+          {
+            "title": "Autumn Menu Copy",
+            "summary": "You and Hannah from Bluebird Bakery wrote the descriptions for the autumn menu. Hannah will check the allergen notes."
+          },
+          {
+            "title": "Website Order Form",
+            "summary": "You and Hannah planned an online order form for Bluebird's celebration cakes. You will build a first version this week."
+          },
+          {
+            "title": "Bluebird Brand Refresh",
+            "summary": "You and Hannah agreed on a new logo and shop sign for Bluebird Bakery. You will send the final files next week."
+          }
+        ]
+      },
+      {
+        "name": "onboarding",
+        "meetings": [
+          {
+            "title": "First Week Plan for Ana",
+            "summary": "You and Leah planned Ana's first week, including her laptop setup and her first pairing sessions. Leah will send Ana the schedule on Friday."
+          },
+          {
+            "title": "Buddy Program Kickoff",
+            "summary": "You and Leah set up a buddy program so every new starter has a named colleague for their first month. You will ask for volunteers at the all-hands."
+          },
+          {
+            "title": "New Starter Laptop Setup",
+            "summary": "You and Ravi worked out why new laptops take two days to set up. Ravi will script the account creation so it takes an hour."
+          }
+        ]
+      },
+      {
+        "name": "fundraising",
+        "meetings": [
+          {
+            "title": "Series A Pipeline Review",
+            "summary": "You and Helen went through the twenty investors you have pitched and the six still interested. Helen will chase the three who asked for the data room."
+          },
+          {
+            "title": "Investor Pitch Practice",
+            "summary": "You rehearsed the Series A pitch with Helen, who said the market slide runs too long. You will cut it to one chart."
+          },
+          {
+            "title": "Data Room Setup",
+            "summary": "You and Helen set up the data room with the financial model and customer contracts. Helen will add the cap table."
+          }
+        ]
+      },
+      {
+        "name": "team meetings",
+        "meetings": [
+          {
+            "title": "Platform Team Standup",
+            "summary": "The platform team went through what each person finished yesterday and the blocked deploy. Ines will unblock the deploy after lunch."
+          },
+          {
+            "title": "Sprint Planning",
+            "summary": "You and the platform team picked twelve tickets for the next two-week sprint. The search rewrite was pushed to the following sprint."
+          },
+          {
+            "title": "Platform Team Retro",
+            "summary": "The platform team said the sprint went well but code reviews were slow. You agreed to review pull requests within a day."
+          }
+        ]
+      },
+      {
+        "name": "design reviews",
+        "meetings": [
+          {
+            "title": "Settings Page Review",
+            "summary": "You and Noor reviewed the new settings page and cut two rarely used toggles. Noor will update the mockups before Thursday."
+          },
+          {
+            "title": "Checkout Flow Critique",
+            "summary": "You and Noor walked through the checkout screens and found the address step confusing. Noor will test a single-page version with five users."
+          }
+        ]
+      },
+      {
+        "name": "invoices",
+        "meetings": [
+          {
+            "title": "Overdue Invoices Review",
+            "summary": "You and Mei went through the four invoices more than thirty days overdue. Mei will send reminders today."
+          },
+          {
+            "title": "VAT Return Prep",
+            "summary": "You and Mei gathered the receipts for the quarter's VAT return. Mei will file it before the deadline on the seventh."
+          },
+          {
+            "title": "Bookkeeper Monthly Call",
+            "summary": "You and Mei reconciled August's bank statements and found one duplicate payment. Mei will ask the supplier for a refund."
+          }
+        ]
+      },
+      {
+        "name": "Northwind redesign",
+        "meetings": [
+          {
+            "title": "Navigation Sketches Review",
+            "summary": "You and Grace from Northwind reviewed sketches for the new site navigation. Grace prefers the version with fewer top-level items."
+          },
+          {
+            "title": "Redesign Kickoff",
+            "summary": "You and Grace kicked off Northwind's website redesign and agreed on a launch in March. You will send a project plan with three design rounds."
+          },
+          {
+            "title": "Brand Colours Workshop",
+            "summary": "You and Grace chose a new colour palette for the Northwind site. You will apply it to the homepage mockup."
+          }
+        ]
+      }
+    ],
+    "meeting": {
+      "title": "Garden Planting Day",
+      "summary": "You and Ruth planned the spring planting day for the community garden. Ruth will ask the council for compost."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-quick-sync-about-a-client",
+    "folders": [],
+    "meeting": {
+      "title": "Quick Sync",
+      "summary": "You and Owen went over Acme's request to extend their pilot by a month. Owen will send Acme a revised timeline and price by Wednesday."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-community-garden",
+    "folders": [],
+    "meeting": {
+      "title": "Garden Planting Day",
+      "summary": "You and Ruth planned the spring planting day for the community garden. Ruth will ask the council for compost."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-weekly-check-in-about-a-move",
+    "folders": [],
+    "meeting": {
+      "title": "Weekly Check-in",
+      "summary": "You and Chris went over the moving date and the rooms still to pack. Chris will book the van for the twenty-eighth."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-one-on-one",
+    "folders": [],
+    "meeting": {
+      "title": "Promotion Case Discussion",
+      "summary": "You and Priya went through what her promotion case needs before the review cycle. She will draft examples from her payments work and you will review them next week."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-podcast-edit",
+    "folders": [],
+    "meeting": {
+      "title": "Episode Edit Notes",
+      "summary": "You and Zara listened back to the interview with the climate researcher and cut ten minutes. Zara will publish it on Monday."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-generic-kickoff",
+    "folders": [],
+    "meeting": {
+      "title": "Kickoff",
+      "summary": "You and Lina kicked off the mobile ordering app for Bluebird Bakery and agreed on a first release in six weeks. Lina will write the scope document."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-interview-debrief",
+    "folders": [],
+    "meeting": {
+      "title": "Interview Debrief",
+      "summary": "You and Leah compared notes on the two backend engineer candidates and agreed to move one to the final round. Leah will schedule it for next week."
+    },
+    "expect": null
+  },
+  {
+    "name": "no-folders-catch-up-personal",
+    "folders": [],
+    "meeting": {
+      "title": "Catch Up",
+      "summary": "You and Dan talked about where to spend the holidays and settled on the coast. Dan will look for a cottage to rent."
+    },
+    "expect": null
+  }
+]

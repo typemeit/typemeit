@@ -8,6 +8,7 @@
 #   make asr-model-verify-url   re-download the published tar and hash it
 #   make eval               score the clean-up prompt on Apple Intelligence
 #   make meeting-eval       score meeting summaries and titles on Apple Intelligence
+#   make folder-eval        score the meeting folder pick on Apple Intelligence
 #   make asr-eval ARGS=...  score speech models and diarizers against AssemblyAI (Scripts/asr-eval/README.md)
 #   make asr-eval-test      unit tests for the asr-eval scoring
 #   make model-trials       build docs/model-trials.md and typeme.it/models from docs/model-trials.json
@@ -53,7 +54,7 @@ DIARIZER_PINNED_SHA := $(shell sed -n 's/.*let sha256 = "\([0-9a-f]*\)".*/\1/p' 
 DIARIZER_PINNED_BYTES := $(shell sed -n 's/.*let expectedBytes: Int64 = \([0-9_]*\).*/\1/p' $(DIARIZER_STORE) | tr -d _)
 
 .DEFAULT_GOAL := help
-.PHONY: help asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval asr-eval asr-eval-test model-trials \
+.PHONY: help asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval folder-eval asr-eval asr-eval-test model-trials bench \
 	diarizer-model diarizer-model-sums diarizer-model-verify diarizer-model-publish diarizer-model-verify-url
 
 help:
@@ -108,6 +109,11 @@ eval:
 # MeetingSummary. Needs a Mac with Apple Intelligence on.
 meeting-eval:
 	Scripts/meeting-eval/run.sh
+
+# The folder a new meeting is filed in, on written test folders and meetings,
+# through the app's own MeetingFolderPick. Needs a Mac with Apple Intelligence on.
+folder-eval:
+	Scripts/folder-eval/run.sh
 
 # Speech models and diarizers scored against an AssemblyAI reference whose
 # disagreements were hand-checked, e.g. make asr-eval ARGS="run shipped".

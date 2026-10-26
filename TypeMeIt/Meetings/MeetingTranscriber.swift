@@ -214,7 +214,18 @@ enum MeetingTranscriber {
     }
 
     static func saveToStore(_ meeting: Meeting) async {
-        await MainActor.run { MeetingStore.shared.save(meeting) }
+        await MainActor.run { MeetingStore.shared.save(keepingFiling(meeting, from: MeetingStore.shared.meeting(meeting.id))) }
+    }
+
+    /// `meeting` with the folder and folder suggestion `stored` has: the
+    /// pass's copy is from before it started, and the user may have filed
+    /// the meeting or answered a suggestion since. Pure.
+    static func keepingFiling(_ meeting: Meeting, from stored: Meeting?) -> Meeting {
+        guard let stored else { return meeting }
+        var kept = meeting
+        kept.folder = stored.folder
+        kept.folderSuggestion = stored.folderSuggestion
+        return kept
     }
 
     /// The far end is `them`, the mic `you`, a room `room`.

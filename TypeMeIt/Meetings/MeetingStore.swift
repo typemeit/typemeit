@@ -22,6 +22,7 @@ final class MeetingStore {
     private(set) var folderAvailable = true
 
     @ObservationIgnored private var folders: [UUID: URL] = [:]
+    @ObservationIgnored private var folderCountsCache: (revision: Int, counts: [(name: String, count: Int)]) = (-1, [])
     @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
     @ObservationIgnored private var watchedPath: String?
 
@@ -34,6 +35,19 @@ final class MeetingStore {
     func folder(for id: UUID) -> URL? { folders[id] }
 
     func meeting(_ id: UUID) -> Meeting? { meetings.first { $0.id == id } }
+
+    /// Every folder meetings are kept in, by name, with how many are in
+    /// each: the one list of folders the filter, the menus, the meeting's
+    /// page and the folder pick read. Worked out again only when `meetings`
+    /// changes.
+    var folderCounts: [(name: String, count: Int)] {
+        if folderCountsCache.revision != revision {
+            var counts: [String: Int] = [:]
+            for m in meetings { if let folder = m.folder { counts[folder, default: 0] += 1 } }
+            folderCountsCache = (revision, counts.map { ($0.key, $0.value) }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
+        }
+        return folderCountsCache.counts
+    }
 
     // MARK: Reading
 
@@ -93,11 +107,7 @@ final class MeetingStore {
         if let stored = self.meeting(meeting.id)?.hookRuns {
             meeting.hookRuns = Meeting.HookRun.union(stored, meeting.hookRuns ?? [])
         }
-        let folder = folders[meeting.id] ?? MeetingFolder.staged(meeting.id)
-        folders[meeting.id] = folder
-        do { try MeetingFolder.write(meeting, to: folder) } catch {
-            Log.meetings.error("Could not write meeting \(meeting.id): \(error.localizedDescription)")
-        }
+        write(meeting)
         if let i = meetings.firstIndex(where: { $0.id == meeting.id }) { meetings[i] = meeting } else { meetings.append(meeting); meetings.sort { $0.started > $1.started } }
         if meeting.published { diskUsage = folderAvailable ? MeetingFolder.diskUsage(of: publishedRoot) : nil }
     }
@@ -111,6 +121,45 @@ final class MeetingStore {
         meeting.titleSource = .user
         save(meeting)
         renameFolderIfNeeded(id)
+    }
+
+    /// The meeting's JSON and Markdown, written atomically into the folder
+    /// it is in.
+    private func write(_ meeting: Meeting) {
+        let folder = folders[meeting.id] ?? MeetingFolder.staged(meeting.id)
+        folders[meeting.id] = folder
+        do { try MeetingFolder.write(meeting, to: folder) } catch {
+            Log.meetings.error("Could not write meeting \(meeting.id): \(error.localizedDescription)")
+        }
+    }
+
+    /// Puts the meetings in a folder, or in none for nil, in one change to
+    /// `meetings`. A name that matches a folder in use ignoring case files
+    /// them in that folder (`MeetingFolderPick.existing`).
+    func file(ids: Set<UUID>, in folder: String?) {
+        let folder = folder.map { MeetingFolderPick.existing($0, among: folderCounts.map(\.name)) ?? $0 }
+        var updated = meetings
+        var changed = false
+        var published = false
+        for i in updated.indices where ids.contains(updated[i].id) {
+            let filed = updated[i].filed(in: folder)
+            guard filed != updated[i] else { continue }
+            write(filed)
+            updated[i] = filed
+            changed = true
+            published = published || filed.published
+        }
+        guard changed else { return }
+        meetings = updated
+        if published { diskUsage = folderAvailable ? MeetingFolder.diskUsage(of: publishedRoot) : nil }
+    }
+
+    /// The model's folder suggestion for a meeting still in no folder and
+    /// with none waiting.
+    func suggestFolder(_ suggestion: String, for id: UUID) {
+        guard var meeting = meeting(id), meeting.folder == nil, meeting.folderSuggestion == nil else { return }
+        meeting.folderSuggestion = suggestion
+        save(meeting)
     }
 
     /// A published folder's name follows the meeting's title and duration;

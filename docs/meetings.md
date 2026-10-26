@@ -1931,6 +1931,35 @@ forwarded meeting names who forwarded it; plain Markdown, and front matter
 without an id, are not meetings; `format: 2` is refused. `MeetingInsightsTests`
 and `MCPTests`: a shared meeting is not counted.
 
+### 7.17 Folders
+
+A meeting is in at most one folder: `folder` in `meeting.json`, a name, nil
+for none. A folder exists while a meeting is in it; `MeetingStore.folderCounts`
+is the one list of them. Neither `folder` nor `folderSuggestion` goes into a
+`.tmi` file.
+
+- The meetings page has a `folder` filter beside where, who and when: any
+  folder, each folder, `no folder`. With meetings picked, `move N` opens a
+  menu of the folders, `new folder…` and `no folder`. A typed name that
+  matches a folder ignoring case files into that folder.
+- A meeting is filed by itself in one case: when recording stops, it takes
+  the folder of the newest earlier meeting with the same call key
+  (`names.call`) in the same app (`Meeting.seriesFolder`). A folder the user
+  picked while it was live wins.
+- Every other folder is a suggestion. When a transcription finishes with a
+  summary, `MeetingFolderPick` asks Apple's on-device model to grade each
+  folder (up to 12, newest first) as `belongs`, `loose` or `unrelated`
+  against the meeting's title and summary. Exactly one `belongs` suggests
+  that folder; two or more suggest nothing; none asks the model for a new
+  folder's name of up to three words, dropped if it repeats the meeting's
+  title or a folder's words. The suggestion waits on the meeting's page as
+  `folder: X?` or `new folder: X?` with `yes` and `no`, and first in the move
+  menu. A meeting with a summary and no suggestion shows `suggest a folder`.
+
+`make folder-eval` scores the pick and prints the new names
+(Scripts/folder-eval). Tests: `MeetingFolderFilingTests`,
+`MeetingFolderPickTests`.
+
 ## 8. Phase 2: the room, and speakers
 
 ### 8.1 The room

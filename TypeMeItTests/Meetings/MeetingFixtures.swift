@@ -65,4 +65,20 @@ enum MeetingFixtures {
                 speaker: "them", startMs: 21_000, endMs: 30_000,
                 text: "Sure, give me a second to pull it up."),
         ])
+
+    /// `example` as another meeting: a new id, `title` (the app's name, as
+    /// a new meeting has), started `hoursAgo` before `example`, with
+    /// `summary`, in `folder`, on the call `call` in `app`.
+    static func meeting(_ title: String = example.title, hoursAgo: Double = 0, summary: String? = nil, folder: String? = nil,
+                        call: String? = nil, app: Meeting.App? = example.app) -> Meeting {
+        var m = example
+        m.id = UUID()
+        m.title = title
+        m.started = example.started.addingTimeInterval(-hoursAgo * 3600)
+        m.summary = summary
+        m.folder = folder
+        m.app = app
+        m.names = call.map { MeetingNames(source: .roster, roster: [], spans: [], call: $0) }
+        return m
+    }
 }

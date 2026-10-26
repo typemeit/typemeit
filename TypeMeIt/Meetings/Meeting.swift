@@ -235,6 +235,14 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     var questions: [Question]? = nil
     /// The hooks run on the meeting since it ended. Nil when none.
     var hookRuns: [HookRun]? = nil
+    /// The folder the user keeps it in on the meetings page. Nil for none;
+    /// never carried in a `.tmi` share.
+    var folder: String? = nil
+    /// A folder the model suggests for it while it is in none, an existing
+    /// folder or a new one's name (`MeetingFolderPick.suggestion`); which,
+    /// the folder names in use say. Nil once the user answers it; never
+    /// carried in a `.tmi` share.
+    var folderSuggestion: String? = nil
 
     /// Unknown keys are ignored. A file written by a later schema is nil,
     /// with a log line, so this build never rewrites what it cannot read.
@@ -253,6 +261,32 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     }
 
     func encoded() throws -> Data { try StoredJSON.fileEncoder.encode(self) }
+
+    /// The folder of the most recent earlier meeting of the same recurring
+    /// call in the same app, for a new meeting in none. The call is
+    /// `names.call`, the key a rejoin is matched on (`MeetingMerge`): when a
+    /// meeting is first saved its title is still the app's name, so the
+    /// title says nothing about the series. Nil without a call key.
+    /// `earlier` is newest first, as the store keeps it.
+    static func seriesFolder(for meeting: Meeting, among earlier: [Meeting]) -> String? {
+        guard meeting.folder == nil, let call = meeting.names?.call, let bundleId = meeting.app?.bundleId else { return nil }
+        return earlier.first {
+            $0.id != meeting.id && $0.started < meeting.started && $0.names?.call == call && $0.app?.bundleId == bundleId
+        }?.folder
+    }
+
+    /// The folder suggestion while it is in no folder, the only time one
+    /// is shown or offered.
+    var openFolderSuggestion: String? { folder == nil ? folderSuggestion : nil }
+
+    /// It in `folder`, or in none for nil. Filing it answers any folder
+    /// suggestion, so that is cleared.
+    func filed(in folder: String?) -> Meeting {
+        var m = self
+        m.folder = folder
+        m.folderSuggestion = nil
+        return m
+    }
 
     // MARK: Derived
 

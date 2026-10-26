@@ -18,6 +18,14 @@ struct MeetingsTab: View {
     /// The who filter: meetings with everyone in it.
     @State private var people: Set<String> = []
     @State private var when = SquareWhen.any
+    /// The folder filter: nil for any, `.unfiled` for meetings in no folder.
+    @State private var inFolder: FolderChoice?
+    @State private var folderOpen = false
+    /// The move menu for the picked meetings is open, and whether it is
+    /// asking for a new folder's name.
+    @State private var moving = false
+    @State private var namingFolder = false
+    @State private var newFolder = ""
     @State private var from = ""
     @State private var to = ""
     @State private var whereOpen = false
@@ -162,6 +170,13 @@ struct MeetingsTab: View {
             SquareFilter(label: whenLabel, active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
                 SquareWhenPicker(when: $when, from: $from, to: $to)
             }
+            SquareFilter(label: inFolder?.label ?? "folder", active: inFolder != nil, clear: { inFolder = nil }, open: $folderOpen) {
+                let items = folderItems
+                SquareMenuList(items: items.map(\.item), minWidth: 232) { i in
+                    inFolder = items[i].value
+                    folderOpen = false
+                }
+            }
             Spacer(minLength: 0)
             if filtering, !store.meetings.isEmpty {
                 Text("\(shown.formatted()) of \(store.meetings.count.formatted())")
@@ -170,6 +185,12 @@ struct MeetingsTab: View {
                 Button("clear", action: clearFilters).buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
             }
             if !selection.picked.isEmpty {
+                Button("move \(selection.picked.count)") {
+                    namingFolder = false
+                    moving.toggle()
+                }
+                .buttonStyle(SquareButtonStyle())
+                .squarePopover(isPresented: $moving) { moveMenu }
                 let doomed = selection.picked.subtracting(coordinator.liveIDs)
                 Button("delete \(selection.picked.count)") { deletingPicked.toggle() }
                     .buttonStyle(SquareButtonStyle())
@@ -233,11 +254,12 @@ struct MeetingsTab: View {
     // MARK: Filtering
 
     private var filtering: Bool {
-        place != nil || !people.isEmpty || whenActive || !search.trimmingCharacters(in: .whitespaces).isEmpty
+        place != nil || inFolder != nil || !people.isEmpty || whenActive || !search.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func clearFilters() {
         place = nil
+        inFolder = nil
         people = []
         when = .any
         from = ""
@@ -250,6 +272,7 @@ struct MeetingsTab: View {
         let time = WhenFilter(when, from: from, to: to)
         return store.meetings.filter { m in
             if let place, MeetingsTab.app(of: m) != place, MeetingsTab.channel(of: m) != place { return false }
+            if let inFolder, !inFolder.holds(m) { return false }
             if !people.isEmpty, !people.isSubset(of: Set(MeetingsTab.others(in: m))) { return false }
             if !time.contains(m.started) { return false }
             if !q.isEmpty, !MeetingsTab.matches(m, q) { return false }
@@ -303,6 +326,83 @@ struct MeetingsTab: View {
         return out
     }
 
+    /// "Any folder", each folder, then meetings in none.
+    private var folderItems: [(value: FolderChoice?, item: SquareMenuList.Item)] {
+        let folders = store.folderCounts
+        let loose = store.meetings.count - folders.reduce(0) { $0 + $1.count }
+        return [(nil, SquareMenuList.Item(label: "any folder", checked: inFolder == nil, count: counted(store.meetings.count, "meeting")))]
+            + folders.map { (FolderChoice.named($0.name), SquareMenuList.Item(label: $0.name, checked: inFolder == .named($0.name), count: counted($0.count, "meeting"))) }
+            + [(FolderChoice.unfiled, SquareMenuList.Item(label: FolderChoice.unfiled.label, checked: inFolder == .unfiled, count: counted(loose, "meeting"), italic: true))]
+    }
+
+    /// Where the move menu sends the picked meetings.
+    private enum Move {
+        case folder(String)
+        case newFolder
+        case unfiled
+    }
+
+    /// The folder suggestion every picked meeting shares, first; then each
+    /// folder, ticked when it holds them all; a new folder; and out of any,
+    /// when one is in a folder.
+    private var moveItems: [(move: Move, item: SquareMenuList.Item)] {
+        let picked = store.meetings.filter { selection.picked.contains($0.id) }
+        let suggestions = Set(picked.map(\.openFolderSuggestion))
+        let suggestion = suggestions.count == 1 ? suggestions.first ?? nil : nil
+        let folders = store.folderCounts
+        let held = Set(picked.map(\.folder))
+        var items: [(move: Move, item: SquareMenuList.Item)] = []
+        if let suggestion {
+            let label = folders.contains { $0.name == suggestion } ? suggestion : "new folder: \(suggestion)"
+            items.append((.folder(suggestion), SquareMenuList.Item(label: label, checked: false)))
+        }
+        items += folders.filter { $0.name != suggestion }.map { folder in
+            (.folder(folder.name), SquareMenuList.Item(label: folder.name, checked: held == [folder.name], count: counted(folder.count, "meeting")))
+        }
+        items.append((.newFolder, SquareMenuList.Item(label: "new folder…", checked: false, italic: true)))
+        if picked.contains(where: { $0.folder != nil }) {
+            items.append((.unfiled, SquareMenuList.Item(label: FolderChoice.unfiled.label, checked: false, italic: true)))
+        }
+        return items
+    }
+
+    /// The move menu, or the new folder's name once that is picked.
+    @ViewBuilder private var moveMenu: some View {
+        if namingFolder {
+            SquareConfirm(title: "new folder", width: 360) {
+                SquareField(placeholder: "name", text: $newFolder, onSubmit: moveToNewFolder, onCancel: { moving = false })
+                    .frame(minWidth: 150)
+                Button("cancel") { moving = false }.buttonStyle(SquareButtonStyle())
+                Button("move", action: moveToNewFolder)
+                    .buttonStyle(SquareButtonStyle(kind: .primary))
+                    .disabled(newFolder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        } else {
+            let items = moveItems
+            SquareMenuList(items: items.map(\.item), minWidth: 232) { i in
+                switch items[i].move {
+                case .folder(let name): move(to: name)
+                case .unfiled: move(to: nil)
+                case .newFolder:
+                    newFolder = ""
+                    namingFolder = true
+                }
+            }
+        }
+    }
+
+    private func moveToNewFolder() {
+        let name = newFolder.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { move(to: name) }
+    }
+
+    /// Files the picked meetings and lets the selection go, as a delete does.
+    private func move(to folder: String?) {
+        store.file(ids: selection.picked, in: folder)
+        moving = false
+        selection.picked = []
+    }
+
     /// Everyone met, by how many meetings they were in.
     private var personCounts: [(name: String, count: Int)] {
         var counts: [String: Int] = [:]
@@ -330,6 +430,26 @@ struct MeetingsTab: View {
     static func length(_ ms: Int) -> String {
         let minutes = Int((Double(ms) / 60_000).rounded())
         return minutes >= 60 ? String(format: "%dh %02dm", minutes / 60, minutes % 60) : "\(minutes)m"
+    }
+}
+
+/// What the folder filter keeps.
+enum FolderChoice: Equatable {
+    case unfiled
+    case named(String)
+
+    var label: String {
+        switch self {
+        case .unfiled: "no folder"
+        case .named(let name): name
+        }
+    }
+
+    func holds(_ meeting: Meeting) -> Bool {
+        switch self {
+        case .unfiled: meeting.folder == nil
+        case .named(let name): meeting.folder == name
+        }
     }
 }
 
