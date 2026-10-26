@@ -69,6 +69,7 @@ struct OnePageSettings: View {
     /// A new hook's name, typed before it is added.
     @State private var hookName = ""
     @State private var claudeCheck = ClaudeCheck.shared
+    @State private var checkDetailsOpen = false
     @State private var devices = AudioCapture.inputDevices()
     @State private var availability = PostProcessor.availability
     @State private var screenGranted = CGPreflightScreenCaptureAccess()
@@ -191,16 +192,46 @@ struct OnePageSettings: View {
         } below: {
             promptEditor($settings.askClaudeSystemPrompt)
         }
-        SquareSettingsRow(label: "check", help: "runs claude code the two ways ask and hooks do and checks it ran as asked · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off",
-                          caption: checkCaption) {
-            Button("run") { claudeCheck.run() }
-                .buttonStyle(SquareButtonStyle())
-                .disabled(claudeCheck.status == .checking)
+        SquareSettingsRow(label: "claude code", help: "checks claude code runs the way ask and hooks need · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off · use installs the last version that worked, and claude code updates itself again unless DISABLE_AUTOUPDATER is 1 under env in ~/.claude/settings.json",
+                          caption: ClaudeCheck.caption(claudeCheck.status, lastPassed: claudeCheck.lastPassed)) {
+            if let rollback = claudeCheck.rollback {
+                Button("use \(rollback)") { claudeCheck.rollBack(to: rollback) }.buttonStyle(SquareButtonStyle(kind: .primary))
+            } else {
+                Button("check") { claudeCheck.run() }
+                    .buttonStyle(SquareButtonStyle())
+                    .disabled(checkBusy)
+            }
         } below: {
-            VStack(alignment: .leading, spacing: 10) {
-                if case .failed(_, let problems) = claudeCheck.status {
+            if case .failed = claudeCheck.status, !claudeCheck.runs.isEmpty { checkDetails }
+        }
+        .onChange(of: ClaudeCheck.conditions) { _, _ in
+            if ClaudeCheck.inUse { claudeCheck.run() }
+        }
+    }
+
+    private var checkBusy: Bool {
+        switch claudeCheck.status {
+        case .checking, .installing: true
+        default: false
+        }
+    }
+
+    /// Where a failed check's runs went other than asked, and the runs themselves, folded.
+    private var checkDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button { checkDetailsOpen.toggle() } label: {
+                HStack(spacing: 6) {
+                    SquareIcon("akar-chevron-down", size: 9).rotationEffect(.degrees(checkDetailsOpen ? 0 : -90))
+                    Text("details").font(Square.mono(12))
+                }
+                .foregroundStyle(DesignTokens.Colors.ink3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if checkDetailsOpen {
+                if case .failed(_, let problems, _) = claudeCheck.status {
                     ForEach(problems, id: \.self) { problem in
-                        Text("✗ \(problem)").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.diffRemove)
+                        Text(problem).font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
                     }
                 }
                 ForEach(claudeCheck.runs, id: \.id) { run in
@@ -208,26 +239,14 @@ struct OnePageSettings: View {
                 }
             }
         }
-        .onChange(of: ClaudeCheck.conditions) { _, _ in
-            if ClaudeCheck.inUse { claudeCheck.run() }
-        }
     }
 
     /// Ask's rows, which hooks run with too, and the check's result while it runs or has failed.
     private var showsClaudeRows: Bool {
         guard !settings.askClaude, !settings.meetingHooks.contains(where: \.on) else { return true }
         switch claudeCheck.status {
-        case .checking, .failed: return true
+        case .checking, .installing, .failed: return true
         case .unchecked, .passed: return false
-        }
-    }
-
-    private var checkCaption: String? {
-        switch claudeCheck.status {
-        case .unchecked: nil
-        case .checking: "checking"
-        case .passed(let version): ["passed", version].compactMap { $0 }.joined(separator: " · ")
-        case .failed(let version, _): ["failed", version].compactMap { $0 }.joined(separator: " · ")
         }
     }
 

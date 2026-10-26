@@ -105,6 +105,12 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var done: [String: Int] = [:]
     }
 
+    /// A tool Claude Code called on the way to an answer, and the start of what came back.
+    struct ToolCall: Codable, Equatable, Sendable {
+        var name: String
+        var result: String?
+    }
+
     /// A question heard in the meeting that the app offered to ask Claude
     /// Code (Settings.askClaude), what the user did with it, and the answer.
     struct Question: Codable, Equatable, Sendable {
@@ -127,6 +133,8 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         /// The run in `ClaudeLive`, and Claude Code's session for `claude --resume`.
         var runID: UUID?
         var sessionID: String?
+        /// The tools Claude Code called on the way to `answer`.
+        var calls: [ToolCall]?
 
         var result: Outcome { outcome ?? .asked }
 
@@ -150,6 +158,8 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var failed: Bool
         /// What `claude --resume` takes to pick the run up again.
         var sessionID: String? = nil
+        /// The tools Claude Code called on the way to `output`.
+        var calls: [ToolCall]? = nil
 
         /// Every run either list has, oldest first. Runs are only ever added.
         static func union(_ a: [HookRun], _ b: [HookRun]) -> [HookRun] {

@@ -107,7 +107,7 @@ struct AnswerPill: View {
                 .centredLowercase(size: 11)
         case .asking:
             if model.askOpens {
-                Button("open") { model.onOpenAsk?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                openButton
             }
         case .answered(let answer):
             Button { model.answerExpanded.toggle() } label: {
@@ -118,32 +118,23 @@ struct AnswerPill: View {
             .help(model.answerExpanded ? "fold answer" : "show answer")
             .accessibilityLabel(model.answerExpanded ? "fold answer" : "show answer")
             if model.askOpens {
-                Button("open") { model.onOpenAsk?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                openButton
             }
         }
     }
 
+    private var openButton: some View {
+        Button { model.onOpenAsk?() } label: { SquareIcon("akar-link-out", size: 12) }
+            .buttonStyle(SquareIconButtonStyle())
+            .help("open")
+            .accessibilityLabel("open")
+    }
+
     private func answerBody(_ answer: ClaudeRun.Answer) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            let color = NSColor(DesignTokens.Colors.onSlab).withAlphaComponent(answer.failed ? 0.7 : 0.92)
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(ClaudeReplyPart.parts(of: answer.text).enumerated()), id: \.offset) { _, part in
-                        switch part {
-                        case .prose(let prose):
-                            LinkText(markdown: prose, font: Square.appKitMono(12), color: color, lineSpacing: 4)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        case .drawing(let drawing):
-                            // Scrolls sideways rather than wrap, which would break its lines apart.
-                            ScrollView(.horizontal) {
-                                Text(drawing).font(Square.mono(12)).foregroundStyle(Color(nsColor: color))
-                                    .fixedSize().textSelection(.enabled)
-                            }
-                        }
-                    }
-                }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { answerHeight = $0 }
+                ClaudeMarkdown(reply: answer.text, font: Square.mono(12), colour: DesignTokens.Colors.onSlab.opacity(answer.failed ? 0.7 : 0.92))
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { answerHeight = $0 }
             }
             .scrollIndicators(.automatic)
             .frame(height: min(answerHeight, Self.answerMaxHeight))
@@ -152,9 +143,5 @@ struct AnswerPill: View {
         .padding(.trailing, 16)
         .padding(.top, 14)
         .padding(.bottom, 12)
-    }
-
-    static func rendered(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     }
 }

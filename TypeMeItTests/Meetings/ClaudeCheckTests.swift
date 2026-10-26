@@ -34,21 +34,40 @@ struct ClaudeCheckTests {
         let question = ClaudeRun.Answer(text: "Are we keeping the free tier?", seconds: 5, costUSD: nil, failed: false,
                                         setup: ClaudeRun.Setup(model: "claude-sonnet-5", tools: ["Read"], mcpServers: ["typemeit", "linear"], thinkingTokens: 512))
         #expect(Self.problems(question: question) == [
-            "question run has 1 tool",
-            "question run started 2 mcp servers",
-            "question run on claude-sonnet-5, not haiku",
-            "question run thought for 512 tokens",
+            "finding the question: has 1 tool",
+            "finding the question: started 2 mcp servers",
+            "finding the question: ran on claude-sonnet-5, not haiku",
+            "finding the question: thinking is back on",
         ])
     }
 
     @Test func thinkingThatIsNoLongerReportedShows() {
         let question = ClaudeRun.Answer(text: "Are we keeping the free tier?", seconds: 1, costUSD: nil, failed: false,
                                         setup: ClaudeRun.Setup(model: "claude-haiku-4-5"))
-        #expect(Self.problems(question: question) == ["question run's thinking not reported"])
+        #expect(Self.problems(question: question) == ["finding the question: thinking not reported"])
     }
 
     @Test func runsWithNoStartEventShow() {
         let bare = ClaudeRun.Answer(text: Self.code, seconds: 1, costUSD: nil, failed: false)
-        #expect(Self.problems(main: bare, question: bare) == ["no start event", "question run: no start event"])
+        #expect(Self.problems(main: bare, question: bare) == ["no start event", "finding the question: no start event"])
+    }
+
+    @Test func aWorkingClaudeCodeShowsItsVersion() {
+        #expect(ClaudeCheck.caption(.passed(version: "2.1.281"), lastPassed: "2.1.281") == "2.1.281 · working")
+    }
+
+    @Test func aNewerClaudeCodeThatRunsDifferentlyIsNotSupported() {
+        #expect(ClaudeCheck.caption(.failed(version: "2.1.290", problems: ["system prompt not applied"], error: nil), lastPassed: "2.1.281")
+            == "2.1.290 · not supported yet")
+    }
+
+    @Test func theVersionThatPassedFailingPointsAtTheSettings() {
+        #expect(ClaudeCheck.caption(.failed(version: "2.1.281", problems: ["ran in default permission mode, not auto"], error: nil), lastPassed: "2.1.281")
+            == "2.1.281 · doesn't work with these settings")
+    }
+
+    @Test func aRunThatFailedOutrightShowsItsOwnErrorsFirstLine() {
+        #expect(ClaudeCheck.caption(.failed(version: "2.1.281", problems: [], error: "Log in to Claude Code: run claude in a terminal and type /login.\nexit 1"), lastPassed: nil)
+            == "Log in to Claude Code: run claude in a terminal and type /login")
     }
 }

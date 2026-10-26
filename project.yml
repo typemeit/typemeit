@@ -39,6 +39,10 @@ packages:
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio
     exactVersion: "0.17.6"
+  # Renders Claude's replies: lists, tables and code blocks.
+  Textual:
+    url: https://github.com/gonzalezreal/textual
+    exactVersion: "0.5.0"
 targets:
   TypeMeIt:
     type: application
@@ -61,6 +65,7 @@ targets:
         product: Sparkle
       - package: FluidAudio
         product: FluidAudio
+      - package: Textual
       # docs/meetings.md 7.15: the tool ships at Contents/MacOS/typemeit-mcp,
       # copied in and signed by this target, so archives carry it too.
       - target: typemeit-mcp

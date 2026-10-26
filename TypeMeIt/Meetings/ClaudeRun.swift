@@ -68,12 +68,14 @@ final class ClaudeRun: @unchecked Sendable {
         meeting's page under its title, date and people, so don't repeat them.
         """
 
-    /// The app draws a ``` block fixed-width and unwrapped (`ClaudeReplyPart`),
-    /// and renders only inline Markdown everywhere else.
+    /// The reply renders as GitHub-flavoured Markdown in a small panel
+    /// (`ClaudeMarkdown`). An ASCII table that comes back anyway still
+    /// renders as a table (`ClaudeReplyMarkdown`).
     private static let formatting = """
-        Your reply shows in the app, which renders only inline Markdown (bold, links, code): \
-        no headings or Markdown tables. Draw any table or diagram with ASCII characters \
-        (+, -, |) inside a ``` block, so it lines up in a fixed-width font.
+        Your reply shows in a small panel in the app, rendered as GitHub-flavoured Markdown. \
+        Write only valid Markdown: bold, italics, links, inline code, lists and tables. Put a \
+        table in Markdown table syntax, never drawn with ASCII or box-drawing characters. Put \
+        a diagram in a ``` block. Use no headings.
         """
 
     /// Where Claude Code installs itself, then where Homebrew puts it. An app

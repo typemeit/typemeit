@@ -25,8 +25,10 @@ final class ClaudeCheck {
 
     enum Status: Equatable {
         case unchecked, checking
+        case installing(version: String)
         case passed(version: String?)
-        case failed(version: String?, problems: [String])
+        /// `error` is a run's own, when one failed outright; `problems` are where they ran other than asked.
+        case failed(version: String?, problems: [String], error: String?)
     }
 
     struct Run {
@@ -43,7 +45,8 @@ final class ClaudeCheck {
     private struct Failure {
         let conditions: Conditions?
         let version: String?
-        let problems: [String]
+        var problems: [String] = []
+        var error: String?
     }
 
     /// The last check's two runs, for settings to show.
@@ -53,6 +56,8 @@ final class ClaudeCheck {
 
     private static let passKey = "claudeCheckPassed"
     private static let hourly: Duration = .seconds(3600)
+    /// `claude install` downloads the version first.
+    private static let installTimeoutSeconds = 300.0
     private static let questionPrompt = "find the latest question"
     /// What the question run reads; any transcript with a question will do.
     private static let sampleTranscript = """
@@ -66,6 +71,7 @@ final class ClaudeCheck {
     }
     private var failure: Failure?
     private var checking: Conditions?
+    private var installing: String?
     @ObservationIgnored private var waiting: [@MainActor (Bool) -> Void] = []
     @ObservationIgnored private var watching = false
 
@@ -86,10 +92,43 @@ final class ClaudeCheck {
 
     var status: Status {
         let now = Self.conditions
+        if let installing { return .installing(version: installing) }
         if checking != nil { return .checking }
         if let pass, pass.conditions == now { return .passed(version: pass.version) }
-        if let failure, failure.conditions == now { return .failed(version: failure.version, problems: failure.problems) }
+        if let failure, failure.conditions == now { return .failed(version: failure.version, problems: failure.problems, error: failure.error) }
         return .unchecked
+    }
+
+    var lastPassed: String? { pass?.version }
+
+    /// The version that last passed, when a newer one fails because it runs
+    /// differently: going back to it is the fix.
+    var rollback: String? {
+        guard Self.installedNatively, case .failed(let version, let problems, nil) = status, !problems.isEmpty,
+              let passed = pass?.version, passed != version else { return nil }
+        return passed
+    }
+
+    /// The check row's caption: the version and whether it works, or a run's own error.
+    nonisolated static func caption(_ status: Status, lastPassed: String?) -> String? {
+        switch status {
+        case .unchecked: return nil
+        case .checking: return "checking"
+        case .installing(let version): return "installing \(version)"
+        case .passed(let version): return [version, "working"].compactMap { $0 }.joined(separator: " · ")
+        case .failed(_, _, let error?):
+            let line = error.split(whereSeparator: \.isNewline).first.map(String.init) ?? error
+            return line.hasSuffix(".") ? String(line.dropLast()) : line
+        case .failed(let version, _, nil):
+            let reason = lastPassed != nil && lastPassed == version ? "doesn't work with these settings" : "not supported yet"
+            return [version, reason].compactMap { $0 }.joined(separator: " · ")
+        }
+    }
+
+    /// Installed by Claude Code's own installer, which keeps each version
+    /// under this folder and can go back to one with `claude install`.
+    static var installedNatively: Bool {
+        ClaudeRun.executable?.resolvingSymlinksInPath().path.contains("/.local/share/claude/versions/") ?? false
     }
 
     /// Checks unless these conditions already passed; `done` hears whether they pass.
@@ -101,7 +140,7 @@ final class ClaudeCheck {
     func run(_ done: @escaping @MainActor (Bool) -> Void = { _ in }) {
         waiting.append(done)
         guard let conditions = Self.conditions else {
-            finish(Failure(conditions: nil, version: nil, problems: ["claude code isn't installed"]))
+            finish(Failure(conditions: nil, version: nil, error: "claude code isn't installed"))
             return
         }
         guard checking != conditions else { return }
@@ -121,6 +160,43 @@ final class ClaudeCheck {
     func recheckIfStale() {
         guard Self.inUse, checking == nil, Self.conditions != nil, status == .unchecked else { return }
         run { [weak self] passed in if !passed { self?.onUnaskedFailure?() } }
+    }
+
+    /// Installs `version` with Claude Code's own installer, then checks it.
+    func rollBack(to version: String) {
+        guard installing == nil, let claude = ClaudeRun.executable else { return }
+        installing = version
+        Task {
+            let error = await Self.install(version, with: claude)
+            installing = nil
+            if let error {
+                DebugLog.write("Claude check: installing \(version) failed: \(error)")
+                failure = Failure(conditions: Self.conditions, version: failure?.version, error: "couldn't install \(version): \(error)")
+            } else {
+                run()
+            }
+        }
+    }
+
+    /// Nil once installed, else what the installer printed.
+    nonisolated private static func install(_ version: String, with claude: URL) async -> String? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = claude
+                process.arguments = ["install", version]
+                process.environment = ClaudeRun.environment
+                let output = Pipe()
+                process.standardOutput = output
+                process.standardError = output
+                guard (try? process.run()) != nil else { return continuation.resume(returning: "claude did not start") }
+                DispatchQueue.global().asyncAfter(deadline: .now() + installTimeoutSeconds) { if process.isRunning { process.terminate() } }
+                let printed = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                process.waitUntilExit()
+                let trimmed = printed.trimmingCharacters(in: .whitespacesAndNewlines)
+                continuation.resume(returning: process.terminationStatus == 0 ? nil : trimmed.isEmpty ? "exit \(process.terminationStatus)" : trimmed)
+            }
+        }
     }
 
     /// Rechecks now and every hour, which notices Claude Code updating itself.
@@ -149,7 +225,7 @@ final class ClaudeCheck {
                                         allowedTools: conditions.tools, permissionMode: conditions.permissionMode,
                                         userSystemPrompt: Settings.shared.askClaudeSystemPrompt),
               let question = ClaudeRun.latestQuestion(in: Self.sampleTranscript) else {
-            return Failure(conditions: conditions, version: nil, problems: ["claude code isn't installed"])
+            return Failure(conditions: conditions, version: nil, error: "claude code isn't installed")
         }
         runs = [Run(id: UUID(), prompt: ClaudeRun.testPrompt), Run(id: UUID(), prompt: Self.questionPrompt)]
         let (mainID, questionID) = (runs[0].id, runs[1].id)
@@ -168,9 +244,9 @@ final class ClaudeCheck {
             pass = Pass(conditions: conditions, version: version)
             return nil
         }
-        let errors = [answers.main, answers.question].filter(\.failed).map(\.text)
-        DebugLog.write("Claude check failed on \(version ?? "unknown version"): \((errors + problems).joined(separator: " · "))")
-        return Failure(conditions: conditions, version: version, problems: problems)
+        let error = [answers.main, answers.question].first(where: \.failed)?.text
+        DebugLog.write("Claude check failed on \(version ?? "unknown version"): \(([error].compactMap { $0 } + problems).joined(separator: " · "))")
+        return Failure(conditions: conditions, version: version, problems: problems, error: error)
     }
 
     /// Where the two runs did not run as asked: the ask and hook run given
@@ -191,16 +267,16 @@ final class ClaudeCheck {
         }
         if !question.failed {
             if let setup = question.setup {
-                if !setup.tools.isEmpty { problems.append("question run has \(counted(setup.tools.count, "tool"))") }
-                if !setup.mcpServers.isEmpty { problems.append("question run started \(counted(setup.mcpServers.count, "mcp server"))") }
-                if !(setup.model ?? "").contains(ClaudeRun.questionModel) { problems.append("question run on \(setup.model ?? "no model"), not \(ClaudeRun.questionModel)") }
+                if !setup.tools.isEmpty { problems.append("finding the question: has \(counted(setup.tools.count, "tool"))") }
+                if !setup.mcpServers.isEmpty { problems.append("finding the question: started \(counted(setup.mcpServers.count, "mcp server"))") }
+                if !(setup.model ?? "").contains(ClaudeRun.questionModel) { problems.append("finding the question: ran on \(setup.model ?? "no model"), not \(ClaudeRun.questionModel)") }
                 switch setup.thinkingTokens {
-                case nil: problems.append("question run's thinking not reported")
-                case let tokens? where tokens > 0: problems.append("question run thought for \(counted(tokens, "token"))")
+                case nil: problems.append("finding the question: thinking not reported")
+                case let tokens? where tokens > 0: problems.append("finding the question: thinking is back on")
                 default: break
                 }
             } else {
-                problems.append("question run: no start event")
+                problems.append("finding the question: no start event")
             }
         }
         return problems

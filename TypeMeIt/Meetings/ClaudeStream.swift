@@ -128,6 +128,14 @@ final class ClaudeLive {
         runs[id] = run
     }
 
+    /// The tools `id`'s run called, to keep with its answer; nil for none.
+    func calls(_ id: UUID) -> [Meeting.ToolCall]? {
+        let calls = runs[id]?.lines.compactMap { line -> Meeting.ToolCall? in
+            if case .call(let name, let result) = line { Meeting.ToolCall(name: name, result: result) } else { nil }
+        } ?? []
+        return calls.isEmpty ? nil : calls
+    }
+
     func finish(_ id: UUID) {
         running.remove(id)
         cancels[id] = nil

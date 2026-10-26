@@ -18,13 +18,15 @@ struct SquareClaudeSpinner: View {
     var size: CGFloat = 12
     private static let frames = Array("·✢✳✶✻✽✻✶✳✢")
     private static let frameSeconds = 0.12
+    /// Each frame's glyph is a different width; the spinner holds this one.
+    var width: CGFloat { size + 2 }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: Self.frameSeconds)) { context in
             let tick = Int(context.date.timeIntervalSinceReferenceDate / Self.frameSeconds)
             Text(String(Self.frames[tick % Self.frames.count]))
                 .font(.system(size: size))
-                .frame(width: size + 2)
+                .frame(width: width)
         }
         .accessibilityLabel("working")
     }
