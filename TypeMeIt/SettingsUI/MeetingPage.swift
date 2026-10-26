@@ -170,7 +170,9 @@ struct MeetingPage: View {
     private func reveal(_ proxy: ScrollViewProxy) {
         let all = hits
         guard all.indices.contains(hit) else { return }
-        withAnimation(.easeOut(duration: DesignTokens.Duration.n2)) { proxy.scrollTo(all[hit].paragraph, anchor: .center) }
+        // A hit in an aside scrolls to the turn it is shown in.
+        let turn = TranscriptRender.rows(meeting.paragraphs).first { $0.contains(all[hit].paragraph) }?[0] ?? all[hit].paragraph
+        withAnimation(.easeOut(duration: DesignTokens.Duration.n2)) { proxy.scrollTo(turn, anchor: .center) }
     }
 
     /// While the audio is kept, it can go on its own and the transcript stay.
@@ -640,6 +642,7 @@ private struct MeetingTranscript: View {
         // Ticks only while playing, for which line is in ink.
         TimelineView(.animation(minimumInterval: 0.5, paused: !loaded || player.paused)) { _ in
             let current = loaded ? meeting.paragraphs.lastIndex { $0.startMs <= Int(player.currentTime * 1000) } : nil
+            let rows = Dictionary(uniqueKeysWithValues: TranscriptRender.rows(meeting.paragraphs).map { ($0[0], $0) })
             LazyVStack(alignment: .leading, spacing: 0) {
                 if meeting.paragraphs.isEmpty {
                     Text(meeting.transcription.state == .done ? "nothing was said" : "not transcribed yet")
@@ -648,7 +651,7 @@ private struct MeetingTranscript: View {
                 }
                 ForEach(TranscriptRender.entries(meeting), id: \.self) { entry in
                     switch entry {
-                    case .paragraph(let i): turn(i, current: current)
+                    case .paragraph(let i): turn(rows[i] ?? [i], current: current)
                     case .question(let i): question(meeting.questions?[i])
                     }
                 }
@@ -662,23 +665,39 @@ private struct MeetingTranscript: View {
     /// The space inside the box around Claude's reply.
     private static let replyPadding: CGFloat = 14
 
-    private func turn(_ i: Int, current: Int?) -> some View {
-        let paragraph = meeting.paragraphs[i]
+    /// One turn: its first paragraph's speaker and time, and the text of
+    /// every paragraph in `row`, each aside in brackets under its speaker.
+    private func turn(_ row: [Int], current: Int?) -> some View {
+        let paragraph = meeting.paragraphs[row[0]]
+        var text = AttributedString()
+        for i in row {
+            if i != row[0] { text += AttributedString(" ") }
+            if TranscriptRender.bracketed(i, in: row, of: meeting.paragraphs) {
+                var aside = AttributedString("[\(SpeakerAssign.firstName(of: meeting.paragraphs[i].speaker, in: meeting)): ")
+                aside += marked(meeting.paragraphs[i].text, paragraph: i)
+                aside += AttributedString("]")
+                // The current find hit keeps its own colour.
+                for run in aside.runs where run.foregroundColor == nil { aside[run.range].foregroundColor = DesignTokens.Colors.ink3 }
+                text += aside
+            } else {
+                text += marked(meeting.paragraphs[i].text, paragraph: i)
+            }
+        }
         return HStack(alignment: .firstTextBaseline, spacing: Self.speakerGap) {
             VStack(alignment: .leading, spacing: 2) {
                 speaker(paragraph.speaker)
                 time(paragraph)
             }
             .frame(width: Self.speakerWidth, alignment: .leading)
-            Text(marked(paragraph.text, paragraph: i))
+            Text(text)
                 .font(Square.sans(14))
                 .lineSpacing(5)
-                .foregroundStyle(i == current ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
+                .foregroundStyle(current.map(row.contains) == true ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 10)
-        .id(i)
+        .id(row[0])
     }
 
     /// A question offered to Claude, under the turn it was heard in: the

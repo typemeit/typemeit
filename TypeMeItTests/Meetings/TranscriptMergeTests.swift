@@ -51,6 +51,7 @@ struct TranscriptMergeTests {
         let you = TrackWords(role: "you", words: run("a", fromMs: 3500, toMs: 5000))
         let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
         #expect(paragraphs.map(\.speaker) == ["them", "you"])
+        #expect(paragraphs[1].aside == nil)
     }
 
     @Test func anUmOnItsOwnIsDroppedAndCutsNothing() {
@@ -148,16 +149,46 @@ struct TranscriptMergeTests {
         #expect(paragraphs == [Meeting.Paragraph(speaker: "s1", startMs: 1400, endMs: 1800, text: "hi")])
     }
 
-    @Test func overlappingSegmentsTheNearerCentreWins() {
+    @Test func aWordTakesTheSpeakerCoveringMostOfIt() {
+        // The midpoint, 1500, is in s2's segment; s1's covers more of the word.
         let them = TrackWords(role: "them", words: [
-            .at("hi", 1100, 1300),
+            .at("exactly", 1000, 2000),
         ])
         let segments = [
-            segment("s1", 0, 2000),
-            segment("s2", 1000, 3000),
+            segment("s1", 900, 1400),
+            segment("s2", 1400, 1600),
         ]
         let paragraphs = TranscriptMerge.paragraphs(tracks: [them], segments: segments, dictations: [], gap: .seconds(2))
-        #expect(paragraphs == [Meeting.Paragraph(speaker: "s1", startMs: 1100, endMs: 1300, text: "hi")])
+        #expect(paragraphs == [Meeting.Paragraph(speaker: "s1", startMs: 1000, endMs: 2000, text: "exactly")])
+    }
+
+    @Test func aShortReplyInsideATurnIsAnAsideWhereItWasSaid() {
+        // The rest of the turn after the reply lasts 1.1 s, too short to cut
+        // at another speaker's turn; an aside cuts it anyway.
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 4400))
+        let you = TrackWords(role: "you", words: [.at("Exactly.", 3100, 3600)])
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs == [
+            Meeting.Paragraph(speaker: "them", startMs: 0, endMs: 3100, text: "b0 b1 b2 b3 b4 b5 b6 b7"),
+            Meeting.Paragraph(speaker: "you", startMs: 3100, endMs: 3600, text: "Exactly.", aside: true),
+            Meeting.Paragraph(speaker: "them", startMs: 3200, endMs: 4300, text: "b8 b9 b10"),
+        ])
+    }
+
+    @Test func aFragmentInsideATurnIsNotAnAside() {
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 4400))
+        let you = TrackWords(role: "you", words: [.at("and", 3100, 3300), .at("then", 3300, 3600)])
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them", "you"])
+        #expect(paragraphs.allSatisfy { $0.aside == nil })
+    }
+
+    @Test func aReplyTwoSecondsLongIsNotAnAside() {
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 8000))
+        let you = TrackWords(role: "you", words: run("a", fromMs: 3100, toMs: 5600))
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them", "you", "them"])
+        #expect(paragraphs.allSatisfy { $0.aside == nil })
     }
 
     @Test func aWordFarFromEverySegmentTakesThePreviousWordsSpeaker() {
