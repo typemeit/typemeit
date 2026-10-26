@@ -416,6 +416,12 @@ enum Fixed {
     /// A screen read serves every dictation into the same window this long.
     static let screenReadReuse: Duration = .seconds(60)
     static let silencePeak: Float = 0.01
+    /// An unmute that does not take is tried this many times, this far
+    /// apart: long enough to outlast a Bluetooth headset leaving its
+    /// headset profile, short enough not to undo a mute the user sets
+    /// straight after a dictation.
+    static let unmuteTries = 12
+    static let unmuteRetryInterval: TimeInterval = 0.25
     static let learningAppDenylist: Set<String> = [
         "com.1password.1password", "com.agilebits.onepassword7", "com.bitwarden.desktop",
         "com.lastpass.LastPass", "com.apple.keychainaccess", "com.apple.Terminal",

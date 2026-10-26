@@ -30,13 +30,26 @@ enum MissingPermission: CaseIterable {
         }
     }
 
-    var granted: Bool {
+    @MainActor var granted: Bool {
         switch self {
-        case .microphone: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        case .microphone: MissingPermission.microphoneGranted
         case .accessibility: AXIsProcessTrusted()
         }
     }
 
+    /// The microphone grant as last read. Each read is a TCC request, so it
+    /// is read at launch, when the app comes to the front and at each
+    /// dictation, not on the 1 s tick that reads the others.
+    @MainActor private static var microphoneGranted = readMicrophone()
+
+    private static func readMicrophone() -> Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
+
+    @MainActor static func refreshMicrophone() {
+        microphoneGranted = readMicrophone()
+    }
+
     /// The first permission that has been taken away, or nil when all hold.
-    static var first: MissingPermission? { allCases.first { !$0.granted } }
+    @MainActor static var first: MissingPermission? { allCases.first { !$0.granted } }
 }
