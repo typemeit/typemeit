@@ -81,3 +81,28 @@ struct ColumnsOrStack: Layout {
         }
     }
 }
+
+#if DEBUG
+struct SquareLayoutsSpecimen: View {
+    var body: some View {
+        SquareSpecimen {
+            SquareSpecimenLine(name: "flow") {
+                FlowLayout(spacing: 6) {
+                    ForEach(["kubernetes", "postgres", "inngest", "twilio", "parakeet", "fluidaudio", "nemotron"], id: \.self) { word in
+                        Text(word).font(Square.mono(12)).padding(.horizontal, 8).padding(.vertical, 4)
+                            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
+                    }
+                }
+                .frame(width: 260)
+            }
+            SquareSpecimenLine(name: "columns") {
+                ColumnsOrStack {
+                    SquareBox(title: "length") { Text("speech · 4.8 s").font(Square.mono(12)).padding(10) }
+                    SquareBox(title: "speed") { Text("speech · 170 ms").font(Square.mono(12)).padding(10) }
+                }
+                .frame(width: 420)
+            }
+        }
+    }
+}
+#endif

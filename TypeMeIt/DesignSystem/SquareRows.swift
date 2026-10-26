@@ -284,21 +284,48 @@ struct SquareLiveBand: View {
     }
 }
 
-/// How far along something is: a 2 pt ink line on an ink-a12 track.
+/// How far along something is: a 2 pt ink line on an ink-a12 track. With
+/// no width it runs as wide as it is given.
 struct SquareBar: View {
     let fraction: Double
-    var width: CGFloat = 120
+    var width: CGFloat? = 120
     var height: CGFloat = 2
     var track = DesignTokens.Colors.inkA12
     var fill = DesignTokens.Colors.ink
 
     var body: some View {
+        if let width {
+            bar(width)
+        } else {
+            GeometryReader { geo in bar(geo.size.width) }
+                .frame(height: height)
+        }
+    }
+
+    private func bar(_ width: CGFloat) -> some View {
         Rectangle()
             .fill(track)
             .frame(width: width, height: height)
             .overlay(alignment: .leading) {
                 Rectangle().fill(fill).frame(width: width * min(max(fraction, 0), 1))
             }
+    }
+}
+
+/// A mono status line. Done carries a check in ink; pending is ink-2 with no icon.
+struct SquareStatus: View {
+    var text: String
+    var done = false
+    init(_ text: String, done: Bool = false) { self.text = text; self.done = done }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if done {
+                Image("akar-circle-check").resizable().frame(width: 13, height: 13)
+            }
+            Text(text).font(Square.mono(12))
+        }
+        .foregroundStyle(done ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
     }
 }
 
@@ -419,6 +446,11 @@ struct SquareStatusSpecimen: View {
                 Text("transcribing · 64%").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
                 SquareBar(fraction: 0.64)
             }
+            SquareSpecimenLine(name: "download") {
+                SquareBar(fraction: 0.4, width: nil, height: 6, track: DesignTokens.Colors.inkA08).frame(width: 300)
+            }
+            SquareSpecimenLine(name: "done") { SquareStatus("installed", done: true) }
+            SquareSpecimenLine(name: "pending") { SquareStatus("checking the model…") }
             SquareSpecimenLine(name: "running") {
                 SquareSpinner()
                 Text("checking the last 10 dictations").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink)

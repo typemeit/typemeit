@@ -113,7 +113,7 @@ struct OnboardingView: View {
             SquareRows {
                 SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings · the row below" : nil) {
                     if fnOK {
-                        Status("do nothing", done: true)
+                        SquareStatus("do nothing", done: true)
                     } else if fnNeedsSettings {
                         Button("keyboard settings") { NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
                             .buttonStyle(SquareButtonStyle(kind: .primary))
@@ -136,25 +136,25 @@ struct OnboardingView: View {
             SquareRows {
                 switch availability {
                 case .available:
-                    SquareSettingsRow(label: "apple intelligence") { Status("on", done: true) }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("on", done: true) }
                 case .unavailable(.appleIntelligenceNotEnabled):
                     SquareSettingsRow(label: "apple intelligence", help: "turn it on in system settings. this page moves on by itself once it is on.") {
                         Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 case .unavailable(.modelNotReady):
                     SquareSettingsRow(label: "apple intelligence", help: "the download is in system settings. skip and it turns on by itself once done.") {
-                        Status("downloading…")
+                        SquareStatus("downloading…")
                     }
                 case .unavailable(.deviceNotEligible):
-                    SquareSettingsRow(label: "apple intelligence") { Status("not available on this mac") }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("not available on this mac") }
                 case .unavailable:
-                    SquareSettingsRow(label: "apple intelligence") { Status("not available right now") }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("not available right now") }
                 }
             }
         case .tryIt:
             VStack(alignment: .leading, spacing: 12) {
                 if dictated, let last = store.newest {
-                    Status("typed!", done: true)
+                    SquareStatus("typed!", done: true)
                     Text(last.displayText)
                         .font(.system(size: 12))
                         .foregroundStyle(DesignTokens.Colors.ink)
@@ -163,7 +163,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Rectangle().fill(DesignTokens.Colors.inkA04))
                 } else {
-                    Status("waiting for a dictation…")
+                    SquareStatus("waiting for a dictation…")
                     TextField("dictate into this field", text: $scratch)
                         .textFieldStyle(.plain)
                         .focused($scratchFocused)
@@ -195,7 +195,7 @@ struct OnboardingView: View {
         let viaSettings = needsSettings.contains(current)
         return SquareSettingsRow(label: label, help: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil) {
             if granted {
-                Status("granted", done: true)
+                SquareStatus("granted", done: true)
             } else if viaSettings {
                 Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(SquareButtonStyle(kind: .primary))
             } else {
@@ -271,39 +271,6 @@ struct OnboardingView: View {
         fnOK = SecureInput.fnKeyDoesNothing
         availability = PostProcessor.availability
         if step == .tryIt, let last = store.newest, Date().timeIntervalSince(last.timestamp) < 120 { dictated = true }
-    }
-}
-
-/// A mono status line. Done carries a check in ink; pending is ink-2 with no icon.
-struct Status: View {
-    var text: String
-    var done = false
-    init(_ text: String, done: Bool = false) { self.text = text; self.done = done }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if done {
-                Image("akar-circle-check").resizable().frame(width: 13, height: 13)
-            }
-            Text(text).font(.system(size: 12).monospaced())
-        }
-        .foregroundStyle(done ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
-    }
-}
-
-/// A flat ink bar on an ink-a08 track, the same gauge insights draws.
-struct InkProgress: View {
-    var value: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle().fill(DesignTokens.Colors.inkA08)
-                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * min(1, max(0, value)))
-            }
-        }
-        .frame(height: 6)
-        .animation(.easeOut(duration: DesignTokens.Duration.n2), value: value)
     }
 }
 
