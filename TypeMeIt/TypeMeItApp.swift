@@ -117,14 +117,19 @@ struct MenuContent: View {
         return combo.keyboardShortcut
     }
 
+    /// The keys secure input keeps from the app.
+    private var secureInputBlocks: String {
+        Sandbox.watchesFn ? "esc, space and the copy shortcut" : "the shortcuts"
+    }
+
     var body: some View {
         if let owner = appState.secureInputOwner {
             if owner.isLoginWindow {
                 Text("secure input is stuck on from the lock screen")
-                Text("esc, space and the copy shortcut don't work. lock and unlock the mac to clear it.")
+                Text("\(secureInputBlocks) don't work. lock and unlock the mac to clear it.")
             } else {
                 Text("secure input is on in \(owner.name)")
-                Text("esc, space and the copy shortcut don't work until it's off.")
+                Text("\(secureInputBlocks) don't work until it's off.")
             }
             Divider()
         }
@@ -160,7 +165,7 @@ struct MenuContent: View {
         if Pipeline.shared.isBusy {
             Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
         }
-        meetingItems
+        if Sandbox.hasMeetings { meetingItems }
         if Updates.isDevBuild {
             Divider()
             captureItems

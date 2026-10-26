@@ -112,6 +112,8 @@ final class Settings {
     var copyLastShortcut: KeyCombo? {
         didSet { Stored.copyLastShortcut.save(copyLastShortcut, defaults) }
     }
+    /// The key held to dictate where there is no Fn (`Sandbox.watchesFn`).
+    var dictationShortcut: KeyCombo { didSet { Stored.dictationShortcut.save(dictationShortcut, defaults) } }
     /// Words removed by the learned-words toast's Undo. Never learned again.
     var undoneWords: [String] { didSet { Stored.undoneWords.save(undoneWords, defaults) } }
     /// Ask to record when another app opens the microphone. Off, the menu
@@ -198,6 +200,7 @@ final class Settings {
         onboardingComplete = Stored.onboardingComplete.load(d)
         speechModelVersion = Stored.speechModelVersion.load(d)
         copyLastShortcut = Stored.copyLastShortcut.load(d)
+        dictationShortcut = Stored.dictationShortcut.load(d)
         undoneWords = Stored.undoneWords.load(d)
         meetingAsk = Stored.meetingAsk.load(d)
         meetingPreRoll = Stored.meetingPreRoll.load(d)
@@ -263,7 +266,9 @@ extension Settings {
         static let keepRecordings = StoredSetting.bool("keepRecordings", default: Updates.isDevBuild)
         static let autoUpdate = StoredSetting.bool("autoUpdate", default: true)
         static let askBeforeUpdating = StoredSetting.bool("askBeforeUpdating", default: true)
-        static let launchAtLogin = StoredSetting.bool("launchAtLogin", default: true)
+        // App Review refuses an app that adds itself to login items without
+        // being asked (guideline 2.4.5), so the store build starts with it off.
+        static let launchAtLogin = StoredSetting.bool("launchAtLogin", default: !Sandbox.isActive)
         static let appearance = StoredSetting.raw("appearance", default: Appearance.system)
         static let cloudColorEnabled = StoredSetting.bool("cloudColorEnabled", default: false)
         static let cloudColor = StoredSetting.raw("cloudColor", default: CloudColor.coral)
@@ -273,6 +278,7 @@ extension Settings {
         static let onboardingComplete = StoredSetting.bool("onboardingComplete", default: false)
         static let speechModelVersion = StoredSetting<String?>.optionalString("speechModelVersion")
         static let copyLastShortcut = StoredSetting<KeyCombo?>.optionalJSON("copyLastShortcut")
+        static let dictationShortcut = StoredSetting.json("dictationShortcut", default: KeyCombo.optionSpace)
         static let undoneWords = StoredSetting.strings("undoneWords")
         static let meetingAsk = StoredSetting.bool("meetingAsk", default: true)
         static let meetingPreRoll = StoredSetting.bool("meetingPreRoll", default: true)
@@ -385,11 +391,14 @@ enum AppVersion {
 
 enum Fixed {
     static let websiteURL = URL(string: "https://typeme.it")!
+    static let privacyURL = websiteURL.appending(path: "privacy")
     static let contactEmail = "hello@typeme.it"
     static let contactURL = URL(string: "mailto:\(contactEmail)")!
     /// The GitHub release page for a version, linked from the about row.
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
     static let holdThresholdMs = 300
+    /// How often a held hotkey's modifiers are checked for release.
+    static let holdPollMs = 20.0
     /// The microphone stays open this long after a dictation is stopped, so
     /// a last word said as Fn goes up is not cut off.
     static let recordingTail: Duration = .milliseconds(300)

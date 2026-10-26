@@ -37,14 +37,21 @@ struct SquareKeycap: View {
 /// and ⌫ on its own clears it. The cross beside a set shortcut clears it too.
 struct SquareShortcutRecorder: View {
     @Binding var combo: KeyCombo?
+    /// False for a shortcut the app cannot do without: no cross, and ⌫ does
+    /// not clear it.
+    var clearable = true
+    /// Told when any recorder starts or stops listening, so system hotkeys
+    /// can step aside and the keys reach the recorder.
+    static var listeningChanged: (@MainActor (Bool) -> Void)?
     @State private var listening: Bool
     @State private var monitor: Any?
     @State private var hovering = false
     @Environment(\.squarePose) private var pose
 
     /// `listening` starts it listening, for a preview of that state.
-    init(combo: Binding<KeyCombo?>, listening: Bool = false) {
+    init(combo: Binding<KeyCombo?>, clearable: Bool = true, listening: Bool = false) {
         _combo = combo
+        self.clearable = clearable
         _listening = State(initialValue: listening)
     }
 
@@ -53,8 +60,8 @@ struct SquareShortcutRecorder: View {
             Button { listening ? stop() : start() } label: { face }
                 .buttonStyle(.plain)
                 .onHover { hovering = $0 }
-                .help(listening ? "esc to cancel, ⌫ to clear" : "click, then press the keys")
-            if combo != nil, !listening {
+                .help(listening ? (clearable ? "esc to cancel, ⌫ to clear" : "esc to cancel") : "click, then press the keys")
+            if clearable, combo != nil, !listening {
                 Button { combo = nil } label: { SquareIcon("akar-cross", size: 8) }
                     .buttonStyle(SquareIconButtonStyle(side: SquareKeycap.side))
                     .help("clear")
@@ -94,11 +101,12 @@ struct SquareShortcutRecorder: View {
 
     private func start() {
         listening = true
+        Self.listeningChanged?(true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let bare = KeyCombo.Modifiers(event.modifierFlags).isEmpty
             if event.keyCode == 53, bare {  // esc
                 stop()
-            } else if event.keyCode == 51, bare {  // delete
+            } else if event.keyCode == 51, bare, clearable {  // delete
                 combo = nil
                 stop()
             } else if let new = KeyCombo(event: event) {
@@ -111,6 +119,7 @@ struct SquareShortcutRecorder: View {
 
     private func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
+        if monitor != nil { Self.listeningChanged?(false) }
         monitor = nil
         listening = false
     }

@@ -25,22 +25,17 @@ W, H = 2560, 1600
 SCENES = {
     "slack": dict(
         image="slack/out/slack.png", cloud="dark",
-        head="hold fn, speak, let go.",
-        text="it types where the cursor is, be it slack, claude or anything with a text box.",
+        head="hold ⌥ space, speak, let go.",
+        text="it types where the cursor is, be it Slack, Claude or anything with a text box.",
     ),
     "claude": dict(
         image="claude/out/claude.png", cloud="white",
-        head="apple intelligence tidies what you said.",
-        text="you get punctuation and no fillers. nothing leaves your mac.",
-    ),
-    "insights": dict(
-        image="app/insights.png",
-        head="you speak three times faster than you type.",
-        text="see your words, speed, streaks and the apps you spoke into.",
+        head="Apple Intelligence tidies what you said.",
+        text="you get punctuation and no fillers. nothing leaves your Mac.",
     ),
     "history": dict(
         image="app/history.png",
-        head="history stays on your mac.",
+        head="history stays on your Mac.",
         text="review past dictations and copy them again.",
     ),
     "settings": dict(
