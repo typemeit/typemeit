@@ -56,6 +56,9 @@ targets:
           # The store target's; left in, they would be copied as resources.
           - "Support/Info-Store.plist"
           - "Support/TypeMeIt-Store.entitlements"
+          - "Support/TypeMeIt-Release.entitlements"
+      - path: Camera/Shared
+      - path: Camera/Install
       - path: TypeMeIt/Resources/AppIcon.icns
         buildPhase: resources
       - path: TypeMeIt/Resources/AppIcon-Dev.icns
@@ -74,6 +77,10 @@ targets:
         codeSign: true
         copy:
           destination: executables
+      # The type me it camera, which the app adds from its settings
+      # (Camera/Install). Only a release build can: adding one takes the
+      # Release config's entitlement and profile, and an app in /Applications.
+      - target: TypeMeItCamera
       - target: TypeMeItThumbnail
         embed: true
         codeSign: true
@@ -88,6 +95,7 @@ targets:
         LSMinimumSystemVersion: "26.0"
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
         NSAudioCaptureUsageDescription: "type me it records the other side of a call when you ask it to record a meeting."
+        NSCameraUsageDescription: "type me it shows your camera through the type me it camera, with Claude's answers when you ask."
         NSDocumentsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
         NSDesktopFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
         NSDownloadsFolderUsageDescription: "type me it keeps your meetings in the folder you chose."
@@ -116,12 +124,12 @@ targets:
         SUScheduledCheckInterval: 3600
         SUAutomaticallyUpdate: true
         SUPublicEDKey: WGBC31wJMt0uMIwvfVDsWaqVJL8ki+jRfdKACFhPEDw=
-    entitlements:
-      path: TypeMeIt/Support/TypeMeIt.entitlements
-      properties:
-        com.apple.security.device.audio-input: true
     settings:
       base:
+        # The microphone, and the real camera shown through the type me it
+        # camera (Camera/). Set here rather than as `entitlements:`, which
+        # would override the Release config's file.
+        CODE_SIGN_ENTITLEMENTS: TypeMeIt/Support/TypeMeIt.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit
         PRODUCT_NAME: type me it
         PRODUCT_MODULE_NAME: TypeMeIt
@@ -136,6 +144,12 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.dev
           PRODUCT_NAME: type me it dev
           APP_ICON_FILE: AppIcon-Dev
+        # TypeMeIt.entitlements plus system-extension.install, which needs the
+        # profile Scripts/signing-profiles.swift makes. Debug builds go
+        # without both and add the camera with Scripts/install-camera.sh.
+        Release:
+          CODE_SIGN_ENTITLEMENTS: TypeMeIt/Support/TypeMeIt-Release.entitlements
+          PROVISIONING_PROFILE_SPECIFIER: "it.typeme.typemeit Developer ID"
   # Finder's icon for .tmi files (Thumbnail/ThumbnailProvider.swift). Only
   # the DMG app declares the type, so only it embeds this.
   TypeMeItThumbnail:
@@ -186,6 +200,9 @@ targets:
           # The DMG target's; left in, they would be copied as resources.
           - "Support/Info.plist"
           - "Support/TypeMeIt.entitlements"
+          - "Support/TypeMeIt-Release.entitlements"
+      - path: Camera/Shared
+      - path: Camera/Install
       - path: TypeMeIt/Resources/AppIcon.icns
         buildPhase: resources
     dependencies:
@@ -226,6 +243,71 @@ targets:
         # Compiles out what App Review's scan must not find: the private
         # symbol that sets the 🌐 key (SecureInput.setFnKeyToDoNothing).
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE"
+  # The type me it camera: a Core Media I/O camera extension meeting apps
+  # can pick, showing the frames type me it writes into it (Camera/).
+  TypeMeItCamera:
+    type: system-extension
+    platform: macOS
+    sources:
+      - Camera/Extension
+      - Camera/Shared
+    info:
+      path: Camera/Extension/Info.plist
+      properties:
+        CFBundleDisplayName: type me it camera
+        # SYSX. Without it sysextd finds the bundle in no extension category.
+        CFBundlePackageType: "$(PRODUCT_BUNDLE_PACKAGE_TYPE)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "26.0"
+        NSSystemExtensionUsageDescription: "Shows your camera with Claude's answers in your meetings."
+        CMIOExtension:
+          # Must start with one of the extension's app groups.
+          CMIOExtensionMachServiceName: "$(TeamIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)"
+    entitlements:
+      path: Camera/Extension/Camera.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: ["$(TeamIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)"]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.camera.extension
+        # macOS finds a system extension by its bundle's name.
+        PRODUCT_NAME: "$(PRODUCT_BUNDLE_IDENTIFIER)"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+  # Adds TypeMeItCamera for dev builds, which can't add it themselves
+  # (Scripts/install-camera.sh). Adding a system extension takes a
+  # provisioning profile with the System Extension capability, for this
+  # bundle id and the Developer ID certificate.
+  TypeMeItCameraHost:
+    type: application
+    platform: macOS
+    sources:
+      - Camera/Host
+      - Camera/Shared
+      - Camera/Install
+    dependencies:
+      - target: TypeMeItCamera
+    info:
+      path: Camera/Host/Info.plist
+      properties:
+        CFBundleDisplayName: "$(PRODUCT_NAME)"
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "26.0"
+        NSPrincipalClass: NSApplication
+    entitlements:
+      path: Camera/Host/CameraHost.entitlements
+      properties:
+        com.apple.developer.system-extension.install: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: it.typeme.typemeit.camera
+        PRODUCT_NAME: type me it camera
+        GENERATE_INFOPLIST_FILE: NO
+        PROVISIONING_PROFILE_SPECIFIER: "it.typeme.typemeit.camera Developer ID"
   # Command-line tool, docs/meetings.md 7.15: reads a published meetings
   # folder over stdio JSON-RPC. Shares TypeMeIt/Meetings/Meeting.swift's
   # source (an application target can't be imported as a library), with
@@ -317,6 +399,12 @@ targets:
           TEST_HOST: "$(BUILT_PRODUCTS_DIR)/type me it dev.app/Contents/MacOS/type me it dev"
           BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
+  Camera:
+    build:
+      targets:
+        TypeMeItCameraHost: all
+    run:
+      config: Debug
   DesignSystem:
     build:
       targets:

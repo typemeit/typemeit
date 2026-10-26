@@ -1,3 +1,4 @@
+import AVFoundation
 import FoundationModels
 import SwiftUI
 
@@ -69,6 +70,11 @@ struct OnePageSettings: View {
     @State private var updates = Updates.shared
     /// Read from the CLI when the ask claude rows first show; nil until then.
     @State private var claudeModels: [ClaudeModels.Model]?
+    @State private var camera = CameraFeed.shared
+    @State private var cameraInstaller = CameraInstaller.shared
+    @State private var cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var settingUpCamera = false
+    @State private var removingCamera = false
     /// A new hook's name, typed before it is added.
     @State private var hookName = ""
     @State private var claudeCheck = ClaudeCheck.shared
@@ -116,6 +122,7 @@ struct OnePageSettings: View {
         .onReceive(poll) { _ in
             availability = PostProcessor.availability
             screenGranted = CGPreflightScreenCaptureAccess()
+            cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
         }
     }
 
@@ -262,8 +269,38 @@ struct OnePageSettings: View {
         })
     }
 
-    /// Hooks, which only need Claude Code.
+    /// While ask is on, the camera; and hooks, which only need Claude Code.
     @ViewBuilder private var meetingAskRows: some View {
+        if settings.askClaude {
+            SquareSettingsRow(label: "on camera", help: "shows the cloud and claude's answer in your video while a meeting records · pick type me it as the camera in your meeting app",
+                              caption: onCameraCaption) {
+                HStack(spacing: 10) {
+                    if settings.askClaudeOnCamera, !cameraReady {
+                        Button("finish") { settingUpCamera = true }.buttonStyle(SquareButtonStyle())
+                    }
+                    toggle("on camera", $settings.askClaudeOnCamera)
+                }
+            }
+            .onChange(of: settings.askClaudeOnCamera) { _, on in if on, !cameraReady { settingUpCamera = true } }
+            .sheet(isPresented: $settingUpCamera) { CameraSetupView { settingUpCamera = false } }
+            if camera.installed {
+                SquareSettingsRow(label: "camera", help: "the camera type me it shows") {
+                    SquareMenu(selection: $settings.meetingCamera, options: cameraOptions, label: cameraLabel, minWidth: 230)
+                }
+                .onChange(of: settings.meetingCamera) { camera.cameraChanged() }
+                if CameraInstaller.canAdd {
+                    SquareSettingsRow(label: "remove camera", help: "meeting apps stop listing type me it") {
+                        Button("remove") { removingCamera = true }
+                            .buttonStyle(SquareButtonStyle())
+                            .squareConfirmDelete(isPresented: $removingCamera, title: "remove the type me it camera?",
+                                                 detail: "add it again from on camera", confirm: "remove") {
+                                settings.askClaudeOnCamera = false
+                                cameraInstaller.remove()
+                            }
+                    }
+                }
+            }
+        }
         SquareSettingsRow(label: "hooks", help: "prompts claude runs on a finished meeting when you press run hooks · results show on the meeting page · ones added over mcp start off") {
             HStack(spacing: 8) {
                 SquareField(placeholder: "name a new hook", text: $hookName, onSubmit: addHook).frame(width: 200)
@@ -721,6 +758,41 @@ struct OnePageSettings: View {
         }
         if !offeredModels.contains(model) { return "doesn't run in auto mode" }
         return model.description.lowercased()
+    }
+
+    /// The Mac's default, then each camera; the saved one stays listed while it is unplugged.
+    private var cameraOptions: [String] {
+        let listed = camera.cameras.map(\.uniqueID)
+        let saved = [settings.meetingCamera].filter { !$0.isEmpty && !listed.contains($0) }
+        return [""] + saved + listed
+    }
+
+    private func cameraLabel(_ value: String) -> String {
+        if value.isEmpty { return "default" }
+        return camera.cameras.first { $0.uniqueID == value }?.localizedName.lowercased() ?? "unplugged camera"
+    }
+
+    /// Added, allowed and given the real camera; picking it in a meeting app is up to the user.
+    private var cameraReady: Bool { camera.installed && cameraAccess == .authorized }
+
+    /// What is left of setting up on camera, or that a meeting shows it.
+    private var onCameraCaption: String? {
+        guard settings.askClaudeOnCamera else { return nil }
+        if !camera.installed {
+            if !CameraInstaller.canAdd { return "dev build: add it with scripts/install-camera.sh" }
+            if !CameraInstaller.inApplications { return "move to applications first" }
+            switch cameraInstaller.status {
+            case .adding: return "adding…"
+            case .needsApproval: return "needs approval in system settings"
+            case .failed(let reason): return reason
+            default: return "not added"
+            }
+        }
+        switch cameraAccess {
+        case .authorized: return camera.watched ? "showing in a meeting" : "pick type me it in your meeting app"
+        case .notDetermined: return "needs camera access"
+        default: return "camera access is off"
+        }
     }
 
     private var claudeFolderPath: String {

@@ -947,6 +947,8 @@ final class MeetingCoordinator {
     /// down after `ToastTiming.timeout` unless it stands until answered.
     private func toast(_ state: OverlayModel.State, onTimeout: (@MainActor () -> Void)? = nil) {
         toastTask?.cancel()
+        // Whatever replaces an answer's pill takes the answer off camera too.
+        CameraFeed.shared.clear()
         overlay.showMeeting(state)
         guard !state.isStanding else { return }
         toastTask = Task { [weak self] in
@@ -1067,6 +1069,7 @@ final class MeetingCoordinator {
         let shown = prompt != nil && recording != nil ? Self.transcribingStep : question
         var asking = OverlayModel.State.meetingAsking(text: shown)
         overlay.showMeeting(asking)
+        CameraFeed.shared.asking()
         let dictationID = offered?.text == question ? offeredDictationID : nil
         let runID = UUID()
         if recording != nil || dictationID != nil {
@@ -1216,6 +1219,7 @@ final class MeetingCoordinator {
         askPreparing = false
         guard !askOpened else { return }
         if overlay.model.pendingMeeting == asking { overlay.model.pendingMeeting = nil }
+        if answer.failed { CameraFeed.shared.clear() } else { CameraFeed.shared.answer(question: question, answer: answer.text) }
         overlay.model.answerExpanded = true
         overlay.showMeeting(.meetingAnswer(text: question, answer: answer))
     }
@@ -1235,6 +1239,7 @@ final class MeetingCoordinator {
 
     private func dismissToast() {
         toastTask?.cancel()
+        CameraFeed.shared.clear()
         let state = overlay.model.state
         guard state.isMeeting else { return }
         overlay.hideMeeting(state)
