@@ -246,6 +246,10 @@ targets:
       - path: TypeMeIt/SupportPaths.swift
       - path: TypeMeIt/StoredJSON.swift
       - path: TypeMeIt/HistoryEntry.swift
+      # HistoryEntry.styles, and what WritingStyle's file calls.
+      - path: TypeMeIt/WritingStyle.swift
+      - path: TypeMeIt/Digits.swift
+      - path: TypeMeIt/ClockTime.swift
       # Timestamps as the transcript writes them.
       - path: TypeMeIt/Meetings/TranscriptRender.swift
       # Meeting.dataReminder's text.
