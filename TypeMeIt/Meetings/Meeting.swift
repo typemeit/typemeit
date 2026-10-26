@@ -188,6 +188,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         /// The speaker it had before the user merged that speaker into
         /// another, so the merge can be split again.
         var mergedFrom: String? = nil
+        /// Said inside another speaker's turn, which carries on in the
+        /// paragraph after it ("yeah", "exactly"); shown within that turn.
+        var aside: Bool? = nil
     }
 
     var schema: Int = Meeting.currentSchema
