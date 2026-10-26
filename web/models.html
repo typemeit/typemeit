@@ -53,55 +53,64 @@
    "@type": "CreativeWork",
    "name": "Qwen3.5 2B",
    "dateCreated": "2026-09-05",
-   "description": "10 of 11 bench cases at 1.9 s each; Apple passed all 11 at 0.8 s"
+   "description": "10 of 11 bench cases at 1.9 s each; Apple passed all 11 at 0.8 s",
+   "url": "https://huggingface.co/Qwen/Qwen3.5-2B"
   },
   {
    "@type": "CreativeWork",
    "name": "Qwen3.5 4B",
    "dateCreated": "2026-09-05",
-   "description": "all 11 cases at 3.3 s each and 3.2 GB, against Apple's 0.8 s; kept as the fallback below macOS 26"
+   "description": "all 11 cases at 3.3 s each and 3.2 GB, against Apple's 0.8 s; kept as the fallback below macOS 26",
+   "url": "https://huggingface.co/Qwen/Qwen3.5-4B"
   },
   {
    "@type": "CreativeWork",
    "name": "Gemma 4 E2B",
    "dateCreated": "2026-09-05",
-   "description": "all 11 cases at 1.8 s and 3.3 GB, against Apple's 0.8 s; kept as the fallback below macOS 26"
+   "description": "all 11 cases at 1.8 s and 3.3 GB, against Apple's 0.8 s; kept as the fallback below macOS 26",
+   "url": "https://huggingface.co/google/gemma-4-E2B-it"
   },
   {
    "@type": "CreativeWork",
    "name": "Gemma 4 E4B",
    "dateCreated": "2026-09-05",
-   "description": "all 11 cases at 3.3 s and 5.3 GB; about 35 ms a token to Apple's 14"
+   "description": "all 11 cases at 3.3 s and 5.3 GB; about 35 ms a token to Apple's 14",
+   "url": "https://huggingface.co/google/gemma-4-E4B-it"
   },
   {
    "@type": "CreativeWork",
    "name": "S1-mini 0.6B",
    "dateCreated": "2026-09-25",
-   "description": "4.5× faster than Apple (204 vs 946 ms) with 65 more failures, 270 of 335; takes no custom words"
+   "description": "4.5× faster than Apple (204 vs 946 ms) with 65 more failures, 270 of 335; takes no custom words",
+   "url": "https://huggingface.co/superwhisper/s1-mini"
   },
   {
    "@type": "CreativeWork",
    "name": "LFM2.5-1.2B-Instruct",
    "dateCreated": "2026-09-25",
-   "description": "271 of 335 cases against Apple's 335, at 770 vs 863 ms"
+   "description": "271 of 335 cases against Apple's 335, at 770 vs 863 ms",
+   "url": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct"
   },
   {
    "@type": "CreativeWork",
    "name": "Qwen3-4B-Instruct-2507",
    "dateCreated": "2026-09-25",
-   "description": "240 of 335 cases at 1000 ms against Apple's 335 at 863 ms; it rewrote contractions and digits the prompt leaves alone"
+   "description": "240 of 335 cases at 1000 ms against Apple's 335 at 863 ms; it rewrote contractions and digits the prompt leaves alone",
+   "url": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507"
   },
   {
    "@type": "CreativeWork",
    "name": "LFM2.5-8B-A1B",
    "dateCreated": "2026-09-25",
-   "description": "invalid run: answers came back as reasoning text with thinking off, so none were applied"
+   "description": "invalid run: answers came back as reasoning text with thinking off, so none were applied",
+   "url": "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B"
   },
   {
    "@type": "CreativeWork",
    "name": "AssemblyAI Dictation API",
    "dateCreated": "2026-09-25",
-   "description": "211 of 335 cases at about 760 ms round trip; custom words worked, styling didn't, and it isn't on-device"
+   "description": "211 of 335 cases at about 760 ms round trip; custom words worked, styling didn't, and it isn't on-device",
+   "url": "https://www.assemblyai.com/products/dictation-api"
   },
   {
    "@type": "CreativeWork",
@@ -113,61 +122,71 @@
    "@type": "CreativeWork",
    "name": "sherpa-onnx CNN-BiLSTM",
    "dateCreated": "2026-09-25",
-   "description": "sentence-end F1 0.65 at 12 ms against Apple's 0.30 at 1116 ms; the clean-up eval stayed at 327 of 335"
+   "description": "sentence-end F1 0.65 at 12 ms against Apple's 0.30 at 1116 ms; the clean-up eval stayed at 327 of 335",
+   "url": "https://k2-fsa.github.io/sherpa/onnx/punctuation/pretrained_models.html#sherpa-onnx-online-punct-en-2024-08-06"
   },
   {
    "@type": "CreativeWork",
    "name": "pcs_en",
    "dateCreated": "2026-09-25",
-   "description": "sentence-end F1 0.59 at 69 ms; punctuating first dropped the eval to 324 of 335"
+   "description": "sentence-end F1 0.59 at 69 ms; punctuating first dropped the eval to 324 of 335",
+   "url": "https://huggingface.co/1-800-BAD-CODE/punctuation_fullstop_truecase_english"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Unified int8 batch",
    "dateCreated": "2026-09-26",
-   "description": "104 ms mean wait after release against 517 ms (p95 358 vs 1664 ms); 1.6% of words differ on clips under 15 s"
+   "description": "104 ms mean wait after release against 517 ms (p95 358 vs 1664 ms); 1.6% of words differ on clips under 15 s",
+   "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Unified fp16 batch",
    "dateCreated": "2026-09-26",
-   "description": "151 ms mean against int8's 104 ms, with 8 of 3,103 words different"
+   "description": "151 ms mean against int8's 104 ms, with 8 of 3,103 words different",
+   "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Unified int8 streaming",
    "dateCreated": "2026-09-26",
-   "description": "p50 24 vs 52 ms for batch, with 2.9% of words different and words dropped on long recordings"
+   "description": "p50 24 vs 52 ms for batch, with 2.9% of words different and words dropped on long recordings",
+   "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b"
   },
   {
    "@type": "CreativeWork",
    "name": "Vocabulary boosting on Parakeet Unified",
    "dateCreated": "2026-09-26",
-   "description": "fixed 11 terms on eval clips and changed 19 spans of real speech, nearly all wrongly; 533 vs 160 ms"
+   "description": "fixed 11 terms on eval clips and changed 19 spans of real speech, nearly all wrongly; 533 vs 160 ms",
+   "url": "https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md"
   },
   {
    "@type": "CreativeWork",
    "name": "Granite 5.0",
    "dateCreated": "2026-09-30",
-   "description": "lost to Parakeet; numbers not recorded"
+   "description": "lost to Parakeet; numbers not recorded",
+   "url": "https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc"
   },
   {
    "@type": "CreativeWork",
    "name": "Nemotron ASR",
    "dateCreated": "2026-09-30",
-   "description": "lost to Parakeet; numbers not recorded"
+   "description": "lost to Parakeet; numbers not recorded",
+   "url": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b"
   },
   {
    "@type": "CreativeWork",
    "name": "pyannote community-1",
    "dateCreated": "2026-09-26",
-   "description": "8.6% of words under the wrong speaker on 14 meetings, right head count on 9; now only supplies speaker embeddings"
+   "description": "8.6% of words under the wrong speaker on 14 meetings, right head count on 9; now only supplies speaker embeddings",
+   "url": "https://huggingface.co/pyannote/speaker-diarization-community-1"
   },
   {
    "@type": "CreativeWork",
    "name": "Nemotron 3 Diarization",
    "dateCreated": "2026-09-30",
-   "description": "4.8% of words under the wrong speaker against pyannote's 8.6%; right head count on 12 of 14 meetings against 9"
+   "description": "4.8% of words under the wrong speaker against pyannote's 8.6%; right head count on 12 of 14 meetings against 9",
+   "url": "https://huggingface.co/nvidia/Nemotron-3-Diarization"
   },
   {
    "@type": "CreativeWork",
@@ -185,73 +204,85 @@
    "@type": "CreativeWork",
    "name": "Clef-flash",
    "dateCreated": "2026-10-03",
-   "description": "1.8× slower than Apple's on-device rewrite on the M4"
+   "description": "1.8× slower than Apple's on-device rewrite on the M4",
+   "url": "https://huggingface.co/Cloudflare/clef-flash"
   },
   {
    "@type": "CreativeWork",
    "name": "Kev-4B",
    "dateCreated": "2026-10-05",
-   "description": "AUC 0.84 at 9.8 GB; Apple's model scored about chance"
+   "description": "AUC 0.84 at 9.8 GB; Apple's model scored about chance",
+   "url": "https://huggingface.co/jaredpalmer/kev-4b"
   },
   {
    "@type": "CreativeWork",
    "name": "Kev-0.8B",
    "dateCreated": "2026-10-05",
-   "description": "AUC 0.76 at 3.1 GB; Apple's model scored about chance"
+   "description": "AUC 0.76 at 3.1 GB; Apple's model scored about chance",
+   "url": "https://huggingface.co/jaredpalmer/kev-0.8b"
   },
   {
    "@type": "CreativeWork",
    "name": "Cohere Transcribe",
    "dateCreated": "2026-10-10",
-   "description": "65.88% meeting WER against Parakeet's 10.90%; 77% of the worst track's words came from silence. With Silero VAD in front, 14.18%"
+   "description": "65.88% meeting WER against Parakeet's 10.90%; 77% of the worst track's words came from silence. With Silero VAD in front, 14.18%",
+   "url": "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026"
   },
   {
    "@type": "CreativeWork",
    "name": "LocalVQE",
    "dateCreated": "2026-10-11",
-   "description": "left 0–15.4% echo against the app's 0.07–2.2%; near-end recall fell from 92% to 52% on a 47-minute call"
+   "description": "left 0–15.4% echo against the app's 0.07–2.2%; near-end recall fell from 92% to 52% on a 47-minute call",
+   "url": "https://huggingface.co/LocalAI-io/LocalVQE"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Ultra, before listen review",
    "dateCreated": "2026-10-11",
-   "description": "dictation 4.09% vs 4.23% and p95 111 vs 290 ms; meetings 14.58% vs Parakeet's 10.90%"
+   "description": "dictation 4.09% vs 4.23% and p95 111 vs 290 ms; meetings 14.58% vs Parakeet's 10.90%",
+   "url": "https://huggingface.co/moondream/parakeet-ultra"
   },
   {
    "@type": "CreativeWork",
    "name": "Phonon-2",
    "dateCreated": "2026-10-11",
-   "description": "dictation 5.40% vs Parakeet's 4.23%; meetings 17.79% vs 10.90%"
+   "description": "dictation 5.40% vs Parakeet's 4.23%; meetings 17.79% vs 10.90%",
+   "url": "https://huggingface.co/FermionResearch/Phonon-2"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Ultra with Silero VAD chunks",
    "dateCreated": "2026-10-12",
-   "description": "best meeting WER 13.43% vs 10.90%; the gap is inserted words (1,441 vs 663), not chunk edges"
+   "description": "best meeting WER 13.43% vs 10.90%; the gap is inserted words (1,441 vs 663), not chunk edges",
+   "url": "https://huggingface.co/moondream/parakeet-ultra"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Ultra, listen review",
    "dateCreated": "2026-10-12",
-   "description": "34 of 37 sampled extra-word spans were real speech; estimated meeting WER 11.96% vs 12.93%"
+   "description": "34 of 37 sampled extra-word spans were real speech; estimated meeting WER 11.96% vs 12.93%",
+   "url": "https://huggingface.co/moondream/parakeet-ultra"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Ultra, listen review round 2",
    "dateCreated": "2026-10-12",
-   "description": "63% of randomly drawn extra words were real; estimated meetings 12.43% vs 12.57%, a tie, with Ultra 2.9× faster on dictation"
+   "description": "63% of randomly drawn extra words were real; estimated meetings 12.43% vs 12.57%, a tie, with Ultra 2.9× faster on dictation",
+   "url": "https://huggingface.co/moondream/parakeet-ultra"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Ultra",
    "dateCreated": "2026-10-12",
-   "description": "dictation 4.09% vs 4.23%, p95 97 vs 290 ms; meetings 12.55% vs 12.57% after the listen review"
+   "description": "dictation 4.09% vs 4.23%, p95 97 vs 290 ms; meetings 12.55% vs 12.57% after the listen review",
+   "url": "https://huggingface.co/moondream/parakeet-ultra"
   },
   {
    "@type": "CreativeWork",
    "name": "Parakeet Unified on Core ML",
    "dateCreated": "2026-10-12",
-   "description": "dictation tied at 4.23% with p95 122 ms; meetings 11.32% vs 10.90%"
+   "description": "dictation tied at 4.23% with p95 122 ms; meetings 11.32% vs 10.90%",
+   "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b"
   },
   {
    "@type": "CreativeWork",
@@ -263,7 +294,8 @@
    "@type": "CreativeWork",
    "name": "CTC vocabulary boosting on Ultra",
    "dateCreated": "2026-10-12",
-   "description": "synthetic term hits up to 99% from 78%, dictation WER up to 8.18% from 4.67%, p95 3.1× slower"
+   "description": "synthetic term hits up to 99% from 78%, dictation WER up to 8.18% from 4.67%, p95 3.1× slower",
+   "url": "https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md"
   },
   {
    "@type": "CreativeWork",
@@ -275,37 +307,43 @@
    "@type": "CreativeWork",
    "name": "LS-EEND",
    "dateCreated": "2026-10-12",
-   "description": "13.32% of words under the wrong speaker at best, against Nemotron's 8.28%"
+   "description": "13.32% of words under the wrong speaker at best, against Nemotron's 8.28%",
+   "url": "https://huggingface.co/FluidInference/ls-eend-coreml"
   },
   {
    "@type": "CreativeWork",
    "name": "Qwen3-ASR 0.6B",
    "dateCreated": "2026-10-12",
-   "description": "dictation 20.15% vs Ultra's 4.09%; meetings 40.67% vs Parakeet's 10.90%"
+   "description": "dictation 20.15% vs Ultra's 4.09%; meetings 40.67% vs Parakeet's 10.90%",
+   "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B"
   },
   {
    "@type": "CreativeWork",
    "name": "Granite Speech 4.1 2B NAR",
    "dateCreated": "2026-10-16",
-   "description": "dictation 3.65% vs Ultra's 4.09%; meetings 14.95% vs 14.58% with stretches of speech left out; p95 1,721 vs 97 ms"
+   "description": "dictation 3.65% vs Ultra's 4.09%; meetings 14.95% vs 14.58% with stretches of speech left out; p95 1,721 vs 97 ms",
+   "url": "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar"
   },
   {
    "@type": "CreativeWork",
    "name": "Fluid Speech Mini",
    "dateCreated": "2026-10-17",
-   "description": "dictation tied with Ultra at 4.09%; room tracks 10.42% vs 9.12% with fillers dropped"
+   "description": "dictation tied with Ultra at 4.09%; room tracks 10.42% vs 9.12% with fillers dropped",
+   "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml"
   },
   {
    "@type": "CreativeWork",
    "name": "Fluid Speech Mini, rescored against Universal-3.5 Pro",
    "dateCreated": "2026-10-17",
-   "description": "against Universal-3.5 Pro: dictation 4.80% vs Ultra's 4.22%, meetings 14.07% vs 12.70%"
+   "description": "against Universal-3.5 Pro: dictation 4.80% vs Ultra's 4.22%, meetings 14.07% vs 12.70%",
+   "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml"
   },
   {
    "@type": "CreativeWork",
    "name": "Orukeet r3",
    "dateCreated": "2026-10-13",
-   "description": "not run yet"
+   "description": "not run yet",
+   "url": "https://huggingface.co/oruk/orukeet"
   },
   {
    "@type": "CreativeWork",
@@ -317,19 +355,22 @@
    "@type": "CreativeWork",
    "name": "Underdog Bark 3.0 Pro",
    "dateCreated": "2026-10-22",
-   "description": "dictation tied at 4.22%; meetings 13.12% vs Ultra's 12.65%, with 508 deleted words to Ultra's 230"
+   "description": "dictation tied at 4.22%; meetings 13.12% vs Ultra's 12.65%, with 508 deleted words to Ultra's 230",
+   "url": "https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro"
   },
   {
    "@type": "CreativeWork",
    "name": "Underdog Bark 3.0 Plus",
    "dateCreated": "2026-10-22",
-   "description": "dictation 5.82% vs Ultra's 4.22%; meetings 15.17% vs 12.65%"
+   "description": "dictation 5.82% vs Ultra's 4.22%; meetings 15.17% vs 12.65%",
+   "url": "https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Plus"
   },
   {
    "@type": "CreativeWork",
    "name": "FluidAudio 0.17.6 speaker embeddings",
    "dateCreated": "2026-10-22",
-   "description": "wrong-speaker words 1,691 vs 1,700 of 182,436 (0.93% both); the 9 that changed were checked by ear"
+   "description": "wrong-speaker words 1,691 vs 1,700 of 182,436 (0.93% both); the 9 that changed were checked by ear",
+   "url": "https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.6"
   },
   {
    "@type": "CreativeWork",
@@ -361,7 +402,7 @@
 <div>
 <article class="trial" id="underdog-bark-3-0-pro" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-22">22 october 2026</time>
-  <h3>Underdog Bark 3.0 Pro</h3>
+  <h3><a href="https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro">Underdog Bark 3.0 Pro</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation tied at 4.22%; meetings 13.12% vs Ultra&#x27;s 12.65%, with 508 deleted words to Ultra&#x27;s 230</p>
   <details>
@@ -372,7 +413,7 @@
 </article>
 <article class="trial" id="underdog-bark-3-0-plus" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-22">22 october 2026</time>
-  <h3>Underdog Bark 3.0 Plus</h3>
+  <h3><a href="https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Plus">Underdog Bark 3.0 Plus</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation 5.82% vs Ultra&#x27;s 4.22%; meetings 15.17% vs 12.65%</p>
   <details>
@@ -394,7 +435,7 @@
 </article>
 <article class="trial" id="fluid-speech-mini" data-group="speech-recognition" data-status="open">
   <time datetime="2026-10-17">17 october 2026</time>
-  <h3>Fluid Speech Mini</h3>
+  <h3><a href="https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml">Fluid Speech Mini</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">dictation tied with Ultra at 4.09%; room tracks 10.42% vs 9.12% with fillers dropped</p>
   <details>
@@ -405,7 +446,7 @@
 </article>
 <article class="trial" id="fluid-speech-mini-rescored-against-universal-3-5-pro" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-17">17 october 2026</time>
-  <h3>Fluid Speech Mini, rescored against Universal-3.5 Pro</h3>
+  <h3><a href="https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml">Fluid Speech Mini, rescored against Universal-3.5 Pro</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">against Universal-3.5 Pro: dictation 4.80% vs Ultra&#x27;s 4.22%, meetings 14.07% vs 12.70%</p>
   <details>
@@ -416,7 +457,7 @@
 </article>
 <article class="trial" id="granite-speech-4-1-2b-nar" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-16">16 october 2026</time>
-  <h3>Granite Speech 4.1 2B NAR</h3>
+  <h3><a href="https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar">Granite Speech 4.1 2B NAR</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation 3.65% vs Ultra&#x27;s 4.09%; meetings 14.95% vs 14.58% with stretches of speech left out; p95 1,721 vs 97 ms</p>
   <details>
@@ -427,7 +468,7 @@
 </article>
 <article class="trial" id="orukeet-r3" data-group="speech-recognition" data-status="open">
   <time datetime="2026-10-13">13 october 2026</time>
-  <h3>Orukeet r3</h3>
+  <h3><a href="https://huggingface.co/oruk/orukeet">Orukeet r3</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">not run yet</p>
   <details>
@@ -438,7 +479,7 @@
 </article>
 <article class="trial" id="parakeet-ultra-with-silero-vad-chunks" data-group="speech-recognition" data-status="open">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Parakeet Ultra with Silero VAD chunks</h3>
+  <h3><a href="https://huggingface.co/moondream/parakeet-ultra">Parakeet Ultra with Silero VAD chunks</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">best meeting WER 13.43% vs 10.90%; the gap is inserted words (1,441 vs 663), not chunk edges</p>
   <details>
@@ -449,7 +490,7 @@
 </article>
 <article class="trial" id="parakeet-ultra-listen-review" data-group="speech-recognition" data-status="open">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Parakeet Ultra, listen review</h3>
+  <h3><a href="https://huggingface.co/moondream/parakeet-ultra">Parakeet Ultra, listen review</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">34 of 37 sampled extra-word spans were real speech; estimated meeting WER 11.96% vs 12.93%</p>
   <details>
@@ -460,7 +501,7 @@
 </article>
 <article class="trial" id="parakeet-ultra-listen-review-round-2" data-group="speech-recognition" data-status="open">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Parakeet Ultra, listen review round 2</h3>
+  <h3><a href="https://huggingface.co/moondream/parakeet-ultra">Parakeet Ultra, listen review round 2</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">63% of randomly drawn extra words were real; estimated meetings 12.43% vs 12.57%, a tie, with Ultra 2.9× faster on dictation</p>
   <details>
@@ -471,7 +512,7 @@
 </article>
 <article class="trial" id="parakeet-ultra" data-group="speech-recognition" data-status="shipped">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Parakeet Ultra</h3>
+  <h3><a href="https://huggingface.co/moondream/parakeet-ultra">Parakeet Ultra</a></h3>
   <span class="status status-shipped">shipped</span>
   <p class="summary">dictation 4.09% vs 4.23%, p95 97 vs 290 ms; meetings 12.55% vs 12.57% after the listen review</p>
   <details>
@@ -482,7 +523,7 @@
 </article>
 <article class="trial" id="parakeet-unified-on-core-ml" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Parakeet Unified on Core ML</h3>
+  <h3><a href="https://huggingface.co/nvidia/parakeet-unified-en-0.6b">Parakeet Unified on Core ML</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation tied at 4.23% with p95 122 ms; meetings 11.32% vs 10.90%</p>
   <details>
@@ -504,7 +545,7 @@
 </article>
 <article class="trial" id="ctc-vocabulary-boosting-on-ultra" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>CTC vocabulary boosting on Ultra</h3>
+  <h3><a href="https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md">CTC vocabulary boosting on Ultra</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">synthetic term hits up to 99% from 78%, dictation WER up to 8.18% from 4.67%, p95 3.1× slower</p>
   <details>
@@ -526,7 +567,7 @@
 </article>
 <article class="trial" id="qwen3-asr-0-6b" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>Qwen3-ASR 0.6B</h3>
+  <h3><a href="https://huggingface.co/Qwen/Qwen3-ASR-0.6B">Qwen3-ASR 0.6B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation 20.15% vs Ultra&#x27;s 4.09%; meetings 40.67% vs Parakeet&#x27;s 10.90%</p>
   <details>
@@ -537,7 +578,7 @@
 </article>
 <article class="trial" id="parakeet-ultra-before-listen-review" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-11">11 october 2026</time>
-  <h3>Parakeet Ultra, before listen review</h3>
+  <h3><a href="https://huggingface.co/moondream/parakeet-ultra">Parakeet Ultra, before listen review</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation 4.09% vs 4.23% and p95 111 vs 290 ms; meetings 14.58% vs Parakeet&#x27;s 10.90%</p>
   <details>
@@ -548,7 +589,7 @@
 </article>
 <article class="trial" id="phonon-2" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-11">11 october 2026</time>
-  <h3>Phonon-2</h3>
+  <h3><a href="https://huggingface.co/FermionResearch/Phonon-2">Phonon-2</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">dictation 5.40% vs Parakeet&#x27;s 4.23%; meetings 17.79% vs 10.90%</p>
   <details>
@@ -559,7 +600,7 @@
 </article>
 <article class="trial" id="cohere-transcribe" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-10">10 october 2026</time>
-  <h3>Cohere Transcribe</h3>
+  <h3><a href="https://huggingface.co/CohereLabs/cohere-transcribe-03-2026">Cohere Transcribe</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">65.88% meeting WER against Parakeet&#x27;s 10.90%; 77% of the worst track&#x27;s words came from silence. With Silero VAD in front, 14.18%</p>
   <details>
@@ -570,7 +611,7 @@
 </article>
 <article class="trial" id="granite-5-0" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-09-30">30 september 2026</time>
-  <h3>Granite 5.0</h3>
+  <h3><a href="https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc">Granite 5.0</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">lost to Parakeet; numbers not recorded</p>
   <details>
@@ -581,7 +622,7 @@
 </article>
 <article class="trial" id="nemotron-asr" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-09-30">30 september 2026</time>
-  <h3>Nemotron ASR</h3>
+  <h3><a href="https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b">Nemotron ASR</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">lost to Parakeet; numbers not recorded</p>
   <details>
@@ -592,7 +633,7 @@
 </article>
 <article class="trial" id="parakeet-unified-int8-batch" data-group="speech-recognition" data-status="open">
   <time datetime="2026-09-26">26 september 2026</time>
-  <h3>Parakeet Unified int8 batch</h3>
+  <h3><a href="https://huggingface.co/nvidia/parakeet-unified-en-0.6b">Parakeet Unified int8 batch</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">104 ms mean wait after release against 517 ms (p95 358 vs 1664 ms); 1.6% of words differ on clips under 15 s</p>
   <details>
@@ -603,7 +644,7 @@
 </article>
 <article class="trial" id="parakeet-unified-fp16-batch" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-09-26">26 september 2026</time>
-  <h3>Parakeet Unified fp16 batch</h3>
+  <h3><a href="https://huggingface.co/nvidia/parakeet-unified-en-0.6b">Parakeet Unified fp16 batch</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">151 ms mean against int8&#x27;s 104 ms, with 8 of 3,103 words different</p>
   <details>
@@ -614,7 +655,7 @@
 </article>
 <article class="trial" id="parakeet-unified-int8-streaming" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-09-26">26 september 2026</time>
-  <h3>Parakeet Unified int8 streaming</h3>
+  <h3><a href="https://huggingface.co/nvidia/parakeet-unified-en-0.6b">Parakeet Unified int8 streaming</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">p50 24 vs 52 ms for batch, with 2.9% of words different and words dropped on long recordings</p>
   <details>
@@ -625,7 +666,7 @@
 </article>
 <article class="trial" id="vocabulary-boosting-on-parakeet-unified" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-09-26">26 september 2026</time>
-  <h3>Vocabulary boosting on Parakeet Unified</h3>
+  <h3><a href="https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md">Vocabulary boosting on Parakeet Unified</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">fixed 11 terms on eval clips and changed 19 spans of real speech, nearly all wrongly; 533 vs 160 ms</p>
   <details>
@@ -641,7 +682,7 @@
 <div>
 <article class="trial" id="clef-flash" data-group="clean-up" data-status="rejected">
   <time datetime="2026-10-03">3 october 2026</time>
-  <h3>Clef-flash</h3>
+  <h3><a href="https://huggingface.co/Cloudflare/clef-flash">Clef-flash</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">1.8× slower than Apple&#x27;s on-device rewrite on the M4</p>
   <details>
@@ -663,7 +704,7 @@
 </article>
 <article class="trial" id="s1-mini-0-6b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>S1-mini 0.6B</h3>
+  <h3><a href="https://huggingface.co/superwhisper/s1-mini">S1-mini 0.6B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">4.5× faster than Apple (204 vs 946 ms) with 65 more failures, 270 of 335; takes no custom words</p>
   <details>
@@ -674,7 +715,7 @@
 </article>
 <article class="trial" id="lfm2-5-1-2b-instruct" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>LFM2.5-1.2B-Instruct</h3>
+  <h3><a href="https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct">LFM2.5-1.2B-Instruct</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">271 of 335 cases against Apple&#x27;s 335, at 770 vs 863 ms</p>
   <details>
@@ -685,7 +726,7 @@
 </article>
 <article class="trial" id="qwen3-4b-instruct-2507" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>Qwen3-4B-Instruct-2507</h3>
+  <h3><a href="https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507">Qwen3-4B-Instruct-2507</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">240 of 335 cases at 1000 ms against Apple&#x27;s 335 at 863 ms; it rewrote contractions and digits the prompt leaves alone</p>
   <details>
@@ -696,7 +737,7 @@
 </article>
 <article class="trial" id="lfm2-5-8b-a1b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>LFM2.5-8B-A1B</h3>
+  <h3><a href="https://huggingface.co/LiquidAI/LFM2.5-8B-A1B">LFM2.5-8B-A1B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">invalid run: answers came back as reasoning text with thinking off, so none were applied</p>
   <details>
@@ -707,7 +748,7 @@
 </article>
 <article class="trial" id="assemblyai-dictation-api" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>AssemblyAI Dictation API</h3>
+  <h3><a href="https://www.assemblyai.com/products/dictation-api">AssemblyAI Dictation API</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">211 of 335 cases at about 760 ms round trip; custom words worked, styling didn&#x27;t, and it isn&#x27;t on-device</p>
   <details>
@@ -718,7 +759,7 @@
 </article>
 <article class="trial" id="qwen3-5-2b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-05">5 september 2026</time>
-  <h3>Qwen3.5 2B</h3>
+  <h3><a href="https://huggingface.co/Qwen/Qwen3.5-2B">Qwen3.5 2B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">10 of 11 bench cases at 1.9 s each; Apple passed all 11 at 0.8 s</p>
   <details>
@@ -729,7 +770,7 @@
 </article>
 <article class="trial" id="qwen3-5-4b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-05">5 september 2026</time>
-  <h3>Qwen3.5 4B</h3>
+  <h3><a href="https://huggingface.co/Qwen/Qwen3.5-4B">Qwen3.5 4B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">all 11 cases at 3.3 s each and 3.2 GB, against Apple&#x27;s 0.8 s; kept as the fallback below macOS 26</p>
   <details>
@@ -740,7 +781,7 @@
 </article>
 <article class="trial" id="gemma-4-e2b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-05">5 september 2026</time>
-  <h3>Gemma 4 E2B</h3>
+  <h3><a href="https://huggingface.co/google/gemma-4-E2B-it">Gemma 4 E2B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">all 11 cases at 1.8 s and 3.3 GB, against Apple&#x27;s 0.8 s; kept as the fallback below macOS 26</p>
   <details>
@@ -751,7 +792,7 @@
 </article>
 <article class="trial" id="gemma-4-e4b" data-group="clean-up" data-status="rejected">
   <time datetime="2026-09-05">5 september 2026</time>
-  <h3>Gemma 4 E4B</h3>
+  <h3><a href="https://huggingface.co/google/gemma-4-E4B-it">Gemma 4 E4B</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">all 11 cases at 3.3 s and 5.3 GB; about 35 ms a token to Apple&#x27;s 14</p>
   <details>
@@ -767,7 +808,7 @@
 <div>
 <article class="trial" id="fluidaudio-0-17-6-speaker-embeddings" data-group="speakers" data-status="shipped">
   <time datetime="2026-10-22">22 october 2026</time>
-  <h3>FluidAudio 0.17.6 speaker embeddings</h3>
+  <h3><a href="https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.6">FluidAudio 0.17.6 speaker embeddings</a></h3>
   <span class="status status-shipped">shipped</span>
   <p class="summary">wrong-speaker words 1,691 vs 1,700 of 182,436 (0.93% both); the 9 that changed were checked by ear</p>
   <details>
@@ -789,7 +830,7 @@
 </article>
 <article class="trial" id="ls-eend" data-group="speakers" data-status="rejected">
   <time datetime="2026-10-12">12 october 2026</time>
-  <h3>LS-EEND</h3>
+  <h3><a href="https://huggingface.co/FluidInference/ls-eend-coreml">LS-EEND</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">13.32% of words under the wrong speaker at best, against Nemotron&#x27;s 8.28%</p>
   <details>
@@ -811,7 +852,7 @@
 </article>
 <article class="trial" id="nemotron-3-diarization" data-group="speakers" data-status="shipped">
   <time datetime="2026-09-30">30 september 2026</time>
-  <h3>Nemotron 3 Diarization</h3>
+  <h3><a href="https://huggingface.co/nvidia/Nemotron-3-Diarization">Nemotron 3 Diarization</a></h3>
   <span class="status status-shipped">shipped</span>
   <p class="summary">4.8% of words under the wrong speaker against pyannote&#x27;s 8.6%; right head count on 12 of 14 meetings against 9</p>
   <details>
@@ -822,7 +863,7 @@
 </article>
 <article class="trial" id="pyannote-community-1" data-group="speakers" data-status="shipped">
   <time datetime="2026-09-26">26 september 2026</time>
-  <h3>pyannote community-1</h3>
+  <h3><a href="https://huggingface.co/pyannote/speaker-diarization-community-1">pyannote community-1</a></h3>
   <span class="status status-shipped">shipped</span>
   <p class="summary">8.6% of words under the wrong speaker on 14 meetings, right head count on 9; now only supplies speaker embeddings</p>
   <details>
@@ -849,7 +890,7 @@
 <div>
 <article class="trial" id="sherpa-onnx-cnn-bilstm" data-group="punctuation" data-status="open">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>sherpa-onnx CNN-BiLSTM</h3>
+  <h3><a href="https://k2-fsa.github.io/sherpa/onnx/punctuation/pretrained_models.html#sherpa-onnx-online-punct-en-2024-08-06">sherpa-onnx CNN-BiLSTM</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">sentence-end F1 0.65 at 12 ms against Apple&#x27;s 0.30 at 1116 ms; the clean-up eval stayed at 327 of 335</p>
   <details>
@@ -860,7 +901,7 @@
 </article>
 <article class="trial" id="pcs-en" data-group="punctuation" data-status="rejected">
   <time datetime="2026-09-25">25 september 2026</time>
-  <h3>pcs_en</h3>
+  <h3><a href="https://huggingface.co/1-800-BAD-CODE/punctuation_fullstop_truecase_english">pcs_en</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">sentence-end F1 0.59 at 69 ms; punctuating first dropped the eval to 324 of 335</p>
   <details>
@@ -876,7 +917,7 @@
 <div>
 <article class="trial" id="kev-4b" data-group="meeting-questions" data-status="open">
   <time datetime="2026-10-05">5 october 2026</time>
-  <h3>Kev-4B</h3>
+  <h3><a href="https://huggingface.co/jaredpalmer/kev-4b">Kev-4B</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">AUC 0.84 at 9.8 GB; Apple&#x27;s model scored about chance</p>
   <details>
@@ -887,7 +928,7 @@
 </article>
 <article class="trial" id="kev-0-8b" data-group="meeting-questions" data-status="open">
   <time datetime="2026-10-05">5 october 2026</time>
-  <h3>Kev-0.8B</h3>
+  <h3><a href="https://huggingface.co/jaredpalmer/kev-0.8b">Kev-0.8B</a></h3>
   <span class="status status-open">open</span>
   <p class="summary">AUC 0.76 at 3.1 GB; Apple&#x27;s model scored about chance</p>
   <details>
@@ -903,7 +944,7 @@
 <div>
 <article class="trial" id="localvqe" data-group="echo-cancellation" data-status="rejected">
   <time datetime="2026-10-11">11 october 2026</time>
-  <h3>LocalVQE</h3>
+  <h3><a href="https://huggingface.co/LocalAI-io/LocalVQE">LocalVQE</a></h3>
   <span class="status status-rejected">rejected</span>
   <p class="summary">left 0–15.4% echo against the app&#x27;s 0.07–2.2%; near-end recall fell from 92% to 52% on a 47-minute call</p>
   <details>

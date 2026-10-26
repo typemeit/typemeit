@@ -20,6 +20,7 @@
   "trials": [
     {
       "name": "Qwen3.5 2B",
+      "url": "https://huggingface.co/Qwen/Qwen3.5-2B",
       "group": "clean-up",
       "status": "rejected",
       "summary": "10 of 11 bench cases at 1.9 s each; Apple passed all 11 at 0.8 s",
@@ -36,6 +37,7 @@
     },
     {
       "name": "Qwen3.5 4B",
+      "url": "https://huggingface.co/Qwen/Qwen3.5-4B",
       "group": "clean-up",
       "status": "rejected",
       "summary": "all 11 cases at 3.3 s each and 3.2 GB, against Apple's 0.8 s; kept as the fallback below macOS 26",
@@ -52,6 +54,7 @@
     },
     {
       "name": "Gemma 4 E2B",
+      "url": "https://huggingface.co/google/gemma-4-E2B-it",
       "group": "clean-up",
       "status": "rejected",
       "summary": "all 11 cases at 1.8 s and 3.3 GB, against Apple's 0.8 s; kept as the fallback below macOS 26",
@@ -68,6 +71,7 @@
     },
     {
       "name": "Gemma 4 E4B",
+      "url": "https://huggingface.co/google/gemma-4-E4B-it",
       "group": "clean-up",
       "status": "rejected",
       "summary": "all 11 cases at 3.3 s and 5.3 GB; about 35 ms a token to Apple's 14",
@@ -84,6 +88,7 @@
     },
     {
       "name": "S1-mini 0.6B",
+      "url": "https://huggingface.co/superwhisper/s1-mini",
       "group": "clean-up",
       "status": "rejected",
       "summary": "4.5× faster than Apple (204 vs 946 ms) with 65 more failures, 270 of 335; takes no custom words",
@@ -100,6 +105,7 @@
     },
     {
       "name": "LFM2.5-1.2B-Instruct",
+      "url": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct",
       "group": "clean-up",
       "status": "rejected",
       "summary": "271 of 335 cases against Apple's 335, at 770 vs 863 ms",
@@ -116,6 +122,7 @@
     },
     {
       "name": "Qwen3-4B-Instruct-2507",
+      "url": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507",
       "group": "clean-up",
       "status": "rejected",
       "summary": "240 of 335 cases at 1000 ms against Apple's 335 at 863 ms; it rewrote contractions and digits the prompt leaves alone",
@@ -132,6 +139,7 @@
     },
     {
       "name": "LFM2.5-8B-A1B",
+      "url": "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B",
       "group": "clean-up",
       "status": "rejected",
       "summary": "invalid run: answers came back as reasoning text with thinking off, so none were applied",
@@ -148,6 +156,7 @@
     },
     {
       "name": "AssemblyAI Dictation API",
+      "url": "https://www.assemblyai.com/products/dictation-api",
       "group": "clean-up",
       "status": "rejected",
       "summary": "211 of 335 cases at about 760 ms round trip; custom words worked, styling didn't, and it isn't on-device",
@@ -164,6 +173,7 @@
     },
     {
       "name": "Clean-up model gate",
+      "url": null,
       "group": "clean-up",
       "status": "shipped",
       "summary": "calls the model on 10 of 150 real dictations instead of 146; 326 of 335 cases at 12 ms mean, against 335 at 946 ms",
@@ -180,6 +190,7 @@
     },
     {
       "name": "sherpa-onnx CNN-BiLSTM",
+      "url": "https://k2-fsa.github.io/sherpa/onnx/punctuation/pretrained_models.html#sherpa-onnx-online-punct-en-2024-08-06",
       "group": "punctuation",
       "status": "open",
       "summary": "sentence-end F1 0.65 at 12 ms against Apple's 0.30 at 1116 ms; the clean-up eval stayed at 327 of 335",
@@ -196,6 +207,7 @@
     },
     {
       "name": "pcs_en",
+      "url": "https://huggingface.co/1-800-BAD-CODE/punctuation_fullstop_truecase_english",
       "group": "punctuation",
       "status": "rejected",
       "summary": "sentence-end F1 0.59 at 69 ms; punctuating first dropped the eval to 324 of 335",
@@ -212,6 +224,7 @@
     },
     {
       "name": "Parakeet Unified int8 batch",
+      "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b",
       "group": "speech recognition",
       "status": "open",
       "summary": "104 ms mean wait after release against 517 ms (p95 358 vs 1664 ms); 1.6% of words differ on clips under 15 s",
@@ -228,6 +241,7 @@
     },
     {
       "name": "Parakeet Unified fp16 batch",
+      "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "151 ms mean against int8's 104 ms, with 8 of 3,103 words different",
@@ -244,6 +258,7 @@
     },
     {
       "name": "Parakeet Unified int8 streaming",
+      "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "p50 24 vs 52 ms for batch, with 2.9% of words different and words dropped on long recordings",
@@ -260,6 +275,7 @@
     },
     {
       "name": "Vocabulary boosting on Parakeet Unified",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "fixed 11 terms on eval clips and changed 19 spans of real speech, nearly all wrongly; 533 vs 160 ms",
@@ -276,6 +292,7 @@
     },
     {
       "name": "Granite 5.0",
+      "url": "https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "lost to Parakeet; numbers not recorded",
@@ -292,6 +309,7 @@
     },
     {
       "name": "Nemotron ASR",
+      "url": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "lost to Parakeet; numbers not recorded",
@@ -308,6 +326,7 @@
     },
     {
       "name": "pyannote community-1",
+      "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
       "group": "speakers",
       "status": "shipped",
       "summary": "8.6% of words under the wrong speaker on 14 meetings, right head count on 9; now only supplies speaker embeddings",
@@ -324,6 +343,7 @@
     },
     {
       "name": "Nemotron 3 Diarization",
+      "url": "https://huggingface.co/nvidia/Nemotron-3-Diarization",
       "group": "speakers",
       "status": "shipped",
       "summary": "4.8% of words under the wrong speaker against pyannote's 8.6%; right head count on 12 of 14 meetings against 9",
@@ -340,6 +360,7 @@
     },
     {
       "name": "Voice print of the user",
+      "url": null,
       "group": "speakers",
       "status": "rejected",
       "summary": "distance 0.57 for the user against 0.72+ for other voices on one call; missed on another, so removed",
@@ -356,6 +377,7 @@
     },
     {
       "name": "Voice-name classifier",
+      "url": null,
       "group": "speakers",
       "status": "shipped",
       "summary": "76 of 77 voices named right and none of 93 strangers above 0.5; ships as opt-in \"learn voices\"",
@@ -372,6 +394,7 @@
     },
     {
       "name": "Clef-flash",
+      "url": "https://huggingface.co/Cloudflare/clef-flash",
       "group": "clean-up",
       "status": "rejected",
       "summary": "1.8× slower than Apple's on-device rewrite on the M4",
@@ -388,6 +411,7 @@
     },
     {
       "name": "Kev-4B",
+      "url": "https://huggingface.co/jaredpalmer/kev-4b",
       "group": "meeting questions",
       "status": "open",
       "summary": "AUC 0.84 at 9.8 GB; Apple's model scored about chance",
@@ -404,6 +428,7 @@
     },
     {
       "name": "Kev-0.8B",
+      "url": "https://huggingface.co/jaredpalmer/kev-0.8b",
       "group": "meeting questions",
       "status": "open",
       "summary": "AUC 0.76 at 3.1 GB; Apple's model scored about chance",
@@ -420,6 +445,7 @@
     },
     {
       "name": "Cohere Transcribe",
+      "url": "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "65.88% meeting WER against Parakeet's 10.90%; 77% of the worst track's words came from silence. With Silero VAD in front, 14.18%",
@@ -436,6 +462,7 @@
     },
     {
       "name": "LocalVQE",
+      "url": "https://huggingface.co/LocalAI-io/LocalVQE",
       "group": "echo cancellation",
       "status": "rejected",
       "summary": "left 0–15.4% echo against the app's 0.07–2.2%; near-end recall fell from 92% to 52% on a 47-minute call",
@@ -452,6 +479,7 @@
     },
     {
       "name": "Parakeet Ultra, before listen review",
+      "url": "https://huggingface.co/moondream/parakeet-ultra",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation 4.09% vs 4.23% and p95 111 vs 290 ms; meetings 14.58% vs Parakeet's 10.90%",
@@ -468,6 +496,7 @@
     },
     {
       "name": "Phonon-2",
+      "url": "https://huggingface.co/FermionResearch/Phonon-2",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation 5.40% vs Parakeet's 4.23%; meetings 17.79% vs 10.90%",
@@ -484,6 +513,7 @@
     },
     {
       "name": "Parakeet Ultra with Silero VAD chunks",
+      "url": "https://huggingface.co/moondream/parakeet-ultra",
       "group": "speech recognition",
       "status": "open",
       "summary": "best meeting WER 13.43% vs 10.90%; the gap is inserted words (1,441 vs 663), not chunk edges",
@@ -500,6 +530,7 @@
     },
     {
       "name": "Parakeet Ultra, listen review",
+      "url": "https://huggingface.co/moondream/parakeet-ultra",
       "group": "speech recognition",
       "status": "open",
       "summary": "34 of 37 sampled extra-word spans were real speech; estimated meeting WER 11.96% vs 12.93%",
@@ -516,6 +547,7 @@
     },
     {
       "name": "Parakeet Ultra, listen review round 2",
+      "url": "https://huggingface.co/moondream/parakeet-ultra",
       "group": "speech recognition",
       "status": "open",
       "summary": "63% of randomly drawn extra words were real; estimated meetings 12.43% vs 12.57%, a tie, with Ultra 2.9× faster on dictation",
@@ -532,6 +564,7 @@
     },
     {
       "name": "Parakeet Ultra",
+      "url": "https://huggingface.co/moondream/parakeet-ultra",
       "group": "speech recognition",
       "status": "shipped",
       "summary": "dictation 4.09% vs 4.23%, p95 97 vs 290 ms; meetings 12.55% vs 12.57% after the listen review",
@@ -548,6 +581,7 @@
     },
     {
       "name": "Parakeet Unified on Core ML",
+      "url": "https://huggingface.co/nvidia/parakeet-unified-en-0.6b",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation tied at 4.23% with p95 122 ms; meetings 11.32% vs 10.90%",
@@ -564,6 +598,7 @@
     },
     {
       "name": "Meeting chunk length sweep",
+      "url": null,
       "group": "speech recognition",
       "status": "kept",
       "summary": "120 s chunks had the lowest meeting WER, 10.90%; 30 s gave 11.97% and 600 s 11.78%",
@@ -580,6 +615,7 @@
     },
     {
       "name": "CTC vocabulary boosting on Ultra",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/main/Documentation/ASR/CustomVocabulary.md",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "synthetic term hits up to 99% from 78%, dictation WER up to 8.18% from 4.67%, p95 3.1× slower",
@@ -596,6 +632,7 @@
     },
     {
       "name": "Custom-word matcher retuned for Ultra",
+      "url": null,
       "group": "speech recognition",
       "status": "shipped",
       "summary": "0 false insertions and dictation WER 4.09%, same as plain Ultra; 71% of synthetic term hits",
@@ -612,6 +649,7 @@
     },
     {
       "name": "LS-EEND",
+      "url": "https://huggingface.co/FluidInference/ls-eend-coreml",
       "group": "speakers",
       "status": "rejected",
       "summary": "13.32% of words under the wrong speaker at best, against Nemotron's 8.28%",
@@ -628,6 +666,7 @@
     },
     {
       "name": "Qwen3-ASR 0.6B",
+      "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation 20.15% vs Ultra's 4.09%; meetings 40.67% vs Parakeet's 10.90%",
@@ -644,6 +683,7 @@
     },
     {
       "name": "Granite Speech 4.1 2B NAR",
+      "url": "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation 3.65% vs Ultra's 4.09%; meetings 14.95% vs 14.58% with stretches of speech left out; p95 1,721 vs 97 ms",
@@ -660,6 +700,7 @@
     },
     {
       "name": "Fluid Speech Mini",
+      "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml",
       "group": "speech recognition",
       "status": "open",
       "summary": "dictation tied with Ultra at 4.09%; room tracks 10.42% vs 9.12% with fillers dropped",
@@ -676,6 +717,7 @@
     },
     {
       "name": "Fluid Speech Mini, rescored against Universal-3.5 Pro",
+      "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-mini-coreml",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "against Universal-3.5 Pro: dictation 4.80% vs Ultra's 4.22%, meetings 14.07% vs 12.70%",
@@ -692,6 +734,7 @@
     },
     {
       "name": "Orukeet r3",
+      "url": "https://huggingface.co/oruk/orukeet",
       "group": "speech recognition",
       "status": "open",
       "summary": "not run yet",
@@ -708,6 +751,7 @@
     },
     {
       "name": "Parakeet vs Ultra on meaning",
+      "url": null,
       "group": "speech recognition",
       "status": "open",
       "summary": "on meaning, Parakeet's meeting WER is 8.04% against Ultra's 9.45%",
@@ -724,6 +768,7 @@
     },
     {
       "name": "Underdog Bark 3.0 Pro",
+      "url": "https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation tied at 4.22%; meetings 13.12% vs Ultra's 12.65%, with 508 deleted words to Ultra's 230",
@@ -740,6 +785,7 @@
     },
     {
       "name": "Underdog Bark 3.0 Plus",
+      "url": "https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Plus",
       "group": "speech recognition",
       "status": "rejected",
       "summary": "dictation 5.82% vs Ultra's 4.22%; meetings 15.17% vs 12.65%",
@@ -756,6 +802,7 @@
     },
     {
       "name": "FluidAudio 0.17.6 speaker embeddings",
+      "url": "https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.6",
       "group": "speakers",
       "status": "shipped",
       "summary": "wrong-speaker words 1,691 vs 1,700 of 182,436 (0.93% both); the 9 that changed were checked by ear",
@@ -772,6 +819,7 @@
     },
     {
       "name": "Tiled voice-name clips",
+      "url": null,
       "group": "speakers",
       "status": "shipped",
       "summary": "short clips named right 2,990 vs 1,183 of 3,306; strangers reaching 0.5 rose from 2 to 18, so the cut moved to 0.8",

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 
@@ -15,14 +16,20 @@ enum ShortcutEvent: Sendable {
     case roomRequested
 }
 
-/// One listen-only CGEvent tap. Fn is keycode 63 on flagsChanged. Space (49)
-/// and Esc (53) are watched only while a recording is in progress, Return
-/// (36, and Enter on the keypad, 76) only while `onReturn` takes it.
+/// One CGEvent tap. Fn is keycode 63 on flagsChanged. Space (49) and Esc
+/// (53) are watched only while a recording is in progress, Return (36, and
+/// Enter on the keypad, 76) only while `onReturn` takes it. Where the tap is
+/// not allowed (`Sandbox.watchesFn`), system hotkeys stand in and the
+/// combo's modifiers play Fn: the combo starts a recording, which lasts
+/// while its modifiers are held; space with them pins, the combo finishes a
+/// pinned recording, and Esc cancels. Return is not taken there.
 @MainActor
 final class Shortcuts {
     enum Phase: Sendable { case idle, recording, pinned, transcribing, cleaningUp }
 
-    private(set) var phase: Phase = .idle
+    private(set) var phase: Phase = .idle {
+        didSet { if phase != oldValue { phaseChanged() } }
+    }
     private(set) var tapInstalled = false
     var onEvent: (@MainActor (ShortcutEvent) -> Void)?
     /// A plain Return while idle: answers the prompt waiting for it and says
@@ -36,6 +43,16 @@ final class Shortcuts {
     private var fnDownAt: ContinuousClock.Instant?
     /// The Return whose key down `onReturn` took, so its key up is kept too.
     private var swallowingReturn = false
+    private var hotKeys: HotKeys?
+    /// Set while a shortcut recorder is listening, so the combos it is
+    /// shown reach it instead of starting a dictation.
+    private var hotKeysPaused = false
+    /// While a hotkey recording is held: checks whether the combo's
+    /// modifiers are still down, since a hotkey reports no modifier changes.
+    private var holdPoll: Timer?
+    /// The combo's key has come up since it started the recording, so a
+    /// press now is space again rather than the key repeating.
+    private var comboKeyUp = false
 
     private static let fnKeycode: Int64 = 63
     private static let spaceKeycode: Int64 = 49
@@ -45,6 +62,7 @@ final class Shortcuts {
     /// Returns false when Accessibility has not been granted.
     @discardableResult
     func install() -> Bool {
+        if !Sandbox.watchesFn { return installHotKeys() }
         guard tap == nil else { return true }
         let mask: CGEventMask =
             (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
@@ -69,6 +87,93 @@ final class Shortcuts {
         return true
     }
 
+    private func installHotKeys() -> Bool {
+        guard hotKeys == nil else { return true }
+        let hotKeys = HotKeys()
+        guard hotKeys.install() else {
+            Log.shortcuts.error("Hotkey handler could not be installed")
+            return false
+        }
+        hotKeys.onKey = { [weak self] key, down in self?.handle(key, down: down) }
+        self.hotKeys = hotKeys
+        fnSeenUp = true
+        registerHotKeys()
+        Log.shortcuts.info("Hotkeys installed")
+        return true
+    }
+
+    /// Registers the combos from settings, and again whenever they change.
+    private func registerHotKeys() {
+        guard let hotKeys else { return }
+        withObservationTracking {
+            let dictate = Settings.shared.dictationShortcut
+            let copyLast = Settings.shared.copyLastShortcut
+            let recordRoom = Settings.shared.recordRoomShortcut
+            hotKeys.set(.dictate, to: hotKeysPaused ? nil : dictate)
+            hotKeys.set(.copyLast, to: hotKeysPaused ? nil : copyLast)
+            hotKeys.set(.recordRoom, to: hotKeysPaused || !Sandbox.hasMeetings ? nil : recordRoom)
+        } onChange: {
+            Task { @MainActor [weak self] in self?.registerHotKeys() }
+        }
+    }
+
+    /// A shortcut recorder is listening, or has stopped.
+    func pauseHotKeys(_ paused: Bool) {
+        guard hotKeys != nil, paused != hotKeysPaused else { return }
+        hotKeysPaused = paused
+        registerHotKeys()
+    }
+
+    /// Esc is taken from other apps only while there is something to
+    /// cancel, and space with the combo's modifiers only while held.
+    private func phaseChanged() {
+        guard let hotKeys else { return }
+        hotKeys.set(.cancel, to: phase == .idle ? nil : .escape)
+        let combo = Settings.shared.dictationShortcut
+        let pin = KeyCombo.space(with: combo.modifiers)
+        // When the combo is itself space with modifiers, its own press pins.
+        hotKeys.set(.pin, to: phase == .recording && pin != combo ? pin : nil)
+        if phase == .recording {
+            let poll = Timer(timeInterval: Fixed.holdPollMs / 1000, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkHold() }
+            }
+            RunLoop.main.add(poll, forMode: .common)
+            holdPoll = poll
+        } else {
+            holdPoll?.invalidate()
+            holdPoll = nil
+        }
+    }
+
+    /// Letting go of the combo's modifiers is letting go of Fn.
+    private func checkHold() {
+        let held = KeyCombo.Modifiers(CGEventSource.flagsState(.combinedSessionState))
+        if !held.isSuperset(of: Settings.shared.dictationShortcut.modifiers) { fnUp() }
+    }
+
+    private func handle(_ key: HotKeys.Key, down: Bool) {
+        switch key {
+        case .dictate:
+            guard down else { comboKeyUp = true; return }
+            if phase == .recording {
+                if comboKeyUp { pinWhileHeld() }
+            } else {
+                comboKeyUp = false
+                fnDown()
+            }
+        case .pin:
+            if down, phase == .recording { pinWhileHeld() }
+        case .cancel:
+            guard down, phase != .idle else { return }
+            phase = .idle
+            onEvent?(.cancelled)
+        case .copyLast:
+            if down, phase == .idle { onEvent?(.copyLastRequested) }
+        case .recordRoom:
+            if down, phase == .idle { onEvent?(.roomRequested) }
+        }
+    }
+
     func uninstall() {
         if let source = runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
@@ -76,6 +181,9 @@ final class Shortcuts {
         runLoopSource = nil
         tapInstalled = false
     }
+
+    /// The key held to dictate, as running text names it.
+    static var holdKeyName: String { Sandbox.watchesFn ? "fn" : Settings.shared.dictationShortcut.inline }
 
     /// The pipeline tells the shortcuts where it is so Esc means the right thing.
     func setPhase(_ p: Phase) { phase = p }
@@ -200,6 +308,11 @@ final class Shortcuts {
         }
     }
 
+    private func pinWhileHeld() {
+        phase = .pinned
+        onEvent?(.pinned)
+    }
+
     private func fnDown() {
         guard fnSeenUp else { return }
         switch phase {
@@ -232,5 +345,59 @@ final class Shortcuts {
         default:
             break
         }
+    }
+}
+
+/// System hotkeys through Carbon's `RegisterEventHotKey`, which needs no
+/// permission. A registered combo is taken from every app, press and
+/// release, until it is unregistered.
+@MainActor
+private final class HotKeys {
+    enum Key: UInt32 { case dictate = 1, pin, cancel, copyLast, recordRoom }
+
+    var onKey: (@MainActor (Key, _ down: Bool) -> Void)?
+    private var handler: EventHandlerRef?
+    private var registered: [Key: EventHotKeyRef] = [:]
+
+    nonisolated private static let signature: OSType = "tmit".utf8.reduce(0) { $0 << 8 | OSType($1) }
+
+    func install() -> Bool {
+        var types = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased)),
+        ]
+        let userInfo = Unmanaged.passUnretained(self).toOpaque()
+        return InstallEventHandler(GetEventDispatcherTarget(), HotKeys.callback, types.count, &types, userInfo, &handler) == noErr
+    }
+
+    /// Registers `combo` for `key`, replacing what `key` had; nil leaves it
+    /// unregistered.
+    func set(_ key: Key, to combo: KeyCombo?) {
+        if let ref = registered.removeValue(forKey: key) { UnregisterEventHotKey(ref) }
+        guard let combo else { return }
+        var ref: EventHotKeyRef?
+        let id = EventHotKeyID(signature: HotKeys.signature, id: key.rawValue)
+        let status = RegisterEventHotKey(UInt32(combo.keyCode), combo.carbonModifiers, id, GetEventDispatcherTarget(), 0, &ref)
+        if status == noErr, let ref {
+            registered[key] = ref
+        } else {
+            Log.shortcuts.error("Hotkey \(combo.inline) could not be registered: \(status)")
+        }
+    }
+
+    private static let callback: EventHandlerUPP = { _, event, userInfo in
+        guard let event, let userInfo else { return OSStatus(eventNotHandledErr) }
+        var id = EventHotKeyID()
+        let status = GetEventParameter(
+            event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+            nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+        guard status == noErr, id.signature == HotKeys.signature, let key = Key(rawValue: id.id) else {
+            return OSStatus(eventNotHandledErr)
+        }
+        let down = GetEventKind(event) == UInt32(kEventHotKeyPressed)
+        let hotKeys = Unmanaged<HotKeys>.fromOpaque(userInfo).takeUnretainedValue()
+        // Carbon dispatches on the main run loop.
+        MainActor.assumeIsolated { hotKeys.onKey?(key, down) }
+        return noErr
     }
 }

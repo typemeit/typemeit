@@ -68,6 +68,8 @@ final class AppState {
     var revealMeeting: UUID?
     /// A dictation the dictations tab should open when next shown.
     var revealDictation: UUID?
+    /// A settings group to open and scroll to, with `settingsTab` set to settings.
+    var revealSection: SettingsSection?
     /// Clicks on each sidebar page, counted so a page can go back to its
     /// whole list on every click, even one on the page already showing.
     var sidebarClicks: [SettingsTab: Int] = [:]
@@ -115,14 +117,19 @@ struct MenuContent: View {
         return combo.keyboardShortcut
     }
 
+    /// The keys secure input keeps from the app.
+    private var secureInputBlocks: String {
+        Sandbox.watchesFn ? "esc, space and the copy shortcut" : "the shortcuts"
+    }
+
     var body: some View {
         if let owner = appState.secureInputOwner {
             if owner.isLoginWindow {
                 Text("secure input is stuck on from the lock screen")
-                Text("esc, space and the copy shortcut don't work. lock and unlock the mac to clear it.")
+                Text("\(secureInputBlocks) don't work. lock and unlock the mac to clear it.")
             } else {
                 Text("secure input is on in \(owner.name)")
-                Text("esc, space and the copy shortcut don't work until it's off.")
+                Text("\(secureInputBlocks) don't work until it's off.")
             }
             Divider()
         }
@@ -158,7 +165,7 @@ struct MenuContent: View {
         if Pipeline.shared.isBusy {
             Button("Cancel Recording") { Pipeline.shared.shortcuts.cancelFromOverlay() }
         }
-        meetingItems
+        if Sandbox.hasMeetings { meetingItems }
         if Updates.isDevBuild {
             Divider()
             captureItems
@@ -337,6 +344,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observePipeline()
         previewToastIfAsked()
         MeetingProbes.runIfAsked()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in MissingPermission.refreshMicrophone() }
+        }
         secureInputTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let owner = SecureInput.owner

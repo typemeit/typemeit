@@ -52,11 +52,15 @@ enum SecureInput {
     /// fail, in which case the caller sends the user to Keyboard settings.
     @discardableResult
     static func setFnKeyToDoNothing() -> Bool {
+        #if APP_STORE
+        return false
+        #else
         typealias Update = @convention(c) (Int32) -> Void
         guard let carbon = dlopen("/System/Library/Frameworks/Carbon.framework/Carbon", RTLD_LAZY),
               let symbol = dlsym(carbon, "TISUpdateFnUsageType") else { return false }
         unsafeBitCast(symbol, to: Update.self)(0)
         return fnKeyDoesNothing
+        #endif
     }
 
     static let keyboardSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!

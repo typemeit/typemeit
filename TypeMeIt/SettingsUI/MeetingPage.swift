@@ -13,7 +13,6 @@ struct MeetingPage: View {
     @State private var store = MeetingStore.shared
     @State private var coordinator = MeetingCoordinator.shared
     @State private var player = RecordingPlayer.shared
-    @State private var copied = false
     @State private var deleting = false
     @State private var renaming = false
     @State private var pausing = false
@@ -80,20 +79,8 @@ struct MeetingPage: View {
                     .overlay(alignment: .leading) { Rectangle().fill(DesignTokens.Colors.rule).frame(width: DesignTokens.hairline) }
             }
             .frame(maxHeight: .infinity)
-            if let urls = audioURLs {
-                MeetingPlayer(meeting: meeting, urls: urls)
-            } else {
-                Text("no audio kept")
-                    .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .top) { SquareRule() }
-            }
+            PageAudioFoot(id: meeting.id, urls: audioURLs, durationMs: meeting.durationMs)
         }
-        // Playback belongs to the page: leaving it stops it.
-        .onDisappear { if player.playing == meeting.id { player.stop() } }
         .onAppear {
             coordinator.summarise(meeting.id)
             if nameFirst { openNaming(SpeakerAssign.nextUnknown(after: nil, in: meeting)) }
@@ -106,18 +93,8 @@ struct MeetingPage: View {
     // MARK: Top
 
     private var topBar: some View {
-        HStack(spacing: 6) {
-            Button(action: back) {
-                Label {
-                    Text("meetings")
-                } icon: {
-                    SquareIcon("akar-chevron-down", size: 10).rotationEffect(.degrees(90))
-                }
-            }
-            .buttonStyle(SquareButtonStyle(kind: .quiet))
-            // Esc in a field gives up the edit, not the page.
-            .keyboardShortcut(renaming || naming != nil ? nil : .cancelAction)
-            Spacer(minLength: 0)
+        // Esc in a field gives up the edit, not the page.
+        PageTopBar(list: "meetings", backShortcut: renaming || naming != nil ? nil : .cancelAction, back: back) {
             if !hits.isEmpty || !query.isEmpty {
                 Text(hits.isEmpty ? "none" : "\(hit + 1)/\(hits.count)")
                     .font(Square.mono(11))
@@ -128,16 +105,8 @@ struct MeetingPage: View {
                         onSubmit: step, onCancel: { if find.isEmpty { back() } else { find = "" } })
                 .frame(width: 200)
                 .padding(.trailing, 4)
-            Button {
-                Output.copyToClipboard(meeting.transcriptText)
-                copied = true
-            } label: {
-                SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14)
-            }
-            .buttonStyle(SquareIconButtonStyle())
-            .disabled(meeting.paragraphs.isEmpty)
-            .help("copy the transcript")
-            .accessibilityLabel("copy the transcript")
+            PageCopyButton(help: "copy the transcript") { Output.copyToClipboard(meeting.transcriptText) }
+                .disabled(meeting.paragraphs.isEmpty)
             if meeting.isDone, !meeting.paragraphs.isEmpty, !live {
                 // The share menu under the button; the button can also be
                 // dragged, which drops the `.tmi` file into a message or a
@@ -184,11 +153,6 @@ struct MeetingPage: View {
                     .squarePopover(isPresented: $deleting) { deleteConfirm }
             }
         }
-        .padding(.top, 12)
-        .padding(.leading, 12)
-        .padding(.trailing, 16)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) { SquareRule() }
     }
 
     private var query: String { find.trimmingCharacters(in: .whitespaces) }
@@ -206,32 +170,27 @@ struct MeetingPage: View {
     private func reveal(_ proxy: ScrollViewProxy) {
         let all = hits
         guard all.indices.contains(hit) else { return }
-        withAnimation(.easeOut(duration: DesignTokens.Duration.n2)) { proxy.scrollTo(all[hit].paragraph, anchor: .center) }
+        // A hit in an aside scrolls to the turn it is shown in.
+        let turn = TranscriptRender.rows(meeting.paragraphs).first { $0.contains(all[hit].paragraph) }?[0] ?? all[hit].paragraph
+        withAnimation(.easeOut(duration: DesignTokens.Duration.n2)) { proxy.scrollTo(turn, anchor: .center) }
     }
 
     /// While the audio is kept, it can go on its own and the transcript stay.
     private var deleteConfirm: some View {
-        let audio = audioURLs != nil
-        return SquareConfirm(title: "delete this meeting?",
-                             detail: audio ? "it has \(MeetingsTab.length(meeting.durationMs)) of audio." : nil,
-                             width: 300) {
-            Button("cancel") { deleting = false }.buttonStyle(SquareButtonStyle())
-            if audio {
-                Button("audio only") {
-                    if player.playing == meeting.id { player.stop() }
-                    store.deleteAudio(meeting.id)
-                    deleting = false
-                }
-                .buttonStyle(SquareButtonStyle())
-            }
-            Button(audio ? "everything" : "delete") {
-                if player.playing == meeting.id { player.stop() }
-                deleting = false
-                store.delete(ids: [meeting.id])
-                back()
-            }
-            .buttonStyle(SquareButtonStyle(kind: .primary))
-        }
+        SquareAudioDeleteConfirm(title: "delete this meeting?",
+                                 audio: audioURLs.map { _ in MeetingsTab.length(meeting.durationMs) },
+                                 cancel: { deleting = false },
+                                 deleteAudio: {
+                                     if player.playing == meeting.id { player.stop() }
+                                     store.deleteAudio(meeting.id)
+                                     deleting = false
+                                 },
+                                 deleteEverything: {
+                                     if player.playing == meeting.id { player.stop() }
+                                     deleting = false
+                                     store.delete(ids: [meeting.id])
+                                     back()
+                                 })
     }
 
     // MARK: Article
@@ -243,6 +202,7 @@ struct MeetingPage: View {
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .padding(.top, 10)
+            folderSuggestion
             state.padding(.top, 20)
             asking
             hooks
@@ -276,9 +236,16 @@ struct MeetingPage: View {
     /// Claude answering a question asked in this meeting, live.
     @ViewBuilder private var asking: some View {
         if let asked = coordinator.askingIn, asked.meeting == meeting.id, let runID = asked.question.runID {
-            ClaudeRunOutput(id: runID)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 26)
+            Group {
+                // Transcribing or finding the question, which the prompt line names until Claude Code starts.
+                if coordinator.askPreparing {
+                    SquareClaudeThread(lines: [.prompt(asked.question.text)], status: .running, footer: "", stop: { coordinator.cancelAsk() })
+                } else {
+                    ClaudeRunOutput(id: runID)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 26)
         }
     }
 
@@ -296,7 +263,7 @@ struct MeetingPage: View {
                                 .font(Square.mono(11))
                                 .foregroundStyle(DesignTokens.Colors.ink3)
                         }
-                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID))
+                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID, calls: run.calls))
                     }
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -337,6 +304,34 @@ struct MeetingPage: View {
         }
     }
 
+    /// For a meeting in no folder: the model's folder suggestion to take or
+    /// leave, "new folder" when no meeting is in it yet, or the link that
+    /// asks for one when it has a summary.
+    @ViewBuilder private var folderSuggestion: some View {
+        if let suggestion = meeting.openFolderSuggestion {
+            HStack(spacing: 8) {
+                Text(store.folderCounts.contains { $0.name == suggestion } ? "folder: \(suggestion)?" : "new folder: \(suggestion)?")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                Button("yes") { store.file(ids: [meeting.id], in: suggestion) }
+                    .buttonStyle(SquareButtonStyle(small: true))
+                Button("no") { store.file(ids: [meeting.id], in: nil) }
+                    .buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
+            }
+            .padding(.top, 10)
+        } else if meeting.folder == nil {
+            if coordinator.suggestingFolder.contains(meeting.id) {
+                Text("suggesting a folder…")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .padding(.top, 10)
+            } else if meeting.isDone, !live, !(meeting.summary ?? "").isEmpty {
+                SquareLink(title: "suggest a folder", size: 12, color: DesignTokens.Colors.ink2) { coordinator.suggestFolder(meeting.id) }
+                    .padding(.top, 10)
+            }
+        }
+    }
+
     /// "thursday 24 september · 10:21–10:32".
     private var dateLine: String {
         let day = meeting.started.formatted(.dateTime.weekday(.wide).day().month(.wide)).lowercased()
@@ -348,7 +343,8 @@ struct MeetingPage: View {
 
     /// How far its transcription has got, what it still needs, or its summary.
     @ViewBuilder private var state: some View {
-        if let run = coordinator.transcribing, run.id == meeting.id {
+        switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .transcribing(let run):
             HStack(spacing: 12) {
                 Text(pausing ? "pausing…" : run.progress.label)
                     .font(Square.mono(12))
@@ -368,17 +364,24 @@ struct MeetingPage: View {
                 }
             }
             .onChange(of: coordinator.transcribing?.id) { _, running in if running != meeting.id { pausing = false } }
-        } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .queued:
+            Text(MeetingPhase.queuedLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .summarising:
+            Text(MeetingPhase.summarisingLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .needs:
             MeetingChips(meeting: meeting)
-        } else if let summary = meeting.summary, !summary.isEmpty {
-            Text(summary)
-                .font(Square.sans(15))
-                .lineSpacing(6)
-                .foregroundStyle(DesignTokens.Colors.ink)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else if coordinator.summarising.contains(meeting.id) {
-            Text("summarising…").font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        // The rail names unknown speakers here, so the summary shows over them.
+        case .unknownSpeakers, .summary:
+            if let summary = meeting.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(Square.sans(15))
+                    .lineSpacing(6)
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .none:
+            EmptyView()
         }
     }
 
@@ -416,22 +419,7 @@ struct MeetingPage: View {
                 .help("show in finder")
             }
             SquareSubhead(text: "processing")
-            VStack(spacing: 0) {
-                ForEach(processing, id: \.key) { row in
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(row.key).foregroundStyle(DesignTokens.Colors.ink3)
-                        Spacer(minLength: 0)
-                        Text(row.value)
-                            .foregroundStyle(row.waiting ? DesignTokens.Colors.ink3 : DesignTokens.Colors.ink)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .font(Square.mono(11))
-                    .monospacedDigit()
-                    .padding(.vertical, 5)
-                    .overlay(alignment: .top) { SquareRule() }
-                }
-            }
-            .overlay(alignment: .bottom) { SquareRule() }
+            RailFacts(facts: processing)
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 22)
@@ -599,27 +587,28 @@ struct MeetingPage: View {
 
     /// What ran on the meeting and what it came to, from what the meeting
     /// records about itself.
-    private var processing: [(key: String, value: String, waiting: Bool)] {
+    private var processing: [RailFact] {
         let t = meeting.transcription
         let running = coordinator.transcribing?.id == meeting.id
-        var rows: [(key: String, value: String, waiting: Bool)] = []
+        var rows: [RailFact] = []
         if running, let run = coordinator.transcribing {
-            rows.append(("asr", "\(t.asr ?? ModelStore.version) · \(Int(run.fraction * 100))%", false))
+            rows.append(RailFact(key: "asr", value: "\(t.asr ?? ModelStore.version) · \(Int(run.fraction * 100))%"))
         } else {
-            rows.append(("asr", t.asr.map { MeetingPage.timed($0, t.asrMs) } ?? "none yet", t.asr == nil))
+            rows.append(RailFact(key: "asr", value: t.asr.map { MeetingPage.timed($0, t.asrMs) } ?? "none yet", waiting: t.asr == nil))
         }
         let stage = running ? coordinator.transcribing?.progress : nil
-        rows.append(("speakers", t.diarizer.map { MeetingPage.timed(DiarizerModelStore.label(of: $0), t.speakersMs) }
-            ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
-        rows.append(("names from", MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"), MeetingPage.nameSource(meeting) == nil))
-        if meeting.kind == .call { rows.append(("echo", MeetingPage.echo(meeting.echo), meeting.echo == .notMeasured)) }
+        rows.append(RailFact(key: "speakers", value: t.diarizer.map { MeetingPage.timed(DiarizerModelStore.label(of: $0), t.speakersMs) }
+            ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), waiting: t.diarizer == nil))
+        rows.append(RailFact(key: "names from", value: MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"),
+                             waiting: MeetingPage.nameSource(meeting) == nil))
+        if meeting.kind == .call { rows.append(RailFact(key: "echo", value: MeetingPage.echo(meeting.echo), waiting: meeting.echo == .notMeasured)) }
         if let took = t.tookMs, meeting.durationMs > 0 {
-            rows.append(("transcribed", "\(MeetingPage.seconds(took)) · \(timesFaster(audioMs: meeting.durationMs, tookMs: took))", false))
+            rows.append(RailFact(key: "transcribed", value: "\(lengthInSeconds(ms: took)) · \(timesFaster(audioMs: meeting.durationMs, tookMs: took))"))
         }
         let writing = coordinator.summarising.contains(meeting.id) || stage == .summarising
         let summary = meeting.summary.map { _ in MeetingPage.timed("apple intelligence", t.summaryMs) } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
-        rows.append(("summary", summary, meeting.summary == nil))
-        rows.append(("title", MeetingPage.titleSource(meeting.titleSource), false))
+        rows.append(RailFact(key: "summary", value: summary, waiting: meeting.summary == nil))
+        rows.append(RailFact(key: "title", value: MeetingPage.titleSource(meeting.titleSource)))
         return rows
     }
 
@@ -651,12 +640,7 @@ struct MeetingPage: View {
 
     /// What ran, and how long it took when the meeting recorded that.
     private static func timed(_ what: String, _ ms: Int?) -> String {
-        ms.map { "\(what) · \(seconds($0))" } ?? what
-    }
-
-    private static func seconds(_ ms: Int) -> String {
-        let s = Int((Double(ms) / 1000).rounded())
-        return s >= 60 ? String(format: "%dm %02ds", s / 60, s % 60) : "\(s)s"
+        ms.map { "\(what) · \(lengthInSeconds(ms: $0))" } ?? what
     }
 
     /// "~/…/Meetings/2026-09-24 11m pricing page review": home as ~, and
@@ -687,6 +671,7 @@ private struct MeetingTranscript: View {
         // Ticks only while playing, for which line is in ink.
         TimelineView(.animation(minimumInterval: 0.5, paused: !loaded || player.paused)) { _ in
             let current = loaded ? meeting.paragraphs.lastIndex { $0.startMs <= Int(player.currentTime * 1000) } : nil
+            let rows = Dictionary(uniqueKeysWithValues: TranscriptRender.rows(meeting.paragraphs).map { ($0[0], $0) })
             LazyVStack(alignment: .leading, spacing: 0) {
                 if meeting.paragraphs.isEmpty {
                     Text(meeting.transcription.state == .done ? "nothing was said" : "not transcribed yet")
@@ -695,7 +680,7 @@ private struct MeetingTranscript: View {
                 }
                 ForEach(TranscriptRender.entries(meeting), id: \.self) { entry in
                     switch entry {
-                    case .paragraph(let i): turn(i, current: current)
+                    case .paragraph(let i): turn(rows[i] ?? [i], current: current)
                     case .question(let i): question(meeting.questions?[i])
                     }
                 }
@@ -703,60 +688,81 @@ private struct MeetingTranscript: View {
         }
     }
 
-    private func turn(_ i: Int, current: Int?) -> some View {
-        let paragraph = meeting.paragraphs[i]
-        return HStack(alignment: .firstTextBaseline, spacing: 20) {
+    /// The speaker and time column, and the gap before what was said.
+    private static let speakerWidth: CGFloat = 88
+    private static let speakerGap: CGFloat = 20
+    /// The space inside the box around Claude's reply.
+    private static let replyPadding: CGFloat = 14
+
+    /// One turn: its first paragraph's speaker and time, and the text of
+    /// every paragraph in `row`, each aside in brackets under its speaker.
+    private func turn(_ row: [Int], current: Int?) -> some View {
+        let paragraph = meeting.paragraphs[row[0]]
+        var text = AttributedString()
+        for i in row {
+            if i != row[0] { text += AttributedString(" ") }
+            if TranscriptRender.bracketed(i, in: row, of: meeting.paragraphs) {
+                var aside = AttributedString("[\(SpeakerAssign.firstName(of: meeting.paragraphs[i].speaker, in: meeting)): ")
+                aside += marked(meeting.paragraphs[i].text, paragraph: i)
+                aside += AttributedString("]")
+                // The current find hit keeps its own colour.
+                for run in aside.runs where run.foregroundColor == nil { aside[run.range].foregroundColor = DesignTokens.Colors.ink3 }
+                text += aside
+            } else {
+                text += marked(meeting.paragraphs[i].text, paragraph: i)
+            }
+        }
+        return HStack(alignment: .firstTextBaseline, spacing: Self.speakerGap) {
             VStack(alignment: .leading, spacing: 2) {
                 speaker(paragraph.speaker)
                 time(paragraph)
             }
-            .frame(width: 88, alignment: .leading)
-            Text(marked(paragraph.text, paragraph: i))
+            .frame(width: Self.speakerWidth, alignment: .leading)
+            Text(text)
                 .font(Square.sans(14))
                 .lineSpacing(5)
-                .foregroundStyle(i == current ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
+                .foregroundStyle(current.map(row.contains) == true ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 10)
-        .id(i)
+        .id(row[0])
     }
 
-    /// A question offered to Claude: when it was heard, and the answer, or
-    /// what the user did instead of asking.
+    /// A question offered to Claude, under the turn it was heard in: the
+    /// answer, or what the user did instead of asking.
     @ViewBuilder private func question(_ question: Meeting.Question?) -> some View {
         if let question {
-            HStack(alignment: .firstTextBaseline, spacing: 20) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("claude")
-                        .font(Square.mono(12, weight: .medium))
-                        .foregroundStyle(DesignTokens.Colors.ink2)
-                    Text(TranscriptRender.timestamp(ms: question.atMs))
-                        .font(Square.mono(11))
-                        .monospacedDigit()
+            VStack(alignment: .leading, spacing: 8) {
+                // As the dictation page heads its question.
+                HStack(spacing: 8) {
+                    SquareClaudeMark(size: 13)
+                    Text("claude").font(Square.mono(12, weight: .medium))
+                }
+                .foregroundStyle(DesignTokens.Colors.ink2)
+                if question.result != .asked || question.answer == nil && question.runID == nil {
+                    Text(question.text)
+                        .font(Square.mono(13))
+                        .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+                }
+                if question.result == .asked, let answer = question.answer {
+                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls))
+                } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
+                    ClaudeRunOutput(id: runID)
+                } else {
+                    Text(TranscriptRender.outcome(question.result))
+                        .font(Square.mono(12))
                         .foregroundStyle(DesignTokens.Colors.ink3)
                 }
-                .frame(width: 88, alignment: .leading)
-                VStack(alignment: .leading, spacing: 8) {
-                    if question.result != .asked || question.answer == nil && question.runID == nil {
-                        Text(question.text)
-                            .font(Square.mono(13))
-                            .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
-                    }
-                    if question.result == .asked, let answer = question.answer {
-                        ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID))
-                    } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
-                        ClaudeRunOutput(id: runID)
-                    } else {
-                        Text(TranscriptRender.outcome(question.result))
-                            .font(Square.mono(12))
-                            .foregroundStyle(DesignTokens.Colors.ink3)
-                    }
-                }
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 10)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // A reply to the turn: a box whose edge lines up with the turn's text.
+            .padding(Self.replyPadding)
+            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
+            .padding(.leading, Self.speakerWidth + Self.speakerGap)
+            .padding(.top, 4)
+            .padding(.bottom, 14)
         }
     }
 
@@ -776,7 +782,7 @@ private struct MeetingTranscript: View {
 
     private func marked(_ text: String, paragraph: Int) -> AttributedString {
         var marked = AttributedString(text)
-        for range in TranscriptFind.ranges(of: find, in: text) {
+        for range in TextSearch.ranges(of: find, in: text) {
             guard let run = Range(range, in: marked) else { continue }
             if current == TranscriptFind.Hit(paragraph: paragraph, range: range) {
                 marked[run].backgroundColor = DesignTokens.Colors.slab
@@ -801,48 +807,6 @@ private struct MeetingTranscript: View {
         } else {
             text
         }
-    }
-}
-
-/// Play or pause on the slab, the scrubber, and the time over the length.
-private struct MeetingPlayer: View {
-    let meeting: Meeting
-    let urls: [URL]
-    @State private var player = RecordingPlayer.shared
-
-    var body: some View {
-        let loaded = player.playing == meeting.id
-        let running = loaded && !player.paused
-        let total = loaded ? player.duration : Double(meeting.durationMs) / 1000
-        // Ticks only while playing.
-        TimelineView(.animation(minimumInterval: 0.1, paused: !running)) { _ in
-            let at = loaded ? player.currentTime : 0
-            let seek = { (fraction: Double) in
-                if loaded { player.seek(to: fraction * total) } else { player.play(id: meeting.id, urls: urls, from: fraction * total) }
-            }
-            HStack(spacing: 18) {
-                Button {
-                    if running { player.pause() } else { player.play(id: meeting.id, urls: urls) }
-                } label: {
-                    SquareIcon(running ? "akar-pause" : "akar-play", size: 14)
-                }
-                .buttonStyle(SquarePlayButtonStyle())
-                .help(running ? "pause" : "play")
-                .accessibilityLabel(running ? "pause" : "play")
-                SquareScrubber(fraction: total > 0 ? at / total : 0, seek: seek)
-                HStack(spacing: 0) {
-                    Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
-                    Text(" / \(TranscriptRender.timestamp(ms: Int(total * 1000)))").foregroundStyle(DesignTokens.Colors.ink3)
-                }
-                .font(Square.mono(12))
-                .monospacedDigit()
-            }
-        }
-        .padding(.top, 14)
-        .padding(.leading, 20)
-        .padding(.trailing, 24)
-        .padding(.bottom, 16)
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
     }
 }
 

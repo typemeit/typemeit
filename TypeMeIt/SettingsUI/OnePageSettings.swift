@@ -9,10 +9,13 @@ enum SettingsSection: String, CaseIterable {
     /// What the group is for, over its rows when it opens.
     var blurb: String? {
         switch self {
-        case .onThisMac: "dictations, meetings and their audio are stored on this mac and nowhere else."
+        case .onThisMac: Sandbox.hasMeetings ? "dictations, meetings and their audio are stored on this mac and nowhere else." : "dictations and their audio are stored on this mac and nowhere else."
         default: nil
         }
     }
+
+    /// The groups this build shows.
+    static var available: [SettingsSection] { allCases.filter { $0 != .meetings || Sandbox.hasMeetings } }
 }
 
 /// How many dictations or meetings are kept: the last n, everything (0),
@@ -74,9 +77,8 @@ struct OnePageSettings: View {
     @State private var removingCamera = false
     /// A new hook's name, typed before it is added.
     @State private var hookName = ""
-    /// The settings' Claude Code test run, shown under its row.
-    @State private var claudeTestID: UUID?
-    @State private var claudeTestResult: ClaudeRunOutput.Kept?
+    @State private var claudeCheck = ClaudeCheck.shared
+    @State private var checkDetailsOpen = false
     @State private var devices = AudioCapture.inputDevices()
     @State private var availability = PostProcessor.availability
     @State private var screenGranted = CGPreflightScreenCaptureAccess()
@@ -96,7 +98,7 @@ struct OnePageSettings: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(SettingsSection.allCases, id: \.self) { section in
+                    ForEach(SettingsSection.available, id: \.self) { section in
                         SquareGroup(title: section.rawValue, summary: summary(section), blurb: section.blurb, open: binding(section)) {
                             rows(section)
                         }
@@ -162,9 +164,9 @@ struct OnePageSettings: View {
                           blurb: "claude code answers questions you ask in a call or a dictation, and runs your hooks on a meeting once it ends, using your account and mcp servers. each one sends the call's transcript to anthropic.")
             if ClaudeRun.isAvailable {
                 SquareSettingsRow(label: "ask", help: OnePageSettings.askHelp) {
-                    toggle("ask", $settings.askClaude)
+                    toggle("ask", checkedOn(get: { settings.askClaude }, set: { settings.askClaude = $0 }))
                 }
-                if settings.askClaude { claudeRows }
+                if showsClaudeRows { claudeRows }
             } else if !Sandbox.isActive {
                 SquareSettingsRow(label: "ask", help: OnePageSettings.askHelp, caption: "needs claude code") {
                     HStack(spacing: 10) {
@@ -200,13 +202,71 @@ struct OnePageSettings: View {
         } below: {
             promptEditor($settings.askClaudeSystemPrompt)
         }
-        SquareSettingsRow(label: "test", help: "runs claude code once with these settings and shows its output · a failed hook or ask fails here too") {
-            Button("run") { testClaude() }
-                .buttonStyle(SquareButtonStyle())
-                .disabled(claudeTestID.map { ClaudeLive.shared.running.contains($0) } ?? false)
+        SquareSettingsRow(label: "claude code", help: "checks claude code runs the way ask and hooks need · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off · use installs the last version that worked, and claude code updates itself again unless DISABLE_AUTOUPDATER is 1 under env in ~/.claude/settings.json",
+                          caption: ClaudeCheck.caption(claudeCheck.status, lastPassed: claudeCheck.lastPassed)) {
+            if let rollback = claudeCheck.rollback {
+                Button("use \(rollback)") { claudeCheck.rollBack(to: rollback) }.buttonStyle(SquareButtonStyle(kind: .primary))
+            } else {
+                Button("check") { claudeCheck.run() }
+                    .buttonStyle(SquareButtonStyle())
+                    .disabled(checkBusy)
+            }
         } below: {
-            if let claudeTestID { ClaudeRunOutput(id: claudeTestID, kept: claudeTestResult) }
+            if case .failed = claudeCheck.status, !claudeCheck.runs.isEmpty { checkDetails }
         }
+        .onChange(of: ClaudeCheck.conditions) { _, _ in
+            if ClaudeCheck.inUse { claudeCheck.run() }
+        }
+    }
+
+    private var checkBusy: Bool {
+        switch claudeCheck.status {
+        case .checking, .installing: true
+        default: false
+        }
+    }
+
+    /// Where a failed check's runs went other than asked, and the runs themselves, folded.
+    private var checkDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button { checkDetailsOpen.toggle() } label: {
+                HStack(spacing: 6) {
+                    SquareIcon("akar-chevron-down", size: 9).rotationEffect(.degrees(checkDetailsOpen ? 0 : -90))
+                    Text("details").font(Square.mono(12))
+                }
+                .foregroundStyle(DesignTokens.Colors.ink3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if checkDetailsOpen {
+                if case .failed(_, let problems, _) = claudeCheck.status {
+                    ForEach(problems, id: \.self) { problem in
+                        Text(problem).font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
+                    }
+                }
+                ForEach(claudeCheck.runs, id: \.id) { run in
+                    ClaudeRunOutput(id: run.id, kept: run.answer.map { .init(prompt: run.prompt, answer: $0.text, failed: $0.failed, sessionID: $0.sessionID) })
+                }
+            }
+        }
+    }
+
+    /// Ask's rows, which hooks run with too, and the check's result while it runs or has failed.
+    private var showsClaudeRows: Bool {
+        guard !settings.askClaude, !settings.meetingHooks.contains(where: \.on) else { return true }
+        switch claudeCheck.status {
+        case .checking, .installing, .failed: return true
+        case .unchecked, .passed: return false
+        }
+    }
+
+    /// A switch for ask or a hook that checks Claude Code as it goes on, and
+    /// goes back off if the check fails.
+    private func checkedOn(get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> Binding<Bool> {
+        Binding(get: get, set: { on in
+            set(on)
+            if on { claudeCheck.ensure { passed in if !passed { set(false) } } }
+        })
     }
 
     /// While ask is on, the camera; and hooks, which only need Claude Code.
@@ -261,7 +321,7 @@ struct OnePageSettings: View {
                         .buttonStyle(SquareIconButtonStyle())
                         .help("remove")
                         .accessibilityLabel("remove \(hook.name)")
-                    toggle(hook.name, $hook.on)
+                    toggle(hook.name, hookSwitch(hook.id))
                 }
             } below: {
                 promptEditor($hook.prompt, placeholder: "what claude should do with the meeting")
@@ -277,6 +337,12 @@ struct OnePageSettings: View {
             }
             SquareSettingsRow(label: "mute audio", help: "mutes your speakers while you dictate · not during meetings") { toggle("mute audio", $settings.muteWhileRecording) }
             SquareSettingsRow(label: "pause audio", help: "pauses music or video while you dictate · not during meetings") { toggle("pause audio", $settings.pauseWhileRecording) }
+            if !Sandbox.watchesFn {
+                SquareSettingsRow(label: "hold to talk") {
+                    SquareShortcutRecorder(combo: Binding(get: { settings.dictationShortcut }, set: { if let c = $0 { settings.dictationShortcut = c } }), clearable: false)
+                }
+                SquareSettingsRow(label: "pin", help: "\(settings.dictationShortcut.inline) again to finish") { SquareKeycap("space") }
+            }
             SquareSettingsRow(label: "check audio", help: "tests your mic and speakers · writes the results to the debug log and your clipboard · plays a short tone · includes device and app names") {
                 Button(checkingAudio ? "running" : "run") {
                     checkingAudio = true
@@ -388,23 +454,27 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "delete all") {
                 deleteAll(store.history.count, "dictation", showing: $deletingDictations) { store.deleteAllHistory() }
             }
-            SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
-            SquareSettingsRow(label: "keep", help: "only transcribed meetings count") {
-                SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
-            }
-            SquareSettingsRow(label: "keep the audio", help: "replay meetings and relearn voices · off: deleted after transcribing") {
-                toggle("keep the meetings' audio", $settings.meetingKeepAudio)
-            }
-            SquareSettingsRow(label: "delete all") {
-                // A meeting still recording is left alone; it can be deleted once it stops.
-                let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
-                deleteAll(ids.count, "meeting", showing: $deletingMeetings) { meetings.delete(ids: ids) }
-            }
-            SquareSettingsRow(label: "folder", caption: folderPath) {
-                Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
-                    .buttonStyle(SquareButtonStyle())
-                    .disabled(!meetings.folderAvailable)
-            }
+            if Sandbox.hasMeetings { meetingStorageRows }
+        }
+    }
+
+    @ViewBuilder private var meetingStorageRows: some View {
+        SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
+        SquareSettingsRow(label: "keep", help: "only transcribed meetings count") {
+            SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
+        }
+        SquareSettingsRow(label: "keep the audio", help: "replay meetings and relearn voices · off: deleted after transcribing") {
+            toggle("keep the meetings' audio", $settings.meetingKeepAudio)
+        }
+        SquareSettingsRow(label: "delete all") {
+            // A meeting still recording is left alone; it can be deleted once it stops.
+            let ids = Set(meetings.meetings.map(\.id)).subtracting(coordinator.liveIDs)
+            deleteAll(ids.count, "meeting", showing: $deletingMeetings) { meetings.delete(ids: ids) }
+        }
+        SquareSettingsRow(label: "folder", caption: folderPath) {
+            Button("open") { NSWorkspace.shared.open(meetings.publishedRoot) }
+                .buttonStyle(SquareButtonStyle())
+                .disabled(!meetings.folderAvailable)
         }
     }
 
@@ -472,6 +542,12 @@ struct OnePageSettings: View {
             SquareSettingsRow(label: "website") {
                 SquareLink(title: "typeme.it", size: 12) { NSWorkspace.shared.open(Fixed.websiteURL) }
             }
+            // App Review wants the privacy policy reachable in the app (5.1.1(i)).
+            if Sandbox.isStoreBuild {
+                SquareSettingsRow(label: "privacy") {
+                    SquareLink(title: "typeme.it/privacy", size: 12) { NSWorkspace.shared.open(Fixed.privacyURL) }
+                }
+            }
             SquareSettingsRow(label: "contact") {
                 Button(Fixed.contactEmail) { NSWorkspace.shared.open(Fixed.contactURL) }.buttonStyle(SquareButtonStyle())
             }
@@ -497,7 +573,7 @@ struct OnePageSettings: View {
     private func summary(_ section: SettingsSection) -> String {
         switch section {
         case .dictation:
-            return OnePageSettings.join(microphoneName(settings.microphoneUID ?? ""),
+            return OnePageSettings.join(Sandbox.watchesFn ? nil : settings.dictationShortcut.inline, microphoneName(settings.microphoneUID ?? ""),
                                         settings.muteWhileRecording ? "mutes audio" : settings.pauseWhileRecording ? "pauses audio" : nil,
                                         settings.cloudChoice.label, settings.cloudPosition.label, settings.audioFeedback ? "sounds on" : "sounds off")
         case .cleanUp:
@@ -517,9 +593,10 @@ struct OnePageSettings: View {
             let assistantSummary = OnePageSettings.join(ask, hooks, settings.mcpEnabled ? "mcp on" : nil)
             return assistantSummary.isEmpty ? "off" : assistantSummary
         case .onThisMac:
-            let keeps = [KeepLimit.dictations.summary(settings.historyLimit), KeepLimit.meetings.summary(settings.meetingLimit)].compactMap { $0 }
+            let meetingKeep = Sandbox.hasMeetings ? KeepLimit.meetings.summary(settings.meetingLimit) : nil
+            let keeps = [KeepLimit.dictations.summary(settings.historyLimit), meetingKeep].compactMap { $0 }
             return OnePageSettings.join(keeps.isEmpty ? "keeps everything" : keeps.joined(separator: " · "),
-                                        meetingsUsage.map { "meetings use \($0)" })
+                                        Sandbox.hasMeetings ? meetingsUsage.map { "meetings use \($0)" } : nil)
         case .app:
             return OnePageSettings.join(AppVersion.current, updateSummary, settings.launchAtLogin ? "opens at login" : nil,
                                         settings.appearance == .system ? nil : settings.appearance.label)
@@ -570,8 +647,19 @@ struct OnePageSettings: View {
     private func addHook() {
         let name = hookName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        settings.meetingHooks.append(MeetingHook(name: name))
+        let hook = MeetingHook(name: name)
+        settings.meetingHooks.append(hook)
         hookName = ""
+        hookSwitch(hook.id).wrappedValue = true
+    }
+
+    /// A hook's switch, by id: the check that runs as it goes on can end after
+    /// the list has changed.
+    private func hookSwitch(_ id: UUID) -> Binding<Bool> {
+        checkedOn(get: { settings.meetingHooks.first { $0.id == id }?.on ?? false }, set: { on in
+            guard let index = settings.meetingHooks.firstIndex(where: { $0.id == id }) else { return }
+            settings.meetingHooks[index].on = on
+        })
     }
 
     private func toggle(_ label: String, _ isOn: Binding<Bool>) -> some View {
@@ -672,22 +760,6 @@ struct OnePageSettings: View {
         return model.description.lowercased()
     }
 
-    private func testClaude() {
-        let prompt = ClaudeRun.testPrompt
-        guard let run = ClaudeRun.test(folder: URL(fileURLWithPath: settings.askClaudeFolder, isDirectory: true), model: settings.askClaudeModel,
-                                       allowedTools: settings.askClaudeTools, permissionMode: settings.askClaudePermissionMode,
-                                       userSystemPrompt: settings.askClaudeSystemPrompt) else { return }
-        let id = UUID()
-        claudeTestID = id
-        claudeTestResult = nil
-        ClaudeLive.shared.start(id, prompt: prompt, run: run) { run.cancel() }
-        Task {
-            let answer = await run.answer()
-            ClaudeLive.shared.finish(id)
-            claudeTestResult = ClaudeRunOutput.Kept(prompt: prompt, answer: answer.text, failed: answer.failed, sessionID: answer.sessionID)
-        }
-    }
-
     /// The Mac's default, then each camera; the saved one stays listed while it is unplugged.
     private var cameraOptions: [String] {
         let listed = camera.cameras.map(\.uniqueID)
@@ -776,8 +848,9 @@ struct OnePageSettings: View {
     }
 
     private var updateSummary: String {
-        if Updates.isDevBuild { return "dev build · never updates" }
+        // Store first, so a dev build previewing the store says what the store build does.
         if !Sandbox.updatesItself { return "updated by the app store" }
+        if Updates.isDevBuild { return "dev build · never updates" }
         switch updates.state {
         case .checking: return "checking…"
         case .upToDate: return "up to date"

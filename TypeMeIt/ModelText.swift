@@ -134,8 +134,10 @@ enum ModelText {
 
     // MARK: - Scalar helpers
 
-    private static func isWhitespace(_ c: Unicode.Scalar) -> Bool {
-        c.properties.isWhitespace
+    /// Unicode `White_Space`, ASCII answered without the property table,
+    /// which is most of the cost of counting a whole history.
+    static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.isASCII ? scalar == " " || (0x09...0x0D).contains(scalar.value) : scalar.properties.isWhitespace
     }
 
     private static func firstRange(

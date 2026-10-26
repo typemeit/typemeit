@@ -1,7 +1,9 @@
-hold fn, speak, let go.
+hold ⌥ space, speak, let go.
 it types wherever the cursor is.
 
-parakeet transcribes your speech on this mac and apple intelligence tidies it up.
+parakeet transcribes your speech on this Mac and Apple Intelligence tidies it up.
 nothing leaves the computer.
 
-insights on your dictation, and a cloud you can customise.
+a cloud you can customise.
+
+needs Apple Intelligence turned on. English only.

@@ -1,6 +1,6 @@
 ---
 name: store-screenshots
-description: Generate, edit or add the App Store screenshots in Scripts/store — framed 2560x1600 scenes of Slack, Claude and the app's own insights, history and settings tabs
+description: Generate, edit or add the App Store screenshots in Scripts/store — framed 2560x1600 scenes of Slack, Claude and the app's own history and settings tabs
 ---
 
 Every screenshot is a 2560x1600 frame (`Scripts/store/frame.py`): a header
@@ -10,16 +10,18 @@ of scene:
 
 - **painted** (`slack`, `claude`): a real capture of the other app,
   `Scripts/store/<scene>/base.png`, with its text repainted by
-  `<scene>/generate.py` in that app's own font so the conversation is made up.
+  `<scene>/generate.py` in that app's own font (rendered by
+  `Scripts/store/paint.py`) so the conversation is made up.
   The committed base has every region `generate.py` paints already blanked by
   that script's `scrub()`: a capture of a real account shows real people,
   messages and chat titles, and none of it may reach git. Never commit a raw
   capture over a base.
-- **app** (`insights`, `history`, `settings`): the dev app's settings window
-  over seeded history, captured by `Scripts/store/app/capture.py` into
+- **app** (`history`, `settings`): the dev app's settings window, launched
+  with `-previewStore 1` so it looks like the store build (its hotkey in
+  place of Fn, no insights tab), over seeded history, captured by `Scripts/store/app/capture.py` into
   `Scripts/store/app/<tab>.png`.
 
-Bases and app captures are committed; `out/` is not. Needs Google Chrome,
+Bases, app captures and the framed `out/*.png` are committed; `out/*.html` is not. Needs Google Chrome,
 Pillow and numpy; the app captures also need the Debug build and `cliclick`.
 
 ## Regenerate everything
@@ -47,18 +49,17 @@ unless the base changes.
 ## Change what the app tabs show
 
 The history is `Scripts/store/app/seed.py`: the last two days are written by
-hand in `RECENT` (heard, typed, app), older days are random and only feed the
-insights numbers. Then, with no other dev instance running
+hand in `RECENT` (heard, typed, app), older days are random. Then, with no other dev instance running
 (`pgrep -fil "type me it dev.app/Contents/MacOS"`) and a fresh Debug build:
 
 ```sh
-python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py insights history settings
+python3 Scripts/store/app/capture.py && python3 Scripts/store/frame.py history settings
 ```
 
 `capture.py` launches the binary by path with `TYPEMEIT_SUPPORT_DIR` (never
 `open`, which may start another worktree's copy), brings it to the front so
-the capture has the key window's shadow and traffic lights, clicks each tab,
-and for history opens the first row's "heard" panel. Pass tab names to do one.
+the capture has the key window's shadow and traffic lights, and clicks each
+tab. Pass tab names to do one.
 Keep the mouse and keyboard off while it runs: a click elsewhere takes the
 key window away and the capture comes out without the shadow, which the
 script rejects.
@@ -90,9 +91,11 @@ If the layout moved, re-measure the pixel constants at the top of
 
 ## Add a scene
 
-Painted: copy the closest `generate.py`, measure its boxes on the raw
-capture, give it a `scrub()` that blanks every box it paints, adopt the base
-as above, and add an entry to `SCENES` with `cloud="dark"` (or `"white"`) if the
+Painted: model `<scene>/generate.py` on the closest one, importing
+`Painter` from `Scripts/store/paint.py` for the text (give it the device
+scale that matches the app's rasterisation and the app's font) rather than
+copying the rendering code. Measure its boxes on the raw capture, give it a
+`scrub()` that blanks every box it paints, adopt the base as above, and add an entry to `SCENES` with `cloud="dark"` (or `"white"`) if the
 app would show one. App tab: add the tab name to `TABS` in
 `app/capture.py` and an entry to `SCENES` without `cloud`. Add the new scene
 to `PAINTED` in `build.py` if it is painted.

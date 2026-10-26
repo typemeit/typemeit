@@ -9,21 +9,29 @@ struct OnboardingView: View {
 
     enum Step: Int, CaseIterable { case model, microphone, accessibility, cleanup, globeKey, tryIt }
 
+    /// The steps this build shows: the 🌐 key matters only where Fn is the
+    /// dictation key.
+    static let steps = Step.allCases.filter { $0 != .globeKey || Sandbox.watchesFn }
+
     /// Opens on the first step that is not yet satisfied, so a permission
     /// lost since the last launch (a reinstall, a signature change, a TCC
     /// reset) lands straight on its page.
     @State private var step: Step = OnboardingView.firstUnsatisfiedStep()
     @State private var modelStore = ModelStore.shared
-    @State private var micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    private var micGranted: Bool { micStatus == .authorized }
     @State private var axGranted = AXIsProcessTrusted()
     @State private var fnOK = SecureInput.fnKeyDoesNothing
     /// The one-click fix did not take, so the button opens Keyboard settings.
     @State private var fnNeedsSettings = false
     @State private var availability = PostProcessor.availability
     @State private var dictated = false
-    /// Steps whose grant click did not produce a permission. macOS shows the
-    /// prompt once per app, so the button on these steps opens System Settings.
+    /// Steps whose grant or continue press did not bring up the macOS
+    /// prompt. macOS shows it once per app, so these steps offer System
+    /// Settings instead.
     @State private var needsSettings: Set<Step> = []
+    /// Store build: permission steps whose prompt has been asked for on this run.
+    @State private var asked: Set<Step> = []
     @State private var scratch = ""
     @FocusState private var scratchFocused: Bool
     @State private var store = Store.shared
@@ -32,7 +40,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("step \(step.rawValue + 1) of \(Step.allCases.count)")
+                Text("step \(position + 1) of \(Self.steps.count)")
                     .font(DesignTokens.Fonts.micro.monospaced())
                     .foregroundStyle(DesignTokens.Colors.ink3)
                 Text(title)
@@ -50,16 +58,16 @@ struct OnboardingView: View {
                 .transition(.opacity)
             Spacer(minLength: 0)
             HStack(spacing: 8) {
-                StepDots(current: step.rawValue, count: Step.allCases.count)
+                StepDots(current: position, count: Self.steps.count)
                 Spacer()
                 if step == .tryIt, !dictated {
                     Button("skip") { finished() }
-                        .buttonStyle(InkButtonStyle(quiet: true))
+                        .buttonStyle(SquareButtonStyle(kind: .quiet))
                 }
-                Button(step == .tryIt ? "finish" : "continue") { advance() }
-                    .buttonStyle(InkButtonStyle(primary: true))
+                Button(step == .tryIt ? "finish" : "continue") { continuePressed() }
+                    .buttonStyle(SquareButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!canContinue)
+                    .disabled(!canContinue && !(Sandbox.isStoreBuild && isPermissionStep))
             }
         }
         .padding(28)
@@ -84,23 +92,31 @@ struct OnboardingView: View {
 
     private var body_: String {
         switch step {
-        case .model: "hold the fn key, speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
-        case .microphone: "type me it needs the microphone."
-        case .accessibility: "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+        case .model: "hold \(Sandbox.watchesFn ? "the fn key" : Shortcuts.holdKeyName), speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
+        case .microphone:
+            Sandbox.isStoreBuild ? "type me it listens only while you dictate. the audio stays on this mac." : "type me it needs the microphone."
+        case .accessibility:
+            Sandbox.watchesFn
+                ? "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+                : "lets type me it paste your words where your cursor is."
         case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
         case .cleanup: "apple intelligence tidies your words on this mac."
-        case .tryIt: "hold fn and say something. let go when you are done."
+        case .tryIt: "hold \(Shortcuts.holdKeyName) and say something. let go when you are done."
         }
     }
 
     @ViewBuilder private var content: some View {
         switch step {
         case .model:
-            SettingsGroup { ModelDownloadRows() }
+            SquareRows { ModelDownloadRows() }
+        case .microphone where Sandbox.isStoreBuild:
+            storePermission("microphone", granted: micGranted, refused: micStatus == .denied, settings: SecureInput.microphoneSettingsURL)
+        case .accessibility where Sandbox.isStoreBuild:
+            storePermission("accessibility", granted: axGranted, refused: false, settings: SecureInput.accessibilitySettingsURL)
         case .microphone:
             permission("microphone", granted: micGranted, grant: {
                 if AVCaptureDevice.authorizationStatus(for: .audio) == .denied { return false }
-                AVCaptureDevice.requestAccess(for: .audio) { ok in Task { @MainActor in micGranted = ok } }
+                AVCaptureDevice.requestAccess(for: .audio) { _ in Task { @MainActor in refresh() } }
                 return true
             }, missing: { AVCaptureDevice.authorizationStatus(for: .audio) != .authorized }, settings: SecureInput.microphoneSettingsURL)
         case .accessibility:
@@ -110,19 +126,19 @@ struct OnboardingView: View {
                 return true
             }, missing: { !AXIsProcessTrusted() }, settings: SecureInput.accessibilitySettingsURL)
         case .globeKey:
-            SettingsGroup {
-                SettingsRow(label: "press 🌐 key to", subtitle: fnNeedsSettings && !fnOK ? "keyboard settings, the row below." : nil, last: true) {
+            SquareRows {
+                SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings · the row below" : nil) {
                     if fnOK {
-                        Status("do nothing", done: true)
+                        SquareStatus("do nothing", done: true)
                     } else if fnNeedsSettings {
                         Button("keyboard settings") { NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
-                            .buttonStyle(InkButtonStyle(primary: true))
+                            .buttonStyle(SquareButtonStyle(kind: .primary))
                     } else {
                         Button("set to do nothing") {
                             fnOK = SecureInput.setFnKeyToDoNothing()
                             if !fnOK { fnNeedsSettings = true; NSWorkspace.shared.open(SecureInput.keyboardSettingsURL) }
                         }
-                        .buttonStyle(InkButtonStyle(primary: true))
+                        .buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 }
             }
@@ -133,28 +149,28 @@ struct OnboardingView: View {
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
                 .padding(.top, 12)
         case .cleanup:
-            SettingsGroup {
+            SquareRows {
                 switch availability {
                 case .available:
-                    SettingsRow(label: "apple intelligence", last: true) { Status("on", done: true) }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("on", done: true) }
                 case .unavailable(.appleIntelligenceNotEnabled):
-                    SettingsRow(label: "apple intelligence", subtitle: "turn it on in system settings. this page moves on by itself once it is on.", last: true) {
-                        Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(InkButtonStyle(primary: true))
+                    SquareSettingsRow(label: "apple intelligence", help: "turn it on in system settings. this page moves on by itself once it is on.") {
+                        Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 case .unavailable(.modelNotReady):
-                    SettingsRow(label: "apple intelligence", subtitle: "the download is in system settings. skip and it turns on by itself once done.", last: true) {
-                        Status("downloading…")
+                    SquareSettingsRow(label: "apple intelligence", help: "the download is in system settings. skip and it turns on by itself once done.") {
+                        SquareStatus("downloading…")
                     }
                 case .unavailable(.deviceNotEligible):
-                    SettingsRow(label: "apple intelligence", last: true) { Status("not available on this mac") }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("not available on this mac") }
                 case .unavailable:
-                    SettingsRow(label: "apple intelligence", last: true) { Status("not available right now") }
+                    SquareSettingsRow(label: "apple intelligence") { SquareStatus("not available right now") }
                 }
             }
         case .tryIt:
             VStack(alignment: .leading, spacing: 12) {
                 if dictated, let last = store.newest {
-                    Status("typed!", done: true)
+                    SquareStatus("typed!", done: true)
                     Text(last.displayText)
                         .font(.system(size: 12))
                         .foregroundStyle(DesignTokens.Colors.ink)
@@ -163,7 +179,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Rectangle().fill(DesignTokens.Colors.inkA04))
                 } else {
-                    Status("waiting for a dictation…")
+                    SquareStatus("waiting for a dictation…")
                     TextField("dictate into this field", text: $scratch)
                         .textFieldStyle(.plain)
                         .focused($scratchFocused)
@@ -179,8 +195,8 @@ struct OnboardingView: View {
     }
 
     private func permission(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL) -> some View {
-        SettingsGroup {
-            permissionRow(label, granted: granted, grant: grant, missing: missing, settings: settings, last: true)
+        SquareRows {
+            permissionRow(label, granted: granted, grant: grant, missing: missing, settings: settings)
         }
     }
 
@@ -190,14 +206,14 @@ struct OnboardingView: View {
     /// `missing` and this app is still active, meaning no dialog took the
     /// focus, the prompt was used up on an earlier launch: the button becomes
     /// "system settings" and opens the pane straight away.
-    private func permissionRow(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL, last: Bool) -> some View {
+    private func permissionRow(_ label: String, granted: Bool, grant: @escaping () -> Bool, missing: @escaping () -> Bool, settings: URL) -> some View {
         let current = step
         let viaSettings = needsSettings.contains(current)
-        return SettingsRow(label: label, subtitle: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil, last: last) {
+        return SquareSettingsRow(label: label, help: viaSettings && !granted ? "macos did not ask, so turn it on in system settings" : nil) {
             if granted {
-                Status("granted", done: true)
+                SquareStatus("granted", done: true)
             } else if viaSettings {
-                Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(InkButtonStyle(primary: true))
+                Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(SquareButtonStyle(kind: .primary))
             } else {
                 Button("grant") {
                     if !grant() { needsSettings.insert(current); NSWorkspace.shared.open(settings); return }
@@ -209,8 +225,62 @@ struct OnboardingView: View {
                             NSWorkspace.shared.open(settings)
                         }
                     }
-                }.buttonStyle(InkButtonStyle(primary: true))
+                }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
+        }
+    }
+
+    /// The store build's permission row: state only. Asking is the continue
+    /// button's job, since App Review wants the press that brings up a
+    /// permission prompt to read "continue" (guideline 5.1.1(iv)). Once
+    /// macOS has been answered, or will not ask again, the row offers
+    /// System Settings.
+    private func storePermission(_ label: String, granted: Bool, refused: Bool, settings: URL) -> some View {
+        let unasked = needsSettings.contains(step)
+        let subtitle: String? = granted ? nil : refused ? "off. turn it on in system settings." : unasked ? "macos did not ask, so turn it on in system settings" : nil
+        return SquareRows {
+            SquareSettingsRow(label: label, caption: subtitle) {
+                if granted {
+                    SquareStatus("granted", done: true)
+                } else if refused || unasked {
+                    Button("system settings") { NSWorkspace.shared.open(settings) }.buttonStyle(SquareButtonStyle(kind: .primary))
+                }
+            }
+        }
+    }
+
+    private var isPermissionStep: Bool { step == .microphone || step == .accessibility }
+
+    /// In the store build, on a permission step not yet granted, the first
+    /// press asks macOS. A refusal moves on, and a later press moves on
+    /// whatever the answer: App Review wants the refusal respected.
+    private func continuePressed() {
+        guard Sandbox.isStoreBuild else { advance(); return }
+        switch step {
+        case .microphone where micStatus == .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { ok in
+                Task { @MainActor in
+                    refresh()
+                    // A grant moves on through `advanceWhenSettled`, after the check shows.
+                    if !ok, step == .microphone { advance() }
+                }
+            }
+        case .accessibility where !axGranted && !asked.contains(.accessibility):
+            asked.insert(.accessibility)
+            let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+            axGranted = AXIsProcessTrustedWithOptions(opts)
+            // No dialog took the focus: macOS used the prompt up on an
+            // earlier launch, so the pane opens instead.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                refresh()
+                if step == .accessibility, !axGranted, NSApp.isActive {
+                    needsSettings.insert(.accessibility)
+                    NSWorkspace.shared.open(SecureInput.accessibilitySettingsURL)
+                }
+            }
+        default:
+            advance()
         }
     }
 
@@ -227,10 +297,12 @@ struct OnboardingView: View {
 
     private func advance() {
         if step == .tryIt { finished(); return }
-        let next = Step(rawValue: step.rawValue + 1) ?? .tryIt
+        let next = Self.steps.first { $0.rawValue > step.rawValue } ?? .tryIt
         if next == .tryIt { startRunning() }
         move(to: next)
     }
+
+    private var position: Int { Self.steps.firstIndex(of: step) ?? 0 }
 
     private func move(to next: Step) {
         step = next
@@ -261,49 +333,16 @@ struct OnboardingView: View {
         guard Settings.shared.onboardingComplete, ModelStore.isInstalled else { return .model }
         if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized { return .microphone }
         if !AXIsProcessTrusted() { return .accessibility }
-        if !SecureInput.fnKeyDoesNothing { return .globeKey }
+        if Sandbox.watchesFn, !SecureInput.fnKeyDoesNothing { return .globeKey }
         return .model
     }
 
     private func refresh() {
-        micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         axGranted = AXIsProcessTrusted()
         fnOK = SecureInput.fnKeyDoesNothing
         availability = PostProcessor.availability
         if step == .tryIt, let last = store.newest, Date().timeIntervalSince(last.timestamp) < 120 { dictated = true }
-    }
-}
-
-/// A mono status line. Done carries a check in ink; pending is ink-2 with no icon.
-struct Status: View {
-    var text: String
-    var done = false
-    init(_ text: String, done: Bool = false) { self.text = text; self.done = done }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if done {
-                Image("akar-circle-check").resizable().frame(width: 13, height: 13)
-            }
-            Text(text).font(.system(size: 12).monospaced())
-        }
-        .foregroundStyle(done ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
-    }
-}
-
-/// A flat ink bar on an ink-a08 track, the same gauge insights draws.
-struct InkProgress: View {
-    var value: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle().fill(DesignTokens.Colors.inkA08)
-                Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * min(1, max(0, value)))
-            }
-        }
-        .frame(height: 6)
-        .animation(.easeOut(duration: DesignTokens.Duration.n2), value: value)
     }
 }
 

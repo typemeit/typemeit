@@ -21,6 +21,8 @@ struct SquareSidebar<Page: Hashable>: View {
     var tint = Color(nsColor: CloudColor.sky.color)
     var record: () -> Void = {}
     var stop: () -> Void = {}
+    /// "record the room" at the foot; off where the build has no meetings.
+    var showsFoot = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -38,7 +40,7 @@ struct SquareSidebar<Page: Hashable>: View {
                 }
             }
             Spacer(minLength: 0)
-            foot
+            if showsFoot { foot }
         }
         .frame(width: SquareSidebarLayout.width)
         .frame(maxHeight: .infinity, alignment: .top)

@@ -34,6 +34,7 @@ final class Pipeline {
 
     private init() {
         shortcuts.onEvent = { [weak self] event in self?.handle(event) }
+        SquareShortcutRecorder.listeningChanged = { [weak self] listening in self?.shortcuts.pauseHotKeys(listening) }
         capture.onLevel = { [weak self] level in
             Task { @MainActor in self?.overlay.setLevel(level) }
         }
@@ -71,7 +72,7 @@ final class Pipeline {
         if settings.postProcessingEnabled, settings.screenContextEnabled { Task.detached { await ScreenContext.prewarm() } }
         // Loading the model takes seconds; done here, the first dictation does not pay for it.
         if ModelStore.isInstalled { Task { await Transcriber.shared.preload() } }
-        MeetingCoordinator.shared.start()
+        if Sandbox.hasMeetings { MeetingCoordinator.shared.start() }
         if !Sandbox.isActive {
             CameraFeed.shared.start()
             // Where the camera stands, for its settings row; after an update, a newer camera replaces the old one.
@@ -137,6 +138,7 @@ final class Pipeline {
             AppDelegate.shared?.showUpgrade()
             return
         }
+        MissingPermission.refreshMicrophone()
         generation += 1
         phase = .recording
         pinned = false
@@ -299,8 +301,10 @@ final class Pipeline {
         var finalText = matched.text
         var postProcessed: String?
         var postProcessMs: Int?
+        var modelState: String?
 
         if requested {
+            modelState = PostProcessor.state
             phase = .cleaningUp
             shortcuts.setPhase(.cleaningUp)
             overlay.show(.cleaningUp)
@@ -346,7 +350,8 @@ final class Pipeline {
         guard gen == generation else { return }
 
         let entry = HistoryEntry(
-            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested, typed: typed,
+            id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested,
+            modelState: modelState, styles: WritingStyle.allCases.filter(styles.contains), typed: typed,
             durationMs: durationMs, transcribeMs: transcribeMs, postProcessMs: postProcessMs, appId: target?.appId, appName: target?.appName, windowTitle: target?.windowTitle,
             dictionaryFixes: matched.fixes, recordingFile: recordingFile)
         store.append(entry, limit: settings.historyLimit)
@@ -429,19 +434,12 @@ final class Pipeline {
         guard phase == .idle, overlay.model.state == .hidden else { return false }
         overlay.show(state)
         toastTask?.cancel()
-        // A ready update stays up until it is installed or put off; the
-        // buttons are the only way it leaves.
-        if case .updateReady = state { return true }
+        // A standing toast, such as a ready update, stays up until one of
+        // its buttons answers it.
+        guard !state.isStanding else { return true }
         toastTask = Task { [weak self] in
-            var remaining = ToastTiming.timeout
-            let step: Duration = .milliseconds(100)
-            let deadline = ContinuousClock.now + ToastTiming.safetyHide
-            while remaining > .zero, ContinuousClock.now < deadline {
-                try? await Task.sleep(for: step)
-                guard !Task.isCancelled, let self else { return }
-                if !self.overlay.model.toastPaused { remaining -= step }
-            }
-            guard !Task.isCancelled, let self, self.overlay.model.state == state else { return }
+            let ranOut = await ToastTiming.countDown(counting: { self?.overlay.model.isCounting(state) })
+            guard ranOut, let self, self.overlay.model.state == state else { return }
             self.overlay.hide()
         }
         return true

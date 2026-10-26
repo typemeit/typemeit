@@ -52,7 +52,7 @@ struct SquareWhenPicker: View {
             HStack(alignment: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     ForEach(SquareWhen.presets, id: \.self) { preset in
-                        SquareWhenPreset(label: preset.label, checked: preset == when) { when = preset }
+                        SquareMenuLine(item: SquareMenuList.Item(label: preset.label, checked: preset == when)) { when = preset }
                     }
                 }
                 .padding(.vertical, 6)
@@ -78,34 +78,6 @@ struct SquareWhenPicker: View {
             }
         }
         .fixedSize()
-    }
-}
-
-private struct SquareWhenPreset: View {
-    let label: String
-    let checked: Bool
-    let pick: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: pick) {
-            HStack(spacing: 10) {
-                Rectangle()
-                    .fill(checked ? DesignTokens.Colors.ink : .clear)
-                    .overlay(Rectangle().strokeBorder(checked ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
-                    .frame(width: 10, height: 10)
-                Text(label).font(Square.mono(Square.controlSize)).centredLetters(label)
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(DesignTokens.Colors.ink)
-            .padding(.horizontal, 12)
-            .frame(height: 28)
-            .background(Rectangle().fill(hovering ? DesignTokens.Colors.inkA08 : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityAddTraits(checked ? .isSelected : [])
     }
 }
 

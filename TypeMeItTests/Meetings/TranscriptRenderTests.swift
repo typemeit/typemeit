@@ -10,6 +10,12 @@ struct TranscriptRenderTests {
         #expect(TranscriptRender.timestamp(ms: 3_661_000) == "1:01:01")
     }
 
+    /// The player's clock: a part second still shows the second it is in.
+    @Test func timestampRoundsAPartSecondDown() {
+        #expect(TranscriptRender.timestamp(ms: 3_999) == "0:03")
+        #expect(TranscriptRender.timestamp(ms: 724_900) == "12:04")
+    }
+
     @Test func rendersTheExampleMeeting() {
         let expected = """
         ---
@@ -84,6 +90,35 @@ struct TranscriptRenderTests {
             Meeting.Question(atMs: 5_000, text: "Who is on call?", outcome: .dismissed),
         ]
         #expect(TranscriptRender.entries(meeting) == [.question(2), .paragraph(0), .question(1), .paragraph(1), .question(0)])
+    }
+
+    @Test func anAsideIsShownInsideTheTurnItWasSaidIn() {
+        var meeting = MeetingFixtures.example
+        meeting.paragraphs = [
+            Meeting.Paragraph(speaker: "them", startMs: 14_000, endMs: 17_000, text: "The deploy went out at noon."),
+            Meeting.Paragraph(speaker: "you", startMs: 17_200, endMs: 17_800, text: "Exactly.", aside: true),
+            Meeting.Paragraph(speaker: "them", startMs: 17_500, endMs: 19_000, text: "Then the export."),
+            Meeting.Paragraph(speaker: "you", startMs: 21_000, endMs: 22_000, text: "Shall we start?"),
+        ]
+        #expect(TranscriptRender.rows(meeting.paragraphs) == [[0, 1, 2], [3]])
+        #expect(TranscriptRender.paragraphs(meeting) == """
+        **Them** · 0:14
+        The deploy went out at noon. [You: Exactly.] Then the export.
+
+        **You** · 0:21
+        Shall we start?
+        """)
+        #expect(TranscriptRender.entries(meeting) == [.paragraph(0), .paragraph(3)])
+    }
+
+    @Test func anAsideMergedIntoTheTurnsOwnSpeakerReadsAsTheTurn() {
+        let paragraphs = [
+            Meeting.Paragraph(speaker: "them", startMs: 0, endMs: 3_000, text: "First."),
+            Meeting.Paragraph(speaker: "them", startMs: 3_100, endMs: 3_500, text: "Yes.", mergedFrom: "s2", aside: true),
+            Meeting.Paragraph(speaker: "them", startMs: 3_200, endMs: 5_000, text: "Second."),
+        ]
+        #expect(TranscriptRender.rows(paragraphs) == [[0, 1, 2]])
+        #expect(!TranscriptRender.bracketed(1, in: [0, 1, 2], of: paragraphs))
     }
 
     @Test func aQuestionKeptBeforeOutcomesWereIsAsked() throws {

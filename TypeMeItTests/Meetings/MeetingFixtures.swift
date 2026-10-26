@@ -4,6 +4,23 @@ import Foundation
 /// The example meeting from docs/meetings.md 7.9, as a Swift literal so
 /// codable and render tests share one source of truth.
 enum MeetingFixtures {
+    /// A finished meeting with only what a test spells out: no tracks, audio,
+    /// dictations or echo reading, so each fixture names the fields it is about.
+    static func meeting(
+        id: UUID = UUID(), kind: Meeting.Kind = .call, started: Date = Date(timeIntervalSince1970: 0), durationMs: Int = 0,
+        app: Meeting.App? = nil, title: String = "Meeting", speakers: [Meeting.Speaker], paragraphs: [Meeting.Paragraph]
+    ) -> Meeting {
+        Meeting(
+            id: id, kind: kind, started: started, timeZone: "UTC",
+            ended: started.addingTimeInterval(Double(durationMs) / 1000),
+            durationMs: durationMs, recordedMs: durationMs, firstHostTime: nil,
+            app: app, title: title, titleSource: .app, published: true,
+            tracks: [], audio: nil, echo: .notMeasured, bothSilentMs: 0,
+            dictations: [], speakers: speakers,
+            transcription: Meeting.Transcription(state: .done, error: nil, asr: "test", diarizer: nil, tookMs: 0, done: [:]),
+            paragraphs: paragraphs)
+    }
+
     static let example = Meeting(
         id: UUID(uuidString: "9F2C0000-0000-0000-0000-000000000000")!,
         kind: .call,
@@ -48,4 +65,20 @@ enum MeetingFixtures {
                 speaker: "them", startMs: 21_000, endMs: 30_000,
                 text: "Sure, give me a second to pull it up."),
         ])
+
+    /// `example` as another meeting: a new id, `title` (the app's name, as
+    /// a new meeting has), started `hoursAgo` before `example`, with
+    /// `summary`, in `folder`, on the call `call` in `app`.
+    static func meeting(_ title: String = example.title, hoursAgo: Double = 0, summary: String? = nil, folder: String? = nil,
+                        call: String? = nil, app: Meeting.App? = example.app) -> Meeting {
+        var m = example
+        m.id = UUID()
+        m.title = title
+        m.started = example.started.addingTimeInterval(-hoursAgo * 3600)
+        m.summary = summary
+        m.folder = folder
+        m.app = app
+        m.names = call.map { MeetingNames(source: .roster, roster: [], spans: [], call: $0) }
+        return m
+    }
 }
