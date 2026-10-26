@@ -24,6 +24,7 @@ SIDEBAR = (17, 17, 17)
 MAIN_X = (1250, 2600)
 COMPOSER_TOP = 836        # where generate.py expects the composer's top border
 BANNER_TOP = 836          # where a banner's top border would be
+WINDOW_BOTTOM = 1972      # the window's bottom border, which stays put
 LIST_PITCH, ROWS = 55, 9  # numbered rows
 BULLET = (136, 1489, 176, 1525)   # the tenth row's bullet, sidebar included
 BULLET_PITCH_FROM = 9             # rows above it that get a copy
@@ -46,8 +47,8 @@ def main(raw):
     if top > COMPOSER_TOP:
         # The banner, then the composer some way below: shift everything
         # from the composer down by that much, then blank what it uncovered.
-        below = rgb.crop((MAIN_X[0], top, MAIN_X[1], 2010))
-        rgb.paste(BG, (MAIN_X[0], COMPOSER_TOP, MAIN_X[1], 2010))
+        below = rgb.crop((MAIN_X[0], top, MAIN_X[1], WINDOW_BOTTOM))
+        rgb.paste(BG, (MAIN_X[0], COMPOSER_TOP, MAIN_X[1], WINDOW_BOTTOM))
         rgb.paste(below, (MAIN_X[0], COMPOSER_TOP))
     bullet = rgb.crop(BULLET)
     for i in range(ROWS):

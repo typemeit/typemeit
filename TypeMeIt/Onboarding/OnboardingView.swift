@@ -111,7 +111,7 @@ struct OnboardingView: View {
             }, missing: { !AXIsProcessTrusted() }, settings: SecureInput.accessibilitySettingsURL)
         case .globeKey:
             SquareRows {
-                SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings, the row below." : nil) {
+                SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings · the row below" : nil) {
                     if fnOK {
                         SquareStatus("do nothing", done: true)
                     } else if fnNeedsSettings {

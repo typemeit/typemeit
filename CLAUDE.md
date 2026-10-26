@@ -1,5 +1,18 @@
 # type me it
 
+## The repo is public: no personal data
+
+github.com/typemeit/typemeit is public since 2026-10-26. Everything pushed —
+code, tests, eval cases, screenshots, commit messages, branch names, PR titles,
+bodies and comments — is readable by anyone. None of it may hold personal data
+from dictations, meetings or accounts: people's names, emails, phone numbers,
+Meet codes, calendar or chat titles, transcript text, avatars. Use invented
+fixtures and describe a bug generically ("a Meet name with a bracketed
+nickname"). Screenshots of a real account are blanked before their first commit
+(see `scrub()` in `Scripts/store/*/generate.py`). Grep the staged diff for the
+real names you worked from before every commit; once pushed, removing it means
+recreating the repo.
+
 ## English only
 
 The app transcribes and cleans up English only; the speech model is English

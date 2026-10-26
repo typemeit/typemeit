@@ -107,7 +107,7 @@ struct AnswerPill: View {
                 .centredLowercase(size: 11)
         case .asking:
             if model.askOpens {
-                Button("open") { model.onOpenAsk?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                openButton
             }
         case .answered(let answer):
             Button { model.answerExpanded.toggle() } label: {
@@ -118,18 +118,22 @@ struct AnswerPill: View {
             .help(model.answerExpanded ? "fold answer" : "show answer")
             .accessibilityLabel(model.answerExpanded ? "fold answer" : "show answer")
             if model.askOpens {
-                Button("open") { model.onOpenAsk?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                openButton
             }
         }
+    }
+
+    private var openButton: some View {
+        Button { model.onOpenAsk?() } label: { SquareIcon("akar-link-out", size: 12) }
+            .buttonStyle(SquareIconButtonStyle())
+            .help("open")
+            .accessibilityLabel("open")
     }
 
     private func answerBody(_ answer: ClaudeRun.Answer) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                LinkText(markdown: answer.text, font: Square.appKitMono(12),
-                         color: NSColor(DesignTokens.Colors.onSlab).withAlphaComponent(answer.failed ? 0.7 : 0.92), lineSpacing: 4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                ClaudeMarkdown(reply: answer.text, font: Square.mono(12), colour: DesignTokens.Colors.onSlab.opacity(answer.failed ? 0.7 : 0.92))
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { answerHeight = $0 }
             }
             .scrollIndicators(.automatic)
@@ -139,9 +143,5 @@ struct AnswerPill: View {
         .padding(.trailing, 16)
         .padding(.top, 14)
         .padding(.bottom, 12)
-    }
-
-    static func rendered(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     }
 }

@@ -163,7 +163,12 @@ struct SettingsView: View {
 
     private func takeRequestedTab() {
         guard let requested = appState.settingsTab else { return }
-        tab = requested
+        if requested == .settings, let section = appState.revealSection {
+            open(section)
+            appState.revealSection = nil
+        } else {
+            tab = requested
+        }
         appState.settingsTab = nil
     }
 }
