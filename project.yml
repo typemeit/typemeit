@@ -191,6 +191,7 @@ targets:
     dependencies:
       - package: FluidAudio
         product: FluidAudio
+      - package: Textual
     info:
       path: TypeMeIt/Support/Info-Store.plist
       properties:
