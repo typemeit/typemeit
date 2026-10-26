@@ -1,28 +1,5 @@
 import SwiftUI
 
-/// A square inset list with an ink border and a mono title above it.
-struct SettingsGroup<Content: View>: View {
-    var title: String?
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let title {
-                Text(title.lowercased())
-                    .font(DesignTokens.Fonts.label.weight(.regular).monospaced())
-                    .foregroundStyle(DesignTokens.Colors.ink2)
-            }
-            VStack(spacing: 0) { content }
-                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
-        }
-    }
-}
-
-/// Full-width hairline between rows.
-struct RowRule: View {
-    var body: some View { Rectangle().fill(DesignTokens.Colors.inkA20).frame(height: DesignTokens.hairline) }
-}
-
 /// Wraps its children onto as many lines as needed.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6

@@ -54,9 +54,9 @@ struct InsightsTab: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(alignment: .top, spacing: 12) {
-                        statCard("words dictated", s.totalWords.formatted(), monthCaption(s))
+                        SquareStat(label: "words dictated", value: s.totalWords.formatted(), caption: monthCaption(s))
                         wpmCard(s)
-                        statCard("fixes", (s.dictionaryFixes + s.postProcessFixes).formatted(), fixCaption(s))
+                        SquareStat(label: "fixes", value: (s.dictionaryFixes + s.postProcessFixes).formatted(), caption: fixCaption(s))
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     // The where box sets the row's height, rounded up to whole app
@@ -64,25 +64,25 @@ struct InsightsTab: View {
                     // the first has above; the rest of the apps scroll.
                     let rowBox = appsBoxHeight(covering: whereHeight)
                     HStack(alignment: .top, spacing: 12) {
-                        SettingsGroup(title: "where") {
+                        SquareBox(title: "where") {
                             categories(s)
                                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { whereHeight = $0 }
                                 .frame(height: rowBox, alignment: .top)
                         }
                         .frame(maxWidth: .infinity)
-                        SettingsGroup(title: "apps · \(s.totalApps)") {
+                        SquareBox(title: "apps · \(s.totalApps)") {
                             ScrollView { topApps(s) }
                                 .scrollBounceBehavior(.basedOnSize)
                                 .frame(height: rowBox)
                         }
                         .frame(width: 330)
                     }
-                    SettingsGroup(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
+                    SquareBox(title: s.currentStreak > 0 ? "\(s.currentStreak) day streak · longest \(s.longestStreak)" : "streak · longest \(s.longestStreak)") {
                         calendar(s)
                     }
                     ColumnsOrStack {
-                        SettingsGroup(title: "length") { length(s) }
-                        SettingsGroup(title: "speed") { speed(s) }
+                        SquareBox(title: "length") { length(s) }
+                        SquareBox(title: "speed") { speed(s) }
                     }
                     meetings(m)
                 }
@@ -118,12 +118,12 @@ struct InsightsTab: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("meetings").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
             HStack(alignment: .top, spacing: 12) {
-                statCard("in meetings", m.meetings == 0 ? "–" : InsightsTab.span(m.totalMs),
-                         m.meetings == 0 ? empty : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
-                statCard("you talked", m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
-                         m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
-                statCard("typical meeting", m.medianMs.map { Meeting.durationLabel(.milliseconds($0)) } ?? "–",
-                         typicalCaption(m))
+                SquareStat(label: "in meetings", value: m.meetings == 0 ? "–" : InsightsTab.span(m.totalMs),
+                           caption: m.meetings == 0 ? empty : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
+                SquareStat(label: "you talked", value: m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
+                           caption: m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
+                SquareStat(label: "typical meeting", value: m.medianMs.map { Meeting.durationLabel(.milliseconds($0)) } ?? "–",
+                           caption: typicalCaption(m))
             }
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -166,7 +166,7 @@ struct InsightsTab: View {
         VStack(spacing: 0) {
             percentileHeader
             percentileRow("speech", s.audioMs, InsightsTab.duration)
-            RowRule()
+            SquareRule(color: DesignTokens.Colors.inkA20)
             percentileRow("words", s.wordsPerDictation, { $0.formatted() })
         }
     }
@@ -177,7 +177,7 @@ struct InsightsTab: View {
         VStack(spacing: 0) {
             percentileHeader
             percentileRow("speech", s.transcribeMs, InsightsTab.duration)
-            RowRule()
+            SquareRule(color: DesignTokens.Colors.inkA20)
             percentileRow("apple intelligence", s.cleanUpMs, InsightsTab.duration,
                           detail: s.cleanUpMs == nil ? "no clean-ups yet" : nil)
         }
@@ -213,17 +213,6 @@ struct InsightsTab: View {
         ms < 1000 ? "\(ms) ms" : String(format: "%.1f s", Double(ms) / 1000)
     }
 
-    private func statCard(_ label: String, _ value: String, _ caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
-            Text(value).font(Square.mono(26, weight: .medium))
-            Text(caption).font(Square.sans(11)).foregroundStyle(DesignTokens.Colors.ink2)
-        }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
-    }
-
     /// `2.5× faster than typing · 4.2 h saved`. The saving is left off when
     /// speaking came out slower, since there is none.
     private func wpmCaption(_ s: InsightsStats) -> String {
@@ -241,11 +230,7 @@ struct InsightsTab: View {
 
     private func wpmCard(_ s: InsightsStats) -> some View {
         let wpm = s.wordsPerMinute ?? 0
-        return VStack(alignment: .leading, spacing: 2) {
-            Text("words per minute").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
-            Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "–").font(Square.mono(26, weight: .medium))
-            Text(wpmCaption(s))
-                .font(Square.sans(11)).foregroundStyle(DesignTokens.Colors.ink2)
+        return SquareStat(label: "words per minute", value: wpm > 0 ? "\(Int(wpm.rounded()))" : "–", caption: wpmCaption(s)) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(DesignTokens.Colors.inkA08).frame(height: 6)
@@ -257,9 +242,6 @@ struct InsightsTab: View {
             .frame(height: 12).padding(.top, 8)
             HStack { Text("typing \(Int(Insights.typingWPM))"); Spacer(); Text("you \(Int(wpm.rounded()))") }.font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
     }
 
     private func categories(_ s: InsightsStats) -> some View {
