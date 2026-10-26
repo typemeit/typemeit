@@ -699,6 +699,126 @@
       "id": "inworld/stt-1 (eval reference)",
       "date": "2026-10-24",
       "role": "eval reference"
+    },
+    {
+      "id": "Qwen/Qwen3.8-Flash-Next",
+      "date": "2026-10-26",
+      "role": "clean-up"
+    },
+    {
+      "id": "arXiv:2609.12303 (Meta byte-level ~1B)",
+      "date": "2026-10-26",
+      "role": "clean-up"
+    },
+    {
+      "id": "Kayetic/Phonon-2.5-English-CoreML",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "selcukkubur/Phonon-2.5-English-mlx",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "oruk/oruk-loop-153M",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "holmns/parakeet-tdt-0.6b-v2-singlish",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "amit-ksh/ion-stt",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "YaItco/DLA-1-Conformer-CTC",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "futo-org/asr4all-l",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "futo-org/asr4all-m",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "futo-org/asr4all-s",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Musci-research/Musci-ASR-qwen-1019",
+      "date": "2026-10-26",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ihnatov-yuri/wespeaker-simam-resnet100-voxblink2-coreml",
+      "date": "2026-10-26",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "kenrunio/transcriber-speaker-onnx",
+      "date": "2026-10-26",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "speechbrain/spkrec-ecapa-voxceleb",
+      "date": "2026-10-26",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "Scicom-intl/Clearline-VAD",
+      "date": "2026-10-26",
+      "role": "vad"
+    },
+    {
+      "id": "Akiki-AI/akiki-vad-1.0",
+      "date": "2026-10-26",
+      "role": "vad"
+    },
+    {
+      "id": "suryatmodulus/telenow-pvad-v2",
+      "date": "2026-10-26",
+      "role": "vad"
+    },
+    {
+      "id": "GoutSIDE/E2E-SD",
+      "date": "2026-10-26",
+      "role": "diarization"
+    },
+    {
+      "id": "KRAFTON/Raon-1-mini-preview",
+      "date": "2026-10-26",
+      "role": "clean-up"
+    },
+    {
+      "id": "mlx-community/d1a-e2b-it-qat-4bit",
+      "date": "2026-10-26",
+      "role": "clean-up"
+    },
+    {
+      "id": "InternScience/Sage-A1.5",
+      "date": "2026-10-26",
+      "role": "meeting summaries"
+    },
+    {
+      "id": "Nanbeige/Nanbeige4.3-33B",
+      "date": "2026-10-26",
+      "role": "meeting summaries"
+    },
+    {
+      "id": "p99lab/audrey-0.7",
+      "date": "2026-10-26",
+      "role": "eval reference"
     }
   ]
 }
