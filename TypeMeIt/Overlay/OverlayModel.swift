@@ -22,6 +22,8 @@ final class OverlayModel {
         case updateReady(version: String)
         /// An update was found but its download failed; Sparkle retries on the next hourly check.
         case updateFailed(version: String)
+        /// The microphone would not start when a dictation began.
+        case micFailed
         /// A call is confirmed: record it? Stays until answered.
         case meetingPrompt(app: ProcessOwner.Owner)
         /// The tap delivered nothing for `Fixed.meetingSilentSeconds`.
@@ -97,7 +99,7 @@ final class OverlayModel {
         switch state {
         case .hidden: .none
         case .arming, .recording, .pinned, .transcribing, .cleaningUp: .cloud
-        case .copyPrompt, .learned, .undone, .updateReady, .updateFailed: .pill
+        case .copyPrompt, .learned, .undone, .updateReady, .updateFailed, .micFailed: .pill
         case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingHooksDone, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable, .claudeCheckFailed: .pill
         case .meetingQuestion, .meetingAsking, .meetingAnswer: .pill
         }
