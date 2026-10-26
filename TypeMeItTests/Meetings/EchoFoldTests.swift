@@ -6,7 +6,7 @@ struct EchoFoldTests {
     /// Words 500 ms apart, each 300 ms long, starting at `startMs`.
     private func words(_ texts: [String], startMs: Int, offsetMs: Int = 0) -> [Transcriber.Word] {
         texts.enumerated().map { i, text in
-            Transcriber.Word(text: text, confidence: 1, start: .milliseconds(startMs + i * 500 + offsetMs), end: .milliseconds(startMs + i * 500 + 300 + offsetMs))
+            .at(text, startMs + i * 500 + offsetMs, startMs + i * 500 + 300 + offsetMs)
         }
     }
 
@@ -62,13 +62,13 @@ struct EchoFoldTests {
     @Test func oneMispairedWordDoesNotMakeARunTheUsers() {
         // 25 September, 7:48: the mic's echo "so it's it's" paired its first
         // "it's" with the far end's, 140 ms ahead; "so" was 100 ms behind.
-        let mic = [
-            Transcriber.Word(text: "so", confidence: 1, start: .milliseconds(468_860), end: .milliseconds(469_000)),
-            Transcriber.Word(text: "it's", confidence: 1, start: .milliseconds(469_020), end: .milliseconds(469_160)),
+        let mic: [Transcriber.Word] = [
+            .at("so", 468_860, 469_000),
+            .at("it's", 469_020, 469_160),
         ]
-        let others = [
-            Transcriber.Word(text: "So", confidence: 1, start: .milliseconds(468_760), end: .milliseconds(468_900)),
-            Transcriber.Word(text: "it's", confidence: 1, start: .milliseconds(469_160), end: .milliseconds(469_300)),
+        let others: [Transcriber.Word] = [
+            .at("So", 468_760, 468_900),
+            .at("it's", 469_160, 469_300),
         ]
         let result = EchoFold.fold(mic: mic, others: others, micEnvelope: [], othersEnvelope: [], envelopeHz: 100)
         #expect(result == EchoFold.Result(mic: [], others: others, droppedFromMic: 2, droppedFromOthers: 0))
@@ -84,10 +84,10 @@ struct EchoFoldTests {
 
     @Test func aLeftoverWordOfTheFarEndIsEcho() {
         // The tracks heard "going to" and "gonna": no run, but the mic's level follows the far end.
-        let mic = [Transcriber.Word(text: "gonna", confidence: 1, start: .milliseconds(5000), end: .milliseconds(5300))]
-        let others = [
-            Transcriber.Word(text: "going", confidence: 1, start: .milliseconds(4950), end: .milliseconds(5100)),
-            Transcriber.Word(text: "to", confidence: 1, start: .milliseconds(5100), end: .milliseconds(5250)),
+        let mic: [Transcriber.Word] = [.at("gonna", 5000, 5300)]
+        let others: [Transcriber.Word] = [
+            .at("going", 4950, 5100),
+            .at("to", 5100, 5250),
         ]
         let (micEnvelope, othersEnvelope) = echoing(gain: 0.3)
         let result = EchoFold.fold(mic: mic, others: others, micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: 100)
@@ -95,16 +95,16 @@ struct EchoFoldTests {
     }
 
     @Test func aYeahThatSoundsLikeNothingTheFarEndSaidStays() {
-        let mic = [Transcriber.Word(text: "yeah", confidence: 1, start: .milliseconds(5000), end: .milliseconds(5200))]
-        let others = [Transcriber.Word(text: "today.", confidence: 1, start: .milliseconds(4700), end: .milliseconds(5100))]
+        let mic: [Transcriber.Word] = [.at("yeah", 5000, 5200)]
+        let others: [Transcriber.Word] = [.at("today.", 4700, 5100)]
         let (micEnvelope, othersEnvelope) = echoing(gain: 0.3)
         let result = EchoFold.fold(mic: mic, others: others, micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: 100)
         #expect(result.mic == mic)
     }
 
     @Test func aWordWhoseLevelDoesNotFollowTheFarEndStays() {
-        let mic = [Transcriber.Word(text: "gonna", confidence: 1, start: .milliseconds(5000), end: .milliseconds(5300))]
-        let others = [Transcriber.Word(text: "going", confidence: 1, start: .milliseconds(4950), end: .milliseconds(5100))]
+        let mic: [Transcriber.Word] = [.at("gonna", 5000, 5300)]
+        let others: [Transcriber.Word] = [.at("going", 4950, 5100)]
         let (_, othersEnvelope) = echoing(gain: 0.3)
         let micEnvelope = (0..<1000).map { Float(0.05 + 0.04 * sin(Double($0) * 2 * .pi / 7)) }
         let result = EchoFold.fold(mic: mic, others: others, micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: 100)

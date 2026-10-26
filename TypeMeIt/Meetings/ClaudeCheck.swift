@@ -81,7 +81,7 @@ final class ClaudeCheck {
 
     /// Nil when Claude Code is not installed or this build cannot run it.
     static var conditions: Conditions? {
-        guard ClaudeRun.isAvailable, let claude = ClaudeRun.executable else { return nil }
+        guard let claude = ClaudeRun.availableExecutable() else { return nil }
         let settings = Settings.shared
         return Conditions(claude: claude.resolvingSymlinksInPath().path, folder: settings.askClaudeFolder, model: settings.askClaudeModel,
                           permissionMode: settings.askClaudePermissionMode, tools: settings.askClaudeTools)
@@ -164,7 +164,7 @@ final class ClaudeCheck {
 
     /// Installs `version` with Claude Code's own installer, then checks it.
     func rollBack(to version: String) {
-        guard installing == nil, let claude = ClaudeRun.executable else { return }
+        guard installing == nil, let claude = ClaudeRun.availableExecutable() else { return }
         installing = version
         Task {
             let error = await Self.install(version, with: claude)

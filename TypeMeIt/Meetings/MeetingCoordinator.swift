@@ -926,15 +926,8 @@ final class MeetingCoordinator {
         overlay.showMeeting(state)
         guard !state.isStanding else { return }
         toastTask = Task { [weak self] in
-            var remaining = ToastTiming.timeout
-            let step: Duration = .milliseconds(100)
-            let deadline = ContinuousClock.now + ToastTiming.safetyHide
-            while remaining > .zero, ContinuousClock.now < deadline {
-                try? await Task.sleep(for: step)
-                guard !Task.isCancelled, let self else { return }
-                if self.overlay.model.state == state, !self.overlay.model.toastPaused { remaining -= step }
-            }
-            guard !Task.isCancelled, let self else { return }
+            let ranOut = await ToastTiming.countDown(counting: { self?.overlay.model.isCounting(state) })
+            guard ranOut, let self else { return }
             onTimeout?()
             self.overlay.hideMeeting(state)
         }
@@ -950,14 +943,8 @@ final class MeetingCoordinator {
         let state = OverlayModel.State.meetingTranscribeAsk(id: id)
         overlay.showMeeting(state)
         toastTask = Task { [weak self] in
-            var remaining = Duration.seconds(Fixed.meetingTranscribeAskSeconds)
-            let step: Duration = .milliseconds(100)
-            while remaining > .zero {
-                try? await Task.sleep(for: step)
-                guard !Task.isCancelled, let self else { return }
-                if self.overlay.model.state == state, !self.overlay.model.toastPaused { remaining -= step }
-            }
-            guard !Task.isCancelled, let self else { return }
+            let ranOut = await ToastTiming.countDown(.seconds(Fixed.meetingTranscribeAskSeconds), deadline: nil, counting: { self?.overlay.model.isCounting(state) })
+            guard ranOut, let self else { return }
             self.answerTranscribe(id, now: true)
         }
     }

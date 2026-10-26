@@ -6,7 +6,7 @@ import Foundation
 import SwiftUI
 
 /// The spikes in docs/meetings.md section 6, as launch arguments on the dev
-/// app. Each writes to the debug log and to `Store.directory/Meetings/probe/`,
+/// app. Each writes to the debug log and to `SupportPaths.meetingsRoot/probe/`,
 /// and goes once its pass/fail line in the spec is filled in.
 ///
 ///     -meetingProbe                         log every process object on every fire and every second (S1)
@@ -29,7 +29,7 @@ import SwiftUI
 ///     -dumpMeetingPages <meeting id>...     open each meeting's page in settings and write a window dump (WindowDump)
 @MainActor
 enum MeetingProbes {
-    nonisolated static let directory = Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent("probe", isDirectory: true)
+    nonisolated static let directory = SupportPaths.meetingsRoot.appendingPathComponent("probe", isDirectory: true)
 
     static func runIfAsked() {
         let args = CommandLine.arguments
@@ -314,7 +314,7 @@ enum MeetingProbes {
         Task { @MainActor in
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for (name, stage, expanded) in stages {
-                for dark in [false, true] {
+                await renderPNG(name, into: folder) {
                     // Through PillView, as the overlay shows it.
                     let model = OverlayModel()
                     model.answerExpanded = expanded
@@ -324,24 +324,7 @@ enum MeetingProbes {
                     case .asking: .meetingAsking(text: question)
                     case .answered(let answer): .meetingAnswer(text: question, answer: answer)
                     }
-                    let view = PillView(model: model)
-                        .padding(40)
-                        .background(dark ? Color(white: 0.086) : Color(white: 0.925))
-                        .environment(\.colorScheme, dark ? .dark : .light)
-                    let host = NSHostingView(rootView: view)
-                    let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 600, height: 500), styleMask: .borderless, backing: .buffered, defer: false)
-                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                    window.contentView = host
-                    window.orderFrontRegardless()
-                    try? await Task.sleep(for: .milliseconds(400))
-                    host.setFrameSize(host.fittingSize)
-                    window.setContentSize(host.fittingSize)
-                    try? await Task.sleep(for: .milliseconds(400))
-                    if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
-                        host.cacheDisplay(in: host.bounds, to: rep)
-                        try? rep.representation(using: .png, properties: [:])?.write(to: folder.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png"))
-                    }
-                    window.orderOut(nil)
+                    return PillView(model: model)
                 }
             }
             DebugLog.write("Answer pill rendered to \(folder.path)")
@@ -364,35 +347,44 @@ enum MeetingProbes {
         Task { @MainActor in
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for (name, pills) in stacks {
-                for dark in [false, true] {
-                    let view = VStack(spacing: 8) {
+                await renderPNG(name, into: folder) {
+                    VStack(spacing: 8) {
                         ForEach(Array(pills.enumerated()), id: \.offset) { _, pill in
                             let model = OverlayModel()
                             let _ = { model.answerExpanded = pill.2; model.askOpens = true }()
                             AnswerPill(model: model, question: pill.0, stage: pill.1)
                         }
                     }
-                    .padding(40)
-                    .background(dark ? Color(white: 0.086) : Color(white: 0.925))
-                    .environment(\.colorScheme, dark ? .dark : .light)
-                    let host = NSHostingView(rootView: view)
-                    let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 600, height: 500), styleMask: .borderless, backing: .buffered, defer: false)
-                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                    window.contentView = host
-                    window.orderFrontRegardless()
-                    try? await Task.sleep(for: .milliseconds(400))
-                    host.setFrameSize(host.fittingSize)
-                    window.setContentSize(host.fittingSize)
-                    try? await Task.sleep(for: .milliseconds(400))
-                    if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
-                        host.cacheDisplay(in: host.bounds, to: rep)
-                        try? rep.representation(using: .png, properties: [:])?.write(to: folder.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png"))
-                    }
-                    window.orderOut(nil)
                 }
             }
             DebugLog.write("Pill stack rendered to \(folder.path)")
             NSApp.terminate(nil)
+        }
+    }
+
+    /// Draws what `content` builds on the desk colour in an offscreen window,
+    /// light then dark, to `<name>-light.png` and `<name>-dark.png`. Built
+    /// once for each, so neither shares the other's state.
+    private static func renderPNG(_ name: String, into folder: URL, content: () -> some View) async {
+        for dark in [false, true] {
+            let view = content()
+                .padding(40)
+                .background(dark ? Color(white: 0.086) : Color(white: 0.925))
+                .environment(\.colorScheme, dark ? .dark : .light)
+            let host = NSHostingView(rootView: view)
+            let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 600, height: 500), styleMask: .borderless, backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+            window.contentView = host
+            window.orderFrontRegardless()
+            try? await Task.sleep(for: .milliseconds(400))
+            host.setFrameSize(host.fittingSize)
+            window.setContentSize(host.fittingSize)
+            try? await Task.sleep(for: .milliseconds(400))
+            if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: folder.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png"))
+            }
+            window.orderOut(nil)
         }
     }
 

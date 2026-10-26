@@ -13,7 +13,6 @@ struct MeetingPage: View {
     @State private var store = MeetingStore.shared
     @State private var coordinator = MeetingCoordinator.shared
     @State private var player = RecordingPlayer.shared
-    @State private var copied = false
     @State private var deleting = false
     @State private var renaming = false
     @State private var pausing = false
@@ -80,20 +79,8 @@ struct MeetingPage: View {
                     .overlay(alignment: .leading) { Rectangle().fill(DesignTokens.Colors.rule).frame(width: DesignTokens.hairline) }
             }
             .frame(maxHeight: .infinity)
-            if let urls = audioURLs {
-                MeetingPlayer(meeting: meeting, urls: urls)
-            } else {
-                Text("no audio kept")
-                    .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .top) { SquareRule() }
-            }
+            PageAudioFoot(id: meeting.id, urls: audioURLs, durationMs: meeting.durationMs)
         }
-        // Playback belongs to the page: leaving it stops it.
-        .onDisappear { if player.playing == meeting.id { player.stop() } }
         .onAppear {
             coordinator.summarise(meeting.id)
             if nameFirst { openNaming(SpeakerAssign.nextUnknown(after: nil, in: meeting)) }
@@ -106,18 +93,8 @@ struct MeetingPage: View {
     // MARK: Top
 
     private var topBar: some View {
-        HStack(spacing: 6) {
-            Button(action: back) {
-                Label {
-                    Text("meetings")
-                } icon: {
-                    SquareIcon("akar-chevron-down", size: 10).rotationEffect(.degrees(90))
-                }
-            }
-            .buttonStyle(SquareButtonStyle(kind: .quiet))
-            // Esc in a field gives up the edit, not the page.
-            .keyboardShortcut(renaming || naming != nil ? nil : .cancelAction)
-            Spacer(minLength: 0)
+        // Esc in a field gives up the edit, not the page.
+        PageTopBar(list: "meetings", backShortcut: renaming || naming != nil ? nil : .cancelAction, back: back) {
             if !hits.isEmpty || !query.isEmpty {
                 Text(hits.isEmpty ? "none" : "\(hit + 1)/\(hits.count)")
                     .font(Square.mono(11))
@@ -128,16 +105,8 @@ struct MeetingPage: View {
                         onSubmit: step, onCancel: { if find.isEmpty { back() } else { find = "" } })
                 .frame(width: 200)
                 .padding(.trailing, 4)
-            Button {
-                Output.copyToClipboard(meeting.transcriptText)
-                copied = true
-            } label: {
-                SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14)
-            }
-            .buttonStyle(SquareIconButtonStyle())
-            .disabled(meeting.paragraphs.isEmpty)
-            .help("copy the transcript")
-            .accessibilityLabel("copy the transcript")
+            PageCopyButton(help: "copy the transcript") { Output.copyToClipboard(meeting.transcriptText) }
+                .disabled(meeting.paragraphs.isEmpty)
             if meeting.isDone, !meeting.paragraphs.isEmpty, !live {
                 // The share menu under the button; the button can also be
                 // dragged, which drops the `.tmi` file into a message or a
@@ -184,11 +153,6 @@ struct MeetingPage: View {
                     .squarePopover(isPresented: $deleting) { deleteConfirm }
             }
         }
-        .padding(.top, 12)
-        .padding(.leading, 12)
-        .padding(.trailing, 16)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) { SquareRule() }
     }
 
     private var query: String { find.trimmingCharacters(in: .whitespaces) }
@@ -211,27 +175,20 @@ struct MeetingPage: View {
 
     /// While the audio is kept, it can go on its own and the transcript stay.
     private var deleteConfirm: some View {
-        let audio = audioURLs != nil
-        return SquareConfirm(title: "delete this meeting?",
-                             detail: audio ? "it has \(MeetingsTab.length(meeting.durationMs)) of audio." : nil,
-                             width: 300) {
-            Button("cancel") { deleting = false }.buttonStyle(SquareButtonStyle())
-            if audio {
-                Button("audio only") {
-                    if player.playing == meeting.id { player.stop() }
-                    store.deleteAudio(meeting.id)
-                    deleting = false
-                }
-                .buttonStyle(SquareButtonStyle())
-            }
-            Button(audio ? "everything" : "delete") {
-                if player.playing == meeting.id { player.stop() }
-                deleting = false
-                store.delete(ids: [meeting.id])
-                back()
-            }
-            .buttonStyle(SquareButtonStyle(kind: .primary))
-        }
+        SquareAudioDeleteConfirm(title: "delete this meeting?",
+                                 audio: audioURLs.map { _ in MeetingsTab.length(meeting.durationMs) },
+                                 cancel: { deleting = false },
+                                 deleteAudio: {
+                                     if player.playing == meeting.id { player.stop() }
+                                     store.deleteAudio(meeting.id)
+                                     deleting = false
+                                 },
+                                 deleteEverything: {
+                                     if player.playing == meeting.id { player.stop() }
+                                     deleting = false
+                                     store.delete(ids: [meeting.id])
+                                     back()
+                                 })
     }
 
     // MARK: Article
@@ -355,7 +312,8 @@ struct MeetingPage: View {
 
     /// How far its transcription has got, what it still needs, or its summary.
     @ViewBuilder private var state: some View {
-        if let run = coordinator.transcribing, run.id == meeting.id {
+        switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .transcribing(let run):
             HStack(spacing: 12) {
                 Text(pausing ? "pausing…" : run.progress.label)
                     .font(Square.mono(12))
@@ -375,17 +333,24 @@ struct MeetingPage: View {
                 }
             }
             .onChange(of: coordinator.transcribing?.id) { _, running in if running != meeting.id { pausing = false } }
-        } else if MeetingState.hasChips(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
+        case .queued:
+            Text(MeetingPhase.queuedLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .summarising:
+            Text(MeetingPhase.summarisingLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        case .needs:
             MeetingChips(meeting: meeting)
-        } else if let summary = meeting.summary, !summary.isEmpty {
-            Text(summary)
-                .font(Square.sans(15))
-                .lineSpacing(6)
-                .foregroundStyle(DesignTokens.Colors.ink)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else if coordinator.summarising.contains(meeting.id) {
-            Text("summarising…").font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
+        // The rail names unknown speakers here, so the summary shows over them.
+        case .unknownSpeakers, .summary:
+            if let summary = meeting.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(Square.sans(15))
+                    .lineSpacing(6)
+                    .foregroundStyle(DesignTokens.Colors.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .none:
+            EmptyView()
         }
     }
 
@@ -423,22 +388,7 @@ struct MeetingPage: View {
                 .help("show in finder")
             }
             SquareSubhead(text: "processing")
-            VStack(spacing: 0) {
-                ForEach(processing, id: \.key) { row in
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(row.key).foregroundStyle(DesignTokens.Colors.ink3)
-                        Spacer(minLength: 0)
-                        Text(row.value)
-                            .foregroundStyle(row.waiting ? DesignTokens.Colors.ink3 : DesignTokens.Colors.ink)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .font(Square.mono(11))
-                    .monospacedDigit()
-                    .padding(.vertical, 5)
-                    .overlay(alignment: .top) { SquareRule() }
-                }
-            }
-            .overlay(alignment: .bottom) { SquareRule() }
+            RailFacts(facts: processing)
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 22)
@@ -606,27 +556,28 @@ struct MeetingPage: View {
 
     /// What ran on the meeting and what it came to, from what the meeting
     /// records about itself.
-    private var processing: [(key: String, value: String, waiting: Bool)] {
+    private var processing: [RailFact] {
         let t = meeting.transcription
         let running = coordinator.transcribing?.id == meeting.id
-        var rows: [(key: String, value: String, waiting: Bool)] = []
+        var rows: [RailFact] = []
         if running, let run = coordinator.transcribing {
-            rows.append(("asr", "\(t.asr ?? ModelStore.version) · \(Int(run.fraction * 100))%", false))
+            rows.append(RailFact(key: "asr", value: "\(t.asr ?? ModelStore.version) · \(Int(run.fraction * 100))%"))
         } else {
-            rows.append(("asr", t.asr.map { MeetingPage.timed($0, t.asrMs) } ?? "none yet", t.asr == nil))
+            rows.append(RailFact(key: "asr", value: t.asr.map { MeetingPage.timed($0, t.asrMs) } ?? "none yet", waiting: t.asr == nil))
         }
         let stage = running ? coordinator.transcribing?.progress : nil
-        rows.append(("speakers", t.diarizer.map { MeetingPage.timed(DiarizerModelStore.label(of: $0), t.speakersMs) }
-            ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), t.diarizer == nil))
-        rows.append(("names from", MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"), MeetingPage.nameSource(meeting) == nil))
-        if meeting.kind == .call { rows.append(("echo", MeetingPage.echo(meeting.echo), meeting.echo == .notMeasured)) }
+        rows.append(RailFact(key: "speakers", value: t.diarizer.map { MeetingPage.timed(DiarizerModelStore.label(of: $0), t.speakersMs) }
+            ?? (stage == .findingSpeakers ? "finding" : meeting.isDone ? "none" : "waiting"), waiting: t.diarizer == nil))
+        rows.append(RailFact(key: "names from", value: MeetingPage.nameSource(meeting) ?? (meeting.isDone ? "none" : "waiting"),
+                             waiting: MeetingPage.nameSource(meeting) == nil))
+        if meeting.kind == .call { rows.append(RailFact(key: "echo", value: MeetingPage.echo(meeting.echo), waiting: meeting.echo == .notMeasured)) }
         if let took = t.tookMs, meeting.durationMs > 0 {
-            rows.append(("transcribed", "\(MeetingPage.seconds(took)) · \(timesFaster(audioMs: meeting.durationMs, tookMs: took))", false))
+            rows.append(RailFact(key: "transcribed", value: "\(lengthInSeconds(ms: took)) · \(timesFaster(audioMs: meeting.durationMs, tookMs: took))"))
         }
         let writing = coordinator.summarising.contains(meeting.id) || stage == .summarising
         let summary = meeting.summary.map { _ in MeetingPage.timed("apple intelligence", t.summaryMs) } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
-        rows.append(("summary", summary, meeting.summary == nil))
-        rows.append(("title", MeetingPage.titleSource(meeting.titleSource), false))
+        rows.append(RailFact(key: "summary", value: summary, waiting: meeting.summary == nil))
+        rows.append(RailFact(key: "title", value: MeetingPage.titleSource(meeting.titleSource)))
         return rows
     }
 
@@ -658,12 +609,7 @@ struct MeetingPage: View {
 
     /// What ran, and how long it took when the meeting recorded that.
     private static func timed(_ what: String, _ ms: Int?) -> String {
-        ms.map { "\(what) · \(seconds($0))" } ?? what
-    }
-
-    private static func seconds(_ ms: Int) -> String {
-        let s = Int((Double(ms) / 1000).rounded())
-        return s >= 60 ? String(format: "%dm %02ds", s / 60, s % 60) : "\(s)s"
+        ms.map { "\(what) · \(lengthInSeconds(ms: $0))" } ?? what
     }
 
     /// "~/…/Meetings/2026-09-24 11m pricing page review": home as ~, and
@@ -788,7 +734,7 @@ private struct MeetingTranscript: View {
 
     private func marked(_ text: String, paragraph: Int) -> AttributedString {
         var marked = AttributedString(text)
-        for range in TranscriptFind.ranges(of: find, in: text) {
+        for range in TextSearch.ranges(of: find, in: text) {
             guard let run = Range(range, in: marked) else { continue }
             if current == TranscriptFind.Hit(paragraph: paragraph, range: range) {
                 marked[run].backgroundColor = DesignTokens.Colors.slab
@@ -813,48 +759,6 @@ private struct MeetingTranscript: View {
         } else {
             text
         }
-    }
-}
-
-/// Play or pause on the slab, the scrubber, and the time over the length.
-private struct MeetingPlayer: View {
-    let meeting: Meeting
-    let urls: [URL]
-    @State private var player = RecordingPlayer.shared
-
-    var body: some View {
-        let loaded = player.playing == meeting.id
-        let running = loaded && !player.paused
-        let total = loaded ? player.duration : Double(meeting.durationMs) / 1000
-        // Ticks only while playing.
-        TimelineView(.animation(minimumInterval: 0.1, paused: !running)) { _ in
-            let at = loaded ? player.currentTime : 0
-            let seek = { (fraction: Double) in
-                if loaded { player.seek(to: fraction * total) } else { player.play(id: meeting.id, urls: urls, from: fraction * total) }
-            }
-            HStack(spacing: 18) {
-                Button {
-                    if running { player.pause() } else { player.play(id: meeting.id, urls: urls) }
-                } label: {
-                    SquareIcon(running ? "akar-pause" : "akar-play", size: 14)
-                }
-                .buttonStyle(SquarePlayButtonStyle())
-                .help(running ? "pause" : "play")
-                .accessibilityLabel(running ? "pause" : "play")
-                SquareScrubber(fraction: total > 0 ? at / total : 0, seek: seek)
-                HStack(spacing: 0) {
-                    Text(TranscriptRender.timestamp(ms: Int(at * 1000)))
-                    Text(" / \(TranscriptRender.timestamp(ms: Int(total * 1000)))").foregroundStyle(DesignTokens.Colors.ink3)
-                }
-                .font(Square.mono(12))
-                .monospacedDigit()
-            }
-        }
-        .padding(.top, 14)
-        .padding(.leading, 20)
-        .padding(.trailing, 24)
-        .padding(.bottom, 16)
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
     }
 }
 

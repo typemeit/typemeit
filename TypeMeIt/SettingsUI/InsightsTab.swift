@@ -30,12 +30,7 @@ struct InsightsTab: View {
     }
 
     private func stats(_ meetings: [Meeting]) -> InsightsStats {
-        Insights.compute(shownHistory.map {
-            InsightRow(timestamp: $0.timestamp, transcript: $0.transcript, postProcessed: $0.postProcessed,
-                       postProcessRequested: $0.postProcessRequested, durationMs: $0.durationMs,
-                       transcribeMs: $0.transcribeMs, postProcessMs: $0.postProcessMs,
-                       dictionaryFixes: $0.dictionaryFixes, appId: $0.appId, appName: $0.appName, windowTitle: $0.windowTitle)
-        }, meetings: meetings.filter { $0.isDone && $0.recordedHere }.map {
+        Insights.compute(shownHistory.map(InsightRow.init), meetings: meetings.filter { $0.isDone && $0.recordedHere }.map {
             InsightMeeting(started: $0.started, appId: $0.app?.bundleId, appName: $0.app?.name)
         })
     }
@@ -121,13 +116,13 @@ struct InsightsTab: View {
     /// Time in meetings, your share of the talk on calls, and how long one runs.
     private func meetings(_ m: MeetingStats) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("meetings").font(DesignTokens.Fonts.label.weight(.regular).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+            Text("meetings").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
             HStack(alignment: .top, spacing: 12) {
                 statCard("in meetings", m.meetings == 0 ? "–" : InsightsTab.span(m.totalMs),
                          m.meetings == 0 ? empty : "\(counted(m.meetings, "meeting")) · \(InsightsTab.span(m.thisMonthMs)) this month")
                 statCard("you talked", m.callTalkMs == 0 ? "–" : "\(Int((Double(m.yourTalkMs) / Double(m.callTalkMs) * 100).rounded()))%",
                          m.callTalkMs == 0 ? "no calls yet" : "of the talk on calls · \(InsightsTab.span(m.yourTalkMs))")
-                statCard("typical meeting", m.medianMs.map { MeetingFolder.durationLabel(.milliseconds($0)) } ?? "–",
+                statCard("typical meeting", m.medianMs.map { Meeting.durationLabel(.milliseconds($0)) } ?? "–",
                          typicalCaption(m))
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -138,7 +133,7 @@ struct InsightsTab: View {
     private func typicalCaption(_ m: MeetingStats) -> String {
         guard let longest = m.longestMs else { return empty }
         let most = m.topApp.map { " · most on \($0.lowercased())" } ?? ""
-        return "longest \(MeetingFolder.durationLabel(.milliseconds(longest)))" + most
+        return "longest \(Meeting.durationLabel(.milliseconds(longest)))" + most
     }
 
     private func monthCaption(_ s: InsightsStats) -> String {
@@ -192,7 +187,7 @@ struct InsightsTab: View {
         HStack(spacing: 12) {
             Spacer()
             ForEach(InsightsTab.percentileColumns, id: \.name) { column in
-                Text(column.name).font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                Text(column.name).font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
                     .frame(width: InsightsTab.percentileColumnWidth, alignment: .trailing)
             }
         }
@@ -201,12 +196,12 @@ struct InsightsTab: View {
 
     private func percentileRow(_ label: String, _ value: Percentiles?, _ format: @escaping (Int) -> String, detail: String? = nil) -> some View {
         HStack(spacing: 12) {
-            Text(label).font(.system(size: 12)).fixedSize()
+            Text(label).font(Square.sans(12)).fixedSize()
             Spacer()
-            if let detail { Text(detail).font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink3).fixedSize() }
+            if let detail { Text(detail).font(Square.sans(11)).foregroundStyle(DesignTokens.Colors.ink3).fixedSize() }
             ForEach(InsightsTab.percentileColumns, id: \.name) { column in
                 Text(value.map { format($0[keyPath: column.value]) } ?? "–")
-                    .font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    .font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
                     .frame(width: InsightsTab.percentileColumnWidth, alignment: .trailing)
             }
         }
@@ -220,9 +215,9 @@ struct InsightsTab: View {
 
     private func statCard(_ label: String, _ value: String, _ caption: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-            Text(value).font(.system(size: 26, weight: .medium, design: .monospaced))
-            Text(caption).font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
+            Text(label).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+            Text(value).font(Square.mono(26, weight: .medium))
+            Text(caption).font(Square.sans(11)).foregroundStyle(DesignTokens.Colors.ink2)
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -247,10 +242,10 @@ struct InsightsTab: View {
     private func wpmCard(_ s: InsightsStats) -> some View {
         let wpm = s.wordsPerMinute ?? 0
         return VStack(alignment: .leading, spacing: 2) {
-            Text("words per minute").font(.system(size: 11).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-            Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "–").font(.system(size: 26, weight: .medium, design: .monospaced))
+            Text("words per minute").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+            Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "–").font(Square.mono(26, weight: .medium))
             Text(wpmCaption(s))
-                .font(.system(size: 11)).foregroundStyle(DesignTokens.Colors.ink2)
+                .font(Square.sans(11)).foregroundStyle(DesignTokens.Colors.ink2)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(DesignTokens.Colors.inkA08).frame(height: 6)
@@ -260,7 +255,7 @@ struct InsightsTab: View {
                 }
             }
             .frame(height: 12).padding(.top, 8)
-            HStack { Text("typing \(Int(Insights.typingWPM))"); Spacer(); Text("you \(Int(wpm.rounded()))") }.font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+            HStack { Text("typing \(Int(Insights.typingWPM))"); Spacer(); Text("you \(Int(wpm.rounded()))") }.font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -271,7 +266,7 @@ struct InsightsTab: View {
         let total = max(1, s.categories.reduce(0) { $0 + $1.dictations })
         return VStack(alignment: .leading, spacing: 10) {
             if s.categories.isEmpty {
-                Text(empty).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2)
+                Text(empty).font(Square.sans(12)).foregroundStyle(DesignTokens.Colors.ink2)
             } else {
                 GeometryReader { geo in
                     let shown = s.categories.filter { $0.dictations > 0 }
@@ -292,9 +287,9 @@ struct InsightsTab: View {
                     ForEach(Array(s.categories.enumerated()), id: \.element.category) { i, c in
                         HStack(spacing: 6) {
                             Rectangle().fill(InsightsTab.tone(i)).frame(width: 8, height: 8)
-                            Text(c.category.displayName.lowercased()).font(.system(size: 12))
+                            Text(c.category.displayName.lowercased()).font(Square.sans(12))
                             Spacer()
-                            Text("\(Int((Double(c.dictations) / Double(total) * 100).rounded()))%").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                            Text("\(Int((Double(c.dictations) / Double(total) * 100).rounded()))%").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
                         }
                     }
                 }
@@ -316,13 +311,13 @@ struct InsightsTab: View {
 
     private func topApps(_ s: InsightsStats) -> some View {
         VStack(spacing: 0) {
-            if s.topApps.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(DesignTokens.Colors.ink2).frame(height: InsightsTab.appRowHeight) }
+            if s.topApps.isEmpty { Text(empty).font(Square.sans(12)).foregroundStyle(DesignTokens.Colors.ink2).frame(height: InsightsTab.appRowHeight) }
             ForEach(s.topApps, id: \.name) { a in
                 HStack(spacing: 10) {
-                    Text(a.name.lowercased()).font(.system(size: 12)).lineLimit(1)
+                    Text(a.name.lowercased()).font(Square.sans(12)).lineLimit(1)
                     Spacer()
-                    Text(a.words > 0 ? counted(a.words, "word") : "").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
-                    Text(a.meetings > 0 ? counted(a.meetings, "meeting") : "").font(.system(size: 12).monospaced()).foregroundStyle(DesignTokens.Colors.ink2)
+                    Text(a.words > 0 ? counted(a.words, "word") : "").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
+                    Text(a.meetings > 0 ? counted(a.meetings, "meeting") : "").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(width: InsightsTab.meetingsColumnWidth, alignment: .trailing)
                 }
                 .frame(height: InsightsTab.appRowHeight)
@@ -369,12 +364,12 @@ struct InsightsTab: View {
             Spacer()
             if let shown = selectedDay {
                 Text(InsightsTab.dayCaption(shown, byDate[shown]))
-                    .font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                    .font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
             } else {
                 HStack(spacing: 4) {
-                    Text("less").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                    Text("less").font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
                     ForEach([0.08, 0.3, 0.55, 0.8, 1.0], id: \.self) { o in Rectangle().fill(DesignTokens.Colors.ink.opacity(o)).frame(width: 9, height: 9) }
-                    Text("more").font(.system(size: 10).monospaced()).foregroundStyle(DesignTokens.Colors.ink3)
+                    Text("more").font(Square.mono(10)).foregroundStyle(DesignTokens.Colors.ink3)
                 }
             }
         }

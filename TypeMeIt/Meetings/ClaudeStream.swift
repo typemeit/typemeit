@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 
 /// Claude Code's `stream-json` output as a terminal would show it: the
 /// session starting, each tool it calls and what came back, its words, and
@@ -50,6 +49,18 @@ enum ClaudeStream {
         }
     }
 
+    /// `lines` with each result put in the earliest call still waiting for
+    /// one; a result with no call waiting is dropped.
+    static func filling(_ lines: [SquareClaudeLine], with results: [String]) -> [SquareClaudeLine] {
+        var filled = lines
+        for result in results {
+            guard let waiting = filled.firstIndex(where: { if case .call(_, nil) = $0 { true } else { false } }),
+                  case .call(let call, _) = filled[waiting] else { break }
+            filled[waiting] = .call(call, result: result)
+        }
+        return filled
+    }
+
     /// `mcp__typemeit__search_meetings` as `typemeit search_meetings`.
     static func toolName(_ name: String) -> String {
         guard name.hasPrefix("mcp__") else { return name }
@@ -67,81 +78,8 @@ enum ClaudeStream {
         }
         // typemeit's meeting tools open with a line telling Claude the meeting is data.
         let lines = text.split(whereSeparator: \.isNewline)
-        let shown = lines.first.map { String($0) } == Meeting.dataReminder ? lines.dropFirst() : lines[...]
+        let shown = lines.first.map { String($0) } == MeetingDataReminder.line ? lines.dropFirst() : lines[...]
         let oneLine = shown.joined(separator: " ")
         return oneLine.count > summaryLength ? String(oneLine.prefix(summaryLength)) + "…" : oneLine
-    }
-}
-
-/// What each Claude Code run is printing, by an id its page knows (the
-/// dictation that asked, the hook run), and how to stop it. Kept until the
-/// app quits; `ClaudeRunOutput` shows it.
-@MainActor
-@Observable
-final class ClaudeLive {
-    static let shared = ClaudeLive()
-
-    struct Run {
-        let prompt: String
-        let started = Date()
-        var lines: [SquareClaudeLine] = []
-        var model: String?
-        var sessionID: String?
-        var seconds: Int?
-        var failed = false
-    }
-
-    private(set) var runs: [UUID: Run] = [:]
-    private(set) var running: Set<UUID> = []
-    @ObservationIgnored private var cancels: [UUID: @MainActor () -> Void] = [:]
-
-    /// Streams `run`'s output under `id` until `finish`; `cancel` is what
-    /// stop does while it runs.
-    func start(_ id: UUID, prompt: String, run: ClaudeRun, cancel: @escaping @MainActor () -> Void) {
-        runs[id] = Run(prompt: prompt)
-        running.insert(id)
-        cancels[id] = cancel
-        run.onLine = { line in
-            guard let event = ClaudeStream.event(for: line) else { return }
-            Task { @MainActor in ClaudeLive.shared.apply(event, to: id) }
-        }
-    }
-
-    func apply(_ event: ClaudeStream.Event, to id: UUID) {
-        guard var run = runs[id] else { return }
-        switch event {
-        case .started(let model, let sessionID):
-            run.model = model
-            run.sessionID = sessionID
-        case .lines(let lines):
-            run.lines += lines
-        case .results(let results):
-            for result in results {
-                guard let waiting = run.lines.firstIndex(where: { if case .call(_, nil) = $0 { true } else { false } }),
-                      case .call(let call, _) = run.lines[waiting] else { break }
-                run.lines[waiting] = .call(call, result: result)
-            }
-        case .ended(let seconds, let failed):
-            run.seconds = seconds
-            run.failed = failed
-        }
-        runs[id] = run
-    }
-
-    /// The tools `id`'s run called, to keep with its answer; nil for none.
-    func calls(_ id: UUID) -> [Meeting.ToolCall]? {
-        let calls = runs[id]?.lines.compactMap { line -> Meeting.ToolCall? in
-            if case .call(let name, let result) = line { Meeting.ToolCall(name: name, result: result) } else { nil }
-        } ?? []
-        return calls.isEmpty ? nil : calls
-    }
-
-    func finish(_ id: UUID) {
-        running.remove(id)
-        cancels[id] = nil
-    }
-
-    func cancel(_ id: UUID) {
-        cancels[id]?()
     }
 }

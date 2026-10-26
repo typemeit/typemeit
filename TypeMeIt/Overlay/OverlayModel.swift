@@ -71,6 +71,10 @@ final class OverlayModel {
     var level: Float = 0
     var copied = false
     var toastPaused = false
+
+    /// Whether `toast`'s countdown runs: it is the one on screen and the
+    /// pointer is not resting on it.
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused }
     /// Whether the answer pill shows the answer or only its question.
     var answerExpanded = true
     /// When the cloud last arrived. Each dictation gets a new one, so the

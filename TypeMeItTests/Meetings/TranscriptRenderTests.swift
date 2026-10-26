@@ -10,6 +10,12 @@ struct TranscriptRenderTests {
         #expect(TranscriptRender.timestamp(ms: 3_661_000) == "1:01:01")
     }
 
+    /// The player's clock: a part second still shows the second it is in.
+    @Test func timestampRoundsAPartSecondDown() {
+        #expect(TranscriptRender.timestamp(ms: 3_999) == "0:03")
+        #expect(TranscriptRender.timestamp(ms: 724_900) == "12:04")
+    }
+
     @Test func rendersTheExampleMeeting() {
         let expected = """
         ---
