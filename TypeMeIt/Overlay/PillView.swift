@@ -126,6 +126,11 @@ struct PillView: View {
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
                 Button("settings") { model.onShowMeeting?(nil) }.buttonStyle(SquareButtonStyle())
             }
+        case .claudeCheckFailed:
+            SquarePrompt(mark: .icon("akar-triangle-alert"), message: Text("claude code check failed"), failed: true,
+                         dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
+                Button("settings") { model.onShowClaudeCheck?() }.buttonStyle(SquareButtonStyle())
+            }
         default:
             EmptyView()
         }

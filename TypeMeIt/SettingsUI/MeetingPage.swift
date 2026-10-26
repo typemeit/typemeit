@@ -233,9 +233,16 @@ struct MeetingPage: View {
     /// Claude answering a question asked in this meeting, live.
     @ViewBuilder private var asking: some View {
         if let asked = coordinator.askingIn, asked.meeting == meeting.id, let runID = asked.question.runID {
-            ClaudeRunOutput(id: runID)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 26)
+            Group {
+                // Transcribing or finding the question, which the prompt line names until Claude Code starts.
+                if coordinator.askPreparing {
+                    SquareClaudeThread(lines: [.prompt(asked.question.text)], status: .running, footer: "", stop: { coordinator.cancelAsk() })
+                } else {
+                    ClaudeRunOutput(id: runID)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 26)
         }
     }
 
@@ -253,7 +260,7 @@ struct MeetingPage: View {
                                 .font(Square.mono(11))
                                 .foregroundStyle(DesignTokens.Colors.ink3)
                         }
-                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID))
+                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID, calls: run.calls))
                     }
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -649,14 +656,20 @@ private struct MeetingTranscript: View {
         }
     }
 
+    /// The speaker and time column, and the gap before what was said.
+    private static let speakerWidth: CGFloat = 88
+    private static let speakerGap: CGFloat = 20
+    /// The space inside the box around Claude's reply.
+    private static let replyPadding: CGFloat = 14
+
     private func turn(_ i: Int, current: Int?) -> some View {
         let paragraph = meeting.paragraphs[i]
-        return HStack(alignment: .firstTextBaseline, spacing: 20) {
+        return HStack(alignment: .firstTextBaseline, spacing: Self.speakerGap) {
             VStack(alignment: .leading, spacing: 2) {
                 speaker(paragraph.speaker)
                 time(paragraph)
             }
-            .frame(width: 88, alignment: .leading)
+            .frame(width: Self.speakerWidth, alignment: .leading)
             Text(marked(paragraph.text, paragraph: i))
                 .font(Square.sans(14))
                 .lineSpacing(5)
@@ -668,41 +681,40 @@ private struct MeetingTranscript: View {
         .id(i)
     }
 
-    /// A question offered to Claude: when it was heard, and the answer, or
-    /// what the user did instead of asking.
+    /// A question offered to Claude, under the turn it was heard in: the
+    /// answer, or what the user did instead of asking.
     @ViewBuilder private func question(_ question: Meeting.Question?) -> some View {
         if let question {
-            HStack(alignment: .firstTextBaseline, spacing: 20) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("claude")
-                        .font(Square.mono(12, weight: .medium))
-                        .foregroundStyle(DesignTokens.Colors.ink2)
-                    Text(TranscriptRender.timestamp(ms: question.atMs))
-                        .font(Square.mono(11))
-                        .monospacedDigit()
+            VStack(alignment: .leading, spacing: 8) {
+                // As the dictation page heads its question.
+                HStack(spacing: 8) {
+                    SquareClaudeMark(size: 13)
+                    Text("claude").font(Square.mono(12, weight: .medium))
+                }
+                .foregroundStyle(DesignTokens.Colors.ink2)
+                if question.result != .asked || question.answer == nil && question.runID == nil {
+                    Text(question.text)
+                        .font(Square.mono(13))
+                        .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+                }
+                if question.result == .asked, let answer = question.answer {
+                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls))
+                } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
+                    ClaudeRunOutput(id: runID)
+                } else {
+                    Text(TranscriptRender.outcome(question.result))
+                        .font(Square.mono(12))
                         .foregroundStyle(DesignTokens.Colors.ink3)
                 }
-                .frame(width: 88, alignment: .leading)
-                VStack(alignment: .leading, spacing: 8) {
-                    if question.result != .asked || question.answer == nil && question.runID == nil {
-                        Text(question.text)
-                            .font(Square.mono(13))
-                            .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
-                    }
-                    if question.result == .asked, let answer = question.answer {
-                        ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID))
-                    } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
-                        ClaudeRunOutput(id: runID)
-                    } else {
-                        Text(TranscriptRender.outcome(question.result))
-                            .font(Square.mono(12))
-                            .foregroundStyle(DesignTokens.Colors.ink3)
-                    }
-                }
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 10)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // A reply to the turn: a box whose edge lines up with the turn's text.
+            .padding(Self.replyPadding)
+            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
+            .padding(.leading, Self.speakerWidth + Self.speakerGap)
+            .padding(.top, 4)
+            .padding(.bottom, 14)
         }
     }
 

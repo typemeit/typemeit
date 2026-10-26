@@ -43,10 +43,13 @@ final class MeetingCoordinator {
     private(set) var transcribing: Transcribing?
     /// The hook running now on each meeting whose hooks are running.
     private(set) var runningHooks: [UUID: RunningHook] = [:]
-    /// The question Claude is answering for a meeting, shown on its page.
     /// `transcribeSoFar` is running.
     private(set) var transcribingSoFar = false
+    /// The question Claude is answering for a meeting, shown on its page.
     private(set) var askingIn: (meeting: UUID, question: Meeting.Question)?
+    /// Ask is transcribing or finding its question, before Claude Code
+    /// starts on it; until then the question's text names the step.
+    private(set) var askPreparing = false
     /// The Claude Code run of each meeting's running hook, for its cancel.
     @ObservationIgnored private var hookRuns: [UUID: ClaudeRun] = [:]
     /// Meetings whose hooks were cancelled: the running one stops and the rest are skipped.
@@ -149,6 +152,7 @@ final class MeetingCoordinator {
         store.republishPending()
         if Settings.shared.meetingLearnVoices { store.learnVoices() }
         observeModel()
+        ClaudeCheck.shared.watch()
     }
 
     /// Meetings that waited for the speech model go when it lands.
@@ -188,6 +192,17 @@ final class MeetingCoordinator {
         model.onRunHooks = { [weak self] id in self?.dismissToast(); self?.runHooks(id) }
         Pipeline.shared.shortcuts.onReturn = { [weak self] in self?.askDictatedOnReturn() ?? false }
         model.onOpenAsk = { [weak self] in self?.openAsk() }
+        model.onShowClaudeCheck = { [weak self] in
+            self?.dismissToast()
+            AppState.shared.revealSection = .assistant
+            AppState.shared.settingsTab = .settings
+            NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil)
+        }
+        ClaudeCheck.shared.onUnaskedFailure = { [weak self] in
+            // An answer or prompt standing in the pill is left alone; settings shows the failure.
+            guard let self, !self.overlay.model.state.isStanding else { return }
+            self.toast(.claudeCheckFailed)
+        }
     }
 
     /// Opens the dictation that asked the last question, else its meeting,
@@ -801,6 +816,7 @@ final class MeetingCoordinator {
         guard runningHooks[id] == nil, var source = store.meeting(id), source.isDone else { return }
         let hooks = hooksToRun
         guard let first = hooks.first else { return }
+        ClaudeCheck.shared.recheckIfStale()
         runningHooks[id] = RunningHook(runID: UUID(), name: first.name)
         cancelledHooks.remove(id)
         // Earlier runs' output is not the meeting.
@@ -819,19 +835,21 @@ final class MeetingCoordinator {
                 let runID = UUID()
                 self.runningHooks[id] = RunningHook(runID: runID, name: hook.name)
                 var answer = ClaudeRun.Answer(text: "Claude Code isn't installed. Get it at claude.com/claude-code.", seconds: 0, costUSD: nil, failed: true)
+                var calls: [Meeting.ToolCall]?
                 if let run = ClaudeRun.hook(prompt: hook.prompt, transcript: transcript, folder: folder, model: model, allowedTools: tools,
                                             permissionMode: permissionMode, userSystemPrompt: userSystemPrompt) {
                     self.hookRuns[id] = run
                     ClaudeLive.shared.start(runID, prompt: hook.prompt, run: run) { [weak self] in self?.cancelHooks(id) }
                     answer = await run.answer()
                     ClaudeLive.shared.finish(runID)
+                    calls = ClaudeLive.shared.calls(runID)
                     self.hookRuns[id] = nil
                 }
                 if self.cancelledHooks.contains(id) {
                     answer = ClaudeRun.Answer(text: "Cancelled.", seconds: answer.seconds, costUSD: answer.costUSD, failed: true)
                 }
                 if answer.failed { failures += 1 }
-                self.keep(Meeting.HookRun(id: runID, name: hook.name, prompt: hook.prompt, ranAt: Date(), output: answer.text, failed: answer.failed, sessionID: answer.sessionID), in: id)
+                self.keep(Meeting.HookRun(id: runID, name: hook.name, prompt: hook.prompt, ranAt: Date(), output: answer.text, failed: answer.failed, sessionID: answer.sessionID, calls: calls), in: id)
             }
             guard let self else { return }
             self.runningHooks[id] = nil
@@ -1005,25 +1023,33 @@ final class MeetingCoordinator {
         toast(.meetingQuestion(text: question.text)) { [weak self] in self?.logAnswer(.ignored) }
     }
 
+    /// What the menu's ask shows in the pill and on the meeting page, in
+    /// turn, before the question it found.
+    private static let transcribingStep = "transcribing"
+    private static let findingStep = "finding question"
+
     /// The menu's ask: the whole transcript so far goes to Claude, which
     /// answers its latest question.
     func askLatestQuestion() {
-        askClaude("finding latest question…", prompt: "Answer the latest question in the transcript.")
+        askClaude(Self.findingStep, prompt: "Answer the latest question in the transcript.")
     }
 
     /// `prompt` is what Claude is told; by default, the question itself.
     private func askClaude(_ question: String, heardAt: TimeInterval? = nil, prompt: String? = nil) {
         // Asked while another answer is coming: the new one wins.
         if askRun != nil || self.asking != nil { cancelAsk() }
+        ClaudeCheck.shared.recheckIfStale()
         toastTask?.cancel()
-        var asking = OverlayModel.State.meetingAsking(text: question)
+        let shown = prompt != nil && recording != nil ? Self.transcribingStep : question
+        var asking = OverlayModel.State.meetingAsking(text: shown)
         overlay.showMeeting(asking)
         let dictationID = offered?.text == question ? offeredDictationID : nil
         let runID = UUID()
         if recording != nil || dictationID != nil {
             let heard = heardAt ?? (offered?.text == question ? offered?.start : nil) ?? secondsRecorded
-            self.asking = (Meeting.Question(atMs: meetingMs(heard), text: question, outcome: .asked, runID: runID), recording?.id, dictationID)
+            self.asking = (Meeting.Question(atMs: meetingMs(heard), text: shown, outcome: .asked, runID: runID), recording?.id, dictationID)
         }
+        askPreparing = true
         askingIn = self.asking.flatMap { asked in asked.meeting.map { ($0, asked.question) } }
         openTarget = self.asking.map { ($0.meeting, $0.dictation) }
         askOpened = false
@@ -1037,23 +1063,29 @@ final class MeetingCoordinator {
             let transcript = await self?.transcribeSoFar().map(TranscriptRender.markdown)
             // Cancelled while the transcript was gathered.
             guard let self, self.askOpened || self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking else { return }
+            // The page shows the new text, and the pill too while it is up.
+            let show = { (text: String) in
+                self.asking?.question.text = text
+                self.askingIn?.question.text = text
+                if !self.askOpened, self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking {
+                    asking = .meetingAsking(text: text)
+                    self.overlay.showMeeting(asking)
+                }
+            }
             // The menu's ask names no question: Haiku finds it in the transcript.
             var question = question
             var prompt = prompt
-            if prompt != nil, let transcript, let extract = ClaudeRun.latestQuestion(in: transcript) {
-                self.askRun = extract
-                let found = await extract.answer()
-                guard self.askRun === extract else { return }
-                let text = found.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !found.failed, !text.isEmpty {
-                    question = text
-                    prompt = nil
-                    self.asking?.question.text = text
-                    self.askingIn?.question.text = text
-                    // Still up, the pill swaps "finding latest question…" for the question.
-                    if !self.askOpened, self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking {
-                        asking = .meetingAsking(text: text)
-                        self.overlay.showMeeting(asking)
+            if prompt != nil {
+                show(Self.findingStep)
+                if let transcript, let extract = ClaudeRun.latestQuestion(in: transcript) {
+                    self.askRun = extract
+                    let found = await extract.answer()
+                    guard self.askRun === extract else { return }
+                    let text = found.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !found.failed, !text.isEmpty {
+                        question = text
+                        prompt = nil
+                        show(text)
                     }
                 }
             }
@@ -1064,6 +1096,7 @@ final class MeetingCoordinator {
                 return
             }
             self.askRun = run
+            self.askPreparing = false
             let liveID = dictationID ?? runID
             ClaudeLive.shared.start(liveID, prompt: question, run: run) { [weak self] in self?.cancelAsk() }
             let answer = await run.answer()
@@ -1071,7 +1104,7 @@ final class MeetingCoordinator {
             // Cancelled: the pill is already down and the run let go.
             guard self.askRun === run else { return }
             self.askRun = nil
-            self.showAnswer(question, answer, replacing: asking)
+            self.showAnswer(question, answer, calls: ClaudeLive.shared.calls(liveID), replacing: asking)
         }
     }
 
@@ -1147,24 +1180,27 @@ final class MeetingCoordinator {
     }
 
     /// Opens the answer in the pill that asked, or parks it behind the cloud.
-    private func showAnswer(_ question: String, _ answer: ClaudeRun.Answer, replacing asking: OverlayModel.State) {
+    private func showAnswer(_ question: String, _ answer: ClaudeRun.Answer, calls: [Meeting.ToolCall]? = nil, replacing asking: OverlayModel.State) {
         if var kept = self.asking {
             self.asking = nil
             kept.question.answer = answer.text
             kept.question.sessionID = answer.sessionID
+            kept.question.calls = calls
             keep(kept.question, meeting: kept.meeting, dictation: kept.dictation)
         }
         askingIn = nil
+        askPreparing = false
         guard !askOpened else { return }
         if overlay.model.pendingMeeting == asking { overlay.model.pendingMeeting = nil }
         overlay.model.answerExpanded = true
         overlay.showMeeting(.meetingAnswer(text: question, answer: answer))
     }
 
-    private func cancelAsk() {
+    func cancelAsk() {
         askRun?.cancel()
         askRun = nil
         askingIn = nil
+        askPreparing = false
         if var kept = asking {
             asking = nil
             kept.question.outcome = .cancelled
