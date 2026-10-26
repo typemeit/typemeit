@@ -7,13 +7,22 @@ private let rows = (0..<8).map { _ in UUID() }
 
 private func click(_ index: Int, extending: Bool = false, anchor: Int? = nil,
                    selected: [Int] = []) -> Set<Int> {
-    let out = HistorySelection.clicked(rows[index], extending: extending,
-                                       anchor: anchor.map { rows[$0] }, in: rows,
-                                       selected: Set(selected.map { rows[$0] }))
-    return Set(out.map { rows.firstIndex(of: $0)! })
+    var selection = ListSelection(picked: Set(selected.map { rows[$0] }), anchor: anchor.map { rows[$0] })
+    selection.click(rows[index], extending: extending, in: rows)
+    return Set(selection.picked.map { rows.firstIndex(of: $0)! })
 }
 
-final class HistorySelectionTests: XCTestCase {
+final class ListSelectionTests: XCTestCase {
+    /// The box clicked is what the next shift-click measures from.
+    func testAClickMovesTheAnchorToItsRow() {
+        var selection = ListSelection(picked: [rows[1]], anchor: rows[1])
+        selection.click(rows[4], extending: false, in: rows)
+        XCTAssertEqual(selection.anchor, rows[4])
+        selection.click(rows[6], extending: true, in: rows)
+        XCTAssertEqual(selection.picked, [rows[1], rows[4], rows[5], rows[6]])
+        XCTAssertEqual(selection.anchor, rows[6])
+    }
+
     func testPlainClickTurnsARowOnAndOffAgain() {
         XCTAssertEqual(click(3), [3])
         XCTAssertEqual(click(3, selected: [3]), [])
@@ -61,8 +70,9 @@ final class HistorySelectionTests: XCTestCase {
     /// so the click turns its own row on rather than reaching for a range.
     func testShiftWithAnAnchorThatIsNoLongerListedIsAPlainClick() {
         let gone = UUID()
-        let out = HistorySelection.clicked(rows[3], extending: true, anchor: gone, in: rows, selected: [])
-        XCTAssertEqual(out, [rows[3]])
+        var selection = ListSelection(anchor: gone)
+        selection.click(rows[3], extending: true, in: rows)
+        XCTAssertEqual(selection.picked, [rows[3]])
     }
 }
 

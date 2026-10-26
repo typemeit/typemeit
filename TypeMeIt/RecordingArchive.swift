@@ -6,7 +6,7 @@ import Foundation
 /// 16 kbps, 16 kHz mono: intelligible speech at roughly 120 KB a minute. A file
 /// is named after its history entry's id and goes when the entry does.
 enum RecordingArchive {
-    static let directory = Store.directory.appendingPathComponent("Recordings", isDirectory: true)
+    static let directory = SupportPaths.directory.appendingPathComponent("Recordings", isDirectory: true)
 
     private static let queue = DispatchQueue(label: "it.typeme.typemeit.recording-archive", qos: .utility)
 

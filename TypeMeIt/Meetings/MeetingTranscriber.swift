@@ -62,7 +62,7 @@ enum MeetingTranscriber {
                 let cuts = ChunkCutter.cuts(peaks: envelopes.peaks, frameMs: peakEnvelopeMs, maxChunkMs: Fixed.meetingChunkSeconds * 1000,
                                             overlapMs: Fixed.meetingChunkOverlapSeconds * 1000, searchMs: Fixed.meetingChunkSearchSeconds * 1000)
                 let scratch = folder.appendingPathComponent("words-\(track.role.rawValue).json")
-                var words = (try? Data(contentsOf: scratch)).flatMap { try? Meeting.decoder.decode(TrackWords.self, from: $0) } ?? TrackWords(role: speakerID(for: track.role), words: [])
+                var words = (try? Data(contentsOf: scratch)).flatMap { try? StoredJSON.decoder.decode(TrackWords.self, from: $0) } ?? TrackWords(role: speakerID(for: track.role), words: [])
                 let already = meeting.transcription.done[track.role.rawValue] ?? 0
                 let file = try AVAudioFile(forReading: url)
                 for (index, range) in cuts.enumerated() where index >= already {
@@ -80,7 +80,7 @@ enum MeetingTranscriber {
                     let longest = Duration.milliseconds(Fixed.meetingLongestWordMs)
                     let trimmed = transcribed.map { Transcriber.Word(text: $0.text, confidence: $0.confidence, start: $0.start, end: min($0.end, $0.start + longest)) }
                     words.words = ChunkStitch.append(trimmed, after: words.words, overlapMs: Fixed.meetingChunkOverlapSeconds * 1000)
-                    try Meeting.encoder.encode(words).write(to: scratch, options: .atomic)
+                    try StoredJSON.fileEncoder.encode(words).write(to: scratch, options: .atomic)
                     meeting.transcription.done[track.role.rawValue] = index + 1
                     doneChunks += 1
                     progress(.transcribing(Double(doneChunks) / Double(max(totalChunks, 1))))
@@ -88,7 +88,10 @@ enum MeetingTranscriber {
                 }
                 // The dictionary runs on the finished track, not per chunk, so
                 // a term heard across a chunk seam is still one run.
-                words.words = matched(words.words, terms: terms)
+                // On the main actor because `EnglishWord.isKnown` asks the
+                // spell checker.
+                let heard = words.words
+                words.words = await MainActor.run { matched(heard, terms: terms, isKnownWord: { word in MainActor.assumeIsolated { EnglishWord.isKnown(word) } }) }
                 trackWords.append(words)
             }
 
@@ -330,9 +333,9 @@ enum MeetingTranscriber {
     /// The user's dictionary applied as dictation applies it. A replaced
     /// run becomes one word spanning the run's time, as sure as its least
     /// sure word.
-    static func matched(_ words: [Transcriber.Word], terms: [CustomWordMatcher.Term]) -> [Transcriber.Word] {
+    static func matched(_ words: [Transcriber.Word], terms: [CustomWordMatcher.Term], isKnownWord: (String) -> Bool) -> [Transcriber.Word] {
         let matcherWords = words.map { CustomWordMatcher.Word(text: $0.text, confidence: $0.confidence.isNaN ? nil : $0.confidence) }
-        let outcome = CustomWordMatcher.apply(matcherWords, terms: terms)
+        let outcome = CustomWordMatcher.apply(matcherWords, terms: terms, isKnownWord: isKnownWord)
         guard outcome.fixes > 0 else { return words }
         return outcome.pieces.map { piece in
             let run = words[piece.source]
@@ -353,12 +356,10 @@ enum MeetingTranscriber {
         let file = try AVAudioFile(forReading: url)
         let rate = Int(file.processingFormat.sampleRate)
         let peakFrames = rate * peakEnvelopeMs / 1000
-        let rmsFrames = rate / rmsEnvelopeHz
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(rate)) else { return ([], []) }
         var peaks: [Float] = []
-        var rms: [Float] = []
+        var rms = EchoBleedDetector.RMSEnvelope(sampleRate: rate, hz: rmsEnvelopeHz)
         var peakAcc: Float = 0, peakCount = 0
-        var rmsAcc: Float = 0, rmsCount = 0
         while file.framePosition < file.length {
             try file.read(into: buffer, frameCount: AVAudioFrameCount(rate))
             let n = Int(buffer.frameLength)
@@ -366,14 +367,12 @@ enum MeetingTranscriber {
             for i in 0..<n {
                 let v = data[i]
                 peakAcc = max(peakAcc, abs(v)); peakCount += 1
-                rmsAcc += v * v; rmsCount += 1
+                rms.add(v)
                 if peakCount == peakFrames { peaks.append(peakAcc); peakAcc = 0; peakCount = 0 }
-                if rmsCount == rmsFrames { rms.append((rmsAcc / Float(rmsFrames)).squareRoot()); rmsAcc = 0; rmsCount = 0 }
             }
         }
         if peakCount > 0 { peaks.append(peakAcc) }
-        if rmsCount > 0 { rms.append((rmsAcc / Float(rmsCount)).squareRoot()) }
-        return (peaks, rms)
+        return (peaks, rms.envelope)
     }
 
     /// A chunk's samples, read a second at a time. One read of a whole

@@ -29,7 +29,7 @@ FRAMES='[{"x":0.12,"size":1900,"exp":0.3,"flow":0.3,"time":140,"dens":1.5},
 SQUARE='[{"x":0.5,"y":0.5,"size":4600,"exp":0.5,"trail":0.58,"flow":0.55,"time":205,"dens":1.5}]'
 quote() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$1"; }
 
-python3 Scripts/og/serve.py "$TMP" & SERVE=$!
+python3 Scripts/render-serve.py "$TMP" & SERVE=$!
 sleep 1
 
 # render <name> <w> <h> <frames>: the page posts <name>.png back to $TMP.

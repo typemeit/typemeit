@@ -68,6 +68,8 @@ final class AppState {
     var revealMeeting: UUID?
     /// A dictation the dictations tab should open when next shown.
     var revealDictation: UUID?
+    /// A settings group to open and scroll to, with `settingsTab` set to settings.
+    var revealSection: SettingsSection?
     /// Clicks on each sidebar page, counted so a page can go back to its
     /// whole list on every click, even one on the page already showing.
     var sidebarClicks: [SettingsTab: Int] = [:]

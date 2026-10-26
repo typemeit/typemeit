@@ -91,4 +91,13 @@ struct EchoBleedDetectorTests {
             #expect(abs(value - 0.5) < 1e-4)
         }
     }
+
+    @Test func aTrailingPartFrameIsTheRMSOfWhatItHolds() {
+        let sampleRate = 16_000
+        let samplesPerFrame = sampleRate / MeetingTranscriber.rmsEnvelopeHz
+        let pcm = [Float](repeating: 0.5, count: samplesPerFrame) + [Float](repeating: 0.25, count: samplesPerFrame / 2)
+        let envelope = EchoBleedDetector.rmsEnvelope(pcm, sampleRate: sampleRate, hz: MeetingTranscriber.rmsEnvelopeHz)
+
+        #expect(envelope == [0.5, 0.25])
+    }
 }

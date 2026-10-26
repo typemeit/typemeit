@@ -11,92 +11,45 @@ struct DictationPage: View {
     @State private var store = Store.shared
     @State private var player = RecordingPlayer.shared
     @State private var heardOpen = true
-    @State private var copied = false
     @State private var deleting = false
 
     private static let railWidth: CGFloat = 272
 
     var body: some View {
         VStack(spacing: 0) {
-            topBar
+            PageTopBar(list: "dictations", back: back) {
+                PageCopyButton(help: "copy") { Output.copyToClipboard(entry.displayText) }
+                Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
+                    .buttonStyle(SquareIconButtonStyle())
+                    .help("delete")
+                    .accessibilityLabel("delete")
+                    .squarePopover(isPresented: $deleting) { deleteConfirm }
+            }
             HStack(alignment: .top, spacing: 0) {
                 ScrollView { article }.frame(maxWidth: .infinity)
                 rail
             }
             .frame(maxHeight: .infinity)
-            if let file = entry.recordingFile {
-                DictationPlayer(entry: entry, url: RecordingArchive.url(for: file))
-            } else {
-                Text("no audio kept")
-                    .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .top) { SquareRule() }
-            }
+            PageAudioFoot(id: entry.id, urls: entry.recordingFile.map { [RecordingArchive.url(for: $0)] }, durationMs: entry.durationMs ?? 0)
         }
-        // Playback belongs to the page: leaving it stops it.
-        .onDisappear { if player.playing == entry.id { player.stop() } }
-    }
-
-    private var topBar: some View {
-        HStack(spacing: 6) {
-            Button(action: back) {
-                Label {
-                    Text("dictations")
-                } icon: {
-                    SquareIcon("akar-chevron-down", size: 10).rotationEffect(.degrees(90))
-                }
-            }
-            .buttonStyle(SquareButtonStyle(kind: .quiet))
-            .keyboardShortcut(.cancelAction)
-            Spacer(minLength: 0)
-            Button {
-                Output.copyToClipboard(entry.displayText)
-                copied = true
-            } label: {
-                SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14)
-            }
-            .buttonStyle(SquareIconButtonStyle())
-            .help("copy")
-            .accessibilityLabel("copy")
-            Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
-                .buttonStyle(SquareIconButtonStyle())
-                .help("delete")
-                .accessibilityLabel("delete")
-                .squarePopover(isPresented: $deleting) { deleteConfirm }
-        }
-        .padding(.top, 12)
-        .padding(.leading, 12)
-        .padding(.trailing, 16)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) { SquareRule() }
     }
 
     /// While the audio is kept, it can go on its own and the text stay.
     private var deleteConfirm: some View {
-        let audio = entry.recordingFile != nil
-        return SquareConfirm(title: "delete this dictation?",
-                             detail: audio ? "it has \(DictationPage.length(entry.durationMs ?? 0)) of audio." : nil,
-                             width: 300) {
-            Button("cancel") { deleting = false }.buttonStyle(SquareButtonStyle())
-            if audio {
-                Button("audio only") {
-                    if player.playing == entry.id { player.stop() }
-                    store.deleteAudio(id: entry.id)
-                    deleting = false
-                }
-                .buttonStyle(SquareButtonStyle())
-            }
-            Button(audio ? "everything" : "delete") {
-                if player.playing == entry.id { player.stop() }
-                deleting = false
-                store.delete(id: entry.id)
-                back()
-            }
-            .buttonStyle(SquareButtonStyle(kind: .primary))
-        }
+        SquareAudioDeleteConfirm(title: "delete this dictation?",
+                                 audio: entry.recordingFile.map { _ in lengthInSeconds(ms: entry.durationMs ?? 0) },
+                                 cancel: { deleting = false },
+                                 deleteAudio: {
+                                     if player.playing == entry.id { player.stop() }
+                                     store.deleteAudio(id: entry.id)
+                                     deleting = false
+                                 },
+                                 deleteEverything: {
+                                     if player.playing == entry.id { player.stop() }
+                                     deleting = false
+                                     store.delete(id: entry.id)
+                                     back()
+                                 })
     }
 
     private var article: some View {
@@ -138,7 +91,7 @@ struct DictationPage: View {
                 }
             }
             if let answer {
-                ClaudeRunOutput(id: entry.id, kept: .init(prompt: question.text, answer: answer, failed: false))
+                ClaudeRunOutput(id: entry.id, kept: .init(prompt: question.text, answer: answer, failed: false, calls: question.calls))
             } else if live.runs[entry.id] != nil {
                 ClaudeRunOutput(id: entry.id)
             } else {
@@ -193,20 +146,7 @@ struct DictationPage: View {
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink)
             SquareSubhead(text: "timings")
-            VStack(spacing: 0) {
-                ForEach(timings, id: \.key) { timing in
-                    HStack {
-                        Text(timing.key).foregroundStyle(DesignTokens.Colors.ink3)
-                        Spacer(minLength: 12)
-                        Text(timing.value).foregroundStyle(DesignTokens.Colors.ink)
-                    }
-                    .font(Square.mono(11))
-                    .monospacedDigit()
-                    .padding(.vertical, 6)
-                    .overlay(alignment: .top) { SquareRule() }
-                }
-            }
-            .overlay(alignment: .bottom) { SquareRule() }
+            RailFacts(facts: timings)
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 22)
@@ -228,138 +168,27 @@ struct DictationPage: View {
     }
 
     private var lengthLine: String {
-        let words = counted(HistoryTab.words(in: entry), "word")
+        let words = counted(entry.wordCount, "word")
         guard let ms = entry.durationMs else { return words }
-        return "\(DictationPage.length(ms)) · \(words)"
+        return "\(lengthInSeconds(ms: ms)) · \(words)"
     }
 
     /// The speech model's time and how many times faster than realtime it ran, clean-up's time and
     /// whether its text was used, and the two together.
-    private var timings: [(key: String, value: String)] {
+    private var timings: [RailFact] {
         let e = entry
-        var rows: [(key: String, value: String)] = [("asr", e.transcribeMs.map { "\($0)ms" } ?? "n/a")]
+        var rows = [RailFact(key: "asr", value: e.transcribeMs.map { "\($0)ms" } ?? "n/a")]
         if let ms = e.transcribeMs, let audio = e.durationMs, audio > 0 {
-            rows.append(("speed", timesFaster(audioMs: audio, tookMs: ms)))
+            rows.append(RailFact(key: "speed", value: timesFaster(audioMs: audio, tookMs: ms)))
         }
         if e.postProcessRequested {
             let outcome = e.postProcessMs == nil ? "" : (e.postProcessed == nil ? " →fallback" : " →applied")
-            rows.append(("llm", (e.postProcessMs.map { "\($0)ms" } ?? "n/a") + outcome))
+            rows.append(RailFact(key: "llm", value: (e.postProcessMs.map { "\($0)ms" } ?? "n/a") + outcome))
         } else {
-            rows.append(("llm", "off"))
+            rows.append(RailFact(key: "llm", value: "off"))
         }
-        rows.append(("total", e.transcribeMs.map { "\($0 + (e.postProcessMs ?? 0))ms" } ?? "n/a"))
+        rows.append(RailFact(key: "total", value: e.transcribeMs.map { "\($0 + (e.postProcessMs ?? 0))ms" } ?? "n/a"))
         return rows
-    }
-
-    /// "5s", or "1m 05s" past a minute.
-    static func length(_ ms: Int) -> String {
-        let seconds = Int((Double(ms) / 1000).rounded())
-        guard seconds >= 60 else { return "\(seconds)s" }
-        return String(format: "%dm %02ds", seconds / 60, seconds % 60)
-    }
-}
-
-/// Play or pause on the slab, where it is along a bar to click or drag, and
-/// the time over the length.
-private struct DictationPlayer: View {
-    let entry: HistoryEntry
-    let url: URL
-    @State private var player = RecordingPlayer.shared
-
-    var body: some View {
-        let loaded = player.playing == entry.id
-        let running = loaded && !player.paused
-        let total = loaded ? player.duration : Double(entry.durationMs ?? 0) / 1000
-        // Ticks only while playing: each tick lays the bar out again.
-        TimelineView(.animation(minimumInterval: 0.1, paused: !running)) { _ in
-            let at = loaded ? player.currentTime : 0
-            HStack(spacing: 18) {
-                Button {
-                    if running { player.pause() } else { player.play(id: entry.id, urls: [url]) }
-                } label: {
-                    SquareIcon(running ? "akar-pause" : "akar-play", size: 14)
-                }
-                .buttonStyle(SquarePlayButtonStyle())
-                .help(running ? "pause" : "play the audio")
-                .accessibilityLabel(running ? "pause" : "play the audio")
-                SquareScrubber(fraction: total > 0 ? at / total : 0) { fraction in
-                    if loaded { player.seek(to: fraction * total) } else { player.play(id: entry.id, urls: [url], from: fraction * total) }
-                }
-                HStack(spacing: 0) {
-                    Text(SquareScrubber.clock(at))
-                    Text(" / \(SquareScrubber.clock(total))").foregroundStyle(DesignTokens.Colors.ink3)
-                }
-                .font(Square.mono(12))
-                .monospacedDigit()
-            }
-        }
-        .padding(.top, 14)
-        .padding(.leading, 20)
-        .padding(.trailing, 24)
-        .padding(.bottom, 16)
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
-    }
-}
-
-/// The player's play button: a 34 pt square on the slab.
-struct SquarePlayButtonStyle: ButtonStyle {
-    static let side: CGFloat = 34
-
-    func makeBody(configuration: Configuration) -> some View {
-        SquarePlayButton(configuration: configuration)
-    }
-}
-
-/// Its fill fades under the pointer like every filled button's.
-private struct SquarePlayButton: View {
-    let configuration: ButtonStyleConfiguration
-    @State private var hovering = false
-
-    var body: some View {
-        configuration.label
-            .foregroundStyle(DesignTokens.Colors.onSlab)
-            .frame(width: SquarePlayButtonStyle.side, height: SquarePlayButtonStyle.side)
-            .background(SquareButtonStyle.fill(DesignTokens.Colors.slab, hot: hovering, down: configuration.isPressed))
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-    }
-}
-
-/// How far through the audio: ink along an ink-a04 bar. A click or a drag
-/// moves it, and the player is told once, when the pointer lifts.
-struct SquareScrubber: View {
-    let fraction: Double
-    let seek: (Double) -> Void
-    @State private var dragging: Double?
-
-    private static let height: CGFloat = 10
-
-    var body: some View {
-        GeometryReader { geo in
-            let shown = min(max(dragging ?? fraction, 0), 1)
-            Rectangle()
-                .fill(DesignTokens.Colors.inkA04)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * shown)
-                }
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { dragging = min(max($0.location.x / max(geo.size.width, 1), 0), 1) }
-                    .onEnded { _ in
-                        if let dragging { seek(dragging) }
-                        dragging = nil
-                    })
-        }
-        .frame(height: SquareScrubber.height)
-        .accessibilityElement()
-        .accessibilityLabel("position")
-        .accessibilityValue("\(Int(fraction * 100)) percent")
-    }
-
-    /// "0:03", "12:04", "1:02:10".
-    static func clock(_ seconds: TimeInterval) -> String {
-        let s = Int(seconds.rounded(.down))
-        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
 }
 

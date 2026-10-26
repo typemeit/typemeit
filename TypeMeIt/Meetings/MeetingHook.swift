@@ -12,4 +12,13 @@ struct MeetingHook: Codable, Identifiable, Equatable, Sendable {
     var prompt = ""
     /// Off, run hooks leaves it out.
     var on = true
+
+    /// The hooks kept in `defaults`; none when there are none or they can't be read.
+    static func stored(in defaults: UserDefaults) -> [MeetingHook] {
+        defaults.data(forKey: defaultsKey).flatMap { try? JSONDecoder().decode([MeetingHook].self, from: $0) } ?? []
+    }
+
+    static func store(_ hooks: [MeetingHook], in defaults: UserDefaults) {
+        defaults.set(try? JSONEncoder().encode(hooks), forKey: defaultsKey)
+    }
 }

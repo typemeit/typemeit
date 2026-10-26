@@ -22,27 +22,17 @@ enum ClaudeModels {
     }
 
     private static func read() -> [Model] {
-        guard let executable = ClaudeRun.executable else { return [] }
-        let process = Process()
-        process.executableURL = executable
         // Bare: no hooks, plugins or MCP servers are started just to list models.
-        process.arguments = ["-p", "--bare", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
-        process.environment = ClaudeRun.environment
-        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        let stdin = Pipe(), stdout = Pipe()
-        process.standardInput = stdin
-        process.standardOutput = stdout
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return [] }
-        stdin.fileHandleForWriting.write(Data((request + "\n").utf8))
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeoutSeconds) { if process.isRunning { process.terminate() } }
+        guard let claude = ClaudeRun.command(["-p", "--bare", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"],
+                                             timeoutSeconds: timeoutSeconds) else { return [] }
+        claude.input.write(Data((request + "\n").utf8))
         defer {
-            try? stdin.fileHandleForWriting.close()
-            if process.isRunning { process.terminate() }
+            try? claude.input.close()
+            if claude.process.isRunning { claude.process.terminate() }
         }
         var pending = Data()
         while true {
-            let read = stdout.fileHandleForReading.availableData
+            let read = claude.output.availableData
             guard !read.isEmpty else { break }
             pending.append(read)
             while let newline = pending.firstIndex(of: UInt8(ascii: "\n")) {
