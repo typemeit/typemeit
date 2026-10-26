@@ -71,9 +71,8 @@ struct OnePageSettings: View {
     @State private var claudeModels: [ClaudeModels.Model]?
     /// A new hook's name, typed before it is added.
     @State private var hookName = ""
-    /// The settings' Claude Code test run, shown under its row.
-    @State private var claudeTestID: UUID?
-    @State private var claudeTestResult: ClaudeRunOutput.Kept?
+    @State private var claudeCheck = ClaudeCheck.shared
+    @State private var checkDetailsOpen = false
     @State private var devices = AudioCapture.inputDevices()
     @State private var availability = PostProcessor.availability
     @State private var screenGranted = CGPreflightScreenCaptureAccess()
@@ -158,9 +157,9 @@ struct OnePageSettings: View {
                           blurb: "claude code answers questions you ask in a call or a dictation, and runs your hooks on a meeting once it ends, using your account and mcp servers. each one sends the call's transcript to anthropic.")
             if ClaudeRun.isAvailable {
                 SquareSettingsRow(label: "ask", help: OnePageSettings.askHelp) {
-                    toggle("ask", $settings.askClaude)
+                    toggle("ask", checkedOn(get: { settings.askClaude }, set: { settings.askClaude = $0 }))
                 }
-                if settings.askClaude { claudeRows }
+                if showsClaudeRows { claudeRows }
             } else if !Sandbox.isActive {
                 SquareSettingsRow(label: "ask", help: OnePageSettings.askHelp, caption: "needs claude code") {
                     HStack(spacing: 10) {
@@ -196,13 +195,71 @@ struct OnePageSettings: View {
         } below: {
             promptEditor($settings.askClaudeSystemPrompt)
         }
-        SquareSettingsRow(label: "test", help: "runs claude code once with these settings and shows its output · a failed hook or ask fails here too") {
-            Button("run") { testClaude() }
-                .buttonStyle(SquareButtonStyle())
-                .disabled(claudeTestID.map { ClaudeLive.shared.running.contains($0) } ?? false)
+        SquareSettingsRow(label: "claude code", help: "checks claude code runs the way ask and hooks need · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off · use installs the last version that worked, and claude code updates itself again unless DISABLE_AUTOUPDATER is 1 under env in ~/.claude/settings.json",
+                          caption: ClaudeCheck.caption(claudeCheck.status, lastPassed: claudeCheck.lastPassed)) {
+            if let rollback = claudeCheck.rollback {
+                Button("use \(rollback)") { claudeCheck.rollBack(to: rollback) }.buttonStyle(SquareButtonStyle(kind: .primary))
+            } else {
+                Button("check") { claudeCheck.run() }
+                    .buttonStyle(SquareButtonStyle())
+                    .disabled(checkBusy)
+            }
         } below: {
-            if let claudeTestID { ClaudeRunOutput(id: claudeTestID, kept: claudeTestResult) }
+            if case .failed = claudeCheck.status, !claudeCheck.runs.isEmpty { checkDetails }
         }
+        .onChange(of: ClaudeCheck.conditions) { _, _ in
+            if ClaudeCheck.inUse { claudeCheck.run() }
+        }
+    }
+
+    private var checkBusy: Bool {
+        switch claudeCheck.status {
+        case .checking, .installing: true
+        default: false
+        }
+    }
+
+    /// Where a failed check's runs went other than asked, and the runs themselves, folded.
+    private var checkDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button { checkDetailsOpen.toggle() } label: {
+                HStack(spacing: 6) {
+                    SquareIcon("akar-chevron-down", size: 9).rotationEffect(.degrees(checkDetailsOpen ? 0 : -90))
+                    Text("details").font(Square.mono(12))
+                }
+                .foregroundStyle(DesignTokens.Colors.ink3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if checkDetailsOpen {
+                if case .failed(_, let problems, _) = claudeCheck.status {
+                    ForEach(problems, id: \.self) { problem in
+                        Text(problem).font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
+                    }
+                }
+                ForEach(claudeCheck.runs, id: \.id) { run in
+                    ClaudeRunOutput(id: run.id, kept: run.answer.map { .init(prompt: run.prompt, answer: $0.text, failed: $0.failed, sessionID: $0.sessionID) })
+                }
+            }
+        }
+    }
+
+    /// Ask's rows, which hooks run with too, and the check's result while it runs or has failed.
+    private var showsClaudeRows: Bool {
+        guard !settings.askClaude, !settings.meetingHooks.contains(where: \.on) else { return true }
+        switch claudeCheck.status {
+        case .checking, .installing, .failed: return true
+        case .unchecked, .passed: return false
+        }
+    }
+
+    /// A switch for ask or a hook that checks Claude Code as it goes on, and
+    /// goes back off if the check fails.
+    private func checkedOn(get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> Binding<Bool> {
+        Binding(get: get, set: { on in
+            set(on)
+            if on { claudeCheck.ensure { passed in if !passed { set(false) } } }
+        })
     }
 
     /// Hooks, which only need Claude Code.
@@ -227,7 +284,7 @@ struct OnePageSettings: View {
                         .buttonStyle(SquareIconButtonStyle())
                         .help("remove")
                         .accessibilityLabel("remove \(hook.name)")
-                    toggle(hook.name, $hook.on)
+                    toggle(hook.name, hookSwitch(hook.id))
                 }
             } below: {
                 promptEditor($hook.prompt, placeholder: "what claude should do with the meeting")
@@ -553,8 +610,19 @@ struct OnePageSettings: View {
     private func addHook() {
         let name = hookName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        settings.meetingHooks.append(MeetingHook(name: name))
+        let hook = MeetingHook(name: name)
+        settings.meetingHooks.append(hook)
         hookName = ""
+        hookSwitch(hook.id).wrappedValue = true
+    }
+
+    /// A hook's switch, by id: the check that runs as it goes on can end after
+    /// the list has changed.
+    private func hookSwitch(_ id: UUID) -> Binding<Bool> {
+        checkedOn(get: { settings.meetingHooks.first { $0.id == id }?.on ?? false }, set: { on in
+            guard let index = settings.meetingHooks.firstIndex(where: { $0.id == id }) else { return }
+            settings.meetingHooks[index].on = on
+        })
     }
 
     private func toggle(_ label: String, _ isOn: Binding<Bool>) -> some View {
@@ -653,22 +721,6 @@ struct OnePageSettings: View {
         }
         if !offeredModels.contains(model) { return "doesn't run in auto mode" }
         return model.description.lowercased()
-    }
-
-    private func testClaude() {
-        let prompt = ClaudeRun.testPrompt
-        guard let run = ClaudeRun.test(folder: URL(fileURLWithPath: settings.askClaudeFolder, isDirectory: true), model: settings.askClaudeModel,
-                                       allowedTools: settings.askClaudeTools, permissionMode: settings.askClaudePermissionMode,
-                                       userSystemPrompt: settings.askClaudeSystemPrompt) else { return }
-        let id = UUID()
-        claudeTestID = id
-        claudeTestResult = nil
-        ClaudeLive.shared.start(id, prompt: prompt, run: run) { run.cancel() }
-        Task {
-            let answer = await run.answer()
-            ClaudeLive.shared.finish(id)
-            claudeTestResult = ClaudeRunOutput.Kept(prompt: prompt, answer: answer.text, failed: answer.failed, sessionID: answer.sessionID)
-        }
     }
 
     private var claudeFolderPath: String {

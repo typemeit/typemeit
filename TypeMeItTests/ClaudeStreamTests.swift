@@ -39,4 +39,22 @@ struct ClaudeStreamTests {
         #expect(ClaudeStream.event(for: #"{"type":"rate_limit_event"}"#) == nil)
         #expect(ClaudeStream.event(for: "not json") == nil)
     }
+
+    @Test func resultsFillTheCallsInTheOrderTheyWereMade() {
+        let lines: [SquareClaudeLine] = [.prompt("Who owns the deploy?"), .call("typemeit search_meetings deploy", result: "2 hits"),
+                                         .call("typemeit get_meeting a", result: nil), .text("Checking."), .call("typemeit get_meeting b", result: nil)]
+        #expect(ClaudeStream.filling(lines, with: ["title: Standup"])
+            == [.prompt("Who owns the deploy?"), .call("typemeit search_meetings deploy", result: "2 hits"),
+                .call("typemeit get_meeting a", result: "title: Standup"), .text("Checking."), .call("typemeit get_meeting b", result: nil)])
+    }
+
+    @Test func resultsWithNoCallWaitingAreDropped() {
+        let lines: [SquareClaudeLine] = [.call("typemeit get_meeting a", result: nil)]
+        #expect(ClaudeStream.filling(lines, with: ["first", "second"]) == [.call("typemeit get_meeting a", result: "first")])
+    }
+
+    @Test func onlyTheServerPrefixIsTakenOffAToolName() {
+        #expect(ClaudeStream.toolName("mcp__typemeit__get_meeting") == "typemeit get_meeting")
+        #expect(ClaudeStream.toolName("Read") == "Read")
+    }
 }

@@ -2,17 +2,6 @@ import Testing
 @testable import TypeMeIt
 
 struct RoomVoicesTests {
-    private func segment(_ speaker: String, _ start: Int, _ end: Int) -> SpeakerSegment {
-        SpeakerSegment(speaker: speaker, startMs: start, endMs: end)
-    }
-
-    /// Back-to-back half-second words from `startMs` to `endMs`.
-    private func words(_ startMs: Int, _ endMs: Int) -> [Transcriber.Word] {
-        stride(from: startMs, to: endMs, by: 500).map {
-            Transcriber.Word(text: "word", confidence: 1, start: .milliseconds($0), end: .milliseconds($0 + 500))
-        }
-    }
-
     @Test func aListedNameThatNeverLitIsSilent() {
         let names = MeetingNames(source: .speaking, roster: ["Edie O'Neill", "Hugh Ashby-Clarke", "Max Mitchell"], channel: nil, spans: [
             MeetingNames.Span(name: "Hugh Ashby-Clarke", startMs: 0, endMs: 5_000),

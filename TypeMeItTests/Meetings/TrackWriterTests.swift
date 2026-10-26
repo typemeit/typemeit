@@ -2,12 +2,6 @@ import AVFoundation
 import Testing
 @testable import TypeMeIt
 
-private func tempTrackURL() -> URL {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    return dir.appendingPathComponent("track.caf")
-}
-
 /// The header the spec's table (docs/meetings.md 7.5) describes, built here
 /// field by field rather than borrowed from `TrackWriter` so the test proves
 /// the written bytes, not just that the writer agrees with itself.
@@ -31,20 +25,13 @@ private func expectedHeader() -> [UInt8] {
     return bytes
 }
 
-private func readSamples(at url: URL, frameCount: Int) throws -> [Float] {
-    let file = try AVAudioFile(forReading: url)
-    guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(frameCount)) else {
-        return []
-    }
-    try file.read(into: buffer)
-    guard let channel = buffer.floatChannelData else { return [] }
-    return Array(UnsafeBufferPointer(start: channel[0], count: Int(buffer.frameLength)))
-}
+final class TrackWriterTests {
+    private let dir = tempDir()
+    private var url: URL { dir.appendingPathComponent("track.caf") }
 
-struct TrackWriterTests {
+    deinit { try? FileManager.default.removeItem(at: dir) }
+
     @Test func headerBytesMatchTheSpec() throws {
-        let url = tempTrackURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         _ = try TrackWriter(url: url)
 
         let written = try Data(contentsOf: url)
@@ -54,11 +41,7 @@ struct TrackWriterTests {
     }
 
     @Test func aTruncatedFileOpensAndReportsItsFrameCount() throws {
-        let url = tempTrackURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let writer = try TrackWriter(url: url)
-        writer.append([Float](repeating: 0.5, count: 1_000))
-        _ = writer.finish()
+        try writeTrack([Float](repeating: 0.5, count: 1_000), to: url)
 
         let fullSize = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as! Int
         // Truncate mid-frame, to a size that need not be a multiple of 2:
@@ -67,7 +50,7 @@ struct TrackWriterTests {
         #expect(truncatedSize < fullSize)
 
         let data = try Data(contentsOf: url).prefix(truncatedSize)
-        let truncatedURL = url.deletingLastPathComponent().appendingPathComponent("truncated.caf")
+        let truncatedURL = dir.appendingPathComponent("truncated.caf")
         try data.write(to: truncatedURL)
 
         let file = try AVAudioFile(forReading: truncatedURL)
@@ -75,14 +58,10 @@ struct TrackWriterTests {
     }
 
     @Test func samplesReadBackMatchTheClampedQuantisedInput() throws {
-        let url = tempTrackURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let writer = try TrackWriter(url: url)
         let input: [Float] = [0, 0.5, -0.5, 1.5, -1.5, 0.999_97]
-        writer.append(input)
-        _ = writer.finish()
+        try writeTrack(input, to: url)
 
-        let samples = try readSamples(at: url, frameCount: input.count)
+        let samples = try readSamples(at: url)
         #expect(samples.count == input.count)
         // Signed 16-bit PCM has no code for +1.0 (only -1.0 has one), so a
         // clamped +1 sample is off by exactly one quantisation step; a hair
@@ -95,21 +74,17 @@ struct TrackWriterTests {
     }
 
     @Test func appendSilenceAddsZeros() throws {
-        let url = tempTrackURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let writer = try TrackWriter(url: url)
         writer.appendSilence(frames: 500)
         let (frames, peak) = writer.finish()
 
         #expect(frames == 500)
         #expect(peak == 0)
-        let samples = try readSamples(at: url, frameCount: 500)
+        let samples = try readSamples(at: url)
         #expect(samples == [Float](repeating: 0, count: 500))
     }
 
     @Test func recentPeakReflectsTheLastWindowNotOlderAudio() throws {
-        let url = tempTrackURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let writer = try TrackWriter(url: url)
         let framesPerSecond = Int(AudioCapture.targetFormat.sampleRate)
 

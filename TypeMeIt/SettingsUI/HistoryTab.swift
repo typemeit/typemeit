@@ -1,27 +1,5 @@
 import SwiftUI
 
-/// What a click on a row's box does to the selection. A plain click turns that
-/// one row on or off; shift-click takes every row between the last box clicked
-/// and this one, so a run of dictations can be deleted without clicking each
-/// of them. The range is measured over the rows as they are listed, which
-/// means it crosses the day headings they are grouped under and never reaches
-/// a row the search has hidden. Shift only ever adds, so several runs can be
-/// gathered up before deleting. An anchor that is no longer listed — the
-/// search moved on, or the row was deleted — leaves shift with nothing to
-/// measure from, and the click is the plain one.
-enum HistorySelection {
-    static func clicked(_ id: UUID, extending: Bool, anchor: UUID?, in rows: [UUID],
-                        selected: Set<UUID>) -> Set<UUID> {
-        if extending, let anchor,
-           let from = rows.firstIndex(of: anchor), let to = rows.firstIndex(of: id) {
-            return selected.union(rows[min(from, to)...max(from, to)])
-        }
-        var out = selected
-        if out.contains(id) { out.remove(id) } else { out.insert(id) }
-        return out
-    }
-}
-
 /// The time-of-day half of the when filter, "09:00" to "17:30", either end
 /// left open. A window that ends before it starts runs across midnight.
 struct TimeOfDayWindow {
@@ -92,13 +70,13 @@ struct WhenFilter {
 
 /// What the list works out from each dictation, kept until the history
 /// changes rather than redone on every keystroke: its words for the day
-/// totals, and its text and transcript lowercased for search.
+/// totals, and its text and transcript folded for search.
 @MainActor private final class HistoryIndex {
     private var revision = -1
     private var words: [UUID: Int] = [:]
-    private var texts: [UUID: [UInt8]] = [:]
+    private var texts: [UUID: TextSearch.Folded] = [:]
     private var listKey: ListKey?
-    private var list: (rows: [HistoryEntry], lines: [HistoryTab.Line]) = ([], [])
+    private var list: (rows: [HistoryEntry], lines: [DayLine<HistoryEntry>]) = ([], [])
 
     /// What the list shows depends on, besides the history.
     struct ListKey: Equatable {
@@ -123,7 +101,7 @@ struct WhenFilter {
     /// The rows the filters leave and their day lines, kept until the history
     /// or the filters change: opening a dictation or a menu redraws the page
     /// without changing either.
-    func list(for key: ListKey, store: Store, compute: () -> (rows: [HistoryEntry], lines: [HistoryTab.Line])) -> (rows: [HistoryEntry], lines: [HistoryTab.Line]) {
+    func list(for key: ListKey, store: Store, compute: () -> (rows: [HistoryEntry], lines: [DayLine<HistoryEntry>])) -> (rows: [HistoryEntry], lines: [DayLine<HistoryEntry>]) {
         current(store)
         if key != listKey {
             list = compute()
@@ -135,24 +113,18 @@ struct WhenFilter {
     func words(in entry: HistoryEntry, store: Store) -> Int {
         current(store)
         if let n = words[entry.id] { return n }
-        let n = HistoryTab.words(in: entry)
+        let n = entry.wordCount
         words[entry.id] = n
         return n
     }
 
-    /// Whether the entry's text or transcript holds `query`, lowercased UTF-8.
-    func matches(_ entry: HistoryEntry, _ query: [UInt8], store: Store) -> Bool {
+    /// Whether the entry's searched text holds `query`.
+    func matches(_ entry: HistoryEntry, _ query: TextSearch.Folded, store: Store) -> Bool {
         current(store)
-        let text: [UInt8]
-        if let known = texts[entry.id] {
-            text = known
-        } else {
-            text = Array("\(entry.displayText)\n\(entry.transcript)".lowercased().utf8)
-            texts[entry.id] = text
-        }
-        return text.withUnsafeBytes { hay in
-            query.withUnsafeBytes { q in memmem(hay.baseAddress, hay.count, q.baseAddress, q.count) != nil }
-        }
+        if let known = texts[entry.id] { return known.contains(query) }
+        let text = TextSearch.Folded(HistoryTab.searchedText(of: entry))
+        texts[entry.id] = text
+        return text.contains(query)
     }
 }
 
@@ -174,9 +146,7 @@ struct HistoryTab: View {
     /// Only dictations that asked Claude (true), only typed ones (false), or both.
     @State private var askedClaude: Bool?
     @State private var claudeOpen = false
-    @State private var selected: Set<UUID> = []
-    /// The row a range is measured from: the last one whose box was clicked.
-    @State private var anchor: UUID?
+    @State private var selection = ListSelection()
     /// The row whose copy ran last, which shows a check for it.
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
@@ -234,30 +204,31 @@ struct HistoryTab: View {
                     .font(Square.mono(12))
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .padding(.top, 40)
-                    .padding(.leading, HistoryColumns.page + HistoryColumns.lead)
+                    .padding(.leading, SquareListColumns.page + SquareListColumns.lead)
                 Spacer(minLength: 0)
             } else {
-                HistoryColumns.head.padding(.horizontal, HistoryColumns.page)
+                HistoryColumns.head.padding(.horizontal, SquareListColumns.page)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(lines) { line in
                             switch line {
                             case .day(_, let day, let date, let total):
-                                HistoryDayRow(day: day, date: date, total: total)
+                                SquareDayHeader(day: day, date: date, total: total, totalWidth: HistoryColumns.total, trailing: HistoryColumns.trailing)
                             case .row(let entry):
-                                HistoryRow(entry: entry, picked: picked(entry.id), picking: !selected.isEmpty, copied: copied == entry.id,
+                                HistoryRow(entry: entry, picked: $selection.box(entry.id) { filtered.map(\.id) },
+                                           picking: !selection.picked.isEmpty, copied: copied == entry.id,
                                            open: { open = entry.id },
                                            copy: { Output.copyToClipboard(entry.displayText); copied = entry.id },
-                                           delete: { store.delete(id: entry.id); selected.remove(entry.id) })
+                                           delete: { store.delete(id: entry.id); selection.picked.remove(entry.id) })
                             }
                         }
                     }
-                    .padding(.horizontal, HistoryColumns.page)
+                    .padding(.horizontal, SquareListColumns.page)
                     .padding(.bottom, 20)
                 }
             }
         }
-        .onChange(of: store.history.map(\.id)) { _, ids in selected.formIntersection(ids) }
+        .onChange(of: store.history.map(\.id)) { _, ids in selection.picked.formIntersection(ids) }
     }
 
     private var toolbar: some View {
@@ -282,37 +253,39 @@ struct HistoryTab: View {
                 }
             }
             Spacer(minLength: 0)
-            if !selected.isEmpty {
-                Button("delete \(selected.count)") { deletingPicked.toggle() }
+            if !selection.picked.isEmpty {
+                Button("delete \(selection.picked.count)") { deletingPicked.toggle() }
                     .buttonStyle(SquareButtonStyle())
-                    .squareConfirmDelete(isPresented: $deletingPicked, title: "delete \(counted(selected.count, "dictation"))?",
-                                         detail: SquareDeleteConfirm.gone(selected.count)) {
-                        store.delete(ids: selected)
-                        selected = []
+                    .squareConfirmDelete(isPresented: $deletingPicked, title: "delete \(counted(selection.picked.count, "dictation"))?",
+                                         detail: SquareDeleteConfirm.gone(selection.picked.count)) {
+                        store.delete(ids: selection.picked)
+                        selection.picked = []
                     }
             }
         }
         .padding(.top, 16)
-        .padding(.horizontal, HistoryColumns.page)
+        .padding(.horizontal, SquareListColumns.page)
         .padding(.bottom, 14)
     }
 
     // MARK: Filtering
 
     private var filtered: [HistoryEntry] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         let time = WhenFilter(when, from: from, to: to)
-        let query = Array(q.utf8)
+        let query = TextSearch.Folded(search.trimmingCharacters(in: .whitespaces))
         return store.history.reversed().filter { e in
             if let app, HistoryTab.app(of: e) != app { return false }
             if let askedClaude, (e.question != nil) != askedClaude { return false }
             if !time.contains(e.timestamp) { return false }
-            if !query.isEmpty, !index.matches(e, query, store: store) { return false }
+            if !query.bytes.isEmpty, !index.matches(e, query, store: store) { return false }
             return true
         }
     }
 
     static func app(of entry: HistoryEntry) -> String { entry.appName?.lowercased() ?? "unknown" }
+
+    /// What the search looks in: what was typed, and what was heard.
+    nonisolated static func searchedText(of entry: HistoryEntry) -> String { "\(entry.displayText)\n\(entry.transcript)" }
 
     /// Every dictation, those that asked Claude by name, and those typed.
     private var claudeItems: [(value: Bool?, item: SquareMenuList.Item)] {
@@ -337,43 +310,18 @@ struct HistoryTab: View {
 
     // MARK: Rows
 
-    enum Line: Identifiable {
-        case day(id: Date, day: String, date: String, total: String)
-        case row(HistoryEntry)
-
-        var id: String {
-            switch self {
-            case .day(let id, _, _, _): "day-\(id.timeIntervalSinceReferenceDate)"
-            case .row(let entry): entry.id.uuidString
-            }
-        }
-    }
-
     /// The rows under a line for each day, newest first, the day saying how
     /// much it held.
-    static func lines(_ rows: [HistoryEntry], wordsIn: (HistoryEntry) -> Int = HistoryTab.words, calendar: Calendar = .current) -> [Line] {
-        var out: [Line] = []
-        var i = rows.startIndex
-        while i < rows.endIndex {
-            let day = calendar.startOfDay(for: rows[i].timestamp)
-            var j = i
-            while j < rows.endIndex, calendar.isDate(rows[j].timestamp, inSameDayAs: day) { j += 1 }
-            let same = rows[i..<j]
-            let words = same.reduce(0) { $0 + wordsIn($1) }
-            let label = HistoryTab.dayLabel(day, calendar: calendar)
-            out.append(.day(id: day, day: label.day, date: label.date,
-                            total: "\(counted(same.count, "dictation")) · \(counted(words, "word"))"))
-            out.append(contentsOf: same.map(Line.row))
-            i = j
-        }
-        return out
+    static func lines(_ rows: [HistoryEntry], wordsIn: (HistoryEntry) -> Int = \.wordCount,
+                      calendar: Calendar = .current) -> [DayLine<HistoryEntry>] {
+        DayLine.lines(rows, on: \.timestamp, total: { day in
+            "\(counted(day.count, "dictation")) · \(counted(day.reduce(0) { $0 + wordsIn($1) }, "word"))"
+        }, calendar: calendar)
     }
-
-    nonisolated static func words(in entry: HistoryEntry) -> Int { Insights.wordCount(entry.displayText) }
 
     /// "today" over "thursday 24 september"; an older day by its weekday,
     /// over its date.
-    static func dayLabel(_ day: Date, calendar: Calendar = .current) -> (day: String, date: String) {
+    nonisolated static func dayLabel(_ day: Date, calendar: Calendar = .current) -> (day: String, date: String) {
         let full = day.formatted(.dateTime.weekday(.wide).day().month(.wide)).lowercased()
         if calendar.isDateInToday(day) { return ("today", full) }
         if calendar.isDateInYesterday(day) { return ("yesterday", full) }
@@ -381,34 +329,16 @@ struct HistoryTab: View {
         let date = sameYear ? day.formatted(.dateTime.day().month(.wide)) : day.formatted(.dateTime.day().month(.wide).year())
         return (day.formatted(.dateTime.weekday(.wide)).lowercased(), date.lowercased())
     }
-
-    private func picked(_ id: UUID) -> Binding<Bool> {
-        Binding(get: { selected.contains(id) }, set: { _ in select(id) })
-    }
-
-    private func select(_ id: UUID) {
-        // A SwiftUI button hands its action no event, so the modifier is read
-        // from the keyboard as the click lands.
-        selected = HistorySelection.clicked(id, extending: NSEvent.modifierFlags.contains(.shift),
-                                            anchor: anchor, in: filtered.map(\.id), selected: selected)
-        anchor = id
-    }
 }
 
-/// History's columns: the select box, time, the dictation, its app, what
-/// changed and its words, and a copy and a delete at the end. The head, the days and the rows
-/// share them.
+/// History's own columns beside the shared ones: its app, what changed and
+/// its words, and a copy and a delete at the end. The head, the days and the
+/// rows share them.
 enum HistoryColumns {
-    static let page: CGFloat = 20
-    static let tick: CGFloat = 22
-    static let time: CGFloat = 60
     static let app: CGFloat = 116
     static let changes: CGFloat = 64
     static let words: CGFloat = 52
     static let action: CGFloat = 26
-    static let gap: CGFloat = 16
-    /// Between the select box and the row.
-    static let edge: CGFloat = 4
     /// Between the words and the first action's box, whose own margin makes
     /// up the rest of a column's gap. The two actions sit box to box.
     static let actionLead: CGFloat = 8
@@ -417,67 +347,19 @@ enum HistoryColumns {
     /// The select box and the actions are centred on the first line of the
     /// row, where its words are: this far above the line's baseline.
     static let lineMiddle = Square.appKitMono(12).capHeight / 2
-    /// How far the columns sit inside the row's own left edge.
-    static let inset: CGFloat = 8
-    /// Where the time column starts, from the list's edge.
-    static var lead: CGFloat { tick + edge + inset }
+    /// The head and the days leave the actions' room at the end.
+    static var trailing: CGFloat { SquareListColumns.edge + actions + SquareListColumns.inset }
+    /// A day's total sits over the app, the changes and the words.
+    static var total: CGFloat { app + SquareListColumns.gap + changes + SquareListColumns.gap + words }
 
     static var head: some View {
-        HStack(spacing: edge) {
-            Color.clear.frame(width: tick, height: 1)
-            HStack(spacing: gap) {
-                Text("time").frame(width: time, alignment: .leading)
-                Text("dictation").frame(maxWidth: .infinity, alignment: .leading)
-                Text("app").frame(width: app, alignment: .leading)
-                Text("changes").frame(width: changes, alignment: .trailing)
-                Text("words").frame(width: words, alignment: .trailing)
-            }
-            .padding(.leading, inset)
-            Color.clear.frame(width: actions, height: 1)
+        SquareListHead(trailing: trailing) {
+            Text("time").frame(width: SquareListColumns.time, alignment: .leading)
+            Text("dictation").frame(maxWidth: .infinity, alignment: .leading)
+            Text("app").frame(width: app, alignment: .leading)
+            Text("changes").frame(width: changes, alignment: .trailing)
+            Text("words").frame(width: words, alignment: .trailing)
         }
-        .font(Square.mono(11))
-        .foregroundStyle(DesignTokens.Colors.ink3)
-        .padding(.trailing, inset)
-        .padding(.bottom, 8)
-    }
-}
-
-/// A day in the list: an ink rule, the day under the time, its date under
-/// the dictations, and how much it held under the app and words.
-private struct HistoryDayRow: View {
-    let day: String
-    let date: String
-    let total: String
-
-    var body: some View {
-        HStack(spacing: HistoryColumns.edge) {
-            Color.clear.frame(width: HistoryColumns.tick, height: 1)
-            HStack(alignment: .firstTextBaseline, spacing: HistoryColumns.gap) {
-                // "yesterday" is wider than the time column; it runs into the gap.
-                Text(day)
-                    .font(Square.mono(12, weight: .medium))
-                    .foregroundStyle(DesignTokens.Colors.ink)
-                    .fixedSize()
-                    .frame(width: HistoryColumns.time, alignment: .leading)
-                Text(date)
-                    .font(Square.mono(11))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(total)
-                    .font(Square.mono(11))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .frame(width: HistoryColumns.app + HistoryColumns.gap + HistoryColumns.changes + HistoryColumns.gap + HistoryColumns.words, alignment: .trailing)
-            }
-            .padding(.leading, HistoryColumns.inset)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-            Color.clear.frame(width: HistoryColumns.actions, height: 1)
-        }
-        .padding(.trailing, HistoryColumns.inset)
-        .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
-        .padding(.top, 6)
     }
 }
 
@@ -501,18 +383,18 @@ private struct HistoryRow: View {
             Toggle("select", isOn: $picked)
                 .toggleStyle(SquareTickStyle(faint: true))
                 .labelsHidden()
-                .frame(width: HistoryColumns.tick)
+                .frame(width: SquareListColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
                 .help(picked ? "deselect" : "select · shift-click for a range")
                 .onFirstLine()
-                .padding(.trailing, HistoryColumns.edge)
+                .padding(.trailing, SquareListColumns.edge)
             Button(action: open) {
-                HStack(alignment: .firstTextBaseline, spacing: HistoryColumns.gap) {
+                HStack(alignment: .firstTextBaseline, spacing: SquareListColumns.gap) {
                     Text(entry.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                         .font(Square.mono(12))
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Colors.ink2)
-                        .frame(width: HistoryColumns.time, alignment: .leading)
+                        .frame(width: SquareListColumns.time, alignment: .leading)
                     Text(entry.displayText)
                         .font(Square.sans(13.5))
                         .lineSpacing(2)
@@ -530,13 +412,13 @@ private struct HistoryRow: View {
                     HStack(spacing: 6) { CharDelta(heard: entry.transcript, typed: entry.displayText) }
                         .font(Square.mono(11))
                         .frame(width: HistoryColumns.changes, alignment: .trailing)
-                    Text(HistoryTab.words(in: entry).formatted())
+                    Text(entry.wordCount.formatted())
                         .font(Square.mono(12))
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Colors.ink)
                         .frame(width: HistoryColumns.words, alignment: .trailing)
                 }
-                .padding(.leading, HistoryColumns.inset)
+                .padding(.leading, SquareListColumns.inset)
                 .padding(.vertical, 11)
                 .contentShape(Rectangle())
             }
@@ -555,7 +437,7 @@ private struct HistoryRow: View {
             .onFirstLine()
             .padding(.leading, HistoryColumns.actionLead)
         }
-        .padding(.trailing, HistoryColumns.inset)
+        .padding(.trailing, SquareListColumns.inset)
         .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
         .overlay(alignment: .top) { SquareRule() }
         .onHover { hovering = $0 }

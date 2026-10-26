@@ -3,14 +3,14 @@ import Foundation
 
 /// The voices `VoiceNames` learns from (docs/meetings.md 8.7): for each
 /// transcribed meeting, an embedding of every clip of every speaker, in
-/// `Store.directory/Voices/<meeting id>.json`. Never in the meeting's own
+/// `SupportPaths.directory/Voices/<meeting id>.json`. Never in the meeting's own
 /// folder, which the MCP reads and the user shares. Kept only while
 /// `Settings.meetingLearnVoices` is on; turning it off deletes the folder.
 /// Who a voice belongs to is read from the meetings each time names are
 /// suggested, so a rename teaches it without a second copy of any name.
 actor VoiceLibrary {
     static let shared = VoiceLibrary()
-    nonisolated static let directory = Store.directory.appendingPathComponent("Voices", isDirectory: true)
+    nonisolated static let directory = SupportPaths.directory.appendingPathComponent("Voices", isDirectory: true)
 
     private struct VoiceFile: Codable {
         var dimensions: Int

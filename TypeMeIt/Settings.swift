@@ -30,58 +30,58 @@ enum Appearance: String, Codable, CaseIterable, Sendable {
 @MainActor
 @Observable
 final class Settings {
-    static let shared = Settings()
+    static let shared = Settings(defaults: .standard)
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     /// Hooks `typemeit-mcp` writes from its own process: UserDefaults tells
     /// key-value observers of changes made by other processes.
     @ObservationIgnored private var hooksObservation: NSKeyValueObservation?
     @ObservationIgnored private var systemPromptObservation: NSKeyValueObservation?
 
-    var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: "microphoneUID") } }
+    var microphoneUID: String? { didSet { Stored.microphoneUID.save(microphoneUID, defaults) } }
     // Mute and pause are alternatives: switching one on switches the other off.
     var muteWhileRecording: Bool {
         didSet {
-            defaults.set(muteWhileRecording, forKey: "muteWhileRecording")
+            Stored.muteWhileRecording.save(muteWhileRecording, defaults)
             if muteWhileRecording, pauseWhileRecording { pauseWhileRecording = false }
         }
     }
     var pauseWhileRecording: Bool {
         didSet {
-            defaults.set(pauseWhileRecording, forKey: "pauseWhileRecording")
+            Stored.pauseWhileRecording.save(pauseWhileRecording, defaults)
             if pauseWhileRecording, muteWhileRecording { muteWhileRecording = false }
         }
     }
-    var audioFeedback: Bool { didSet { defaults.set(audioFeedback, forKey: "audioFeedback") } }
-    var postProcessingEnabled: Bool { didSet { defaults.set(postProcessingEnabled, forKey: "postProcessingEnabled") } }
-    var customWords: [String] { didSet { defaults.set(customWords, forKey: "customWords") } }
+    var audioFeedback: Bool { didSet { Stored.audioFeedback.save(audioFeedback, defaults) } }
+    var postProcessingEnabled: Bool { didSet { Stored.postProcessingEnabled.save(postProcessingEnabled, defaults) } }
+    var customWords: [String] { didSet { Stored.customWords.save(customWords, defaults) } }
     /// The custom words plus the built-in ones the user has not listed.
     var matchedWords: [String] {
         CustomWordMatcher.builtInWords.filter { word in !customWords.contains { $0.caseInsensitiveCompare(word) == .orderedSame } } + customWords
     }
     /// The opinionated rewrites clean-up applies on top of its fixes.
-    var writingStyles: Set<WritingStyle> { didSet { defaults.set(writingStyles.map(\.rawValue).sorted(), forKey: "writingStyles") } }
-    var learnFromCorrections: Bool { didSet { defaults.set(learnFromCorrections, forKey: "learnFromCorrections") } }
-    var historyLimit: Int { didSet { defaults.set(historyLimit, forKey: "historyLimit") } }
+    var writingStyles: Set<WritingStyle> { didSet { Stored.writingStyles.save(writingStyles, defaults) } }
+    var learnFromCorrections: Bool { didSet { Stored.learnFromCorrections.save(learnFromCorrections, defaults) } }
+    var historyLimit: Int { didSet { Stored.historyLimit.save(historyLimit, defaults) } }
     /// Keeps each dictation's audio next to its history entry.
-    var keepRecordings: Bool { didSet { defaults.set(keepRecordings, forKey: "keepRecordings") } }
+    var keepRecordings: Bool { didSet { Stored.keepRecordings.save(keepRecordings, defaults) } }
     /// Checks for, downloads and installs updates on its own. Off, the app
     /// looks for an update only when Settings comes to the front, and installs
     /// one only from the version row's button.
-    var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: "autoUpdate") } }
+    var autoUpdate: Bool { didSet { Stored.autoUpdate.save(autoUpdate, defaults) } }
     /// With `autoUpdate` on: a ready update is announced with the pill and
     /// waits for a click. Off, the app installs it and restarts itself once no
     /// dictation is in flight.
-    var askBeforeUpdating: Bool { didSet { defaults.set(askBeforeUpdating, forKey: "askBeforeUpdating") } }
-    var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
-    var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: "appearance") } }
+    var askBeforeUpdating: Bool { didSet { Stored.askBeforeUpdating.save(askBeforeUpdating, defaults) } }
+    var launchAtLogin: Bool { didSet { Stored.launchAtLogin.save(launchAtLogin, defaults) } }
+    var appearance: Appearance { didSet { Stored.appearance.save(appearance, defaults) } }
     /// Off, the cloud is dynamic: white or black against what is behind it.
-    var cloudColorEnabled: Bool { didSet { defaults.set(cloudColorEnabled, forKey: "cloudColorEnabled") } }
-    var cloudColor: CloudColor { didSet { defaults.set(cloudColor.rawValue, forKey: "cloudColor") } }
+    var cloudColorEnabled: Bool { didSet { Stored.cloudColorEnabled.save(cloudColorEnabled, defaults) } }
+    var cloudColor: CloudColor { didSet { Stored.cloudColor.save(cloudColor, defaults) } }
     /// What the last sample found behind the cloud. The next dynamic cloud
     /// starts from it, until its own sample arrives.
-    var lastBackdrop: ScreenSampler.Backdrop? { didSet { defaults.set(lastBackdrop?.rawValue, forKey: "lastBackdrop") } }
-    var cloudPosition: CloudPosition { didSet { defaults.set(cloudPosition.rawValue, forKey: "cloudPosition") } }
+    var lastBackdrop: ScreenSampler.Backdrop? { didSet { Stored.lastBackdrop.save(lastBackdrop, defaults) } }
+    var cloudPosition: CloudPosition { didSet { Stored.cloudPosition.save(cloudPosition, defaults) } }
     /// A cloud with no colour of its own samples the screen under it and goes
     /// white or black against it. Needs Screen Recording; without the grant
     /// the appearance decides.
@@ -102,47 +102,45 @@ final class Settings {
     }
     /// The clean-up model is told the names and terms visible in the window
     /// being dictated into. Needs Screen Recording.
-    var screenContextEnabled: Bool { didSet { defaults.set(screenContextEnabled, forKey: "screenContextEnabled") } }
-    var onboardingComplete: Bool { didSet { defaults.set(onboardingComplete, forKey: "onboardingComplete") } }
+    var screenContextEnabled: Bool { didSet { Stored.screenContextEnabled.save(screenContextEnabled, defaults) } }
+    var onboardingComplete: Bool { didSet { Stored.onboardingComplete.save(onboardingComplete, defaults) } }
     /// `ModelStore.version` of the speech model last installed here. Nil
     /// before the first install, and on a Mac that still has only the
     /// model this one replaced.
-    var speechModelVersion: String? { didSet { defaults.set(speechModelVersion, forKey: "speechModelVersion") } }
+    var speechModelVersion: String? { didSet { Stored.speechModelVersion.save(speechModelVersion, defaults) } }
     /// Copies the newest transcript to the clipboard. Nil means no shortcut.
     var copyLastShortcut: KeyCombo? {
-        didSet { defaults.set(copyLastShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "copyLastShortcut") }
+        didSet { Stored.copyLastShortcut.save(copyLastShortcut, defaults) }
     }
     /// The key held to dictate where there is no Fn (`Sandbox.watchesFn`).
-    var dictationShortcut: KeyCombo {
-        didSet { defaults.set(try? JSONEncoder().encode(dictationShortcut), forKey: "dictationShortcut") }
-    }
+    var dictationShortcut: KeyCombo { didSet { Stored.dictationShortcut.save(dictationShortcut, defaults) } }
     /// Words removed by the learned-words toast's Undo. Never learned again.
-    var undoneWords: [String] { didSet { defaults.set(undoneWords, forKey: "undoneWords") } }
+    var undoneWords: [String] { didSet { Stored.undoneWords.save(undoneWords, defaults) } }
     /// Ask to record when another app opens the microphone. Off, the menu
     /// item is the only way to record a call.
-    var meetingAsk: Bool { didSet { defaults.set(meetingAsk, forKey: "meetingAsk") } }
+    var meetingAsk: Bool { didSet { Stored.meetingAsk.save(meetingAsk, defaults) } }
     /// While a call is being asked about, hold its last two minutes in
     /// memory so a meeting does not start at the click (D20).
-    var meetingPreRoll: Bool { didSet { defaults.set(meetingPreRoll, forKey: "meetingPreRoll") } }
+    var meetingPreRoll: Bool { didSet { Stored.meetingPreRoll.save(meetingPreRoll, defaults) } }
     /// Lets the bundled `typemeit-mcp` answer: other tools can list, search
     /// and read published meetings and dictations (D22). The binary reads
     /// this key itself; it keeps its first name from when it covered meetings
     /// only, so the switch stays as people set it.
-    var mcpEnabled: Bool { didSet { defaults.set(mcpEnabled, forKey: "meetingsMCP") } }
-    var mcpOffTools: [String] { didSet { defaults.set(mcpOffTools, forKey: MCPDefaults.offToolsKey) } }
+    var mcpEnabled: Bool { didSet { Stored.mcpEnabled.save(mcpEnabled, defaults) } }
+    var mcpOffTools: [String] { didSet { Stored.mcpOffTools.save(mcpOffTools, defaults) } }
     /// Keeps a meeting's tracks, compressed, beside its transcript.
-    var meetingKeepAudio: Bool { didSet { defaults.set(meetingKeepAudio, forKey: "meetingKeepAudio") } }
+    var meetingKeepAudio: Bool { didSet { Stored.meetingKeepAudio.save(meetingKeepAudio, defaults) } }
     /// Keeps the voices of transcribed speakers on this Mac, to suggest names
     /// for numbered speakers from people named before (docs/meetings.md 8.7).
     /// Off deletes them.
-    var meetingLearnVoices: Bool { didSet { defaults.set(meetingLearnVoices, forKey: "meetingLearnVoices") } }
+    var meetingLearnVoices: Bool { didSet { Stored.meetingLearnVoices.save(meetingLearnVoices, defaults) } }
     /// After a meeting, the pill offers okay and later before transcribing.
-    var meetingAskBeforeTranscribing: Bool { didSet { defaults.set(meetingAskBeforeTranscribing, forKey: "meetingAskBeforeTranscribing") } }
+    var meetingAskBeforeTranscribing: Bool { didSet { Stored.meetingAskBeforeTranscribing.save(meetingAskBeforeTranscribing, defaults) } }
     /// How many meetings to keep; 0 keeps everything.
-    var meetingLimit: Int { didSet { defaults.set(meetingLimit, forKey: "meetingLimit") } }
+    var meetingLimit: Int { didSet { Stored.meetingLimit.save(meetingLimit, defaults) } }
     /// Offers questions heard in a meeting to Claude Code (`claude -p`).
     /// Only where `ClaudeRun.isAvailable`: installed, and not sandboxed.
-    var askClaude: Bool { didSet { defaults.set(askClaude, forKey: "askClaude") } }
+    var askClaude: Bool { didSet { Stored.askClaude.save(askClaude, defaults) } }
     /// Where Claude Code runs, which decides the project MCP servers and
     /// settings it loads.
     /// Offers questions the app spots on its own; off, only questions asked
@@ -150,85 +148,83 @@ final class Settings {
     /// The user's own system prompt, added after the app's on every ask.
     /// Prompts run on a finished meeting, in order, from its pill or page.
     /// Also written by `typemeit-mcp` from its own process; `hooksObservation` brings those writes in.
-    var meetingHooks: [MeetingHook] { didSet { defaults.set(try? JSONEncoder().encode(meetingHooks), forKey: MeetingHook.defaultsKey) } }
-    var askClaudeSystemPrompt: String { didSet { defaults.set(askClaudeSystemPrompt, forKey: MCPDefaults.systemPromptKey) } }
+    var meetingHooks: [MeetingHook] { didSet { Stored.meetingHooks.save(meetingHooks, defaults) } }
+    var askClaudeSystemPrompt: String { didSet { Stored.askClaudeSystemPrompt.save(askClaudeSystemPrompt, defaults) } }
     /// Claude Code's `--permission-mode`, one of `ClaudeRun.permissionModes`.
-    var askClaudePermissionMode: String { didSet { defaults.set(askClaudePermissionMode, forKey: "askClaudePermissionMode") } }
-    var askClaudeFolder: String { didSet { defaults.set(askClaudeFolder, forKey: "askClaudeFolder") } }
+    var askClaudePermissionMode: String { didSet { Stored.askClaudePermissionMode.save(askClaudePermissionMode, defaults) } }
+    var askClaudeFolder: String { didSet { Stored.askClaudeFolder.save(askClaudeFolder, defaults) } }
     /// A Claude Code model alias for `--model`; `default` leaves the choice
     /// to Claude Code, whose default depends on the plan.
-    var askClaudeModel: String { didSet { defaults.set(askClaudeModel, forKey: "askClaudeModel") } }
+    var askClaudeModel: String { didSet { Stored.askClaudeModel.save(askClaudeModel, defaults) } }
     /// Tools Claude Code may use without its auto-mode classifier reviewing
     /// them, in its `--allowedTools` syntax. Empty leaves every action to the
     /// classifier.
-    var askClaudeTools: [String] { didSet { defaults.set(askClaudeTools, forKey: "askClaudeTools") } }
+    var askClaudeTools: [String] { didSet { Stored.askClaudeTools.save(askClaudeTools, defaults) } }
     /// Starts and stops a room recording. Nil means no shortcut.
     var recordRoomShortcut: KeyCombo? {
-        didSet { defaults.set(recordRoomShortcut.flatMap { try? JSONEncoder().encode($0) }, forKey: "recordRoomShortcut") }
+        didSet { Stored.recordRoomShortcut.save(recordRoomShortcut, defaults) }
     }
     /// Writes what each dictation and paste did to `DebugLog.url`, naming
     /// the app, the clipboard's contents and the start of the transcript.
     /// For bug reports.
     var debugLogs: Bool {
         didSet {
-            defaults.set(debugLogs, forKey: "debugLogs")
+            Stored.debugLogs.save(debugLogs, defaults)
             DebugLog.enabled = debugLogs
             if debugLogs { DebugLog.writeHeader() }
         }
     }
 
-    private init() {
-        let d = UserDefaults.standard
-        func bool(_ key: String, _ fallback: Bool) -> Bool { d.object(forKey: key) == nil ? fallback : d.bool(forKey: key) }
-        microphoneUID = d.string(forKey: "microphoneUID")
-        muteWhileRecording = bool("muteWhileRecording", true)
-        pauseWhileRecording = bool("pauseWhileRecording", false)
-        audioFeedback = bool("audioFeedback", true)
-        postProcessingEnabled = bool("postProcessingEnabled", true)
-        customWords = d.stringArray(forKey: "customWords") ?? []
-        writingStyles = Set((d.stringArray(forKey: "writingStyles") ?? []).compactMap(WritingStyle.init))
-        learnFromCorrections = bool("learnFromCorrections", true)
-        historyLimit = d.object(forKey: "historyLimit") == nil ? 0 : d.integer(forKey: "historyLimit")
-        keepRecordings = bool("keepRecordings", Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
-        autoUpdate = bool("autoUpdate", true)
-        askBeforeUpdating = bool("askBeforeUpdating", true)
-        // App Review refuses an app that adds itself to login items without
-        // being asked (guideline 2.4.5), so the store build starts with it off.
-        launchAtLogin = bool("launchAtLogin", !Sandbox.isActive)
-        appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
-        cloudColorEnabled = bool("cloudColorEnabled", false)
-        cloudColor = CloudColor(rawValue: d.string(forKey: "cloudColor") ?? "") ?? .coral
-        lastBackdrop = ScreenSampler.Backdrop(rawValue: d.string(forKey: "lastBackdrop") ?? "")
-        cloudPosition = CloudPosition(rawValue: d.string(forKey: "cloudPosition") ?? "") ?? .centre
-        screenContextEnabled = bool("screenContextEnabled", false)
-        onboardingComplete = bool("onboardingComplete", false)
-        speechModelVersion = d.string(forKey: "speechModelVersion")
-        copyLastShortcut = d.data(forKey: "copyLastShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
-        dictationShortcut = d.data(forKey: "dictationShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) } ?? .optionSpace
-        undoneWords = d.stringArray(forKey: "undoneWords") ?? []
-        meetingAsk = bool("meetingAsk", true)
-        meetingPreRoll = bool("meetingPreRoll", true)
-        mcpEnabled = bool("meetingsMCP", false)
-        mcpOffTools = d.stringArray(forKey: MCPDefaults.offToolsKey) ?? []
-        meetingKeepAudio = bool("meetingKeepAudio", true)
-        meetingLearnVoices = bool("meetingLearnVoices", false)
-        meetingAskBeforeTranscribing = bool("meetingAskBeforeTranscribing", false)
-        meetingLimit = d.object(forKey: "meetingLimit") == nil ? 0 : d.integer(forKey: "meetingLimit")
-        askClaude = bool("askClaude", Updates.isDevBuild)
-        askClaudeSystemPrompt = d.string(forKey: MCPDefaults.systemPromptKey) ?? ""
-        meetingHooks = Settings.storedHooks(d)
-        askClaudePermissionMode = d.string(forKey: "askClaudePermissionMode") ?? "auto"
-        askClaudeFolder = d.string(forKey: "askClaudeFolder") ?? FileManager.default.homeDirectoryForCurrentUser.path
-        askClaudeTools = d.stringArray(forKey: "askClaudeTools") ?? []
-        askClaudeModel = d.string(forKey: "askClaudeModel") ?? ClaudeRun.defaultModel
-        recordRoomShortcut = d.data(forKey: "recordRoomShortcut").flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
-        debugLogs = bool("debugLogs", false)
+    /// Tests pass a throwaway suite; the app uses `shared`.
+    init(defaults d: UserDefaults) {
+        defaults = d
+        microphoneUID = Stored.microphoneUID.load(d)
+        muteWhileRecording = Stored.muteWhileRecording.load(d)
+        pauseWhileRecording = Stored.pauseWhileRecording.load(d)
+        audioFeedback = Stored.audioFeedback.load(d)
+        postProcessingEnabled = Stored.postProcessingEnabled.load(d)
+        customWords = Stored.customWords.load(d)
+        writingStyles = Stored.writingStyles.load(d)
+        learnFromCorrections = Stored.learnFromCorrections.load(d)
+        historyLimit = Stored.historyLimit.load(d)
+        keepRecordings = Stored.keepRecordings.load(d)
+        autoUpdate = Stored.autoUpdate.load(d)
+        askBeforeUpdating = Stored.askBeforeUpdating.load(d)
+        launchAtLogin = Stored.launchAtLogin.load(d)
+        appearance = Stored.appearance.load(d)
+        cloudColorEnabled = Stored.cloudColorEnabled.load(d)
+        cloudColor = Stored.cloudColor.load(d)
+        lastBackdrop = Stored.lastBackdrop.load(d)
+        cloudPosition = Stored.cloudPosition.load(d)
+        screenContextEnabled = Stored.screenContextEnabled.load(d)
+        onboardingComplete = Stored.onboardingComplete.load(d)
+        speechModelVersion = Stored.speechModelVersion.load(d)
+        copyLastShortcut = Stored.copyLastShortcut.load(d)
+        dictationShortcut = Stored.dictationShortcut.load(d)
+        undoneWords = Stored.undoneWords.load(d)
+        meetingAsk = Stored.meetingAsk.load(d)
+        meetingPreRoll = Stored.meetingPreRoll.load(d)
+        mcpEnabled = Stored.mcpEnabled.load(d)
+        mcpOffTools = Stored.mcpOffTools.load(d)
+        meetingKeepAudio = Stored.meetingKeepAudio.load(d)
+        meetingLearnVoices = Stored.meetingLearnVoices.load(d)
+        meetingAskBeforeTranscribing = Stored.meetingAskBeforeTranscribing.load(d)
+        meetingLimit = Stored.meetingLimit.load(d)
+        askClaude = Stored.askClaude.load(d)
+        askClaudeSystemPrompt = Stored.askClaudeSystemPrompt.load(d)
+        meetingHooks = Stored.meetingHooks.load(d)
+        askClaudePermissionMode = Stored.askClaudePermissionMode.load(d)
+        askClaudeFolder = Stored.askClaudeFolder.load(d)
+        askClaudeTools = Stored.askClaudeTools.load(d)
+        askClaudeModel = Stored.askClaudeModel.load(d)
+        recordRoomShortcut = Stored.recordRoomShortcut.load(d)
+        debugLogs = Stored.debugLogs.load(d)
         DebugLog.enabled = debugLogs
         if debugLogs { DebugLog.writeHeader() }
         systemPromptObservation = d.observe(\.askClaudeSystemPrompt) { [weak self] _, _ in
             Task { @MainActor in
                 guard let self else { return }
-                let stored = self.defaults.string(forKey: MCPDefaults.systemPromptKey) ?? ""
+                let stored = Stored.askClaudeSystemPrompt.load(self.defaults)
                 if stored != self.askClaudeSystemPrompt { self.askClaudeSystemPrompt = stored }
             }
         }
@@ -236,14 +232,10 @@ final class Settings {
             Task { @MainActor in
                 guard let self else { return }
                 // Our own write comes back here too; only an outside one differs.
-                let stored = Settings.storedHooks(self.defaults)
+                let stored = Stored.meetingHooks.load(self.defaults)
                 if stored != self.meetingHooks { self.meetingHooks = stored }
             }
         }
-    }
-
-    private static func storedHooks(_ defaults: UserDefaults) -> [MeetingHook] {
-        defaults.data(forKey: MeetingHook.defaultsKey).flatMap { try? JSONDecoder().decode([MeetingHook].self, from: $0) } ?? []
     }
 
     func addCustomWord(_ word: String) {
@@ -254,6 +246,132 @@ final class Settings {
 
     func removeCustomWord(_ word: String) {
         customWords.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
+    }
+}
+
+extension Settings {
+    /// Every setting's UserDefaults key and its value when nothing is stored.
+    /// The keys are what people's settings are saved under: renaming one
+    /// resets that setting for everyone.
+    enum Stored {
+        static let microphoneUID = StoredSetting<String?>.optionalString("microphoneUID")
+        static let muteWhileRecording = StoredSetting.bool("muteWhileRecording", default: true)
+        static let pauseWhileRecording = StoredSetting.bool("pauseWhileRecording", default: false)
+        static let audioFeedback = StoredSetting.bool("audioFeedback", default: true)
+        static let postProcessingEnabled = StoredSetting.bool("postProcessingEnabled", default: true)
+        static let customWords = StoredSetting.strings("customWords")
+        static let writingStyles = StoredSetting<Set<WritingStyle>>.rawSet("writingStyles")
+        static let learnFromCorrections = StoredSetting.bool("learnFromCorrections", default: true)
+        static let historyLimit = StoredSetting.int("historyLimit", default: 0)
+        static let keepRecordings = StoredSetting.bool("keepRecordings", default: Updates.isDevBuild)
+        static let autoUpdate = StoredSetting.bool("autoUpdate", default: true)
+        static let askBeforeUpdating = StoredSetting.bool("askBeforeUpdating", default: true)
+        // App Review refuses an app that adds itself to login items without
+        // being asked (guideline 2.4.5), so the store build starts with it off.
+        static let launchAtLogin = StoredSetting.bool("launchAtLogin", default: !Sandbox.isActive)
+        static let appearance = StoredSetting.raw("appearance", default: Appearance.system)
+        static let cloudColorEnabled = StoredSetting.bool("cloudColorEnabled", default: false)
+        static let cloudColor = StoredSetting.raw("cloudColor", default: CloudColor.coral)
+        static let lastBackdrop = StoredSetting<ScreenSampler.Backdrop?>.optionalRaw("lastBackdrop")
+        static let cloudPosition = StoredSetting.raw("cloudPosition", default: CloudPosition.centre)
+        static let screenContextEnabled = StoredSetting.bool("screenContextEnabled", default: false)
+        static let onboardingComplete = StoredSetting.bool("onboardingComplete", default: false)
+        static let speechModelVersion = StoredSetting<String?>.optionalString("speechModelVersion")
+        static let copyLastShortcut = StoredSetting<KeyCombo?>.optionalJSON("copyLastShortcut")
+        static let dictationShortcut = StoredSetting.json("dictationShortcut", default: KeyCombo.optionSpace)
+        static let undoneWords = StoredSetting.strings("undoneWords")
+        static let meetingAsk = StoredSetting.bool("meetingAsk", default: true)
+        static let meetingPreRoll = StoredSetting.bool("meetingPreRoll", default: true)
+        static let mcpEnabled = StoredSetting.bool(MCPDefaults.enabledKey, default: false)
+        static let mcpOffTools = StoredSetting.strings(MCPDefaults.offToolsKey)
+        static let meetingKeepAudio = StoredSetting.bool("meetingKeepAudio", default: true)
+        static let meetingLearnVoices = StoredSetting.bool("meetingLearnVoices", default: false)
+        static let meetingAskBeforeTranscribing = StoredSetting.bool("meetingAskBeforeTranscribing", default: false)
+        static let meetingLimit = StoredSetting.int("meetingLimit", default: 0)
+        static let askClaude = StoredSetting.bool("askClaude", default: Updates.isDevBuild)
+        static let askClaudeSystemPrompt = StoredSetting.string(MCPDefaults.systemPromptKey, default: "")
+        static let meetingHooks = StoredSetting<[MeetingHook]>(
+            load: { MeetingHook.stored(in: $0) }, save: { MeetingHook.store($0, in: $1) })
+        static let askClaudePermissionMode = StoredSetting.string("askClaudePermissionMode", default: "auto")
+        static let askClaudeFolder = StoredSetting.string("askClaudeFolder", default: FileManager.default.homeDirectoryForCurrentUser.path)
+        static let askClaudeTools = StoredSetting.strings("askClaudeTools")
+        static let askClaudeModel = StoredSetting.string("askClaudeModel", default: ClaudeRun.defaultModel)
+        static let recordRoomShortcut = StoredSetting<KeyCombo?>.optionalJSON("recordRoomShortcut")
+        static let debugLogs = StoredSetting.bool("debugLogs", default: false)
+    }
+}
+
+/// How one setting is read back from UserDefaults and saved there, under
+/// its key. `load` gives the default when nothing is stored.
+struct StoredSetting<Value>: Sendable {
+    let load: @Sendable (UserDefaults) -> Value
+    let save: @Sendable (Value, UserDefaults) -> Void
+}
+
+extension StoredSetting where Value == Bool {
+    static func bool(_ key: String, default fallback: Bool) -> Self {
+        Self(load: { $0.object(forKey: key) == nil ? fallback : $0.bool(forKey: key) }, save: { $1.set($0, forKey: key) })
+    }
+}
+
+extension StoredSetting where Value == Int {
+    static func int(_ key: String, default fallback: Int) -> Self {
+        Self(load: { $0.object(forKey: key) == nil ? fallback : $0.integer(forKey: key) }, save: { $1.set($0, forKey: key) })
+    }
+}
+
+extension StoredSetting where Value == String {
+    static func string(_ key: String, default fallback: String) -> Self {
+        Self(load: { $0.string(forKey: key) ?? fallback }, save: { $1.set($0, forKey: key) })
+    }
+}
+
+extension StoredSetting where Value == String? {
+    static func optionalString(_ key: String) -> Self {
+        Self(load: { $0.string(forKey: key) }, save: { $1.set($0, forKey: key) })
+    }
+}
+
+extension StoredSetting where Value == [String] {
+    /// Nothing stored reads as no strings.
+    static func strings(_ key: String) -> Self {
+        Self(load: { $0.stringArray(forKey: key) ?? [] }, save: { $1.set($0, forKey: key) })
+    }
+}
+
+extension StoredSetting where Value: RawRepresentable & Sendable, Value.RawValue == String {
+    /// Stored as its raw value; one that no longer names a case reads as the default.
+    static func raw(_ key: String, default fallback: Value) -> Self {
+        Self(load: { $0.string(forKey: key).flatMap(Value.init) ?? fallback }, save: { $1.set($0.rawValue, forKey: key) })
+    }
+}
+
+extension StoredSetting {
+    static func optionalRaw<Case: RawRepresentable>(_ key: String) -> Self where Value == Case?, Case.RawValue == String {
+        Self(load: { $0.string(forKey: key).flatMap(Case.init) }, save: { $1.set($0?.rawValue, forKey: key) })
+    }
+
+    /// Stored as its raw values, sorted; values that no longer name a case are dropped.
+    static func rawSet<Case: RawRepresentable>(_ key: String) -> Self where Value == Set<Case>, Case.RawValue == String {
+        Self(load: { Set(($0.stringArray(forKey: key) ?? []).compactMap(Case.init)) }, save: { $1.set($0.map(\.rawValue).sorted(), forKey: key) })
+    }
+
+    /// Nil removes the key.
+    static func optionalJSON<Wrapped: Codable>(_ key: String) -> Self where Value == Wrapped? {
+        Self(
+            load: { $0.data(forKey: key).flatMap { try? JSONDecoder().decode(Wrapped.self, from: $0) } },
+            save: { $1.set($0.flatMap { try? JSONEncoder().encode($0) }, forKey: key) }
+        )
+    }
+}
+
+extension StoredSetting where Value: Codable & Sendable {
+    /// Stored as JSON data; data that does not decode reads as the default.
+    static func json(_ key: String, default fallback: Value) -> Self {
+        Self(
+            load: { $0.data(forKey: key).flatMap { try? JSONDecoder().decode(Value.self, from: $0) } ?? fallback },
+            save: { $1.set(try? JSONEncoder().encode($0), forKey: key) }
+        )
     }
 }
 

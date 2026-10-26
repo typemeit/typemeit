@@ -16,6 +16,7 @@ MERGE_GAP_S = 0.5
 PAD_S = 0.2
 MAX_CHUNK_SECONDS = 30.0
 SEARCH_SECONDS = 5.0
+FRAME_SECONDS = 0.05
 
 def probabilities(audio):
     import onnxruntime
@@ -56,8 +57,10 @@ def padded_regions(regions, total_seconds):
             merged.append((begin, end))
     return [(max(0.0, b - PAD_S), min(total_seconds, e + PAD_S)) for b, e in merged]
 
-def split_long(piece):
-    window, search, frame = int(MAX_CHUNK_SECONDS * RATE), int(SEARCH_SECONDS * RATE), int(0.05 * RATE)
+def split_long(piece, max_seconds, rate, search_seconds=SEARCH_SECONDS):
+    """Cuts piece into windows of at most max_seconds, each ending mid-way through the quietest
+    FRAME_SECONDS frame in its last search_seconds. Nothing is dropped."""
+    window, search, frame = int(max_seconds * rate), int(search_seconds * rate), int(FRAME_SECONDS * rate)
     start = 0
     while len(piece) - start > window:
         tail = piece[start + window - search:start + window]
@@ -70,7 +73,7 @@ def split_long(piece):
 
 def chunks(audio):
     pieces = [audio[int(b * RATE):int(e * RATE)] for b, e in padded_regions(speech_regions(audio), len(audio) / RATE)]
-    pieces = [part for piece in pieces for part in split_long(piece)]
+    pieces = [part for piece in pieces for part in split_long(piece, MAX_CHUNK_SECONDS, RATE)]
     packed, current, length = [], [], 0
     for piece in pieces:
         if current and length + len(piece) > MAX_CHUNK_SECONDS * RATE:

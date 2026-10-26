@@ -1,11 +1,12 @@
 import Foundation
 
 /// The mechanical part of clean-up, done locally on whatever is about to be
-/// typed: filler sounds, stutters and whitespace. The model is asked to do
-/// the same, and often does not (a tidy sentence with an unfamiliar word
-/// comes back untouched), so this runs on its output and on the raw
-/// transcript alike. Line breaks are kept; within a line, fillers go first
-/// and stutters are judged on what is left, so "the the uh the" is one "the".
+/// typed: filler sounds, stutters, whitespace and clock times. The model is
+/// asked to do the same, and often does not (a tidy sentence with an
+/// unfamiliar word comes back untouched), so this runs on its output and on
+/// the raw transcript alike. Line breaks are kept; within a line, fillers go
+/// first and stutters are judged on what is left, so "the the uh the" is one
+/// "the".
 enum LocalCleanup {
     /// Filler sounds, with any elongation: "uh", "uhhh", "ummm", "erm",
     /// "hmm". "mm" is millimetres, so m needs three.
@@ -23,10 +24,11 @@ enum LocalCleanup {
     nonisolated(unsafe) static let tmi = /(?i)\b(?:tmi|ti[ae]?\s?mai)\b/
 
     static func run(_ text: String) -> String {
-        text.replacing(tmi, with: "TMI").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        let cleaned = text.replacing(tmi, with: "TMI").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
             .map { line(String($0)) }
             .joined(separator: "\n")
             .trimmingCharacters(in: .newlines)
+        return ClockTime.apply(cleaned)
     }
 
     private static func line(_ text: String) -> String {

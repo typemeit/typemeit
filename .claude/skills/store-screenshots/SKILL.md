@@ -10,7 +10,8 @@ of scene:
 
 - **painted** (`slack`, `claude`): a real capture of the other app,
   `Scripts/store/<scene>/base.png`, with its text repainted by
-  `<scene>/generate.py` in that app's own font so the conversation is made up.
+  `<scene>/generate.py` in that app's own font (rendered by
+  `Scripts/store/paint.py`) so the conversation is made up.
   The committed base has every region `generate.py` paints already blanked by
   that script's `scrub()`: a capture of a real account shows real people,
   messages and chat titles, and none of it may reach git. Never commit a raw
@@ -90,9 +91,11 @@ If the layout moved, re-measure the pixel constants at the top of
 
 ## Add a scene
 
-Painted: copy the closest `generate.py`, measure its boxes on the raw
-capture, give it a `scrub()` that blanks every box it paints, adopt the base
-as above, and add an entry to `SCENES` with `cloud="dark"` (or `"white"`) if the
+Painted: model `<scene>/generate.py` on the closest one, importing
+`Painter` from `Scripts/store/paint.py` for the text (give it the device
+scale that matches the app's rasterisation and the app's font) rather than
+copying the rendering code. Measure its boxes on the raw capture, give it a
+`scrub()` that blanks every box it paints, adopt the base as above, and add an entry to `SCENES` with `cloud="dark"` (or `"white"`) if the
 app would show one. App tab: add the tab name to `TABS` in
 `app/capture.py` and an entry to `SCENES` without `cloud`. Add the new scene
 to `PAINTED` in `build.py` if it is painted.
