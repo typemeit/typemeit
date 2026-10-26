@@ -26,7 +26,7 @@
 # ground is white, so the labels read in Light and wash out in Dark.
 #
 # The puffs in Scripts/puff are frames of the app's own shader, not stock smoke
-# -- see Scripts/puff/serve.py for how they are regenerated.
+# -- see Scripts/render-serve.py for how they are regenerated.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

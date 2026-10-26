@@ -39,6 +39,10 @@ packages:
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio
     exactVersion: "0.17.6"
+  # Renders Claude's replies: lists, tables and code blocks.
+  Textual:
+    url: https://github.com/gonzalezreal/textual
+    exactVersion: "0.5.0"
 targets:
   TypeMeIt:
     type: application
@@ -61,6 +65,7 @@ targets:
         product: Sparkle
       - package: FluidAudio
         product: FluidAudio
+      - package: Textual
       # docs/meetings.md 7.15: the tool ships at Contents/MacOS/typemeit-mcp,
       # copied in and signed by this target, so archives carry it too.
       - target: typemeit-mcp
@@ -234,6 +239,17 @@ targets:
       - path: TypeMeIt/MCPDefaults.swift
       # Meeting.names is declared here.
       - path: TypeMeIt/Meetings/SpeakerNaming.swift
+      # Search that finds what the app's own search boxes find.
+      - path: TypeMeIt/TextSearch.swift
+      # Where the app keeps history.json and the meetings, and the JSON it
+      # writes them in.
+      - path: TypeMeIt/SupportPaths.swift
+      - path: TypeMeIt/StoredJSON.swift
+      - path: TypeMeIt/HistoryEntry.swift
+      # Timestamps as the transcript writes them.
+      - path: TypeMeIt/Meetings/TranscriptRender.swift
+      # Meeting.dataReminder's text.
+      - path: TypeMeIt/Meetings/MeetingDataReminder.swift
     settings:
       base:
         # Its own products folder: in the app's, FluidAudio's modules sit
@@ -257,6 +273,9 @@ targets:
       - TypeMeIt/KeyCombo.swift
       - TypeMeIt/MenuBarIcon.swift
       - TypeMeIt/Plural.swift
+      # LiveClaude reads Claude Code's stream as the app does.
+      - TypeMeIt/Meetings/ClaudeStream.swift
+      - TypeMeIt/Meetings/MeetingDataReminder.swift
       - TypeMeIt/Overlay/PuffView.swift
       - TypeMeIt/Overlay/Puff.metal
       - TypeMeIt/Resources/Assets.xcassets

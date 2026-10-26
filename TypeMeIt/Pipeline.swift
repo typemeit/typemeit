@@ -427,19 +427,12 @@ final class Pipeline {
         guard phase == .idle, overlay.model.state == .hidden else { return false }
         overlay.show(state)
         toastTask?.cancel()
-        // A ready update stays up until it is installed or put off; the
-        // buttons are the only way it leaves.
-        if case .updateReady = state { return true }
+        // A standing toast, such as a ready update, stays up until one of
+        // its buttons answers it.
+        guard !state.isStanding else { return true }
         toastTask = Task { [weak self] in
-            var remaining = ToastTiming.timeout
-            let step: Duration = .milliseconds(100)
-            let deadline = ContinuousClock.now + ToastTiming.safetyHide
-            while remaining > .zero, ContinuousClock.now < deadline {
-                try? await Task.sleep(for: step)
-                guard !Task.isCancelled, let self else { return }
-                if !self.overlay.model.toastPaused { remaining -= step }
-            }
-            guard !Task.isCancelled, let self, self.overlay.model.state == state else { return }
+            let ranOut = await ToastTiming.countDown(counting: { self?.overlay.model.isCounting(state) })
+            guard ranOut, let self, self.overlay.model.state == state else { return }
             self.overlay.hide()
         }
         return true

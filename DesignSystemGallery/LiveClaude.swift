@@ -53,9 +53,9 @@ struct LiveClaude: View {
         claude.standardError = FileHandle.nullDevice
         let buffer = LineBuffer()
         pipe.fileHandleForReading.readabilityHandler = { handle in
-            for event in buffer.lines(adding: handle.availableData) {
-                let parsed = Self.parse(event)
-                DispatchQueue.main.async { apply(parsed) }
+            for line in buffer.lines(adding: handle.availableData) {
+                guard let event = ClaudeStream.event(for: String(decoding: line, as: UTF8.self)) else { continue }
+                DispatchQueue.main.async { apply(event) }
             }
         }
         claude.terminationHandler = { ended in
@@ -72,65 +72,13 @@ struct LiveClaude: View {
         process = claude
     }
 
-    private enum Parsed: @unchecked Sendable {
-        case started(model: String, session: String), lines([SquareClaudeLine]), results([String]), end(failed: Bool), nothing }
-
-    private func apply(_ parsed: Parsed) {
-        switch parsed {
-        case .started(let started, let id): model = started; session = id
+    private func apply(_ event: ClaudeStream.Event) {
+        switch event {
+        case .started(let started, let id): model = started; session = id ?? ""
         case .lines(let new): lines += new
-        case .results(let results):
-            for result in results {
-                if let index = lines.lastIndex(where: { if case .call(_, nil) = $0 { true } else { false } }),
-                   case .call(let name, _) = lines[index] { lines[index] = .call(name, result: result) }
-            }
-        case .end(let failed): status = failed ? .failed : .done
-        case .nothing: break
+        case .results(let results): lines = ClaudeStream.filling(lines, with: results)
+        case .ended(_, let failed): status = failed ? .failed : .done
         }
-    }
-
-    nonisolated private static func parse(_ data: Data) -> Parsed {
-        guard let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = fields["type"] as? String else { return .nothing }
-        let content = (fields["message"] as? [String: Any])?["content"] as? [[String: Any]] ?? []
-        switch type {
-        case "system" where fields["subtype"] as? String == "init":
-            return .started(model: fields["model"] as? String ?? "claude", session: fields["session_id"] as? String ?? "")
-        case "assistant":
-            return .lines(content.compactMap { part in
-                switch part["type"] as? String {
-                case "tool_use" where part["name"] as? String == "ToolSearch":
-                    return nil
-                case "tool_use":
-                    let name = (part["name"] as? String ?? "tool").replacingOccurrences(of: "mcp__", with: "").replacingOccurrences(of: "__", with: " ")
-                    return .call("\(name) \(oneLine(part["input"]))", result: nil)
-                case "text": return .text((part["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-                default: return nil
-                }
-            })
-        case "user":
-            let results = content.filter { $0["type"] as? String == "tool_result" && !(($0["content"] as? [[String: Any]])?.contains { $0["type"] as? String == "tool_reference" } ?? false) }
-            return .results(results.map { oneLine($0["content"]) })
-        case "result":
-            return .end(failed: fields["is_error"] as? Bool ?? false)
-        default:
-            return .nothing
-        }
-    }
-
-    nonisolated private static func oneLine(_ value: Any?) -> String {
-        let text: String = switch value {
-        case let string as String: string
-        case let parts as [[String: Any]]: parts.compactMap { $0["text"] as? String ?? $0["tool_name"] as? String }.joined(separator: " ")
-        case let object as [String: Any]: object.keys.sorted().map { "\(object[$0]!)" }.joined(separator: " ")
-        case let object?: "\(object)"
-        default: ""
-        }
-        // typemeit's tools open with a line telling Claude the meeting is data.
-        let lines = text.split(whereSeparator: \.isNewline)
-        let shown = lines.first?.hasPrefix("the text below is meeting content") == true ? lines.dropFirst() : lines[...]
-        let flat = shown.joined(separator: " ")
-        return flat.count > 100 ? String(flat.prefix(100)) + "…" : flat
     }
 }
 

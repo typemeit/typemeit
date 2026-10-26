@@ -20,18 +20,6 @@ enum MeetingFolder {
         return formatter
     }
 
-    /// `8m`, `45m`, `1h20m`, rounded to the nearest minute; a duration under
-    /// a minute is `0m`.
-    static func durationLabel(_ duration: Duration) -> String {
-        let seconds = duration.timeInterval
-        guard seconds >= 60 else { return "0m" }
-        let totalMinutes = Int((seconds / 60).rounded())
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        guard hours > 0 else { return "\(minutes)m" }
-        return "\(hours)h\(minutes)m"
-    }
-
     /// Replaces `/` and `:` with `-`, drops non-whitespace control
     /// characters, collapses whitespace (newlines included) to one space,
     /// trims, strips leading dots and precomposes to NFC. `#` stays.
@@ -79,7 +67,7 @@ enum MeetingFolder {
     }
 
     /// Whether `token` is a duration label this module could have produced:
-    /// `(\d+h)?\d+m`.
+    /// `\d+s` or `(\d+h)?\d+m`.
     private static func isDurationLabel(_ token: String) -> Bool {
         var chars = Substring(token)
         func digits() -> Bool {
@@ -88,6 +76,7 @@ enum MeetingFolder {
             return chars.count < before
         }
         guard digits() else { return false }
+        if chars == "s" { return true }
         if chars.first == "h" {
             chars.removeFirst()
             guard digits() else { return false }
@@ -121,7 +110,7 @@ enum MeetingFolder {
     /// folder's current names) by appending ` 2`, ` 3`, … .
     static func name(started: Date, zone: TimeZone, duration: Duration?, title: String, existing: [String]) -> String {
         let timePart = timeFormatter(zone: zone).string(from: started)
-        let durationPart = duration.map(durationLabel)
+        let durationPart = duration.map(Meeting.durationLabel)
         var titlePart = sanitised(title)
         if titlePart.isEmpty { titlePart = "meeting" }
 
@@ -157,17 +146,10 @@ enum MeetingFolder {
 extension MeetingFolder {
     // MARK: Files
 
-    static let meetingFile = "meeting.json"
-    static let transcriptFile = "transcript.md"
-
     /// Raw tracks and the in-progress record, under Application Support and
     /// excluded from backup.
     nonisolated static var stagingRoot: URL {
-        Store.directory.appendingPathComponent("Meetings", isDirectory: true).appendingPathComponent(".in-progress", isDirectory: true)
-    }
-
-    nonisolated static var defaultPublishedRoot: URL {
-        Store.directory.appendingPathComponent("Meetings", isDirectory: true)
+        SupportPaths.meetingsRoot.appendingPathComponent(SupportPaths.stagingFolderName, isDirectory: true)
     }
 
     nonisolated static func staged(_ id: UUID) -> URL {
@@ -177,8 +159,8 @@ extension MeetingFolder {
     /// Writes `meeting.json` atomically and renders `transcript.md` beside it.
     nonisolated static func write(_ meeting: Meeting, to folder: URL) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try meeting.encoded().write(to: folder.appendingPathComponent(meetingFile), options: .atomic)
-        try Data(TranscriptRender.markdown(meeting).utf8).write(to: folder.appendingPathComponent(transcriptFile), options: .atomic)
+        try meeting.encoded().write(to: folder.appendingPathComponent(SupportPaths.meetingFile), options: .atomic)
+        try Data(TranscriptRender.markdown(meeting).utf8).write(to: folder.appendingPathComponent(SupportPaths.transcriptFile), options: .atomic)
     }
 
     /// Writes the meeting as a `.tmi` file (`MeetingShare`) into `directory`,
@@ -193,7 +175,7 @@ extension MeetingFolder {
     }
 
     nonisolated static func read(_ folder: URL) -> Meeting? {
-        guard let data = try? Data(contentsOf: folder.appendingPathComponent(meetingFile)) else { return nil }
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(SupportPaths.meetingFile)) else { return nil }
         return Meeting.decode(data)
     }
 

@@ -38,6 +38,8 @@ final class OverlayModel {
         /// The call dropped and rejoined; the recording carried on.
         case meetingResumed(app: ProcessOwner.Owner)
         case meetingFolderUnavailable
+        /// A check of Claude Code the user did not start failed (`ClaudeCheck`).
+        case claudeCheckFailed
         /// A question heard in the meeting, offered to Claude Code.
         case meetingQuestion(text: String)
         /// Claude Code is answering. Stays until it answers or is cancelled.
@@ -47,7 +49,7 @@ final class OverlayModel {
 
         var isMeeting: Bool {
             switch self {
-            case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingHooksDone, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable, .meetingQuestion, .meetingAsking, .meetingAnswer: true
+            case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingHooksDone, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable, .claudeCheckFailed, .meetingQuestion, .meetingAsking, .meetingAnswer: true
             default: false
             }
         }
@@ -69,6 +71,10 @@ final class OverlayModel {
     var level: Float = 0
     var copied = false
     var toastPaused = false
+
+    /// Whether `toast`'s countdown runs: it is the one on screen and the
+    /// pointer is not resting on it.
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused }
     /// Whether the answer pill shows the answer or only its question.
     var answerExpanded = true
     /// When the cloud last arrived. Each dictation gets a new one, so the
@@ -92,7 +98,7 @@ final class OverlayModel {
         case .hidden: .none
         case .arming, .recording, .pinned, .transcribing, .cleaningUp: .cloud
         case .copyPrompt, .learned, .undone, .updateReady, .updateFailed: .pill
-        case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingHooksDone, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable: .pill
+        case .meetingPrompt, .meetingSystemAudioOff, .meetingSaved, .meetingHooksDone, .meetingTranscribeAsk, .meetingFailed, .meetingDiskFull, .meetingResumed, .meetingFolderUnavailable, .claudeCheckFailed: .pill
         case .meetingQuestion, .meetingAsking, .meetingAnswer: .pill
         }
     }
@@ -145,4 +151,6 @@ final class OverlayModel {
     var onOpenAsk: (@MainActor () -> Void)?
     /// The saved pill's run hooks.
     var onRunHooks: (@MainActor (UUID) -> Void)?
+    /// Opens settings on the Claude Code check.
+    var onShowClaudeCheck: (@MainActor () -> Void)?
 }

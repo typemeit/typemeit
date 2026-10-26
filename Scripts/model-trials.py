@@ -4,7 +4,8 @@ and keeps the /models line of web/sitemap.xml at the newest trial's date.
 
 The JSON is the only copy anyone edits. Each trial carries the internal notes
 (date ... link, Markdown) and the public fields the web page leads with
-(name, group, status, summary). `--check` exits non-zero if any output is
+(name, url, group, status, summary); url is the model's public page, or null
+for a trial of the app's own code. `--check` exits non-zero if any output is
 stale, for CI.
 """
 import html
@@ -43,6 +44,8 @@ def load():
             raise SystemExit(f"trial {index} ({trial.get('model', '?')[:40]}) has no {', '.join(missing)}")
         if trial["group"] not in GROUPS:
             raise SystemExit(f"trial {index}: group {trial['group']!r} is not one of {GROUPS}")
+        if trial.get("url") is not None and not trial["url"].startswith("https://"):
+            raise SystemExit(f"trial {index}: url {trial['url']!r} is not an https link")
         if trial["status"] not in STATUSES:
             raise SystemExit(f"trial {index}: status {trial['status']!r} is not one of {STATUSES}")
     return data
@@ -92,13 +95,16 @@ def human_date(iso):
 
 
 def trial_html(trial, anchor):
+    name = html.escape(trial["name"])
+    if trial["url"]:
+        name = f'<a href="{html.escape(trial["url"])}">{name}</a>'
     details = "".join(
         f"<dt>{label}</dt><dd>{inline(trial[field])}</dd>"
         for field, label in DETAIL_ROWS if trial[field] != "—"
     )
     return f"""<article class="trial" id="{anchor}" data-group="{slug(trial['group'])}" data-status="{trial['status']}">
   <time datetime="{trial['date']}">{human_date(trial['date'])}</time>
-  <h3>{html.escape(trial['name'])}</h3>
+  <h3>{name}</h3>
   <span class="status status-{trial['status']}">{trial['status']}</span>
   <p class="summary">{html.escape(trial['summary'])}</p>
   <details>
@@ -150,7 +156,7 @@ def page(data):
         "measurementTechnique": f"Local evals on a {data['machine']}",
         "variableMeasured": ["word error rate", "words under the wrong speaker", "eval cases passed", "latency"],
         "hasPart": [{"@type": "CreativeWork", "name": t["name"], "dateCreated": t["date"],
-                     "description": t["summary"]} for t in trials],
+                     "description": t["summary"], **({"url": t["url"]} if t["url"] else {})} for t in trials],
     }, ensure_ascii=False, indent=1)
 
     return f"""<!doctype html>

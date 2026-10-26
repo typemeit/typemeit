@@ -20,7 +20,7 @@ struct UpgradeView: View {
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            SettingsGroup { ModelDownloadRows() }
+            SquareRows { ModelDownloadRows() }
                 .padding(.top, 24)
             Spacer(minLength: 0)
         }
@@ -42,29 +42,31 @@ struct ModelDownloadRows: View {
     var body: some View {
         switch modelStore.state {
         case .installed:
-            SettingsRow(label: ModelStore.displayName, last: true) { Status("installed", done: true) }
+            SquareSettingsRow(label: ModelStore.displayName) { SquareStatus("installed", done: true) }
         case .downloading(let received, let total):
-            SettingsRow(label: ModelStore.displayName) {
-                Button("cancel") { modelStore.cancel() }.buttonStyle(InkButtonStyle())
+            SquareSettingsRow(label: ModelStore.displayName) {
+                Button("cancel") { modelStore.cancel() }.buttonStyle(SquareButtonStyle())
             }
             // Under the bar, not in the row's help popover: the
             // popover redrew on every progress tick and flickered.
             VStack(alignment: .leading, spacing: 8) {
-                InkProgress(value: Double(received) / Double(max(total, 1)))
+                SquareBar(fraction: Double(received) / Double(max(total, 1)), width: nil, height: 6, track: DesignTokens.Colors.inkA08)
+                    .animation(.easeOut(duration: DesignTokens.Duration.n2), value: received)
                 Text(modelStore.reconnecting ? "reconnecting…" : "\(ModelStore.sizeLabel(received)) of \(ModelStore.sizeLabel(total))")
                     .font(DesignTokens.Fonts.micro.monospaced())
                     .foregroundStyle(DesignTokens.Colors.ink2)
             }
-            .padding(.horizontal, 12).padding(.vertical, 12)
+            .padding(.vertical, 12)
+            .overlay(alignment: .top) { SquareRule() }
         case .verifying:
-            SettingsRow(label: ModelStore.displayName, last: true) { Status("checking the model…") }
+            SquareSettingsRow(label: ModelStore.displayName) { SquareStatus("checking the model…") }
         case .failed(let message):
-            SettingsRow(label: ModelStore.displayName, subtitle: message.lowercased(), last: true) {
-                Button("retry") { modelStore.download() }.buttonStyle(InkButtonStyle(primary: true))
+            SquareSettingsRow(label: ModelStore.displayName, help: message.lowercased()) {
+                Button("retry") { modelStore.download() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         case .missing:
-            SettingsRow(label: ModelStore.displayName, subtitle: "\(ModelStore.sizeLabel(ModelStore.expectedBytes)), downloaded once", last: true) {
-                Button("download") { modelStore.download() }.buttonStyle(InkButtonStyle(primary: true))
+            SquareSettingsRow(label: ModelStore.displayName, help: "\(ModelStore.sizeLabel(ModelStore.expectedBytes)), downloaded once") {
+                Button("download") { modelStore.download() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         }
     }

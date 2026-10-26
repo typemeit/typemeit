@@ -12,15 +12,18 @@ device scale 1.8, which reproduces the capture's rasterisation exactly.
 Needs Google Chrome, Pillow and numpy.
 """
 import os
-import subprocess
+import sys
 
 import numpy as np
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+from paint import Painter
+
 OUT = os.path.join(HERE, "out")
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 DSF = 1.8
+PAINT = Painter(OUT, dsf=DSF, text_width=600)
 
 # Measured on base.png (device px).
 PANE = (710, 305, 3120, 1690)        # message pane: left, top, right, composer top
@@ -49,8 +52,8 @@ PILL_AT = (260, 915)
 ACTIVE_GREEN = (43, 172, 118)
 LAST_LINE_GAP = 26                   # device px between the last message and the composer
 
-FONT = {400: "lato-regular", 700: "lato-bold", 900: "lato-black"}
 FONTS_URL = "file://" + os.path.join(HERE, "fonts")
+FONT = {400: f"{FONTS_URL}/lato-regular.woff2", 700: f"{FONTS_URL}/lato-bold.woff2", 900: f"{FONTS_URL}/lato-black.woff2"}
 CSS = """
 @font-face{font-family:L;src:url(%(fonts)s/lato-regular.woff2);font-weight:400}
 @font-face{font-family:L;src:url(%(fonts)s/lato-bold.woff2);font-weight:700}
@@ -75,16 +78,6 @@ CHEVRON = ('<svg width="10" height="6" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"
            'stroke="#1d1c1d" stroke-width="1.5" stroke-linecap="round"/></svg>')
 
 
-def chrome(html, out, w, h):
-    path = os.path.join(OUT, "page.html")
-    with open(path, "w") as f:
-        f.write(html)
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    f"--force-device-scale-factor={DSF}", f"--window-size={w},{h}",
-                    f"--screenshot={out}", f"file://{path}"], capture_output=True, check=True)
-    return Image.open(out).convert("RGB")
-
-
 def thread_html(msgs, avatars, width):
     parts = []
     for m in msgs:
@@ -97,24 +90,6 @@ def thread_html(msgs, avatars, width):
                          f'<div class=hd><span class=nm>{m["name"]}</span><span class=ts>{m["time"]}</span></div>'
                          f'<div class=tx>{m["text"]}</div></div>')
     return f"<!doctype html><meta charset=utf-8><style>{CSS % dict(w=width, fonts=FONTS_URL)}</style><div class=pane>{''.join(parts)}</div>"
-
-
-def text(label, size, weight, color, bg):
-    """Render one line; returns the image and the ink bbox."""
-    html = (f'<!doctype html><meta charset=utf-8><style>@font-face{{font-family:L;src:url({FONTS_URL}/{FONT[weight]}.woff2)}}'
-            f'html,body{{margin:0;background:{bg}}}.m{{position:absolute;left:5px;top:10px;font:{size}px/1.2 L;'
-            f'color:{color};-webkit-font-smoothing:antialiased;white-space:nowrap}}</style><div class=m>{label}</div>')
-    im = chrome(html, os.path.join(OUT, "text.png"), 600, 60)
-    lum = np.array(im.convert("L")).astype(int)
-    bg_lum = int(np.array(Image.new("RGB", (1, 1), bg).convert("L"))[0, 0])
-    ys, xs = np.where(np.abs(lum - bg_lum) > 60)
-    return im, (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
-
-
-def paste_text(dst, label, size, weight, color, bg, x, cap_top):
-    im, (x0, y0, x1, y1) = text(label, size, weight, color, bg)
-    dst.paste(im.crop((x0 - 2, y0 - 3, x1 + 2, y1 + 3)), (x - 2, cap_top - 3))
-    return x + (x1 - x0)
 
 
 def tile(dst, path, x, y, size, radius):
@@ -192,7 +167,7 @@ def generate(msgs, composer, other, me, workspace, avatars, out_path):
     # Message pane, bottom-aligned above the composer and clipped at the tab bar.
     left, top, right, composer_top = PANE
     width = int((right - left) / DSF)
-    thread = chrome(thread_html(msgs, avatars, width), os.path.join(OUT, "thread.png"), width, 1000)
+    thread = PAINT.chrome(thread_html(msgs, avatars, width), os.path.join(OUT, "thread.png"), width, 1000)
     ink_rows = np.where((np.array(thread.convert("L")) < 160).sum(axis=1) > 0)[0]
     last = ink_rows.max()
     y = composer_top - LAST_LINE_GAP - last
@@ -200,23 +175,23 @@ def generate(msgs, composer, other, me, workspace, avatars, out_path):
     src.paste(thread.crop((0, clip, thread.width, last + 4)), (left, y + clip))
 
     # Composer: typed text with a caret after it.
-    end = paste_text(src, composer, 15, 400, INK, "#fff", COMPOSER_X, COMPOSER_CAP)
+    end = PAINT.paste_text(src, composer, FONT[400], 15, INK, "#fff", COMPOSER_X, COMPOSER_CAP)
     d.rectangle((end + 6, CARET[0], end + 7, CARET[1]), fill=(28, 28, 28))
 
     # Channel header.
     tile(src, avatars[other], *HEADER_TILE, 7)
-    paste_text(src, other, 18, 900, INK, "#fff", HEADER_X, HEADER_CAP)
+    PAINT.paste_text(src, other, FONT[900], 18, INK, "#fff", HEADER_X, HEADER_CAP)
 
     # Workspace name and tile; the chevron moves to the end of the new name.
     chevron = src.crop(WORKSPACE_CHEVRON).copy()
     d.rectangle(WORKSPACE_BOX, fill=sidebar)
-    end = paste_text(src, workspace, 18, 900, INK, hexstr(sidebar), WORKSPACE_X, WORKSPACE_CAP)
+    end = PAINT.paste_text(src, workspace, FONT[900], 18, INK, hexstr(sidebar), WORKSPACE_X, WORKSPACE_CAP)
     src.paste(chevron, (end + 17, WORKSPACE_CHEVRON[1]))
     tile(src, avatars["workspace"], *WORKSPACE_TILE, 8)
 
     # Selected DM row in the sidebar.
     tile(src, avatars[other], *DM_TILE, 5)
-    paste_text(src, other, 15, 400, DM_INK, hexstr(pill), DM_X, DM_CAP)
+    PAINT.paste_text(src, other, FONT[400], 15, DM_INK, hexstr(pill), DM_X, DM_CAP)
 
     own_avatar(src, avatars[me], rail)
     src.putalpha(base.getchannel("A"))   # keep the window shadow transparent
