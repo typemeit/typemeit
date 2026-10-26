@@ -245,7 +245,7 @@ enum MeetingProbes {
             objectIDs = holder.objectIDs
             name = holder.owner.name
         }
-        guard let mic = MeetingCapture.microphone(preferredUID: Settings.shared.microphoneUID), let micID = AudioCapture.deviceID(forUID: mic.uid) else { return }
+        guard let mic = MeetingCapture.microphone(preferredUID: Settings.shared.connectedMicrophoneUID()), let micID = AudioCapture.deviceID(forUID: mic.uid) else { return }
         let originalMicRate = MeetingCapture.property(micID, kAudioDevicePropertyNominalSampleRate, Double(0))
         if let micRate { setNominalRate(micID, micRate) }
         do {

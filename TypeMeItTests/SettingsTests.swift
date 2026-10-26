@@ -8,6 +8,7 @@ import Testing
 private func snapshot(_ settings: Settings) -> [String: String] {
     [
         "microphoneUID": String(describing: settings.microphoneUID),
+        "microphoneName": String(describing: settings.microphoneName),
         "muteWhileRecording": String(describing: settings.muteWhileRecording),
         "pauseWhileRecording": String(describing: settings.pauseWhileRecording),
         "audioFeedback": String(describing: settings.audioFeedback),
@@ -64,6 +65,7 @@ private func withThrowawayDefaults(_ body: (UserDefaults, String) throws -> Void
 @MainActor
 private func changeEverySetting(_ settings: Settings) {
     settings.microphoneUID = "BuiltInMicrophoneDevice"
+    settings.microphoneName = "Desk Mic"
     settings.muteWhileRecording = false
     settings.pauseWhileRecording = true
     settings.audioFeedback.toggle()
@@ -111,6 +113,7 @@ struct SettingsTests {
         withThrowawayDefaults { throwaway, _ in
             #expect(snapshot(Settings(defaults: throwaway)) == [
                 "microphoneUID": "nil",
+                "microphoneName": "nil",
                 "muteWhileRecording": "true",
                 "pauseWhileRecording": "false",
                 "audioFeedback": "true",
@@ -172,7 +175,7 @@ struct SettingsTests {
             changeEverySetting(Settings(defaults: throwaway))
             let storedKeys = Set(throwaway.persistentDomain(forName: suiteName)?.keys ?? [:].keys)
             #expect(storedKeys == [
-                "microphoneUID", "muteWhileRecording", "pauseWhileRecording", "audioFeedback",
+                "microphoneUID", "microphoneName", "muteWhileRecording", "pauseWhileRecording", "audioFeedback",
                 "postProcessingEnabled", "customWords", "writingStyles", "learnFromCorrections",
                 "historyLimit", "keepRecordings", "autoUpdate", "askBeforeUpdating", "launchAtLogin",
                 "appearance", "cloudColorEnabled", "cloudColor", "lastBackdrop", "cloudPosition",
@@ -199,6 +202,7 @@ struct SettingsTests {
             #expect(hooks == [MeetingHook(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: "summary", prompt: "Summarise it.", on: false)])
             let expected: [String: Any] = [
                 "microphoneUID": "BuiltInMicrophoneDevice",
+                "microphoneName": "Desk Mic",
                 "muteWhileRecording": false,
                 "pauseWhileRecording": true,
                 "audioFeedback": false,

@@ -291,6 +291,29 @@ final class AudioCapture: @unchecked Sendable {
         var name: String
     }
 
+    /// Every connected device with an input stream, named as CoreAudio
+    /// names it.
+    static func connectedInputs() -> [Device] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return [] }
+        var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids) == noErr else { return [] }
+        return ids.filter { MeetingCapture.streams(of: $0).contains { $0 > 0 } }
+            .compactMap(MeetingCapture.device)
+            .map { Device(id: $0.uid, name: $0.name) }
+    }
+
+    /// The one input with this name, or nil when none or several have it:
+    /// two of the same model are told apart only by UID.
+    static func uid(named name: String, among inputs: [Device]) -> String? {
+        let named = inputs.filter { $0.name == name }
+        return named.count == 1 ? named[0].id : nil
+    }
+
     static func inputDevices() -> [Device] {
         let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified)
         return session.devices.map { Device(id: $0.uniqueID, name: $0.localizedName) }

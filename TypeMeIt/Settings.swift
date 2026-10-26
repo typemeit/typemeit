@@ -39,6 +39,8 @@ final class Settings {
     @ObservationIgnored private var systemPromptObservation: NSKeyValueObservation?
 
     var microphoneUID: String? { didSet { Stored.microphoneUID.save(microphoneUID, defaults) } }
+    /// The picked mic's name, to find it again when its UID changes.
+    var microphoneName: String? { didSet { Stored.microphoneName.save(microphoneName, defaults) } }
     // Mute and pause are alternatives: switching one on switches the other off.
     var muteWhileRecording: Bool {
         didSet {
@@ -185,6 +187,7 @@ final class Settings {
     init(defaults d: UserDefaults) {
         defaults = d
         microphoneUID = Stored.microphoneUID.load(d)
+        microphoneName = Stored.microphoneName.load(d)
         muteWhileRecording = Stored.muteWhileRecording.load(d)
         pauseWhileRecording = Stored.pauseWhileRecording.load(d)
         audioFeedback = Stored.audioFeedback.load(d)
@@ -252,6 +255,25 @@ final class Settings {
         customWords.insert(w, at: 0)
     }
 
+    /// The picked mic's UID as it resolves now, nil for the system default.
+    /// A USB mic's UID carries the port it is on, so behind a dock it can
+    /// come back after sleep under a new one: the mic is then found by its
+    /// name and the new UID stored. A mic picked before names were stored
+    /// gets its name here. A mic not found keeps its UID, and the capture
+    /// falls back to the default input as before.
+    @discardableResult
+    func connectedMicrophoneUID() -> String? {
+        guard let uid = microphoneUID else { return nil }
+        if let id = AudioCapture.deviceID(forUID: uid) {
+            if microphoneName == nil { microphoneName = MeetingCapture.device(id)?.name }
+            return uid
+        }
+        guard let name = microphoneName, let found = AudioCapture.uid(named: name, among: AudioCapture.connectedInputs()) else { return uid }
+        DebugLog.write("Microphone: picked mic back under a new UID; stored it")
+        microphoneUID = found
+        return found
+    }
+
     func removeCustomWord(_ word: String) {
         customWords.removeAll { $0.caseInsensitiveCompare(word) == .orderedSame }
     }
@@ -263,6 +285,7 @@ extension Settings {
     /// resets that setting for everyone.
     enum Stored {
         static let microphoneUID = StoredSetting<String?>.optionalString("microphoneUID")
+        static let microphoneName = StoredSetting<String?>.optionalString("microphoneName")
         static let muteWhileRecording = StoredSetting.bool("muteWhileRecording", default: true)
         static let pauseWhileRecording = StoredSetting.bool("pauseWhileRecording", default: false)
         static let audioFeedback = StoredSetting.bool("audioFeedback", default: true)

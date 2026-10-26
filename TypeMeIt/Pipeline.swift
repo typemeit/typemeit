@@ -150,7 +150,7 @@ final class Pipeline {
         if settings.muteWhileRecording, !meetingRecording { OutputMute.mute() }
         if settings.pauseWhileRecording, !meetingRecording { MediaPause.pause() }
         do {
-            try capture.start(uid: settings.microphoneUID)
+            try capture.start(uid: settings.connectedMicrophoneUID())
             MeetingCoordinator.shared.dictationBegan(hostTime: mach_absolute_time())
         } catch {
             Log.audio.error("Could not start capture: \(error.localizedDescription)")
