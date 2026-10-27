@@ -70,8 +70,8 @@ struct TranscriptRenderTests {
 
         ## Speakers
 
-        - **Ines Varga**: named by the user; the call's speaking indicator said Theo Brandt; voice matches Theo Brandt (55%)
-        - **Rosa Pell**: named from the call's captions; voice matches Rosa Pell (97%)
+        - **Ines Varga**: named by you · call: Theo Brandt (speaking) · voice: Theo Brandt 55%
+        - **Rosa Pell**: named by captions · voice: Rosa Pell 97%
 
         ## Transcript
 

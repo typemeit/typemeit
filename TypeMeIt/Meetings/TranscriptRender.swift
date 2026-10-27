@@ -70,29 +70,30 @@ enum TranscriptRender {
         return (frontMatter + body).joined(separator: "\n") + "\n"
     }
 
-    /// `- **name**: ` and where that name came from, what the meeting window
-    /// said before the user renamed them, and whom the voice sounds like.
-    /// Nil for a speaker with none of these: the user, or one still numbered.
+    /// `- **name**: ` and who named them, what the meeting window said
+    /// before the user renamed them, and whom the voice sounds like, `·`
+    /// between. Nil for a speaker with none of these: the user, or one
+    /// still numbered.
     static func speakerLine(_ speaker: Meeting.Speaker, voice: Meeting.Speaker.VoiceGuess?) -> String? {
         var said: [String] = []
         if let source = speaker.nameSource {
-            said.append(source == .user ? "named by the user" : "named from the call's \(windowPart(source))")
+            said.append("named by \(source == .user ? "you" : sourceLabel(source))")
         }
         if let predicted = speaker.predicted {
-            said.append("the call's \(windowPart(predicted.source)) said \(predicted.name)")
+            said.append("call: \(predicted.name) (\(sourceLabel(predicted.source)))")
         }
         if let voice {
-            said.append("voice matches \(voice.name) (\(Int((voice.posterior * 100).rounded()))%)")
+            said.append("voice: \(voice.name) \(Int((voice.posterior * 100).rounded()))%")
         }
         guard !said.isEmpty else { return nil }
-        return "- **\(speaker.name)**: \(said.joined(separator: "; "))"
+        return "- **\(speaker.name)**: \(said.joined(separator: " · "))"
     }
 
-    private static func windowPart(_ source: MeetingNames.Source) -> String {
+    private static func sourceLabel(_ source: MeetingNames.Source) -> String {
         switch source {
         case .captions: "captions"
-        case .speaking: "speaking indicator"
-        case .roster, .user: "participant list"
+        case .speaking: "speaking"
+        case .roster, .user: "roster"
         }
     }
 
