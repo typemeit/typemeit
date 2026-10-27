@@ -106,9 +106,8 @@ struct OnePageSettings: View {
                     }
                 }
                 .overlay(alignment: .bottom) { SquareRule() }
-                .padding(.top, 26)
-                .padding(.leading, 40)
-                .padding(.trailing, 48)
+                .padding(.top, 16)
+                .padding(.horizontal, SquareListColumns.page)
                 .padding(.bottom, 40)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -343,7 +342,9 @@ struct OnePageSettings: View {
                 SquareSettingsRow(label: "hold to talk") {
                     SquareShortcutRecorder(combo: Binding(get: { settings.dictationShortcut }, set: { if let c = $0 { settings.dictationShortcut = c } }), clearable: false)
                 }
-                SquareSettingsRow(label: "pin", help: "\(settings.dictationShortcut.inline) again to finish") { SquareKeycap("space") }
+                SquareSettingsRow(label: "pin", help: "\(settings.dictationShortcut.inline) again to finish") {
+                    Text("space").font(Square.mono(Square.controlSize)).foregroundStyle(DesignTokens.Colors.ink2)
+                }
             }
             SquareSettingsRow(label: "check audio", help: "tests your mic and speakers · writes the results to the debug log and your clipboard · plays a short tone · includes device and app names") {
                 Button(checkingAudio ? "running" : "run") {
@@ -366,8 +367,7 @@ struct OnePageSettings: View {
                     NSWorkspace.shared.open(SecureInput.screenRecordingSettingsURL)
                 }
             }
-            .padding(.top, 11)
-            .padding(.bottom, 8)
+            .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .top) { SquareRule() }
             SquareSettingsRow(label: "position", caption: settings.cloudPosition.label) {
