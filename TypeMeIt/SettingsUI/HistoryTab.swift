@@ -336,6 +336,24 @@ struct HistoryTab: View {
         let date = sameYear ? day.formatted(.dateTime.day().month(.wide)) : day.formatted(.dateTime.day().month(.wide).year())
         return (day.formatted(.dateTime.weekday(.wide)).lowercased(), date.lowercased())
     }
+
+    /// "19:16", for a row under its day line.
+    nonisolated static func clock(_ date: Date) -> String {
+        date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+    }
+
+    /// "tuesday 27 october 2026 · 19:16", for a time shown without its day.
+    nonisolated static func fullStamp(_ date: Date) -> String {
+        "\(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()).lowercased()) · \(clock(date))"
+    }
+
+    /// "14:02" today, "yesterday 14:02", then "21 oct 14:02", for a list
+    /// with no day lines.
+    nonisolated static func shortStamp(_ date: Date, calendar: Calendar = .current) -> String {
+        if calendar.isDateInToday(date) { return clock(date) }
+        if calendar.isDateInYesterday(date) { return "yesterday \(clock(date))" }
+        return "\(date.formatted(.dateTime.day().month(.abbreviated)).lowercased()) \(clock(date))"
+    }
 }
 
 /// History's own columns beside the shared ones: its app, what changed and
@@ -397,11 +415,12 @@ private struct HistoryRow: View {
                 .padding(.trailing, SquareListColumns.edge)
             Button(action: open) {
                 HStack(alignment: .firstTextBaseline, spacing: SquareListColumns.gap) {
-                    Text(entry.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                    Text(HistoryTab.clock(entry.timestamp))
                         .font(Square.mono(12))
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(width: SquareListColumns.time, alignment: .leading)
+                        .help(HistoryTab.fullStamp(entry.timestamp))
                     Text(entry.displayText)
                         .font(Square.sans(13.5))
                         .lineSpacing(2)

@@ -91,7 +91,7 @@ struct SquareCloudPalette: View {
             }
             let described = hovered ?? selection
             HStack(spacing: 10) {
-                Text(SquareCloudPalette.caption(described))
+                Text(SquareCloudPalette.caption(described, screenRecordingAllowed: screenRecordingAllowed))
                     .font(Square.sans(11.5))
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,11 +107,8 @@ struct SquareCloudPalette: View {
     }
 
     /// What the row under the palette says for a choice.
-    private static func caption(_ choice: CloudChoice) -> String {
-        switch choice {
-        case .dynamic: "picks black or white from the pixels under it (requires screen recording permissions)"
-        case .colour(let c): c.label
-        }
+    private static func caption(_ choice: CloudChoice, screenRecordingAllowed: Bool) -> String {
+        choice == .dynamic && !screenRecordingAllowed ? "\(choice.label) · needs screen recording" : choice.label
     }
 
     @ViewBuilder private func swatch(_ choice: CloudChoice, index: Int) -> some View {

@@ -47,6 +47,13 @@ struct DayLineTests {
         ])
     }
 
+    @Test func aShortStampNamesTheDayOnlyBeforeToday() {
+        let now = Date.now
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
+        #expect(HistoryTab.shortStamp(now) == HistoryTab.clock(now))
+        #expect(HistoryTab.shortStamp(yesterday) == "yesterday \(HistoryTab.clock(yesterday))")
+    }
+
     @Test func noRowsIsNoLines() {
         #expect(DayLine<Row>.lines([], on: \.at, total: { _ in "" }, calendar: Self.calendar).isEmpty)
     }
