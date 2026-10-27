@@ -845,7 +845,7 @@ final class MeetingCoordinator {
         cancelledHooks.remove(id)
         // Earlier runs' output is not the meeting.
         source.hookRuns = nil
-        let transcript = TranscriptRender.markdown(source)
+        let meetings = settings.meetingLearnVoices ? store.meetings : nil
         let folder = URL(fileURLWithPath: settings.askClaudeFolder, isDirectory: true)
         let model = settings.askClaudeModel
         let tools = settings.askClaudeTools
@@ -853,6 +853,10 @@ final class MeetingCoordinator {
         let userSystemPrompt = settings.askClaudeSystemPrompt
         DebugLog.write("Hooks: running \(counted(hooks.count, "hook")) on meeting \(id)")
         Task { [weak self] in
+            // Who each voice sounds like, beside the names the meeting holds.
+            var voices: [String: Meeting.Speaker.VoiceGuess] = [:]
+            if let meetings { voices = await VoiceLibrary.shared.likeliest(for: source, among: meetings) }
+            let transcript = TranscriptRender.markdown(source, voices: voices)
             var failures = 0
             for hook in hooks {
                 guard let self, !self.cancelledHooks.contains(id) else { break }
@@ -1087,7 +1091,7 @@ final class MeetingCoordinator {
         let userSystemPrompt = settings.askClaudeSystemPrompt
         let permissionMode = settings.askClaudePermissionMode
         Task { [weak self] in
-            let transcript = await self?.transcribeSoFar().map(TranscriptRender.markdown)
+            let transcript = await self?.transcribeSoFar().map { TranscriptRender.markdown($0) }
             // Cancelled while the transcript was gathered.
             guard let self, self.askOpened || self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking else { return }
             // The page shows the new text, and the pill too while it is up.

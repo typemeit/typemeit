@@ -242,8 +242,7 @@ enum SpeakerAssign {
                 m = merge(id, into: you.id, in: m)
             } else {
                 m.speakers[i].isYou = true
-                m.speakers[i].name = "You"
-                m.speakers[i].nameSource = .user
+                rename(&m.speakers[i], to: "You")
             }
         case .name(let raw):
             let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -251,8 +250,7 @@ enum SpeakerAssign {
             if let twin = m.speakers.first(where: { $0.id != id && !$0.isYou && $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
                 m = merge(id, into: twin.id, in: m)
             } else {
-                m.speakers[i].name = name
-                m.speakers[i].nameSource = .user
+                rename(&m.speakers[i], to: name)
                 m.speakers[i].isYou = false
             }
         }
@@ -264,6 +262,16 @@ enum SpeakerAssign {
             m.speakers[open[0]].nameSource = .roster
         }
         return m
+    }
+
+    /// `speaker` named `name` by the user, keeping the name the meeting
+    /// window gave it as its prediction.
+    private static func rename(_ speaker: inout Meeting.Speaker, to name: String) {
+        if let source = speaker.nameSource, source != .user {
+            speaker.predicted = Meeting.Speaker.Prediction(name: speaker.name, source: source)
+        }
+        speaker.name = name
+        speaker.nameSource = .user
     }
 
     /// `from`'s paragraphs moved onto `into`, each remembering the speaker

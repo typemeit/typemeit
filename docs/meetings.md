@@ -1418,6 +1418,24 @@ Morning. Shall we start with the deploy?
 Times are `m:ss` from the start, or `h:mm:ss` past an hour. The file is
 rewritten whenever `meeting.json` changes.
 
+When a speaker's name came from somewhere (8.6), a `## Speakers` list
+follows the front matter and the paragraphs go under `## Transcript`. Each
+line says where the name came from and, for a speaker the user renamed, the
+name the meeting window gave first (`speakers[].predicted`, kept by
+`SpeakerAssign.apply`):
+
+```markdown
+## Speakers
+
+- **Ines Varga**: named by the user; the call's speaking indicator said Theo Brandt; voice matches Theo Brandt (55%)
+- **Rosa Pell**: named from the call's captions
+```
+
+The voice part is only in a hook's copy: run hooks asks `VoiceLibrary` whom
+each speaker but the user sounds like (8.7), from a model trained on the
+other meetings, and passes that to `markdown(_:voices:)`. `transcript.md`,
+and so `get_meeting`, has no voice part.
+
 `MeetingStore` (`@MainActor @Observable final class`, `shared`):
 
 - At launch, reads every `*/meeting.json` under the published folder and

@@ -281,7 +281,7 @@ enum MeetingTranscriber {
         if meeting.kind == .call, order.count == 1 {
             let them = Meeting.Speaker.them
             let before = previous.first { $0.id == them }
-            meeting.speakers.append(Meeting.Speaker(id: them, name: before?.name ?? defaultName(for: .others), isYou: false, talkMs: 0, nameSource: before?.nameSource))
+            meeting.speakers.append(Meeting.Speaker(id: them, name: before?.name ?? defaultName(for: .others), isYou: false, talkMs: 0, nameSource: before?.nameSource, predicted: before?.predicted))
             DebugLog.write("Meeting speakers: 1 on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
             return nil
         }
@@ -289,7 +289,7 @@ enum MeetingTranscriber {
         for (i, original) in order.enumerated() {
             let id = ids[original]!
             let before = previous.first { $0.id == id }
-            meeting.speakers.append(Meeting.Speaker(id: id, name: before?.name ?? Meeting.Speaker.numberedName(i + 1), isYou: false, talkMs: 0, nameSource: before?.nameSource))
+            meeting.speakers.append(Meeting.Speaker(id: id, name: before?.name ?? Meeting.Speaker.numberedName(i + 1), isYou: false, talkMs: 0, nameSource: before?.nameSource, predicted: before?.predicted))
         }
         DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
         return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
@@ -330,7 +330,7 @@ enum MeetingTranscriber {
     private static func roomSpeakers(_ ids: [String], silent: [String], after: Int, previous: [Meeting.Speaker]) -> [Meeting.Speaker] {
         ids.enumerated().map { i, id in
             if let renamed = previous.first(where: { $0.id == id && $0.nameSource == .user }) {
-                return Meeting.Speaker(id: id, name: renamed.name, isYou: false, talkMs: 0, nameSource: .user)
+                return Meeting.Speaker(id: id, name: renamed.name, isYou: false, talkMs: 0, nameSource: .user, predicted: renamed.predicted)
             }
             if ids.count == 1, silent.count == 1 {
                 return Meeting.Speaker(id: id, name: silent[0], isYou: false, talkMs: 0, nameSource: .roster)
