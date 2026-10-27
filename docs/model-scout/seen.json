@@ -819,6 +819,78 @@
       "id": "p99lab/audrey-0.7",
       "date": "2026-10-26",
       "role": "eval reference"
+    },
+    {
+      "id": "ConwayResearch/Underdog-Poodle-4B",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "variant of rejected Qwen3.5 4B; agent benchmarks only, no clean-up score"
+    },
+    {
+      "id": "izwi-ai/izwi",
+      "date": "2026-10-27",
+      "role": "runtime",
+      "why": "Rust/Metal runtime for Parakeet v3 and Nemotron diarization; no new model"
+    },
+    {
+      "id": "OpenLLM-France/Luciole-8B-Audio-1.0",
+      "date": "2026-10-27",
+      "role": "speech recognition",
+      "why": "WER 7.50, AMI 14.10 vs Parakeet v2 6.02, 9.09; 8B"
+    },
+    {
+      "id": "category271/whispernow-qwen3.5-4b",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "fine-tune of rejected Qwen3.5 4B; 5.3 GB in use, over 1.5 GB"
+    },
+    {
+      "id": "category271/whispernow-lfm2.5-2.6b",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "LFM licence revenue cap; 3.3 GB in use, over 1.5 GB"
+    },
+    {
+      "id": "category271/whispernow-lfm2.5-1.2b",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "fine-tune of rejected LFM2.5-1.2B; LFM licence; 1.6 GB at Q8_0"
+    },
+    {
+      "id": "scribekey/scribekey-cleanup-fast-GGUF",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "LFM licence revenue cap; no gain over rejected S1-mini"
+    },
+    {
+      "id": "hpal007/utter-dictation-cleanup-GGUF",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "no published score; bases Qwen3-1.7B and rejected Gemma 4 E2B"
+    },
+    {
+      "id": "Radiumcoders/localflow-clean",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "LoRA on rejected Qwen3.5-0.8B; 32/41 vs 35/41 for qwen3.5:4b"
+    },
+    {
+      "id": "Muesli-HQ/qwen35-0.8b-muesli-cleanup-v12-gguf",
+      "date": "2026-10-27",
+      "role": "clean-up",
+      "why": "rejected Qwen3.5 family; synthetic test sets only"
+    },
+    {
+      "id": "OpenMOSS-Team/MOSS-Transcribe-preview-2B",
+      "date": "2026-10-27",
+      "role": "speech recognition",
+      "why": "trained on leaderboard splits incl. AMI; 4.84 GB bf16, over 1.5 GB"
+    },
+    {
+      "id": "Hebrish/Parakeet-TDT-0.6B-v2-Tech-And-Accent",
+      "date": "2026-10-27",
+      "role": "speech recognition",
+      "why": "gated card, no published number"
     }
   ]
 }
