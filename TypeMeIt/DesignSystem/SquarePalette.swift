@@ -35,9 +35,11 @@ struct SquareCloudPalette: View {
     /// resting cloud fills most of the cell and the chosen one, half as big
     /// again, still just fits.
     private static let fill: CGFloat = 1.25
+    /// The width of the ink bar under the chosen cloud.
+    private static let mark: CGFloat = 16
     /// Black and white as the palette draws them, a little off so that each
     /// still shows on paper of its own colour.
-    private static let onLight = Color(white: 0.24)
+    private static let onLight = Color(white: 0.34)
     private static let onDark = Color(white: 0.85)
     /// The clouds breathe and drift over seconds, so 20 fps is smooth enough.
     private static let driftInterval = 1.0 / 20
@@ -74,6 +76,11 @@ struct SquareCloudPalette: View {
                             .animation(.easeOut(duration: DesignTokens.Duration.n2), value: scale)
                             .frame(width: SquareCloudPalette.cell, height: SquareCloudPalette.cell)
                             .frame(minWidth: SquareCloudPalette.narrowest, maxWidth: SquareCloudPalette.cell)
+                            .overlay(alignment: .bottom) {
+                                if on {
+                                    Rectangle().fill(DesignTokens.Colors.ink).frame(width: SquareCloudPalette.mark, height: DesignTokens.hairline * 2)
+                                }
+                            }
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

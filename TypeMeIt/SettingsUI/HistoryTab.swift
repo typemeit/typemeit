@@ -218,7 +218,14 @@ struct HistoryTab: View {
                                 HistoryRow(entry: entry, picked: $selection.box(entry.id) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty, copied: copied == entry.id,
                                            open: { open = entry.id },
-                                           copy: { Output.copyToClipboard(entry.displayText); copied = entry.id },
+                                           copy: {
+                                               Output.copyToClipboard(entry.displayText)
+                                               copied = entry.id
+                                               Task {
+                                                   try? await Task.sleep(for: PageCopyButton.checkFor)
+                                                   if copied == entry.id { copied = nil }
+                                               }
+                                           },
                                            delete: { store.delete(id: entry.id); selection.picked.remove(entry.id) })
                             }
                         }
@@ -348,7 +355,7 @@ enum HistoryColumns {
     /// row, where its words are: this far above the line's baseline.
     static let lineMiddle = Square.appKitMono(12).capHeight / 2
     /// The head and the days leave the actions' room at the end.
-    static var trailing: CGFloat { SquareListColumns.edge + actions + SquareListColumns.inset }
+    static var trailing: CGFloat { actions + SquareListColumns.inset }
     /// A day's total sits over the app, the changes and the words.
     static var total: CGFloat { app + SquareListColumns.gap + changes + SquareListColumns.gap + words }
 
@@ -415,7 +422,7 @@ private struct HistoryRow: View {
                     Text(entry.wordCount.formatted())
                         .font(Square.mono(12))
                         .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(width: HistoryColumns.words, alignment: .trailing)
                 }
                 .padding(.leading, SquareListColumns.inset)
@@ -426,6 +433,7 @@ private struct HistoryRow: View {
             HStack(spacing: 0) {
                 Button(action: copy) { SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14) }
                     .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                    .animation(.easeOut(duration: DesignTokens.Duration.n1), value: copied)
                     .help("copy")
                     .accessibilityLabel("copy")
                 Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }

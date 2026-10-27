@@ -64,7 +64,7 @@ struct SquareScreenPicker: View {
     @Environment(\.squarePose) private var pose
     @State private var hovered: CloudPosition?
 
-    private static let width: CGFloat = 144
+    private static let width: CGFloat = 112
     /// The Mac's own screen shape, 1512 by 982 on a 14-inch MacBook Pro.
     private static var height: CGFloat {
         NSScreen.main.map { width * $0.frame.height / $0.frame.width } ?? width * 10 / 16
@@ -92,7 +92,7 @@ struct SquareScreenPicker: View {
             }
         }
         .frame(width: SquareScreenPicker.width, height: SquareScreenPicker.height)
-        .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
+        .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
         .fixedSize()
     }
 
@@ -152,7 +152,7 @@ struct SquareMenu<Value: Hashable>: View {
             .foregroundStyle(DesignTokens.Colors.ink)
             .padding(.leading, 8)
             .padding(.trailing, 7)
-            .frame(height: 24)
+            .frame(height: SquareButtonStyle.height)
             .overlay(Rectangle().strokeBorder(open || pose.hot(hovering) ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl,
                                               lineWidth: DesignTokens.hairline))
             .background(!open && pose.hot(hovering) ? DesignTokens.Colors.inkA08 : .clear)
@@ -391,7 +391,7 @@ struct SquareHelp: View {
             Image(systemName: "questionmark.circle")
                 .font(.system(size: 11))
                 .foregroundStyle(open || hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
-                .frame(width: 18, height: 18)
+                .frame(width: 20, height: 20)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

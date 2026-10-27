@@ -52,8 +52,8 @@ struct DictionaryTab: View {
                 verifyPanel
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 26)
-            .padding(.horizontal, 40)
+            .padding(.top, 16)
+            .padding(.horizontal, SquareListColumns.page)
             .padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
         }

@@ -113,6 +113,9 @@ struct SquareGroup<Content: View>: View {
     private static var inset: CGFloat { 4 }
     private static var titleWidth: CGFloat { 150 }
     private static var gap: CGFloat { 24 }
+    /// The widest the rows run, so a control stays in reach of its label
+    /// on a wide window.
+    private static var rowsWidth: CGFloat { 620 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -142,6 +145,7 @@ struct SquareGroup<Content: View>: View {
                     if let blurb { SquareBlurb(text: blurb).padding(.bottom, 14) }
                     content
                 }
+                .frame(maxWidth: SquareGroup.rowsWidth, alignment: .leading)
                 .padding(.leading, SquareGroup.inset + SquareGroup.titleWidth + SquareGroup.gap)
                 .padding(.trailing, SquareGroup.inset)
                 .padding(.bottom, 22)
@@ -172,7 +176,7 @@ private struct SquareGroupSign: View {
 enum SquareListColumns {
     static let page: CGFloat = 20
     static let tick: CGFloat = 22
-    static let time: CGFloat = 60
+    static let time: CGFloat = 68
     static let gap: CGFloat = 16
     /// Between the select box and the row.
     static let edge: CGFloat = 4
@@ -215,11 +219,9 @@ struct SquareDayHeader: View {
         HStack(spacing: SquareListColumns.edge) {
             Color.clear.frame(width: SquareListColumns.tick, height: 1)
             HStack(alignment: .firstTextBaseline, spacing: SquareListColumns.gap) {
-                // "yesterday" is wider than the time column; it runs into the gap.
                 Text(day)
                     .font(Square.mono(12, weight: .medium))
                     .foregroundStyle(DesignTokens.Colors.ink)
-                    .fixedSize()
                     .frame(width: SquareListColumns.time, alignment: .leading)
                 Text(date)
                     .font(Square.mono(11))
