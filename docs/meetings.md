@@ -1954,7 +1954,7 @@ is the one list of them. Neither `folder` nor `folderSuggestion` goes into a
   folder's name of up to three words, dropped if it repeats the meeting's
   title or a folder's words. The suggestion waits on the meeting's page as
   `folder: X?` or `new folder: X?` with `yes` and `no`, and first in the move
-  menu. A meeting with a summary and no suggestion shows `suggest a folder`.
+  menu.
 
 `make folder-eval` scores the pick and prints the new names
 (Scripts/folder-eval). Tests: `MeetingFolderFilingTests`,
