@@ -1,7 +1,9 @@
 import AppKit
 
 /// An Option-click on the menu bar puff starts a recording, or stops the one
-/// in progress, without opening the menu. `MenuBarExtra` has no click
+/// in progress, without opening the menu. During a recorded meeting with ask
+/// on, it asks Claude instead, as the menu's Ask Claude does; a dictation
+/// already running is still stopped first. `MenuBarExtra` has no click
 /// handler of its own, so the click is caught on its way to the status
 /// item's button.
 @MainActor
@@ -13,8 +15,18 @@ enum MenuBarClick {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
             guard event.modifierFlags.contains(.option), isOnStatusItem(event) else { return event }
             // With nothing to start or stop, the click opens the menu as usual.
-            return Pipeline.shared.shortcuts.toggleFromMenuBar() ? nil : event
+            return act() ? nil : event
         }
+    }
+
+    private static func act() -> Bool {
+        let shortcuts = Pipeline.shared.shortcuts
+        let meetings = MeetingCoordinator.shared
+        if shortcuts.phase == .idle, meetings.recording != nil, Settings.shared.askClaude, ClaudeRun.isAvailable {
+            meetings.askLatestQuestion()
+            return true
+        }
+        return shortcuts.toggleFromMenuBar()
     }
 
     /// The status item's window holds nothing but its button, so a click in
