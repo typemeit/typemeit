@@ -116,10 +116,10 @@ private struct RecordingPlayerBar: View {
                 .monospacedDigit()
             }
         }
-        .padding(.top, 14)
+        // As tall as the sidebar's foot beside it, which pads a 34 pt row the same way.
+        .padding(.vertical, SquareSidebarLayout.footDrop)
         .padding(.leading, 20)
         .padding(.trailing, 24)
-        .padding(.bottom, 16)
         .overlay(alignment: .top) { SquareRule(color: DesignTokens.Colors.ink) }
     }
 }
