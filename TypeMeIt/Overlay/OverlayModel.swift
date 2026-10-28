@@ -151,6 +151,8 @@ final class OverlayModel {
     var askOpens = false
     /// Opens the page of the dictation or meeting Claude is answering for.
     var onOpenAsk: (@MainActor () -> Void)?
+    /// Continues the answered question's Claude Code session in the Claude desktop app.
+    var onContinueInClaude: (@MainActor (String) -> Void)?
     /// The saved pill's run hooks.
     var onRunHooks: (@MainActor (UUID) -> Void)?
     /// Opens settings on the Claude Code check.

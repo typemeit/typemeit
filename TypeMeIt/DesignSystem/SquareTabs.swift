@@ -71,6 +71,8 @@ struct SquareClaudeThread: View {
     let footer: String
     /// Claude Code's session, which a click copies as a resume command.
     var sessionID: String?
+    /// Opens the run in the Claude desktop app; nil offers nothing.
+    var openInClaude: (() -> Void)?
     var stop: () -> Void = {}
     /// Offered on a failed run; nil offers nothing.
     var runAgain: (() -> Void)?
@@ -91,7 +93,7 @@ struct SquareClaudeThread: View {
     }
 
     private var hasFooter: Bool {
-        !footer.isEmpty || sessionID != nil || status == .running || status == .failed && runAgain != nil
+        !footer.isEmpty || sessionID != nil || openInClaude != nil || status == .running || status == .failed && runAgain != nil
     }
 
     /// Running with nothing back yet: the prompt's mark spins, as the pill's does.
@@ -152,6 +154,9 @@ struct SquareClaudeThread: View {
                             }
                     }
                     Spacer()
+                    if status != .running, let openInClaude {
+                        SquareClaudeButton(title: "continue in claude", action: openInClaude)
+                    }
                     if status == .running {
                         Button("stop", action: stop).buttonStyle(SquareButtonStyle(kind: .quiet))
                     }
