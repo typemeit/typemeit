@@ -117,6 +117,9 @@ struct AnswerPill: View {
             .buttonStyle(SquareIconButtonStyle())
             .help(model.answerExpanded ? "fold answer" : "show answer")
             .accessibilityLabel(model.answerExpanded ? "fold answer" : "show answer")
+            if let sessionID = answer.sessionID, ClaudeDesktop.installed {
+                SquareClaudeButton(title: "continue in claude", iconOnly: true) { model.onContinueInClaude?(sessionID) }
+            }
             if model.askOpens {
                 openButton
             }

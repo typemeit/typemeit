@@ -122,7 +122,7 @@ struct MeetingPage: View {
                 .background(SharePicker(file: sharing) { sharing = nil })
                 .onDrag { store.shareFile(meeting.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
             }
-            if meeting.isDone, !meeting.paragraphs.isEmpty, !live, coordinator.hooksReady {
+            if meeting.isDone, !meeting.paragraphs.isEmpty, !live, coordinator.hooksReady, !coordinator.hooksToRun(on: meeting).isEmpty {
                 let running = coordinator.runningHooks[meeting.id] != nil
                 Button(running ? "running hooks…" : "run hooks") { coordinator.runHooks(meeting.id) }
                     .buttonStyle(SquareButtonStyle(kind: .quiet))
@@ -241,7 +241,7 @@ struct MeetingPage: View {
                 if coordinator.askPreparing {
                     SquareClaudeThread(lines: [.prompt(asked.question.text)], status: .running, footer: "", stop: { coordinator.cancelAsk() })
                 } else {
-                    ClaudeRunOutput(id: runID)
+                    ClaudeRunOutput(id: runID, meeting: meeting.id)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -263,7 +263,7 @@ struct MeetingPage: View {
                                 .font(Square.mono(11))
                                 .foregroundStyle(DesignTokens.Colors.ink3)
                         }
-                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID, calls: run.calls))
+                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID, calls: run.calls), meeting: meeting.id)
                     }
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -272,7 +272,7 @@ struct MeetingPage: View {
                 if let current {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(current.name).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink2)
-                        ClaudeRunOutput(id: current.runID)
+                        ClaudeRunOutput(id: current.runID, meeting: meeting.id)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 10)
@@ -740,9 +740,9 @@ private struct MeetingTranscript: View {
                         .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
                 }
                 if question.result == .asked, let answer = question.answer {
-                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls))
+                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls), meeting: meeting.id)
                 } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
-                    ClaudeRunOutput(id: runID)
+                    ClaudeRunOutput(id: runID, meeting: meeting.id)
                 } else {
                     Text(TranscriptRender.outcome(question.result))
                         .font(Square.mono(12))

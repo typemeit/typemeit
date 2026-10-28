@@ -21,4 +21,11 @@ struct MeetingHook: Codable, Identifiable, Equatable, Sendable {
     static func store(_ hooks: [MeetingHook], in defaults: UserDefaults) {
         defaults.set(try? JSONEncoder().encode(hooks), forKey: defaultsKey)
     }
+
+    /// `hooks` less those that already ran on the meeting without failing,
+    /// matched by name: a hook runs on a meeting once, and again only if it failed.
+    static func notYetRun(_ hooks: [MeetingHook], on meeting: Meeting) -> [MeetingHook] {
+        let ran = Set((meeting.hookRuns ?? []).filter { !$0.failed }.map(\.name))
+        return hooks.filter { !ran.contains($0.name) }
+    }
 }

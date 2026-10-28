@@ -14,6 +14,8 @@ struct ClaudeRunOutput: View {
 
     let id: UUID
     var kept: Kept?
+    /// The meeting the run was on, which continuing in Claude names.
+    var meeting: UUID?
     @State private var live = ClaudeLive.shared
 
     var body: some View {
@@ -26,6 +28,7 @@ struct ClaudeRunOutput: View {
                                    status: running ? .running : failed ? .failed : .done,
                                    footer: ([running || !failed ? nil : "failed", "\(seconds) s", run.model].compactMap { $0 }).joined(separator: " · "),
                                    sessionID: run.sessionID,
+                                   openInClaude: openInClaude(run.sessionID),
                                    stop: { live.cancel(id) })
             }
         } else if let kept {
@@ -33,8 +36,14 @@ struct ClaudeRunOutput: View {
                                    + [kept.failed ? .error(kept.answer) : .text(kept.answer)],
                                status: kept.failed ? .failed : .done,
                                footer: kept.failed ? "failed" : "",
-                               sessionID: kept.sessionID)
+                               sessionID: kept.sessionID,
+                               openInClaude: openInClaude(kept.sessionID))
         }
+    }
+
+    private func openInClaude(_ sessionID: String?) -> (() -> Void)? {
+        guard ClaudeDesktop.installed else { return nil }
+        return sessionID.map { id in { [meeting] in ClaudeDesktop.open(prompt: ClaudeDesktop.prompt(resuming: id, meeting: meeting)) } }
     }
 
     private static func isText(_ line: SquareClaudeLine) -> Bool {

@@ -192,6 +192,9 @@ final class MeetingCoordinator {
         model.onRunHooks = { [weak self] id in self?.dismissToast(); self?.runHooks(id) }
         Pipeline.shared.shortcuts.onReturn = { [weak self] in self?.askDictatedOnReturn() ?? false }
         model.onOpenAsk = { [weak self] in self?.openAsk() }
+        model.onContinueInClaude = { [weak self] sessionID in
+            ClaudeDesktop.open(prompt: ClaudeDesktop.prompt(resuming: sessionID, meeting: self?.openTarget?.meeting))
+        }
         model.onShowClaudeCheck = { [weak self] in
             self?.dismissToast()
             AppState.shared.revealSection = .assistant
@@ -833,12 +836,17 @@ final class MeetingCoordinator {
     /// Claude Code can run and there is a hook to run.
     var hooksReady: Bool { ClaudeRun.isAvailable && !hooksToRun.isEmpty }
 
-    /// Runs every hook switched on over the finished meeting, one after
-    /// another, keeping each output in the meeting as it lands. Only ever
-    /// from a button: the meeting's pill or its page.
+    /// The hooks run hooks would run on the meeting now.
+    func hooksToRun(on meeting: Meeting) -> [MeetingHook] {
+        MeetingHook.notYetRun(hooksToRun, on: meeting)
+    }
+
+    /// Runs every hook switched on that has not run on the finished meeting,
+    /// one after another, keeping each output in the meeting as it lands.
+    /// Only ever from a button: the meeting's pill or its page.
     func runHooks(_ id: UUID) {
         guard runningHooks[id] == nil, var source = store.meeting(id), source.isDone else { return }
-        let hooks = hooksToRun
+        let hooks = hooksToRun(on: source)
         guard let first = hooks.first else { return }
         ClaudeCheck.shared.recheckIfStale()
         runningHooks[id] = RunningHook(runID: UUID(), name: first.name)
