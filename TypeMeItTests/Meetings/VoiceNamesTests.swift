@@ -120,6 +120,21 @@ struct VoiceNamesTests {
         #expect(VoiceNames.Model.train([("Ana", [1, 0]), ("ana", [0.9, 0.1])], steps: 10, rate: 4, momentum: 0.9) == nil)
     }
 
+    @Test func theLikeliestPersonIsGivenHoweverUnsureButNotFromTooFewClips() {
+        var (model, voices) = trained()
+        let heard: [String: [[Float]]] = [
+            "s1": (0..<5).map { _ in voices.near(1) },
+            "s2": (0..<5).map { _ in voices.near(3) },
+            "s3": (0..<2).map { _ in voices.near(0) },
+        ]
+        let guesses = VoiceNames.likeliest(for: heard, model: model, minimumClips: 3)
+        #expect(guesses.keys.sorted() == ["s1", "s2"])
+        #expect(guesses["s1"]!.name == "Bo")
+        #expect(guesses["s1"]!.posterior >= 0.5)
+        // A stranger still gets their likeliest person, with the posterior that says how unsure.
+        #expect(guesses["s2"]!.posterior < 0.5)
+    }
+
     @Test func aNameGoesToTheLikelierSpeakerOnlyAndNeverOneAlreadyTaken() {
         var (model, voices) = trained()
         let heard: [String: [[Float]]] = [

@@ -197,6 +197,18 @@ enum VoiceNames {
         }
     }
 
+    /// The likeliest person for each speaker in `voices` with at least
+    /// `minimumClips` clips, however unsure, with the model's posterior.
+    static func likeliest(for voices: [String: [[Float]]], model: Model, minimumClips: Int) -> [String: Meeting.Speaker.VoiceGuess] {
+        var guesses: [String: Meeting.Speaker.VoiceGuess] = [:]
+        for (speaker, vectors) in voices where vectors.count >= minimumClips {
+            let posterior = model.posterior(vectors)
+            guard let best = posterior.indices.max(by: { posterior[$0] < posterior[$1] }) else { continue }
+            guesses[speaker] = Meeting.Speaker.VoiceGuess(name: model.names[best], posterior: posterior[best])
+        }
+        return guesses
+    }
+
     /// A name for each speaker in `voices` whose likeliest person reaches
     /// `minimum` and is not already one of the meeting's `taken` names. A
     /// person goes to one speaker at most, the likelier one. Speakers with

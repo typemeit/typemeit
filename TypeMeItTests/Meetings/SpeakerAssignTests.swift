@@ -21,6 +21,21 @@ struct SpeakerAssignTests {
         return m
     }
 
+    // MARK: Predicted
+
+    @Test func renamingKeepsTheNameTheCallGaveAsThePrediction() {
+        let m = call(speakers: [speaker("you", "You", you: true), speaker("s1", "Theo Brandt", source: .speaking)])
+        let renamed = SpeakerAssign.apply(.name("Ines Varga"), to: "s1", in: m)
+        let again = SpeakerAssign.apply(.name("Ines Varga-Lowe"), to: "s1", in: renamed)
+        #expect(again.speakers[1] == Meeting.Speaker(id: "s1", name: "Ines Varga-Lowe", isYou: false, talkMs: 10_000, nameSource: .user,
+                                                    predicted: Meeting.Speaker.Prediction(name: "Theo Brandt", source: .speaking)))
+    }
+
+    @Test func aNumberedSpeakerRenamedHasNoPrediction() {
+        let m = SpeakerAssign.apply(.name("Ines Varga"), to: "r1", in: call())
+        #expect(m.speakers[1].predicted == nil)
+    }
+
     // MARK: Unknown
 
     @Test func aNumberedSpeakerIsUnknownAndYouAndTheRoomAreNot() {

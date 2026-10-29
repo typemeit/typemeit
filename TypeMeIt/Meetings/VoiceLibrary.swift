@@ -121,18 +121,7 @@ actor VoiceLibrary {
         loadAll()
         guard !unnamed.isEmpty, let file = voices[meeting.id] else { return [:] }
         let heard = VoiceNames.regrouped(file, in: meeting)
-        var examples: [(name: String, vector: [Float])] = []
-        var trainedOn: [String] = []
-        for other in meetings {
-            guard let file = voices[other.id] else { continue }
-            let clips = VoiceNames.regrouped(file, in: other)
-            for speaker in other.speakers {
-                guard let name = VoiceNames.label(of: speaker), let vectors = clips[speaker.id] else { continue }
-                examples += vectors.map { (name, $0) }
-                trainedOn.append("\(other.id) \(speaker.id) \(name) \(vectors.count)")
-            }
-        }
-        let key = trainedOn.sorted().joined(separator: "\n")
+        let (named, key) = examples(from: meetings)
         let model: VoiceNames.Model
         if let cached, cached.key == key {
             model = cached.model
@@ -143,7 +132,7 @@ actor VoiceLibrary {
             } else {
                 // A training for names that have since changed is no longer wanted.
                 training?.task.cancel()
-                let trainingSet = examples
+                let trainingSet = named
                 task = Task.detached {
                     VoiceNames.Model.train(trainingSet, steps: Fixed.meetingVoiceTrainingSteps, rate: Fixed.meetingVoiceTrainingRate, momentum: Fixed.meetingVoiceTrainingMomentum)
                 }
@@ -157,6 +146,41 @@ actor VoiceLibrary {
         }
         return VoiceNames.suggestions(for: heard.filter { unnamed.contains($0.key) }, taken: Set(meeting.speakers.compactMap(VoiceNames.label(of:))),
                                       model: model, minimum: Fixed.meetingVoiceSuggestPosterior, minimumClips: Fixed.meetingVoiceMinimumClips)
+    }
+
+    /// Whom each of the meeting's speakers but the user sounds like, however
+    /// unsure, for a hook to weigh against the names the meeting holds. The
+    /// model is trained on the other meetings alone, so a name given in this
+    /// one does not vouch for itself, and apart from `suggestions`' so
+    /// neither cancels the other's training.
+    func likeliest(for meeting: Meeting, among meetings: [Meeting]) async -> [String: Meeting.Speaker.VoiceGuess] {
+        loadAll()
+        let others = Set(meeting.speakers.filter { !$0.isYou }.map(\.id))
+        guard !others.isEmpty, let file = voices[meeting.id] else { return [:] }
+        let heard = VoiceNames.regrouped(file, in: meeting).filter { others.contains($0.key) }
+        let (named, _) = examples(from: meetings.filter { $0.id != meeting.id })
+        let model = await Task.detached {
+            VoiceNames.Model.train(named, steps: Fixed.meetingVoiceTrainingSteps, rate: Fixed.meetingVoiceTrainingRate, momentum: Fixed.meetingVoiceTrainingMomentum)
+        }.value
+        guard let model else { return [:] }
+        return VoiceNames.likeliest(for: heard, model: model, minimumClips: Fixed.meetingVoiceMinimumClips)
+    }
+
+    /// Every clip of every named speaker in `meetings` under its name, and
+    /// a key that changes when any of them does.
+    private func examples(from meetings: [Meeting]) -> (examples: [(name: String, vector: [Float])], key: String) {
+        var examples: [(name: String, vector: [Float])] = []
+        var trainedOn: [String] = []
+        for other in meetings {
+            guard let file = voices[other.id] else { continue }
+            let clips = VoiceNames.regrouped(file, in: other)
+            for speaker in other.speakers {
+                guard let name = VoiceNames.label(of: speaker), let vectors = clips[speaker.id] else { continue }
+                examples += vectors.map { (name, $0) }
+                trainedOn.append("\(other.id) \(speaker.id) \(name) \(vectors.count)")
+            }
+        }
+        return (examples, trainedOn.sorted().joined(separator: "\n"))
     }
 
     // MARK: Files
