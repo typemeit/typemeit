@@ -156,10 +156,10 @@ final class CameraCompositor: @unchecked Sendable {
         if Self.drawsDebug {
             let finished = ProcessInfo.processInfo.systemUptime
             let timing = lock.withLock {
-                timing.renderMilliseconds = (finished - started) * 1000
-                if let last = timing.lastFrame { timing.framesPerSecond = 1 / max(started - last, 0.001) }
-                timing.lastFrame = started
-                return timing
+                self.timing.renderMilliseconds = (finished - started) * 1000
+                if let last = self.timing.lastFrame { self.timing.framesPerSecond = 1 / max(started - last, 0.001) }
+                self.timing.lastFrame = started
+                return self.timing
             }
             if frames % Self.timingLogEvery == 0 {
                 DebugLog.write(String(format: "Camera: %.0f fps, this frame took %.1f ms", timing.framesPerSecond, timing.renderMilliseconds))
