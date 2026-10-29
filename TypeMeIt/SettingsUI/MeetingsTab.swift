@@ -47,6 +47,9 @@ struct MeetingsTab: View {
         Group {
             if let id = open, let meeting = store.meeting(id) {
                 MeetingPage(meeting: meeting, find: search.trimmingCharacters(in: .whitespaces), nameFirst: nameOnOpen) { open = nil }
+                    // A meeting revealed over another's page gets a page of its own,
+                    // not the last one's voice suggestions, open field and find.
+                    .id(id)
             } else if store.meetings.isEmpty, coordinator.recording == nil {
                 VStack(spacing: 0) {
                     SquarePageHeader(title: "meetings")
