@@ -891,6 +891,30 @@
       "date": "2026-10-27",
       "role": "speech recognition",
       "why": "gated card, no published number"
+    },
+    {
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "30B MoE speech LLM, offline; 67.5 GB bf16, MLX 4-bit 25 GB and ~22 GB peak, over every budget; AMI, ICSI and Fisher in training, so its AMI 7.81 is not held out"
+    },
+    {
+      "id": "FluidInference/nemotron-3.5-transcribe-lite-coreml",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "its encoder + CTC head without the LLM, Core ML 1.36 GB fp16; LibriSpeech test-clean 5.50% and AMI EN2002c 26.3% WER, far behind Parakeet; speaker side is Nemotron 3 Diarization, which we ship"
+    },
+    {
+      "id": "Sawfwair/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-MLX-4bit",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "MLX 4-bit of the 30B model, 25 GB, 21.8 GiB peak; no word timestamps on that path"
+    },
+    {
+      "id": "akhaliq/nemotron-3.5-transcribe-mini-64e",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "REAP expert-pruned 30B model, 38-53 GB bf16"
     }
   ]
 }
