@@ -72,10 +72,19 @@ enum TokenDiff {
         return out
     }
 
-    /// All hunks between `original` and `edited`, or nil when either side is
-    /// too long to diff. Classic LCS over match keys; when a token can be
-    /// taken from either side, the removal comes first.
-    static func hunks(original: String, edited: String) -> [Hunk]? {
+    /// One token of the alignment between the original and the edited text.
+    enum Step: Equatable, Sendable {
+        /// A token on both sides, as written in the original and in the edit.
+        /// The two share a match key but may differ in case or punctuation.
+        case kept(String, String)
+        case removed(String)
+        case inserted(String)
+    }
+
+    /// The token alignment of `original` against `edited`, or nil when either
+    /// side is too long to diff. Classic LCS over match keys; when a token can
+    /// be taken from either side, the removal comes first.
+    static func steps(original: String, edited: String) -> [Step]? {
         let a = tokens(original)
         let b = tokens(edited)
         if a.count > maxTokens || b.count > maxTokens {
@@ -97,35 +106,55 @@ enum TokenDiff {
             }
         }
 
-        var out: [Hunk] = []
-        var current: Hunk? = nil
+        var out: [Step] = []
         var i = 0
         var j = 0
         while i < n || j < m {
-            let matched = i < n && j < m && ka[i] == kb[j]
-            if matched {
+            if i < n && j < m && ka[i] == kb[j] {
+                out.append(.kept(a[i], b[j]))
+                i += 1
+                j += 1
+            } else if j >= m || (i < n && lcs[(i + 1) * width + j] >= lcs[i * width + (j + 1)]) {
+                out.append(.removed(a[i]))
+                i += 1
+            } else {
+                out.append(.inserted(b[j]))
+                j += 1
+            }
+        }
+        return out
+    }
+
+    /// Runs of changed steps as hunks, in order.
+    static func hunks(_ steps: [Step]) -> [Hunk] {
+        var out: [Hunk] = []
+        var current: Hunk? = nil
+        for step in steps {
+            switch step {
+            case .kept:
                 if let hunk = current {
                     out.append(hunk)
                     current = nil
                 }
-                i += 1
-                j += 1
-                continue
+            case .removed(let token):
+                var hunk = current ?? Hunk(removed: [], inserted: [])
+                hunk.removed.append(token)
+                current = hunk
+            case .inserted(let token):
+                var hunk = current ?? Hunk(removed: [], inserted: [])
+                hunk.inserted.append(token)
+                current = hunk
             }
-            var hunk = current ?? Hunk(removed: [], inserted: [])
-            let takeFromA = j >= m || (i < n && lcs[(i + 1) * width + j] >= lcs[i * width + (j + 1)])
-            if takeFromA {
-                hunk.removed.append(a[i])
-                i += 1
-            } else {
-                hunk.inserted.append(b[j])
-                j += 1
-            }
-            current = hunk
         }
         if let hunk = current {
             out.append(hunk)
         }
         return out
+    }
+
+    /// All hunks between `original` and `edited`, or nil when either side is
+    /// too long to diff.
+    static func hunks(original: String, edited: String) -> [Hunk]? {
+        steps(original: original, edited: edited).map { hunks($0) }
     }
 }

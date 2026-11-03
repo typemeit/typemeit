@@ -106,19 +106,119 @@ enum Learning {
             }
     }
 
+    /// Replacement hunks with the pieces of one multi-word correction joined
+    /// back together. The diff cuts a phrase wherever a token survives on its
+    /// match key, so "get hub actions" corrected to "GitHub Actions" comes
+    /// out as "get hub" to "GitHub", and "Sarah Jane Smyth" corrected to
+    /// "Sara Jane Smith" as two one-word fixes. A kept token joins the
+    /// replacement beside it when the user capitalised it ("actions" to
+    /// "Actions"), and a capitalised kept token bridges two replacements
+    /// ("Jane"). Function words, a comma or full stop between the pieces,
+    /// and a side longer than `Prefilter.maxTokensPerSide` keep them apart.
+    static func phrases(_ steps: [TokenDiff.Step]) -> [TokenDiff.Hunk] {
+        enum Piece {
+            case kept(String, String)
+            case changed(TokenDiff.Hunk)
+        }
+        var pieces: [Piece] = []
+        for step in steps {
+            switch step {
+            case .kept(let heard, let meant):
+                pieces.append(.kept(heard, meant))
+            case .removed(let token):
+                if case .changed(var hunk) = pieces.last {
+                    hunk.removed.append(token)
+                    pieces[pieces.count - 1] = .changed(hunk)
+                } else {
+                    pieces.append(.changed(TokenDiff.Hunk(removed: [token], inserted: [])))
+                }
+            case .inserted(let token):
+                if case .changed(var hunk) = pieces.last {
+                    hunk.inserted.append(token)
+                    pieces[pieces.count - 1] = .changed(hunk)
+                } else {
+                    pieces.append(.changed(TokenDiff.Hunk(removed: [], inserted: [token])))
+                }
+            }
+        }
+
+        func breaksPhrase(_ token: String) -> Bool {
+            guard let last = token.unicodeScalars.last else { return false }
+            return ",.;:!?".unicodeScalars.contains(last)
+        }
+        func capitalised(_ token: String) -> Bool {
+            let word = Prefilter.trimOuterPunctuation(token)
+            return word.first?.isUppercase == true
+                && !Prefilter.functionWords.contains(TokenDiff.matchKey(word))
+        }
+        func recased(_ heard: String, _ meant: String) -> Bool {
+            capitalised(meant) && Prefilter.trimOuterPunctuation(heard) != Prefilter.trimOuterPunctuation(meant)
+        }
+        func fits(_ hunk: TokenDiff.Hunk, adding removed: Int, _ inserted: Int) -> Bool {
+            hunk.removed.count + removed <= Prefilter.maxTokensPerSide
+                && hunk.inserted.count + inserted <= Prefilter.maxTokensPerSide
+        }
+
+        var out: [TokenDiff.Hunk] = []
+        // Pieces before this index belong to a phrase already taken.
+        var taken = 0
+        var i = 0
+        while i < pieces.count {
+            guard case .changed(var hunk) = pieces[i], hunk.isReplacement else {
+                i += 1
+                continue
+            }
+            // Recased tokens just before it.
+            var start = i
+            while start > taken, case .kept(let heard, let meant) = pieces[start - 1],
+                  !breaksPhrase(meant), recased(heard, meant), fits(hunk, adding: 1, 1) {
+                hunk.removed.insert(heard, at: 0)
+                hunk.inserted.insert(meant, at: 0)
+                start -= 1
+            }
+            i += 1
+            // Recased tokens after it, and a capitalised token followed by
+            // another replacement.
+            while i < pieces.count, let last = hunk.inserted.last, !breaksPhrase(last) {
+                if case .kept(let heard, let meant) = pieces[i], recased(heard, meant), fits(hunk, adding: 1, 1) {
+                    hunk.removed.append(heard)
+                    hunk.inserted.append(meant)
+                    i += 1
+                } else if case .changed(let next) = pieces[i], next.isReplacement,
+                          fits(hunk, adding: next.removed.count, next.inserted.count) {
+                    hunk.removed += next.removed
+                    hunk.inserted += next.inserted
+                    i += 1
+                } else if i + 1 < pieces.count, case .kept(let heard, let meant) = pieces[i],
+                          capitalised(meant), !breaksPhrase(meant),
+                          case .changed(let next) = pieces[i + 1], next.isReplacement,
+                          fits(hunk, adding: 1 + next.removed.count, 1 + next.inserted.count) {
+                    hunk.removed += [heard] + next.removed
+                    hunk.inserted += [meant] + next.inserted
+                    i += 2
+                } else {
+                    break
+                }
+            }
+            taken = i
+            out.append(hunk)
+        }
+        return out
+    }
+
     /// Candidates from an edit, before the model is consulted. Empty when the
     /// edit is a rewrite, too long to diff, or contains nothing learnable.
     static func candidates(original: String, edited: String, context: LearnContext) -> [Candidate] {
-        guard let hunks = TokenDiff.hunks(original: original, edited: edited) else {
+        guard let steps = TokenDiff.steps(original: original, edited: edited) else {
             return []
         }
-        if hunks.count > Prefilter.maxHunksPerEdit {
+        if TokenDiff.hunks(steps).count > Prefilter.maxHunksPerEdit {
             return []
         }
         let known = Prefilter.keys(context.customWords)
         let denied = Prefilter.keys(context.denylist)
         var out: [Candidate] = []
-        for hunk in hunks where hunk.isReplacement {
+        for hunk in phrases(steps) {
             if case .success(let candidate) = Prefilter.candidate(hunk, knownKeys: known, deniedKeys: denied) {
                 out.append(candidate)
             }

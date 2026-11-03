@@ -226,6 +226,61 @@ final class LearningEngineTests: XCTestCase {
         XCTAssertEqual(Learning.candidates(original: original, edited: edited, context: LearnContext()).count, 4)
     }
 
+    private func phrases(_ original: String, _ edited: String) -> [Candidate] {
+        Learning.candidates(original: original, edited: edited, context: LearnContext())
+    }
+
+    func testARecasedWordJoinsTheReplacementBesideIt() {
+        XCTAssertEqual(
+            phrases("we run it on get hub actions now", "we run it on GitHub Actions now"),
+            [Candidate(heard: "get hub actions", meant: "GitHub Actions")]
+        )
+        XCTAssertEqual(
+            phrases("my new mac book pro is here", "my new MacBook Pro is here"),
+            [Candidate(heard: "mac book pro", meant: "MacBook Pro")]
+        )
+        XCTAssertEqual(
+            phrases("tell jon smyth today", "tell Jon Smith today"),
+            [Candidate(heard: "jon smyth", meant: "Jon Smith")]
+        )
+    }
+
+    func testACapitalisedWordBridgesTwoReplacements() {
+        XCTAssertEqual(
+            phrases("I met Sarah Jane Smyth at lunch", "I met Sara Jane Smith at lunch"),
+            [Candidate(heard: "Sarah Jane Smyth", meant: "Sara Jane Smith")]
+        )
+    }
+
+    func testSeparateCorrectionsStaySeparate() {
+        // Lowercase or function words between them.
+        XCTAssertEqual(
+            phrases("ask Jon called Smyth", "ask John called Smith").map(\.meant),
+            ["John", "Smith"]
+        )
+        XCTAssertEqual(
+            phrases("Jon and Smyth", "John And Smith").map(\.meant),
+            ["John", "Smith"]
+        )
+        // A full stop between them.
+        XCTAssertEqual(
+            phrases("we use Zen tricks. Today Jon is in", "we use Zentrix. Today John is in").map(\.meant),
+            ["Zentrix", "John"]
+        )
+        // A capitalised word the user did not touch stays out of a lone fix.
+        XCTAssertEqual(
+            phrases("ask pree yanka Patel", "ask Priyanka Patel"),
+            [Candidate(heard: "pree yanka", meant: "Priyanka")]
+        )
+    }
+
+    func testAJoinedPhraseStaysWithinFourWordsASide() {
+        XCTAssertEqual(
+            phrases("on get hub actions runner pool", "on GitHub Actions Runner Pool"),
+            [Candidate(heard: "get hub actions runner", meant: "GitHub Actions Runner")]
+        )
+    }
+
     func testNormalizeMatchesCustomWordsInput() {
         XCTAssertEqual(Learning.normalizeWord("  <Charge\"Bee>  Pro "), "ChargeBee Pro")
     }
