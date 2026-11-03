@@ -281,6 +281,17 @@ a { color: inherit; }
 .phantom span { position: absolute; left: 0; bottom: 0; white-space: nowrap; opacity: 0; font: 400 1.75cqw/1 var(--font-mono); letter-spacing: -0.01em; will-change: transform, opacity, filter; }
 .shot { margin: 0; }
 .shot img { width: 100%; height: auto; display: block; border-radius: 1% / 1.6%; box-shadow: var(--frame); }
+/* A screenshot opens full screen on a click; a click on it there zooms to its full size, where it pans. */
+.shot button { all: unset; display: block; width: 100%; cursor: zoom-in; border-radius: 1% / 1.6%; }
+.shot button:focus-visible { outline: 2px solid var(--tmi-ink); outline-offset: 4px; }
+.zoom { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--tmi-paper); color: var(--tmi-ink); overflow: auto; overscroll-behavior: contain; }
+.zoom::backdrop { background: var(--tmi-paper); }
+.zoom .stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; padding: 56px 16px 16px; box-sizing: border-box; }
+.zoom img { display: block; max-width: 100%; max-height: calc(100dvh - 72px); width: auto; height: auto; cursor: zoom-in; border-radius: 1% / 1.6%; box-shadow: var(--frame); }
+.zoom.big .stage { place-items: start; padding: 56px 16px 16px; }
+.zoom.big img { max-width: none; max-height: none; width: var(--full); cursor: zoom-out; }
+.zoom .close { position: fixed; top: 12px; right: 12px; z-index: 1; width: 40px; height: 40px; display: grid; place-items: center; background: var(--tmi-paper); color: var(--tmi-ink); border: 1px solid var(--tmi-rule); cursor: pointer; }
+.zoom .close svg { width: 16px; height: 16px; }
 
 .end { border-top: 1px solid var(--tmi-rule); padding-block: 96px 120px; }
 .end h2 { max-width: 30ch; }
@@ -311,9 +322,6 @@ a { color: inherit; }
 }
 
 @media (max-width: 760px) {
-  /* A screenshot pans inside its own box rather than shrinking past reading. */
-  .shot { overflow-x: auto; border: 1px solid var(--tmi-ink-a20); }
-  .shot img { width: 880px; max-width: none; border-radius: 0; box-shadow: none; }
   .foot a { display: inline-block; padding: 12px 0; }
 }
 @media (max-width: 480px) {
@@ -378,7 +386,7 @@ a { color: inherit; }
       </div>
       <div class="cap">
         <h3>summary</h3>
-        <p>apple intelligence on your mac writes two sentences and a title for each meeting.</p>
+        <p>apple intelligence on your mac writes a summary and a title for each meeting.</p>
       </div>
       <div class="cap">
         <h3>sharing</h3>
@@ -391,13 +399,12 @@ a { color: inherit; }
       </div>
       <div class="cap">
         <h3>mcp</h3>
-        <p>ask claude, codex or any ai app about your meetings. add type me it to any app that supports mcp, and it can list, read and search your transcripts.</p>
-        <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code></p>
+        <p>ask claude, codex or any ai app about your meetings and dictations. add type me it to any app that supports mcp, and it can list, read and search them, and set up your hooks.</p>
+        <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code><code>list_dictations</code><code>search_dictations</code><code>list_hooks</code><code>add_hook</code><code>update_hook</code><code>remove_hook</code><code>get_system_prompt</code><code>update_system_prompt</code></p>
       </div>
       <div class="cap">
         <h3>hooks</h3>
         <p>save prompts like “write the follow-up email” or “file the action items”. when a meeting ends, press run hooks and claude code runs each one on the transcript, with your mcp servers. what it writes shows on the meeting’s page.</p>
-        <p class="tools"><code>list_hooks</code><code>add_hook</code><code>update_hook</code><code>remove_hook</code></p>
         <p class="note">needs claude code, which sends the transcript to anthropic. hooks an assistant adds over mcp start off.</p>
       </div>
     </div></div>
@@ -575,6 +582,48 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
   addEventListener("scroll", go, { passive: true });
   addEventListener("resize", go);
   go();
+}
+</script>
+<script>
+"use strict";
+// Screenshots open full screen; a click there zooms to full size, kept under the pointer.
+{
+  const zoom = document.createElement("dialog");
+  zoom.className = "zoom";
+  zoom.setAttribute("aria-label", "screenshot");
+  zoom.innerHTML = '<button class="close" type="button" aria-label="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 20L4 4m16 0L4 20"/></svg></button><div class="stage"><img alt=""></div>';
+  document.body.append(zoom);
+  const big = zoom.querySelector("img");
+  const close = () => zoom.close();
+  zoom.querySelector(".close").addEventListener("click", close);
+  zoom.querySelector(".stage").addEventListener("click", (e) => { if (e.target !== big) close(); });
+  zoom.addEventListener("close", () => { zoom.classList.remove("big"); document.documentElement.style.overflow = ""; });
+
+  big.addEventListener("click", (e) => {
+    if (zoom.classList.contains("big")) { zoom.classList.remove("big"); return; }
+    const r = big.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    // Captures are 2x: half the pixel width is their size on the Mac, and never less than 1.6 times what fits.
+    zoom.style.setProperty("--full", Math.max(big.naturalWidth / 2, r.width * 1.6) + "px");
+    zoom.classList.add("big");
+    const n = big.getBoundingClientRect();
+    zoom.scrollTo(n.left + zoom.scrollLeft + fx * n.width - e.clientX, n.top + zoom.scrollTop + fy * n.height - e.clientY);
+  });
+
+  for (const img of document.querySelectorAll(".shot img")) {
+    const open = document.createElement("button");
+    open.type = "button";
+    open.setAttribute("aria-label", "enlarge: " + img.alt);
+    img.replaceWith(open);
+    open.append(img);
+    open.addEventListener("click", () => {
+      big.src = img.currentSrc || img.src;
+      big.alt = img.alt;
+      document.documentElement.style.overflow = "hidden";
+      zoom.showModal();
+      zoom.scrollTo(0, 0);
+    });
+  }
 }
 </script>
 </body>
