@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://typeme.it/og.png">
 <link rel="canonical" href="https://typeme.it/">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Meeting hooks: prompts Claude Code runs on a meeting once it ends","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
 </script>
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -393,6 +393,12 @@ a { color: inherit; }
         <h3>mcp</h3>
         <p>ask claude, codex or any ai app about your meetings. add type me it to any app that supports mcp, and it can list, read and search your transcripts.</p>
         <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code></p>
+      </div>
+      <div class="cap">
+        <h3>hooks</h3>
+        <p>save prompts like “write the follow-up email” or “file the action items”. when a meeting ends, press run hooks and claude code runs each one on the transcript, with your mcp servers. what it writes shows on the meeting’s page.</p>
+        <p class="tools"><code>list_hooks</code><code>add_hook</code><code>update_hook</code><code>remove_hook</code></p>
+        <p class="note">needs claude code, which sends the transcript to anthropic. hooks an assistant adds over mcp start off.</p>
       </div>
     </div></div>
     <div class="cell pics"><div class="stick">
