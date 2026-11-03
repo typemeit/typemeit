@@ -833,6 +833,23 @@
       "held": "partly: right names yes, strangers at 0.5 no",
       "verdict": "shipped with the cut at 0.8; voice files learned padded are relearned",
       "link": "`docs/voice-names-research/modes.py`"
+    },
+    {
+      "name": "S1-mini, digits neurons off",
+      "url": "https://huggingface.co/superwhisper/s1-mini",
+      "group": "clean-up",
+      "status": "open",
+      "summary": "128 neurons zeroed, no training: digits from spoken numbers fall from 84 to 1 of 101 held-out dictations; not yet scored on the eval",
+      "date": "2026-11-03",
+      "role": "Clean-up",
+      "model": "S1-mini 0.6B (Superwhisper) with 128 MLP neurons switched off (0.022% of weights), found by gradient × activation on the digit-or-word token",
+      "against": "S1-mini unedited",
+      "hypothesis": "Most of S1-mini's eval failures (46 of 65) are one behaviour, writing digits with the digits style off, which a weight edit can remove without retraining",
+      "metric": "Outputs with digits, non-ASCII outputs and input words kept on 80 held-out invented dictations plus the 21 eval inputs it writes digits for; outputs changed on the other 124 eval inputs; then make eval through A2S1",
+      "result": "Digits 84 → 1, non-ASCII 3 → 0, input words kept 78.5% → 97.3%. 17 of 124 other outputs change: input digits become words, \"C-E-O\", lost quotes, \"there house\" no longer fixed; some closer to what was said. Banning digit tokens instead breaks 6 of 21 (Chinese numerals, dropped words)",
+      "held": "partly",
+      "verdict": "open: run Scripts/postprocess-lab/s1-words/eval.sh on the Mac",
+      "link": "[Scripts/postprocess-lab/s1-words/README.md](../Scripts/postprocess-lab/s1-words/README.md)"
     }
   ]
 }

@@ -35,7 +35,7 @@
  "name": "type me it model trials",
  "description": "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores.",
  "url": "https://typeme.it/models",
- "dateModified": "2026-10-22",
+ "dateModified": "2026-11-03",
  "creator": {
   "@type": "Organization",
   "name": "type me it",
@@ -377,6 +377,13 @@
    "name": "Tiled voice-name clips",
    "dateCreated": "2026-10-22",
    "description": "short clips named right 2,990 vs 1,183 of 3,306; strangers reaching 0.5 rose from 2 to 18, so the cut moved to 0.8"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "S1-mini, digits neurons off",
+   "dateCreated": "2026-11-03",
+   "description": "128 neurons zeroed, no training: digits from spoken numbers fall from 84 to 1 of 101 held-out dictations; not yet scored on the eval",
+   "url": "https://huggingface.co/superwhisper/s1-mini"
   }
  ]
 }
@@ -387,7 +394,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">48 trials · updated 22 october 2026</p>
+  <p class="meta">49 trials · updated 3 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -680,6 +687,17 @@
 <section id="clean-up" data-group="clean-up">
 <h2>clean-up</h2>
 <div>
+<article class="trial" id="s1-mini-digits-neurons-off" data-group="clean-up" data-status="open">
+  <time datetime="2026-11-03">3 november 2026</time>
+  <h3><a href="https://huggingface.co/superwhisper/s1-mini">S1-mini, digits neurons off</a></h3>
+  <span class="status status-open">open</span>
+  <p class="summary">128 neurons zeroed, no training: digits from spoken numbers fall from 84 to 1 of 101 held-out dictations; not yet scored on the eval</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">S1-mini 0.6B (Superwhisper) with 128 MLP neurons switched off (0.022% of weights), found by gradient × activation on the digit-or-word token</p>
+    <dl><dt>against</dt><dd>S1-mini unedited</dd><dt>expected</dt><dd>Most of S1-mini's eval failures (46 of 65) are one behaviour, writing digits with the digits style off, which a weight edit can remove without retraining</dd><dt>measured</dt><dd>Outputs with digits, non-ASCII outputs and input words kept on 80 held-out invented dictations plus the 21 eval inputs it writes digits for; outputs changed on the other 124 eval inputs; then make eval through A2S1</dd><dt>result</dt><dd>Digits 84 → 1, non-ASCII 3 → 0, input words kept 78.5% → 97.3%. 17 of 124 other outputs change: input digits become words, "C-E-O", lost quotes, "there house" no longer fixed; some closer to what was said. Banning digit tokens instead breaks 6 of 21 (Chinese numerals, dropped words)</dd><dt>held</dt><dd>partly</dd><dt>verdict</dt><dd>open: run Scripts/postprocess-lab/s1-words/eval.sh on the Mac</dd></dl>
+  </details>
+</article>
 <article class="trial" id="clef-flash" data-group="clean-up" data-status="rejected">
   <time datetime="2026-10-03">3 october 2026</time>
   <h3><a href="https://huggingface.co/Cloudflare/clef-flash">Clef-flash</a></h3>
