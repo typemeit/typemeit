@@ -915,6 +915,131 @@
       "date": "2026-10-29",
       "role": "speech recognition",
       "why": "REAP expert-pruned 30B model, 38-53 GB bf16"
+    },
+    {
+      "id": "zoom/scribe_v2.1_pro (eval reference)",
+      "date": "2026-11-03",
+      "role": "eval reference"
+    },
+    {
+      "id": "smdesai/TitaNet-Large-CoreML",
+      "date": "2026-11-03",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "LiquidAI/LFM3-Audio-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidInference/lfm3-audio-2b-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "LiquidAI/LFM3-Omni-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "LiquidAI/d1-Omni-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/nemotron-labs-unified-asr-0.6b",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidInference/nemotron-labs-unified-asr-0.6b-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Muesli-HQ/phonon-2.5-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "maya-research/maya-transcribe",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "EphAsad/SatellaSTT-27M",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "WhissleAI/arc-v1.1",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nikioth/diarizen-wavlm-large-s80-md-v2-coreml",
+      "date": "2026-11-03",
+      "role": "diarization"
+    },
+    {
+      "id": "nikioth/diarizen-wavlm-base-s80-md-coreml",
+      "date": "2026-11-03",
+      "role": "diarization"
+    },
+    {
+      "id": "diarizeapp/redimnet2-b3-onnx",
+      "date": "2026-11-03",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "fonada/kapture-v3 (eval reference)",
+      "date": "2026-11-03",
+      "role": "eval reference"
+    },
+    {
+      "id": "category271/whispernow-lfm3-1.7b",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "category271/whispernow-nemotron-bolt-e4b",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "hasanchadaram/dictation-cleanup-qwen3.5-4b-gguf",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "devadathanmb/utter-dictation-cleanup-qwen3-1.7b-mlx-6bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "danielrosehill/S1-ASR-Cleanup",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Glimpse-Dictation/Glimpse-C1-2B",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Muesli-HQ/qwen35-2b-base-cotypist-mlx-4bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Muesli-HQ/qwen35-0.8b-base-cotypist-mlx-4bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Subvocal (Hacker News)",
+      "date": "2026-11-03",
+      "role": "speech recognition"
     }
   ]
 }
