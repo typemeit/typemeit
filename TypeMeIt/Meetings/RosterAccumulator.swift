@@ -52,6 +52,7 @@ struct RosterAccumulator: Equatable {
     @discardableResult
     mutating func add(_ reading: RosterReading, atMs ms: Int) -> Bool {
         if let other = reading.call, let call, other != call { return false }
+        if let other = reading.name, let name, other != name { return false }
         for name in reading.roster where !roster.contains(name) { roster.append(name) }
         if let c = reading.channel { channel = c }
         if let w = reading.workspace { workspace = w }

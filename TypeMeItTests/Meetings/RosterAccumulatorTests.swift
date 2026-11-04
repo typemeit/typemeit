@@ -67,6 +67,16 @@ struct RosterAccumulatorTests {
             call: "bcd-efgh-ijk", name: "Design review"))
     }
 
+    @Test func anotherCallsNameIsLeftOutWhenNoCodeWasRead() {
+        var a = RosterAccumulator(minimumSpanMs: 250)
+        let first = a.add(RosterReading(roster: ["Rafael"], name: "Design review"), atMs: 0)
+        let same = a.add(RosterReading(roster: ["Oskar"], name: "Design review"), atMs: 1000)
+        let next = a.add(RosterReading(roster: ["Greta"], name: "Team standup"), atMs: 2000)
+        #expect([first, same, next] == [true, true, false])
+        #expect(a.finish(atMs: 3000) == MeetingNames(
+            source: .roster, roster: ["Rafael", "Oskar"], channel: nil, spans: [], captions: nil, name: "Design review"))
+    }
+
     @Test func aFlickerShorterThanTheHoldIsOneTurn() {
         // Meet's highlight goes out between words.
         var a = RosterAccumulator(minimumSpanMs: 250, holdMs: 1000)

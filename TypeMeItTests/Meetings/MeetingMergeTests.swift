@@ -7,7 +7,7 @@ struct MeetingMergeTests {
     private let window: TimeInterval = 15 * 60
 
     /// A Slack call starting `atSeconds` after `t0`, lasting `seconds`, done, with kept audio.
-    private func call(_ atSeconds: TimeInterval, seconds: Int, app: String = "com.tinyspeck.slackmacgap", call key: String? = nil) -> Meeting {
+    private func call(_ atSeconds: TimeInterval, seconds: Int, app: String = "com.tinyspeck.slackmacgap", call key: String? = nil, name: String? = nil) -> Meeting {
         var m = MeetingFixtures.example
         m.id = UUID()
         m.started = t0.addingTimeInterval(atSeconds)
@@ -17,7 +17,7 @@ struct MeetingMergeTests {
         m.app = Meeting.App(bundleId: app, name: "Slack")
         m.tracks = m.tracks.map { var t = $0; t.frames = seconds * 1000 * Meeting.framesPerMs; t.gaps = []; return t }
         m.dictations = []
-        m.names = key.map { MeetingNames(source: .roster, roster: ["Ana"], channel: nil, spans: [], captions: nil, call: $0) }
+        m.names = key == nil && name == nil ? nil : MeetingNames(source: .roster, roster: ["Ana"], channel: nil, spans: [], captions: nil, call: key, name: name)
         return m
     }
 
@@ -43,6 +43,18 @@ struct MeetingMergeTests {
         let earlier = call(0, seconds: 600, call: "abc-defg-hij")
         let later = call(660, seconds: 300, call: "xyz-wxyz-xyz")
         #expect(MeetingMerge.previous(of: later, among: [earlier, later], window: window) == nil)
+    }
+
+    @Test func twoCallNamesThatDifferStandAlone() {
+        let earlier = call(0, seconds: 600, name: "Design review")
+        let later = call(660, seconds: 300, name: "Team standup")
+        #expect(MeetingMerge.previous(of: later, among: [earlier, later], window: window) == nil)
+    }
+
+    @Test func theSameCallNameJoins() {
+        let earlier = call(0, seconds: 600, name: "Design review")
+        let later = call(660, seconds: 300, name: "Design review")
+        #expect(MeetingMerge.previous(of: later, among: [earlier, later], window: window)?.id == earlier.id)
     }
 
     @Test func aCallKeyOnOneSideOnlyStillJoins() {

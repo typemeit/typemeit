@@ -4,9 +4,9 @@ import Foundation
 /// A call recorded again soon after its last recording ended (you left and
 /// came back, or the app dropped the mic for longer than the 30 s a pause
 /// covers) is joined onto that meeting instead of becoming a second one.
-/// The key is the app, plus the Meet code or the huddle's channel when the
-/// window was read: two recordings whose keys both say which call they
-/// were must say the same one. The earlier meeting's tracks and the new
+/// The key is the app, plus the Meet code or the huddle's channel and the
+/// call's name when the window was read: two recordings whose keys both
+/// say which call they were must say the same one. The earlier meeting's tracks and the new
 /// ones are joined end to end with the time between them as silence, and
 /// the whole meeting is transcribed again so its speakers are found once.
 enum MeetingMerge {
@@ -20,6 +20,7 @@ enum MeetingMerge {
                 guard m.id != new.id, m.kind == .call, m.app?.bundleId == app.bundleId, m.continues == nil,
                       !m.tracks.isEmpty, m.transcription.state == .done ? !m.audioFiles.isEmpty : true else { return false }
                 if let a = m.names?.call, let b = new.names?.call, a != b { return false }
+                if let a = m.names?.name, let b = new.names?.name, a != b { return false }
                 let gap = new.started.timeIntervalSince(end(of: m))
                 // The new recording's held minute can reach back past the
                 // old one's end; a little overlap is still a rejoin.
