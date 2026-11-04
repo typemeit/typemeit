@@ -58,12 +58,14 @@ final class Roster: @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var lastMs = 0
     private var readings = 0
-    /// The tiles the last walk found, when it ran and the call it read;
+    /// The tiles the last walk found, when it ran and the call and name it read;
     /// touched only on `queue`.
     private var tiles: [AXUIElement] = []
     private var walked: ContinuousClock.Instant?
     private var walkedCall: String?
+    private var walkedName: String?
     private var showingOtherCall = false
+    private var loggedUnreadCode = false
 
     /// The last reading was of a call other than this meeting's.
     var showsOtherCall: Bool {
@@ -100,6 +102,7 @@ final class Roster: @unchecked Sendable {
             for tile in tiles { Roster.walk(tile, depth: 0, maxDepth: Roster.tileDepthLimit, into: &nodes, elements: &elements) }
             reading = RosterRules.read(nodes, target: target)
             reading.call = walkedCall
+            reading.name = walkedName
             // Tiles that no longer answer have left the page, as when the
             // call ends: the next poll walks it again.
             if nodes.isEmpty { tiles = [] }
@@ -108,11 +111,18 @@ final class Roster: @unchecked Sendable {
             var whole = RosterRules.read(window.nodes, target: target)
             whole.call = target == .meet ? window.meetCode : whole.channel
             if target == .meet {
-                whole.name = window.nodes.lazy.filter { $0.role == "AXWebArea" }.compactMap { $0.title.flatMap(RosterRules.Meet.name(inTitle:)) }.first
+                let titles = window.nodes.lazy.filter { $0.role == "AXWebArea" }.compactMap(\.title)
+                whole.name = titles.compactMap(RosterRules.Meet.name(inTitle:)).first
+                whole.call = whole.call ?? titles.compactMap(RosterRules.Meet.code(inTitle:)).first
+                if whole.call == nil, !whole.roster.isEmpty, !loggedUnreadCode {
+                    loggedUnreadCode = true
+                    DebugLog.write("Meeting names: no Meet code in the call's address \(window.meetPath ?? "not read") or title")
+                }
             }
             tiles = RosterRules.tileRoots(window.nodes, target: target).map { window.elements[$0] }
             walked = ContinuousClock.now
             walkedCall = whole.call
+            walkedName = whole.name
             reading = whole
         }
         lock.lock()
@@ -186,12 +196,12 @@ final class Roster: @unchecked Sendable {
     /// The meeting's part of the app: for Meet, the web area of the tab on
     /// meet.google.com; for Slack, every window, since a huddle can sit in
     /// the main window as well as its own, walked no deeper than its tiles.
-    /// Each node's element beside it, and the Meet code from the tab's
-    /// address, for Meet.
-    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], elements: [AXUIElement], meetCode: String?) {
+    /// Each node's element beside it, and the Meet code and path from the
+    /// tab's address, for Meet.
+    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], elements: [AXUIElement], meetCode: String?, meetPath: String?) {
         let app = AXUIElementCreateApplication(pid)
         var nodes: [AXNode] = [], elements: [AXUIElement] = []
-        var code: String?
+        var code: String?, path: String?
         for window in children(app, kAXWindowsAttribute) {
             switch target {
             case .slackHuddle:
@@ -199,12 +209,13 @@ final class Roster: @unchecked Sendable {
             case .meet:
                 for area in webAreas(under: window) {
                     guard let address = url(of: area), address.host == "meet.google.com" else { continue }
-                    code = code ?? RosterRules.Meet.code(inPath: address.path)
+                    code = code ?? RosterRules.Meet.code(in: address.absoluteString)
+                    path = path ?? address.path
                     walk(area, depth: 0, maxDepth: depthLimit, into: &nodes, elements: &elements)
                 }
             }
         }
-        return (nodes, elements, code)
+        return (nodes, elements, code, path)
     }
 
     private static let nodeLimit = 20_000

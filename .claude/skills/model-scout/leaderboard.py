@@ -89,8 +89,16 @@ def main():
     elif args.private:
         table = call("_private_update", [args.version, "", True, "Scripted vs. Conversational"])[0]["value"]
     else:
-        show_proprietary, show_llm = True, True
-        table = call("_main_table_update", [args.version, "", show_proprietary, show_llm, main_table_columns()])[0]["value"]
+        # Send every parameter the endpoint lists, in its order: the Space adds
+        # filters now and then (max_size, 2026-11), and a call missing one
+        # returns {"error": null} instead of a table. Unknown ones keep their
+        # default; max_size's default is its slider's top, so no row is hidden
+        # (a value above the top also returns {"error": null}).
+        values = {"version_id": args.version, "search_query": "", "show_proprietary": True,
+                  "show_llm": True, "selected_columns": main_table_columns()}
+        data = [values.get(p["parameter_name"], p.get("parameter_default"))
+                for p in endpoint_parameters("_main_table_update")]
+        table = call("_main_table_update", data)[0]["value"]
 
     writer = csv.writer(sys.stdout)
     writer.writerow(table["headers"])
