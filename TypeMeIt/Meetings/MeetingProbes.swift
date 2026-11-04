@@ -319,6 +319,7 @@ enum MeetingProbes {
                     let model = OverlayModel()
                     model.answerExpanded = expanded
                     model.askOpens = true
+                    model.offerCopies = true
                     model.state = switch stage {
                     case .offered, .queued: .meetingQuestion(text: question)
                     case .asking: .meetingAsking(text: question)
