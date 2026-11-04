@@ -1040,6 +1040,26 @@
       "id": "Subvocal (Hacker News)",
       "date": "2026-11-03",
       "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio campplus-coreml v2",
+      "date": "2026-11-04",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "FluidInference/vela-3.0-coreml",
+      "date": "2026-11-04",
+      "role": "clean-up"
+    },
+    {
+      "id": "Prahaladha/hima-asr-mlx",
+      "date": "2026-11-04",
+      "role": "speech recognition"
+    },
+    {
+      "id": "RadiOtter/RadiOtter-ASR-v1",
+      "date": "2026-11-04",
+      "role": "speech recognition"
     }
   ]
 }
