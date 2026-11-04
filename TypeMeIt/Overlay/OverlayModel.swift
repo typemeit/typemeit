@@ -146,6 +146,10 @@ final class OverlayModel {
     var onAskClaude: (@MainActor (String) -> Void)?
     /// The pill's no: not a question to ask.
     var onDeclineQuestion: (@MainActor (String) -> Void)?
+    /// The offered pill shows copy: a dictation asked by name, which may be an accident.
+    var offerCopies = false
+    /// Copies the offered dictation instead of asking.
+    var onCopyDictation: (@MainActor () -> Void)?
     var onCancelAsk: (@MainActor () -> Void)?
     /// The asking pill shows open: Claude is answering for a dictation or a meeting with a page.
     var askOpens = false

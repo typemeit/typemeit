@@ -324,7 +324,7 @@ final class Pipeline {
             if cleaned.applied { postProcessed = cleaned.text }
             finalText = cleaned.text
         } else {
-            finalText = LocalCleanup.run(finalText)
+            finalText = LocalCleanup.run(ModelText.spokenSentenceEnds(finalText))
         }
         // Fillers alone ("um", "uh") clean down to nothing; that is silence, not a dictation.
         if finalText.isEmpty {
@@ -333,7 +333,7 @@ final class Pipeline {
             return
         }
 
-        if settings.askClaude, ClaudeRun.isAvailable, let request = WakePhrase.request(in: finalText) {
+        if settings.askClaude, ClaudeRun.isAvailable, MeetingCoordinator.shared.canOffer, let request = WakePhrase.request(in: finalText) {
             DebugLog.write("Dictation asked by name: offered instead of typed, \"\(DebugLog.excerpt(raw.text))\"")
             // Kept like any dictation, with nothing typed; the answer joins it.
             let asked = HistoryEntry(
@@ -342,7 +342,7 @@ final class Pipeline {
                 windowTitle: target?.windowTitle, dictionaryFixes: matched.fixes, recordingFile: recordingFile, question: Meeting.Question(atMs: 0, text: request))
             store.append(asked, limit: settings.historyLimit)
             finishIdle()
-            MeetingCoordinator.shared.offerDictated(request, dictation: entryId)
+            MeetingCoordinator.shared.offerDictated(request, dictation: entryId, text: finalText)
             return
         }
         let typed = finalText

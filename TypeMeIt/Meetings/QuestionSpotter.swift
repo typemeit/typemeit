@@ -29,8 +29,8 @@ enum WakePhrase {
                                             ["claude"], ["clawed"]]
     private static let greetings: Set<String> = ["hey", "ok", "okay"]
     private static let asks: Set<String> = ["can", "could", "would", "will"]
-    /// How a question can open when the name comes last and the stream
-    /// dropped its question mark: "what was the score TMI".
+    /// How a question can open when the speech model dropped its question
+    /// mark: "what was the score TMI", "TMI, who won".
     private static let questionWords: Set<String> = ["what", "who", "when", "where", "why", "how", "which",
                                                      "is", "are", "was", "were", "do", "does", "did", "have", "has"]
 
@@ -49,19 +49,32 @@ enum WakePhrase {
         at += name.count
         guard words.count > at + 1 else { return nil }
         let asksYou = asks.contains(words[at]) && words[at + 1] == "you"
-        guard asksYou || sentence.hasSuffix("?") else { return nil }
-        return capitalised(tokens[at...].joined(separator: " "))
+        if asksYou || sentence.hasSuffix("?") { return capitalised(tokens[at...].joined(separator: " ")) }
+        let request = tokens[at...]
+        guard questionWords.contains(words[at]), !request.dropLast().contains(where: endsSentence) else { return nil }
+        return capitalised(request.joined(separator: " ").trimmingCharacters(in: requestEdges) + "?")
     }
 
     /// The name last: "what was the score, TMI?".
     private static func trailing(_ tokens: [String], _ words: [String], _ sentence: String) -> String? {
         guard let name = names.first(where: { Array(words.suffix($0.count)) == $0 }) else { return nil }
         let before = tokens.dropLast(name.count)
-        guard before.count >= 2, let first = words.first else { return nil }
-        let opensAsQuestion = questionWords.contains(first) || (asks.contains(first) && words.dropFirst().first == "you")
+        // Only the sentence the name closes: an earlier one opening with a
+        // question word says nothing about it.
+        let start = before.dropLast().lastIndex(where: endsSentence).map { $0 + 1 } ?? 0
+        let asked = before[start...]
+        guard asked.count >= 2 else { return nil }
+        let opensAsQuestion = questionWords.contains(words[start]) || (asks.contains(words[start]) && words[start + 1] == "you")
         guard opensAsQuestion || sentence.hasSuffix("?") else { return nil }
-        let request = before.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,"))
-        return capitalised(request + "?")
+        return capitalised(asked.joined(separator: " ").trimmingCharacters(in: requestEdges) + "?")
+    }
+
+    private static let requestEdges = CharacterSet(charactersIn: " ,.?!")
+    private static let abbreviations: Set<String> = ["dr", "mr", "mrs", "ms", "st", "vs"]
+
+    private static func endsSentence(_ token: String) -> Bool {
+        guard token.last.map({ ".?!".contains($0) }) == true else { return false }
+        return !abbreviations.contains(token.lowercased().filter(\.isLetter))
     }
 
     private static func capitalised(_ request: String) -> String {

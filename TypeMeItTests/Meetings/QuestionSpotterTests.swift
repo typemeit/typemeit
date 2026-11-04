@@ -111,6 +111,29 @@ struct QuestionSpotterTests {
         #expect(WakePhrase.request(in: "TMI, what was the latest score in the cup final?") == "What was the latest score in the cup final?")
     }
 
+    @Test func theNameBeforeAQuestionHeardAsAStatementIsARequest() {
+        #expect(WakePhrase.request(in: "Claude is Paris in France.") == "Is Paris in France?")
+        #expect(WakePhrase.request(in: "TMI, who is the top scorer") == "Who is the top scorer?")
+    }
+
+    @Test func theNameBeforeAQuestionWordStopsAtOneSentence() {
+        #expect(WakePhrase.request(in: "Claude is fine. We should ship it.") == nil)
+    }
+
+    @Test func theNameLastOnlyAsksInItsOwnSentence() {
+        #expect(WakePhrase.request(in: "Why is it slow? This should have gone to Claude.") == nil)
+        #expect(WakePhrase.request(in: "It looks wrong. What was the score, TMI.") == "What was the score?")
+        #expect(WakePhrase.request(in: "what was the score T. M. I.") == "What was the score?")
+    }
+
+    @Test func anAbbreviationDoesNotEndTheSentence() {
+        #expect(WakePhrase.request(in: "What did Dr. Lee say, TMI") == "What did Dr. Lee say?")
+    }
+
+    @Test func aRequestEndsInOneQuestionMark() {
+        #expect(WakePhrase.request(in: "Is it ready? TMI") == "Is it ready?")
+    }
+
     @Test func theNameWithoutAskingIsNotARequest() {
         #expect(WakePhrase.request(in: "TMI, honestly.") == nil)
         #expect(WakePhrase.request(in: "That was TMI, can you believe it?") == nil)

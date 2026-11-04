@@ -97,6 +97,8 @@ final class MeetingCoordinator {
     @ObservationIgnored private var offeredMeetingID: UUID?
     /// The dictation that asked the offered question by name.
     @ObservationIgnored private var offeredDictationID: UUID?
+    /// The offered dictation as it would have been typed, name included.
+    @ObservationIgnored private var offeredDictationText: String?
     /// What the pill's open shows for the question asked last, through its answer.
     /// The ask was opened: its answer goes to its page, not the pill.
     @ObservationIgnored private var askOpened = false
@@ -187,6 +189,12 @@ final class MeetingCoordinator {
         model.onDeclineQuestion = { [weak self] _ in
             self?.logAnswer(.no)
             self?.dismissToast()
+        }
+        model.onCopyDictation = { [weak self] in
+            guard let self, let text = self.offeredDictationText else { return }
+            Output.copyToClipboard(text)
+            self.logAnswer(.no)
+            self.dismissToast()
         }
         model.onCancelAsk = { [weak self] in self?.cancelAsk() }
         model.onRunHooks = { [weak self] id in self?.dismissToast(); self?.runHooks(id) }
@@ -1031,29 +1039,35 @@ final class MeetingCoordinator {
         (recordingMeeting?.preRollMs ?? 0) + Int(seconds * 1000)
     }
 
-    /// A checked question, offered while nothing else is being asked.
-    /// A dictation that asks by name ("TMI, can you…"): offered in the pill
-    /// instead of typed, with the meeting's transcript when one is recording.
-    func offerDictated(_ request: String, dictation: UUID) {
-        let id = UUID()
-        QuestionLog.append(QuestionLog.Entry(id: id, at: Date(), step: .checked, question: request, meeting: recording?.id, verdict: .addressed))
-        let now = secondsRecorded
-        offer(SpottedQuestion(text: request, track: .mic, start: now, end: now, addressed: true), logID: id, dictation: dictation)
-    }
-
-    private func offer(_ question: SpottedQuestion, logID: UUID, dictation: UUID? = nil) {
+    /// An open answer is not swept away by the next question.
+    var canOffer: Bool {
         let answering = { (state: OverlayModel.State?) -> Bool in
             if case .meetingAnswer = state { return true }
             return false
         }
-        // An open answer is not swept away by the next question.
-        guard askRun == nil, !answering(overlay.model.state), !answering(overlay.model.pendingMeeting) else { return }
+        return askRun == nil && !answering(overlay.model.state) && !answering(overlay.model.pendingMeeting)
+    }
+
+    /// A checked question, offered while nothing else is being asked.
+    /// A dictation that asks by name ("TMI, can you…"): offered in the pill
+    /// instead of typed, with the meeting's transcript when one is recording.
+    func offerDictated(_ request: String, dictation: UUID, text: String) {
+        let id = UUID()
+        QuestionLog.append(QuestionLog.Entry(id: id, at: Date(), step: .checked, question: request, meeting: recording?.id, verdict: .addressed))
+        let now = secondsRecorded
+        offer(SpottedQuestion(text: request, track: .mic, start: now, end: now, addressed: true), logID: id, dictation: dictation, dictatedText: text)
+    }
+
+    private func offer(_ question: SpottedQuestion, logID: UUID, dictation: UUID? = nil, dictatedText: String? = nil) {
+        guard canOffer else { return }
         // A question offered and left unanswered says nothing either way.
         if offeredLogID != nil { logAnswer(.ignored) }
         offered = question
         offeredLogID = logID
         offeredMeetingID = recording?.id
         offeredDictationID = dictation
+        offeredDictationText = dictatedText
+        overlay.model.offerCopies = dictatedText != nil
         toast(.meetingQuestion(text: question.text)) { [weak self] in self?.logAnswer(.ignored) }
     }
 
