@@ -66,6 +66,7 @@ xcodebuild archive \
   -configuration Release \
   -archivePath "$ARCHIVE" \
   -derivedDataPath "$DERIVED" \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) Diarizer' \
   -allowProvisioningUpdates \
   -authenticationKeyPath "$ASC_KEY_PATH" \
   -authenticationKeyID "$ASC_KEY_ID" \

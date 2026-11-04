@@ -60,6 +60,7 @@ actor Diarizer {
     /// comparison probe, and, told there is one speaker, for embeddings.
     static let configuration = OfflineDiarizerConfig(
         segmentationStepRatio: Fixed.meetingDiarizerStepRatio,
+        exclusiveSegments: true,
         segmentationMinDurationOn: Fixed.meetingDiarizerMinOnSeconds, segmentationMinDurationOff: Fixed.meetingDiarizerMinOffSeconds)
 
     private func ensureLoaded() async throws -> Loaded {

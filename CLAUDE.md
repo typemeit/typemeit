@@ -29,9 +29,12 @@ a build over `/Applications/type me it.app`, which is the user's release install
 
 ```sh
 DEVELOPMENT_TEAM=Z28DW76Y3W xcodegen generate
-xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug -derivedDataPath /tmp/typemeit-dd build
+xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug -derivedDataPath /tmp/typemeit-dd build 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) Diarizer'
 open "/tmp/typemeit-dd/Build/Products/Debug/type me it dev.app"
 ```
+
+The condition is needed because xcodebuild leaves FluidAudio's default package traits
+off, which hides its diarizer; the release scripts pass it too.
 
 `/tmp/typemeit-dd` is shared by every worktree, and is not a tidiness choice: a
 `-derivedDataPath` inside the worktree gives each one its own full copy of the build,
