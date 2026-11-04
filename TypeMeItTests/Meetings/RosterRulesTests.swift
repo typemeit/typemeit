@@ -130,11 +130,26 @@ struct RosterRulesTests {
         #expect(RosterRules.meet(nodes) == RosterReading(roster: ["Ana Lopez", "Ben Ode"], speaking: ["Ana Lopez"], captions: [], channel: nil))
     }
 
-    @Test func theMeetCodeComesFromTheAddressPath() {
-        #expect(RosterRules.Meet.code(inPath: "/abc-defg-hij") == "abc-defg-hij")
-        #expect(RosterRules.Meet.code(inPath: "/abc-defg-hij/extra") == "abc-defg-hij")
-        #expect(RosterRules.Meet.code(inPath: "/landing") == nil)
-        #expect(RosterRules.Meet.code(inPath: "/") == nil)
+    @Test func theMeetCodeIsFoundAnywhereInTheAddress() {
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/abc-defg-hij") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/abc-defg-hij/extra?authuser=1") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/meet/abc-defg-hij?hs=1") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/u/1/call/abc-defg-hij") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/join?code=abc-defg-hij") == "abc-defg-hij")
+    }
+
+    @Test func aMeetAddressWithoutACodeHasNone() {
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/home/2026/10/27") == nil)
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/landing") == nil)
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/") == nil)
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/xabc-defg-hij") == nil)
+        #expect(RosterRules.Meet.code(in: "https://meet.google.com/abc-defg-hij-klm") == nil)
+    }
+
+    @Test func theMeetCodeComesFromTheTabTitleToo() {
+        #expect(RosterRules.Meet.code(inTitle: "Meet – abc-defg-hij") == "abc-defg-hij")
+        #expect(RosterRules.Meet.code(inTitle: "Meet – Sam / Max") == nil)
+        #expect(RosterRules.Meet.code(inTitle: "Notes on abc-defg-hij") == nil)
     }
 
     /// Titles from the 5 October captures.

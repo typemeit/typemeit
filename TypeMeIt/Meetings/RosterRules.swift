@@ -96,12 +96,14 @@ enum RosterRules {
         /// A name is a few words; anything longer on a tile is something else.
         static let nameMaxWords = 5
 
-        /// The meeting code from a Meet address's path, `/abc-defg-hij`.
-        static func code(inPath path: String) -> String? {
-            guard let first = path.split(separator: "/").first else { return nil }
-            let parts = first.split(separator: "-").map(\.count)
-            guard parts == [3, 4, 3], first.allSatisfy({ $0.isLowercase || $0 == "-" }) else { return nil }
-            return String(first)
+        /// A meeting code, `abc-defg-hij`, standing on its own.
+        private static let codePattern = "(?<![a-z0-9-])[a-z]{3}-[a-z]{4}-[a-z]{3}(?![a-z0-9-])"
+
+        /// The first meeting code anywhere in `text`. Matched by its shape
+        /// and not its place, because Meet moves it: the address was
+        /// `/abc-defg-hij` until October 2026, then `/meet/abc-defg-hij`.
+        static func code(in text: String) -> String? {
+            text.range(of: codePattern, options: .regularExpression).map { String(text[$0]) }
         }
 
         /// What the Meet tab's title puts before the meeting's name.
@@ -113,8 +115,14 @@ enum RosterRules {
         static func name(inTitle title: String) -> String? {
             guard title.hasPrefix(titlePrefix) else { return nil }
             let name = title.dropFirst(titlePrefix.count).trimmingCharacters(in: .whitespaces)
-            guard !name.isEmpty, code(inPath: name) == nil else { return nil }
+            guard !name.isEmpty, code(in: name) != name else { return nil }
             return name
+        }
+
+        /// The meeting code from the Meet tab's title, `Meet – abc-defg-hij`,
+        /// which is what a call with no calendar event shows.
+        static func code(inTitle title: String) -> String? {
+            title.hasPrefix(titlePrefix) ? code(in: title) : nil
         }
 
         /// The words a name may carry in lower case: "Ana de la Cruz".
