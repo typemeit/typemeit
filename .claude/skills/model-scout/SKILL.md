@@ -12,7 +12,10 @@ whenever a model is tried locally.
 
 Every PR this skill opens (a report, a no-picks update, a trial, a change to
 this skill) is merged as soon as it is open: `gh pr merge --squash`, never
-`--admin`, with no wait for review. No AI attribution in any commit, branch or PR.
+`--admin`, with no wait for review. If a permission check refuses the merge
+(it can refuse an unreviewed PR), leave the PR open, don't work around the
+refusal, and give the user the link to merge. No AI attribution in any commit,
+branch or PR.
 
 ## Models we ship
 
