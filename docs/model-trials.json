@@ -833,6 +833,23 @@
       "held": "partly: right names yes, strangers at 0.5 no",
       "verdict": "shipped with the cut at 0.8; voice files learned padded are relearned",
       "link": "`docs/voice-names-research/modes.py`"
+    },
+    {
+      "name": "FluidAudio 0.18.2",
+      "url": "https://github.com/FluidInference/FluidAudio/releases/tag/v0.18.2",
+      "group": "speech recognition",
+      "status": "shipped",
+      "summary": "FluidAudio 0.18.2 tied 0.17.6: meetings 13.49% vs 13.48% WER, dictation 4.32% on both",
+      "date": "2026-11-05",
+      "role": "Speech recognition and speakers",
+      "model": "FluidAudio 0.18.2",
+      "against": "FluidAudio 0.17.6",
+      "hypothesis": "—",
+      "metric": "`make asr-eval` WER on meetings and dictation, one run each; dictation latency; peak memory; words under the wrong speaker through `nemotron_app`, 71 meeting tracks",
+      "result": "Meetings 13.49% vs 13.48%; dictation 4.32% on both; p50/p95 49/135 ms vs 51/97 ms; peak 498 vs 495 MB. Wrong-speaker words 1,691 of 182,436 on both; right number of people on 53 of 71 on both",
+      "held": "—",
+      "verdict": "shipped",
+      "link": "`Scripts/asr-eval/diarizers/nemotron_app.py`"
     }
   ]
 }
