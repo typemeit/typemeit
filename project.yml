@@ -364,11 +364,14 @@ targets:
       - TypeMeIt/MenuBarIcon.swift
       - TypeMeIt/Plural.swift
       # LiveClaude reads Claude Code's stream as the app does.
+      - TypeMeIt/Meetings/ClaudeReplyMarkdown.swift
       - TypeMeIt/Meetings/ClaudeStream.swift
       - TypeMeIt/Meetings/MeetingDataReminder.swift
       - TypeMeIt/Overlay/PuffView.swift
       - TypeMeIt/Overlay/Puff.metal
       - TypeMeIt/Resources/Assets.xcassets
+    dependencies:
+      - package: Textual
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: it.typeme.designsystem
