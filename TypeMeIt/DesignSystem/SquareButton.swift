@@ -44,7 +44,7 @@ private struct SquareButtonLabel: View {
     var body: some View {
         configuration.label
             .labelStyle(SquareButtonLabelStyle())
-            .environment(\.squareLabelLift, Square.drop(lowercase: true, size: size))
+            .environment(\.squareLabelLift, Square.drop(shortLetters: false, size: size))
             .font(Square.mono(size))
             .lineLimit(1)
             .centredLowercase(size: size)

@@ -18,18 +18,19 @@ enum Square {
     /// The label size on every control: buttons, segments, menus, keys, chips.
     static let controlSize: CGFloat = 12
 
+    /// Letters that rise no higher than the x-height and hang no lower than the line.
+    private static let shortLetters = Set("acemnorsuvwxz ")
+
     /// How far a mono label's letters sit below the middle of its line, from
-    /// the face's own metrics. Lowercase centres on the x-height; capitals,
-    /// digits and the modifier symbols centre on the cap height. The line box
-    /// centres ascender to descender, so without this a lowercase label looks
-    /// low in its box.
+    /// the face's own metrics. Labels centre on the cap height, so tall letters
+    /// look centred; a word of only short letters centres on the x-height.
     static func drop(of text: String, size: CGFloat) -> CGFloat {
-        drop(lowercase: text.contains(where: \.isLowercase), size: size)
+        drop(shortLetters: text.allSatisfy(shortLetters.contains), size: size)
     }
 
-    static func drop(lowercase: Bool, size: CGFloat) -> CGFloat {
+    static func drop(shortLetters: Bool, size: CGFloat) -> CGFloat {
         let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
-        let band = lowercase ? font.xHeight : font.capHeight
+        let band = shortLetters ? font.xHeight : font.capHeight
         return (font.ascender + font.descender - band) / 2
     }
 }
@@ -101,7 +102,7 @@ extension View {
     /// The same for a label whose text isn't to hand, such as a button's:
     /// labels are set lowercase throughout.
     func centredLowercase(size: CGFloat = Square.controlSize) -> some View {
-        offset(y: -Square.drop(lowercase: true, size: size))
+        offset(y: -Square.drop(shortLetters: false, size: size))
     }
 
     /// The one shadow, for what floats: the prompt, menus and popovers.
