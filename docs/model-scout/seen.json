@@ -1060,6 +1060,46 @@
       "id": "RadiOtter/RadiOtter-ASR-v1",
       "date": "2026-11-04",
       "role": "speech recognition"
+    },
+    {
+      "id": "assemblyai/universal-3-6-pro (eval reference)",
+      "date": "2026-11-05",
+      "role": "eval reference"
+    },
+    {
+      "id": "qualcomm/Parakeet-TDT-0.6B-v3",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "MatterWaveAI/grt-30m-asr",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "rolandnsharp/oscillator-asr",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "JoshHughes/p0pc0rn-voicein-nemotron35-asr-06b",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "keithics/parakeet-tdt-0.6b-v2-coreml",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "coming245/HotBias",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-bf16",
+      "date": "2026-11-05",
+      "role": "speech recognition"
     }
   ]
 }
