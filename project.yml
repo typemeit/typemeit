@@ -38,7 +38,7 @@ packages:
   # loaded from disk.
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio
-    exactVersion: "0.17.6"
+    exactVersion: "0.18.2"
   # Renders Claude's replies: lists, tables and code blocks.
   Textual:
     url: https://github.com/gonzalezreal/textual

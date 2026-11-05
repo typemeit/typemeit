@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "appasr",
     platforms: [.macOS(.v15)],
-    dependencies: [.package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.6")],
+    dependencies: [.package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.2")],
     targets: [
         .executableTarget(name: "appasr", dependencies: [.product(name: "FluidAudio", package: "FluidAudio")], path: "Sources/appasr", swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-enable-bare-slash-regex"])]),
     ]
