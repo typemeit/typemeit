@@ -10,7 +10,8 @@ struct SquareTab: Hashable {
 
 /// Tabs over a framed panel: the picked tab is a slab joined to the panel's
 /// ink frame, the rest are ink3 labels. A running tab shows a spinner, a
-/// failed one says so after its name.
+/// failed one says so after its name. The content brings its own padding, so
+/// a scroll inside the panel runs to the frame.
 struct SquareTabs<Trailing: View, Content: View>: View {
     let tabs: [SquareTab]
     @Binding var picked: Int
@@ -20,34 +21,47 @@ struct SquareTabs<Trailing: View, Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    let isPicked = picked == index
-                    Button { picked = index } label: {
-                        HStack(spacing: 6) {
-                            if tab.state == .running {
-                                SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, isPicked)
-                            }
-                            Text(tab.name)
-                            if tab.state == .failed {
-                                Text("· failed").foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
-                            }
+                // Tabs past the panel's width scroll sideways, the picked one kept in view.
+                ScrollViewReader { reader in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in tabButton(index, tab).id(index) }
                         }
-                        .font(Square.mono(12))
-                        .foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(isPicked ? DesignTokens.Colors.slab : .clear)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .scrollIndicators(.never)
+                    .onAppear { reader.scrollTo(picked) }
+                    .onChange(of: picked) { _, now in withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(now) } }
                 }
                 Spacer(minLength: 12)
                 trailing()
             }
             content(picked)
-                .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(Rectangle().stroke(DesignTokens.Colors.ink, lineWidth: 1))
         }
+    }
+
+    private func tabButton(_ index: Int, _ tab: SquareTab) -> some View {
+        let isPicked = picked == index
+        return Button { picked = index } label: {
+            HStack(spacing: 6) {
+                if tab.state == .running {
+                    SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, isPicked)
+                }
+                Text(tab.name)
+                if tab.state == .failed {
+                    Text("· failed").foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
+                }
+            }
+            .font(Square.mono(12))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(isPicked ? DesignTokens.Colors.slab : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -224,7 +238,7 @@ struct SquareTabsSpecimen: View {
             SquareTabs(tabs: tabs, picked: $picked) {
                 Button("run hooks") {}.buttonStyle(SquareButtonStyle(kind: .quiet))
             } content: { index in
-                panel(tabs[index], isSummary: index == 0)
+                panel(tabs[index], isSummary: index == 0).padding(14)
             }
             VStack(alignment: .leading, spacing: 12) {
                 SquareSubhead(text: "transcript")

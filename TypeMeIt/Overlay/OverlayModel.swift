@@ -76,7 +76,10 @@ final class OverlayModel {
 
     /// Whether `toast`'s countdown runs: it is the one on screen and the
     /// pointer is not resting on it.
-    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused }
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !hookTrayOpen }
+    /// The saved pill is grown into the hook tray: it stands, and takes
+    /// keys for its find line.
+    var hookTrayOpen = false
     /// Whether the answer pill shows the answer or only its question.
     var answerExpanded = true
     /// When the cloud last arrived. Each dictation gets a new one, so the
@@ -151,8 +154,8 @@ final class OverlayModel {
     var askOpens = false
     /// Opens the page of the dictation or meeting Claude is answering for.
     var onOpenAsk: (@MainActor () -> Void)?
-    /// The saved pill's run hooks.
-    var onRunHooks: (@MainActor (UUID) -> Void)?
+    /// The saved pill's run: the meeting and the hooks ticked to run.
+    var onRunHooks: (@MainActor (UUID, [UUID]) -> Void)?
     /// Opens settings on the Claude Code check.
     var onShowClaudeCheck: (@MainActor () -> Void)?
 }

@@ -10,6 +10,8 @@ struct ClaudeRunOutput: View {
         let failed: Bool
         var sessionID: String?
         var calls: [Meeting.ToolCall]?
+        /// When it ran, which leads the footer.
+        var ranAt: Date?
     }
 
     let id: UUID
@@ -24,7 +26,7 @@ struct ClaudeRunOutput: View {
                 let failed = run.failed || (!running && kept?.failed == true)
                 SquareClaudeThread(lines: [.prompt(run.prompt)] + run.lines + (failed && !run.lines.contains(where: Self.isText) ? kept.map { [.error($0.answer)] } ?? [] : []),
                                    status: running ? .running : failed ? .failed : .done,
-                                   footer: ([running || !failed ? nil : "failed", "\(seconds) s", run.model].compactMap { $0 }).joined(separator: " · "),
+                                   footer: ([running ? nil : ranLabel, running || !failed ? nil : "failed", "\(seconds) s", run.model].compactMap { $0 }).joined(separator: " · "),
                                    sessionID: run.sessionID,
                                    stop: { live.cancel(id) })
             }
@@ -32,9 +34,17 @@ struct ClaudeRunOutput: View {
             SquareClaudeThread(lines: [.prompt(kept.prompt)] + (kept.calls ?? []).map { .call($0.name, result: $0.result) }
                                    + [kept.failed ? .error(kept.answer) : .text(kept.answer)],
                                status: kept.failed ? .failed : .done,
-                               footer: kept.failed ? "failed" : "",
+                               footer: [ranLabel, kept.failed ? "failed" : nil].compactMap { $0 }.joined(separator: " · "),
                                sessionID: kept.sessionID)
         }
+    }
+
+    /// "19:53" today, "27 oct 19:53" before.
+    private var ranLabel: String? {
+        guard let ran = kept?.ranAt else { return nil }
+        let time = ran.formatted(date: .omitted, time: .shortened)
+        let label = Calendar.current.isDateInToday(ran) ? time : "\(ran.formatted(.dateTime.day().month(.abbreviated))) \(time)"
+        return label.lowercased()
     }
 
     private static func isText(_ line: SquareClaudeLine) -> Bool {

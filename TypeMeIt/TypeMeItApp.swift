@@ -68,6 +68,10 @@ final class AppState {
     var revealMeeting: UUID?
     /// A dictation the dictations tab should open when next shown.
     var revealDictation: UUID?
+    /// A hook the hooks tab should open for editing when next shown.
+    var editHook: UUID?
+    /// The hooks page should start a new hook when it opens.
+    var startNewHook = false
     /// A settings group to open and scroll to, with `settingsTab` set to settings.
     var revealSection: SettingsSection?
     /// Clicks on each sidebar page, counted so a page can go back to its

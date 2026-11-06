@@ -208,6 +208,32 @@ struct SquareField: View {
     }
 }
 
+/// A prompt typed over several lines in a hairline box, with what goes in
+/// it shown while empty.
+struct SquarePromptEditor: View {
+    @Binding var text: String
+    var placeholder: String?
+
+    var body: some View {
+        TextEditor(text: $text)
+            .font(Square.sans(13))
+            .scrollContentBackground(.hidden)
+            .padding(6)
+            .frame(minHeight: 72)
+            .overlay(alignment: .topLeading) {
+                if let placeholder, text.isEmpty {
+                    Text(placeholder)
+                        .font(Square.sans(13))
+                        .foregroundStyle(DesignTokens.Colors.ink3)
+                        .padding(.horizontal, 11)
+                        .padding(.top, 6)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
+    }
+}
+
 #if DEBUG
 struct SquareChipSpecimen: View {
     @State private var words = ["typeme.it", "priya", "parakeet"]
@@ -231,7 +257,7 @@ struct SquareChipSpecimen: View {
             }
             SquareSpecimenLine(name: "help chip") {
                 SquareHelpChip(text: "list_meetings", help: "lists your meetings, newest first · titles, dates and people, no transcripts")
-                SquareHelpChip(text: "add_hook", help: "adds a hook · it stays off until you switch it on here")
+                SquareHelpChip(text: "add_hook", help: "adds a hook · stays off until you switch it on in hooks")
             }
             SquareSpecimenLine(name: "tag") {
                 SquareTag(text: "only your side")

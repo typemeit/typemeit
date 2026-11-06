@@ -99,10 +99,13 @@ struct PillView: View {
                 Button("system settings") { model.onOpenSystemAudio?() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         case .meetingSaved(let id, let hooks):
-            SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"),
-                         dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                if hooks { Button("run hooks") { model.onRunHooks?(id) }.buttonStyle(SquareButtonStyle(kind: .quiet)) }
-                Button("show") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle(kind: .primary))
+            if hooks {
+                MeetingSavedPill(model: model, id: id, width: width)
+            } else {
+                SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"),
+                             dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
+                    Button("show") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle(kind: .primary))
+                }
             }
         case .meetingHooksDone(let id, let ran, let failed):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text(PillView.hooksDone(ran: ran, failed: failed)), failed: failed > 0,
@@ -146,5 +149,46 @@ struct PillView: View {
         case ran: ran == 1 ? "hook failed" : "\(counted(ran, "hook")) failed"
         default: "\(failed) of \(counted(ran, "hook")) failed"
         }
+    }
+}
+
+/// The saved pill with hooks to run: ▷ runs the ticked ones, those switched
+/// on until the tray changes them; the chevron grows the pill into the tray
+/// to pick. Running closes the pill and opens the meeting's page.
+private struct MeetingSavedPill: View {
+    @Bindable var model: OverlayModel
+    let id: UUID
+    let width: CGFloat
+    @State private var settings = Settings.shared
+    /// The tray's ticks; nil until one changes.
+    @State private var ticked: Set<UUID>?
+
+    private var hooks: [MeetingHook] { settings.meetingHooks.filter(\.runnable) }
+    private var picked: Set<UUID> { ticked ?? Set(hooks.filter(\.on).map(\.id)) }
+
+    var body: some View {
+        if model.hookTrayOpen {
+            SquareHookTray(items: hooks.map { .init(id: $0.id, name: $0.name, picked: picked.contains($0.id), note: $0.on ? nil : "off") },
+                           title: "meeting saved",
+                           toggle: { hook in ticked = picked.symmetricDifference([hook]) },
+                           setAll: { hooks, on in ticked = on ? picked.union(hooks) : picked.subtracting(hooks) },
+                           run: run,
+                           show: { model.closeNow = true; model.onShowMeeting?(id) },
+                           close: { model.closeNow = true; model.onDismissMeeting?() })
+        } else {
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"),
+                         dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
+                SquareRunSplitButton(count: picked.count, named: true, run: run, pick: { model.hookTrayOpen = true })
+                Button { model.onShowMeeting?(id) } label: { SquareIcon("akar-arrow-right", size: 13) }
+                    .buttonStyle(SquareIconButtonStyle(bordered: true))
+                    .help("show meeting")
+                    .accessibilityLabel("show meeting")
+            }
+        }
+    }
+
+    private func run() {
+        model.closeNow = true
+        model.onRunHooks?(id, hooks.map(\.id).filter(picked.contains))
     }
 }
