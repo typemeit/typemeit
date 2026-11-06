@@ -358,7 +358,7 @@ struct MeetingPage: View {
             SquareSubhead(text: "hooks")
             Spacer()
             if coordinator.hooksReady {
-                Button { coordinator.runHooks(meeting.id) } label: { SquareRunLabel(count: toRun, size: 11) }
+                Button { coordinator.runHooks(meeting.id) } label: { SquareRunLabel(count: toRun) }
                     .buttonStyle(SquareButtonStyle(small: true))
                     .disabled(toRun == 0 || hooksRunning)
                     .help("run \(counted(toRun, "hook"))")

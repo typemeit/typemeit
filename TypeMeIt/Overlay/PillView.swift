@@ -178,7 +178,7 @@ private struct MeetingSavedPill: View {
         } else {
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"),
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                SquareRunSplitButton(count: picked.count, named: true, run: run, pick: { model.hookTrayOpen = true })
+                SquareRunSplitButton(count: picked.count, run: run, pick: { model.hookTrayOpen = true })
                 Button { model.onShowMeeting?(id) } label: { SquareIcon("akar-arrow-right", size: 13) }
                     .buttonStyle(SquareIconButtonStyle(bordered: true))
                     .help("show meeting")

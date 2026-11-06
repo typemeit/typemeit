@@ -1,10 +1,9 @@
 import SwiftUI
 
 /// Hooks to run on a meeting as a run sheet: each one numbered, ticked when
-/// it will run, and one button that runs the ticked ones. On the slab it is
-/// the meeting pill grown open, its message on top; on paper it is the
-/// meeting page's menu. "all" over the list ticks every hook shown, or
-/// unticks them once all are. Past `visibleRows` the list scrolls and a find
+/// it will run, and one button that runs the ticked ones. It is the meeting
+/// pill grown open, its message on top. "all" over the list ticks every hook
+/// shown, or unticks them once all are. Past `visibleRows` the list scrolls and a find
 /// line filters it; return ticks the first match.
 struct SquareHookTray: View {
     struct Item: Identifiable, Equatable {
@@ -16,15 +15,14 @@ struct SquareHookTray: View {
     }
 
     let items: [Item]
-    /// The pill's message over the list; nil on paper, which has no head.
-    var title: String?
-    var onSlab = true
+    /// The pill's message over the list.
+    let title: String
     var toggle: (UUID) -> Void
     /// Ticks (true) or unticks the hooks given.
     var setAll: ([UUID], Bool) -> Void
     var run: () -> Void
-    var show: (() -> Void)?
-    var close: (() -> Void)?
+    var show: () -> Void
+    var close: () -> Void
     @State private var find = ""
 
     static let width: CGFloat = 420
@@ -33,42 +31,37 @@ struct SquareHookTray: View {
     /// The line number's column, so "all" lines up with the names.
     fileprivate static let numberWidth: CGFloat = 16
 
-    private var fg: Color { onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink }
-    private var bg: Color { onSlab ? DesignTokens.Colors.slab : DesignTokens.Colors.paper }
+    private let fg = DesignTokens.Colors.onSlab
+    private let bg = DesignTokens.Colors.slab
     private var picked: Int { items.filter(\.picked).count }
     private var shown: [Item] { items.filter { find.isEmpty || $0.name.localizedCaseInsensitiveContains(find) } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let title { head(title) }
+            head
             if items.count > SquareHookTray.visibleRows { findLine }
             list
             foot
         }
         .frame(width: SquareHookTray.width)
         .background(bg)
-        .overlay { if !onSlab { Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline) } }
         .squareLift()
-        .environment(\.squareOnSlab, onSlab)
+        .environment(\.squareOnSlab, true)
     }
 
-    private func head(_ title: String) -> some View {
+    private var head: some View {
         HStack(spacing: 12) {
             SquareIcon("akar-people-group", size: 14).foregroundStyle(fg)
             Text(title).font(Square.mono(13)).foregroundStyle(fg).lineLimit(1).centredLetters(title, size: 13)
             Spacer()
-            if let show {
-                Button(action: show) { SquareIcon("akar-arrow-right", size: 13) }
-                    .buttonStyle(SquareIconButtonStyle(bordered: true))
-                    .help("show meeting")
-                    .accessibilityLabel("show meeting")
-            }
-            if let close {
-                Button(action: close) { SquareIcon("akar-cross", size: 12) }
-                    .buttonStyle(SquareIconButtonStyle())
-                    .help("dismiss")
-                    .accessibilityLabel("dismiss")
-            }
+            Button(action: show) { SquareIcon("akar-arrow-right", size: 13) }
+                .buttonStyle(SquareIconButtonStyle(bordered: true))
+                .help("show meeting")
+                .accessibilityLabel("show meeting")
+            Button(action: close) { SquareIcon("akar-cross", size: 12) }
+                .buttonStyle(SquareIconButtonStyle())
+                .help("dismiss")
+                .accessibilityLabel("dismiss")
         }
         .padding(.leading, 14)
         .padding(.trailing, 10)
@@ -213,11 +206,9 @@ struct SquareRunNumber: View {
 }
 
 /// Run as the play mark and how many hooks it starts, as "4 hooks" where
-/// the label has room. The button lifts its label for lowercase; a bare
-/// count centres on the cap height, so it goes back down by the difference.
+/// the label has room.
 struct SquareRunLabel: View {
     let count: Int
-    var size: CGFloat = Square.controlSize
     /// Names the hooks after the count.
     var named = false
 
@@ -228,31 +219,27 @@ struct SquareRunLabel: View {
                 Text(counted(count, "hook"))
             } else {
                 Text("\(count)").monospacedDigit()
-                    .offset(y: Square.drop(shortLetters: true, size: size) - Square.drop(shortLetters: false, size: size))
             }
         }
     }
 }
 
-/// "▷ n" with a chevron beside it: the button runs the hooks switched on,
-/// the chevron opens the tray to pick.
+/// "▷ n hooks" with a chevron beside it: the button runs the hooks switched
+/// on, the chevron opens the tray to pick.
 struct SquareRunSplitButton: View {
     let count: Int
-    var small = false
-    var open = false
-    var named = false
     let run: () -> Void
     let pick: () -> Void
 
     var body: some View {
         HStack(spacing: -DesignTokens.hairline) {
-            Button(action: run) { SquareRunLabel(count: count, size: small ? 11 : Square.controlSize, named: named) }
-                .buttonStyle(SquareButtonStyle(small: small))
+            Button(action: run) { SquareRunLabel(count: count, named: true) }
+                .buttonStyle(SquareButtonStyle())
                 .disabled(count == 0)
                 .help("run \(counted(count, "hook"))")
                 .accessibilityLabel("run \(counted(count, "hook"))")
-            Button(action: pick) { SquareIcon("akar-chevron-down", size: small ? 9 : 10).rotationEffect(.degrees(open ? 180 : 0)) }
-                .buttonStyle(SquareButtonStyle(small: small))
+            Button(action: pick) { SquareIcon("akar-chevron-down", size: 10) }
+                .buttonStyle(SquareButtonStyle())
                 .help("pick")
                 .accessibilityLabel("pick hooks")
         }
