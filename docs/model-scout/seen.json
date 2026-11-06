@@ -1100,6 +1100,48 @@
       "id": "mlx-community/nemotron-labs-unified-asr-0.6b-bf16",
       "date": "2026-11-05",
       "role": "speech recognition"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-4bit",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "MLX port of nemotron-labs-unified-asr, seen 2026-11-03"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-8bit",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "MLX port of nemotron-labs-unified-asr, seen 2026-11-03"
+    },
+    {
+      "id": "mlx-community/parakeet-ctc-0.6b-Vietnamese",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "not English"
+    },
+    {
+      "id": "balbal-v2 (r/speechtech)",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "Turkish, not English"
+    },
+    {
+      "id": "AILogDev/RE-USE-MLX-CoreML",
+      "date": "2026-11-06",
+      "role": "speech enhancement",
+      "why": "port of NVIDIA RE-USE; speech enhancement is not a role we ship"
+    },
+    {
+      "id": "Omi General STT v1 (eval reference)",
+      "date": "2026-11-06",
+      "role": "eval reference",
+      "why": "Voice Arena rank 10 on conversational US English, behind Universal-3 Pro at rank 3"
+    },
+    {
+      "id": "FluidInference/citenet-coreml",
+      "date": "2026-11-06",
+      "role": "none",
+      "why": "legal citation checker, not a role we ship"
     }
   ]
 }
