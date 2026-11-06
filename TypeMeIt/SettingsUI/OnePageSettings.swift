@@ -189,12 +189,12 @@ struct OnePageSettings: View {
             Button("change") { chooseClaudeFolder() }.buttonStyle(SquareButtonStyle())
         }
         SquareSettingsRow(label: "model", help: "the models claude code offers your account · in auto mode only those that support it", caption: claudeModelCaption) {
-            SquareMenu(selection: $settings.askClaudeModel, options: claudeModelOptions, label: claudeModelLabel, minWidth: 230)
+            SquareMenu(selection: $settings.askClaudeModel, options: claudeModelOptions, label: claudeModelLabel)
         }
         .task { if claudeModels == nil { claudeModels = await ClaudeModels.load() } }
         SquareSettingsRow(label: "permissions", help: "what claude code may do without asking · anyone in the meeting can speak into the transcript claude reads",
                           caption: ClaudeRun.permissionModes.first { $0.mode == settings.askClaudePermissionMode }?.caption) {
-            SquareMenu(selection: $settings.askClaudePermissionMode, options: ClaudeRun.permissionModes.map(\.mode), label: { $0 }, minWidth: 230)
+            SquareMenu(selection: $settings.askClaudePermissionMode, options: ClaudeRun.permissionModes.map(\.mode), label: { $0 })
         }
         SquareSettingsRow(label: "system prompt", help: "added to claude's system prompt on every ask") {
             EmptyView()
@@ -284,7 +284,7 @@ struct OnePageSettings: View {
             .sheet(isPresented: $settingUpCamera) { CameraSetupView { settingUpCamera = false } }
             if camera.installed {
                 SquareSettingsRow(label: "camera", help: "the camera type me it shows") {
-                    SquareMenu(selection: $settings.meetingCamera, options: cameraOptions, label: cameraLabel, minWidth: 230)
+                    SquareMenu(selection: $settings.meetingCamera, options: cameraOptions, label: cameraLabel)
                 }
                 .onChange(of: settings.meetingCamera) { camera.cameraChanged() }
                 if CameraInstaller.canAdd {
@@ -311,7 +311,7 @@ struct OnePageSettings: View {
         SquareRows {
             SquareSubhead(text: "recording", first: true)
             SquareSettingsRow(label: "microphone", help: "meetings record your side from it too") {
-                SquareMenu(selection: microphoneID, options: [""] + devices.map(\.id), label: microphoneName, minWidth: 230)
+                SquareMenu(selection: microphoneID, options: [""] + devices.map(\.id), label: microphoneName)
             }
             SquareSettingsRow(label: "mute audio", help: "mutes your speakers while you dictate · not during meetings") { toggle("mute audio", $settings.muteWhileRecording) }
             SquareSettingsRow(label: "pause audio", help: "pauses music or video while you dictate · not during meetings") { toggle("pause audio", $settings.pauseWhileRecording) }
@@ -425,7 +425,7 @@ struct OnePageSettings: View {
         SquareRows {
             SquareSubhead(text: "dictations", trailing: store.history.count.formatted(), first: true)
             SquareSettingsRow(label: "keep", help: "starred dictations are always kept") {
-                SquareMenu(selection: historyLimit, options: KeepLimit.dictations.options, label: KeepLimit.dictations.label, minWidth: 230)
+                SquareMenu(selection: historyLimit, options: KeepLimit.dictations.options, label: KeepLimit.dictations.label)
             }
             SquareSettingsRow(label: "keep the audio", help: "replay dictations in history · off: new ones aren't saved") {
                 toggle("keep the dictations' audio", $settings.keepRecordings).disabled(settings.historyLimit < 0)
@@ -440,7 +440,7 @@ struct OnePageSettings: View {
     @ViewBuilder private var meetingStorageRows: some View {
         SquareSubhead(text: "meetings", trailing: [meetings.meetings.count.formatted(), meetingsUsage].compactMap { $0 }.joined(separator: " · "))
         SquareSettingsRow(label: "keep", help: "only transcribed meetings count") {
-            SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label, minWidth: 230)
+            SquareMenu(selection: meetingLimit, options: KeepLimit.meetings.options, label: KeepLimit.meetings.label)
         }
         SquareSettingsRow(label: "keep the audio", help: "replay meetings and relearn voices · off: deleted after transcribing") {
             toggle("keep the meetings' audio", $settings.meetingKeepAudio)
@@ -463,7 +463,7 @@ struct OnePageSettings: View {
                 SquareMenu(selection: Binding(get: { settings.appearance }, set: {
                     settings.appearance = $0
                     AppDelegate.shared?.applyAppearance()
-                }), options: Appearance.allCases, label: { $0.label }, minWidth: 140)
+                }), options: Appearance.allCases, label: { $0.label })
             }
             SquareSettingsRow(label: "open at login") {
                 toggle("open at login", Binding(get: { settings.launchAtLogin }, set: {

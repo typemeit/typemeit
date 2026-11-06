@@ -257,9 +257,6 @@ struct SquareWhenSpecimen: View {
                     SquareWhenPicker(when: $when, from: $from, to: $to, today: SquareWhenSpecimen.today)
                 }
             }
-            SquareSpecimenLine(name: "open") {
-                SquareWhenPicker(when: $when, from: $from, to: $to, today: SquareWhenSpecimen.today)
-            }
         }
     }
 }

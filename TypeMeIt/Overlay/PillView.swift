@@ -56,11 +56,9 @@ struct PillView: View {
             SquarePrompt(mark: .icon("akar-clipboard"), message: Text(cantType ? "accessibility is off, so it can't type" : "nowhere to type it"),
                          dismiss: "cancel", onDismiss: { model.closeNow = true; model.onCancel?() }, minWidth: width) {
                 if cantType {
-                    Button("system settings") { model.onOpenAccessibility?() }.buttonStyle(SquareButtonStyle(kind: .quiet))
+                    SquarePromptIcon(icon: "akar-gear", help: "system settings", kind: .quiet) { model.onOpenAccessibility?() }
                 }
-                Button(model.copied ? "copied" : "copy") { model.onCopy?() }
-                    .buttonStyle(SquareButtonStyle(kind: .primary))
-                    .help("copy transcript")
+                SquarePromptIcon(icon: model.copied ? "akar-check" : "akar-copy", help: model.copied ? "copied" : "copy transcript") { model.onCopy?() }
             }
         case .learned(_, let words):
             // The word itself in medium, kept as the user spelt it, since that
@@ -96,7 +94,7 @@ struct PillView: View {
         case .meetingSystemAudioOff:
             SquarePrompt(mark: .icon("akar-microphone"), message: Text("system audio is off"),
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("system settings") { model.onOpenSystemAudio?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                SquarePromptIcon(icon: "akar-gear", help: "system settings") { model.onOpenSystemAudio?() }
             }
         case .meetingSaved(let id, let hooks):
             if hooks {
@@ -104,13 +102,13 @@ struct PillView: View {
             } else {
                 SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"),
                              dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                    Button("show") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle(kind: .primary))
+                    SquarePromptIcon(icon: "akar-link-out", help: "open") { model.onShowMeeting?(id) }
                 }
             }
         case .meetingHooksDone(let id, let ran, let failed):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text(PillView.hooksDone(ran: ran, failed: failed)), failed: failed > 0,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("view") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle(kind: .primary))
+                SquarePromptIcon(icon: "akar-link-out", help: "open") { model.onShowMeeting?(id) }
             }
         case .meetingTranscribeAsk(let id):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("transcribe now?"), minWidth: width) {
@@ -120,22 +118,22 @@ struct PillView: View {
         case .meetingFailed(let id):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting not transcribed"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("show") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-link-out", help: "open") { model.onShowMeeting?(id) }
             }
         case .meetingDiskFull(let id):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("disk full · meeting stopped"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("show") { model.onShowMeeting?(id) }.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-link-out", help: "open") { model.onShowMeeting?(id) }
             }
         case .meetingFolderUnavailable:
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("meetings folder unavailable"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("settings") { model.onShowMeeting?(nil) }.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-gear", help: "settings") { model.onShowMeeting?(nil) }
             }
         case .claudeCheckFailed:
             SquarePrompt(mark: .icon("akar-triangle-alert"), message: Text("claude code check failed"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onDismissMeeting?() }, minWidth: width) {
-                Button("settings") { model.onShowClaudeCheck?() }.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-gear", help: "settings") { model.onShowClaudeCheck?() }
             }
         default:
             EmptyView()

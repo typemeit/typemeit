@@ -186,11 +186,15 @@ struct SquareField: View {
     var onCancel: (() -> Void)?
     @State private var focused = false
 
+    /// An AppKit field sets its text this far below the middle of its box.
+    private static let textLift: CGFloat = 1
+
     var body: some View {
         HStack(spacing: 8) {
             if let icon { SquareIcon(icon, size: 13).foregroundStyle(DesignTokens.Colors.ink3) }
             SquareTextInput(placeholder: placeholder, text: $text, font: Square.appKitSans(13), focused: $focused,
                             onSubmit: onSubmit, onCancel: onCancel)
+                .offset(y: -SquareField.textLift)
         }
         .padding(.horizontal, 9)
         .frame(height: SquareButtonStyle.height)
@@ -244,7 +248,6 @@ struct SquareChipSpecimen: View {
                 SquareChip(text: "zoom") {}
                 SquareChip(text: "slack")
             }
-            SquareSpecimenLine(name: "chip hover", pose: .hover) { SquareChip(text: "zoom") {} }
             SquareSpecimenLine(name: "word") {
                 SquareWordChip(word: "typeme.it", heardAs: ["titemere", "type me it"]) {}
                 SquareWordChip(word: "priya", heardAs: ["pria"], learnedFrom: "pria") {}
@@ -278,7 +281,7 @@ struct SquareFieldSpecimen: View {
     var body: some View {
         SquareSpecimen {
             SquareSpecimenLine(name: "search") { SquareField(placeholder: "search", text: $search, icon: "akar-search").frame(width: 220) }
-            SquareSpecimenLine(name: "filled") { SquareField(placeholder: "add a word, or heard = word", text: $word).frame(width: 360) }
+            SquareSpecimenLine(name: "word") { SquareField(placeholder: "add a word, or heard = word", text: $word).frame(width: 360) }
         }
     }
 }

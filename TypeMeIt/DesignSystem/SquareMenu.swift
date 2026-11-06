@@ -130,28 +130,38 @@ struct SquareScreenPicker: View {
 
 /// A square popup: the value and a chevron on the control rule. Under the
 /// pointer its edge goes to ink on a button's ink-a08 wash; while open the
-/// edge stays ink. A click opens its options on a panel under it, right
-/// edges lined up.
+/// edge stays ink. It is as wide as its longest option, so a click opens the
+/// options joined to its bottom edge at its own width.
 struct SquareMenu<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [Value]
     var label: (Value) -> String
-    var minWidth: CGFloat = 190
     @State private var open = false
     @State private var hovering = false
+    @State private var width: CGFloat = 0
     @Environment(\.squarePose) private var pose
+
+    private var items: [SquareMenuList.Item] {
+        options.map { SquareMenuList.Item(label: label($0), checked: $0 == selection) }
+    }
 
     var body: some View {
         Button { open.toggle() } label: {
             let text = label(selection)
-            HStack(spacing: 10) {
-                Text(text).centredLetters(text)
-                SquareIcon("akar-chevron-down", size: 10)
+            ZStack {
+                // The lines, unseen, set the width the open list will have.
+                SquareMenuLines(items: items, pick: { _ in }).frame(height: 0).hidden()
+                HStack(spacing: 10) {
+                    Text(text).centredLetters(text)
+                    Spacer(minLength: 0)
+                    SquareIcon("akar-chevron-down", size: 10)
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, 7)
             }
+            .fixedSize(horizontal: true, vertical: false)
             .font(Square.mono(Square.controlSize))
             .foregroundStyle(DesignTokens.Colors.ink)
-            .padding(.leading, 8)
-            .padding(.trailing, 7)
             .frame(height: SquareButtonStyle.height)
             .overlay(Rectangle().strokeBorder(open || pose.hot(hovering) ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl,
                                               lineWidth: DesignTokens.hairline))
@@ -160,8 +170,9 @@ struct SquareMenu<Value: Hashable>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .squarePopover(isPresented: $open) {
-            SquareMenuList(items: options.map { SquareMenuList.Item(label: label($0), checked: $0 == selection) }, minWidth: minWidth) { i in
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .squarePopover(isPresented: $open, attached: true) {
+            SquareMenuList(items: items, minWidth: width) { i in
                 selection = options[i]
                 open = false
             }
@@ -170,8 +181,8 @@ struct SquareMenu<Value: Hashable>: View {
 }
 
 extension SquareMenu where Value == String {
-    init(selection: Binding<String>, options: [String], minWidth: CGFloat = 190) {
-        self.init(selection: selection, options: options, label: { $0 }, minWidth: minWidth)
+    init(selection: Binding<String>, options: [String]) {
+        self.init(selection: selection, options: options, label: { $0 })
     }
 }
 
@@ -423,8 +434,7 @@ struct SquareChoiceSpecimen: View {
 
     var body: some View {
         SquareSpecimen {
-            SquareSpecimenLine(name: "rest") { SquareChoice(selection: $theme, options: ["system", "light", "dark"]) }
-            SquareSpecimenLine(name: "hover", pose: .hover) { SquareChoice(selection: .constant("system"), options: ["system", "light", "dark"]) }
+            SquareSpecimenLine(name: "three") { SquareChoice(selection: $theme, options: ["system", "light", "dark"]) }
             SquareSpecimenLine(name: "four") { SquareChoice(selection: $position, options: ["left", "top", "bottom", "right"]) }
             SquareSpecimenLine(name: "two") { SquareChoice(selection: .constant("ask"), options: ["ask", "never"]) }
         }
@@ -436,8 +446,7 @@ struct SquareScreenPickerSpecimen: View {
 
     var body: some View {
         SquareSpecimen {
-            SquareSpecimenLine(name: "rest") { SquareScreenPicker(selection: $position) }
-            SquareSpecimenLine(name: "hover", pose: .hover) { SquareScreenPicker(selection: .constant(.left)) }
+            SquareSpecimenLine(name: "try it") { SquareScreenPicker(selection: $position) }
         }
     }
 }
@@ -448,21 +457,10 @@ struct SquareMenuSpecimen: View {
 
     var body: some View {
         SquareSpecimen {
-            SquareSpecimenLine(name: "rest") {
-                SquareMenu(selection: $microphone, options: ["system default", "macbook pro microphone", "airpods pro"], minWidth: 230)
+            SquareSpecimenLine(name: "try it") {
+                SquareMenu(selection: $microphone, options: ["system default", "macbook pro microphone", "airpods pro"])
             }
-            SquareSpecimenLine(name: "hover", pose: .hover) { SquareMenu(selection: $key, options: ["return", "tab"], minWidth: 180) }
-            SquareSpecimenLine(name: "open") {
-                SquareMenuList(items: [
-                    .init(label: "keep everything", checked: true),
-                    .init(label: "the last 500", checked: false),
-                    .init(label: "a month", checked: false),
-                    .init(label: "nothing · never keep", checked: false),
-                ], minWidth: 230) { _ in }
-            }
-            SquareSpecimenLine(name: "hover line", pose: .hover) {
-                SquareMenuList(items: [.init(label: "return", checked: true)], minWidth: 180) { _ in }
-            }
+            SquareSpecimenLine(name: "short") { SquareMenu(selection: $key, options: ["return", "tab"]) }
             SquareSpecimenLine(name: "with counts") {
                 SquareMenuList(items: [
                     .init(label: "any app", checked: true, count: "563"),
@@ -477,7 +475,6 @@ struct SquareMenuSpecimen: View {
 struct SquareFilterSpecimen: View {
     @State private var appOpen = false
     @State private var app = "any app"
-    @State private var whenOpen = false
 
     var body: some View {
         SquareSpecimen {
@@ -488,14 +485,6 @@ struct SquareFilterSpecimen: View {
                         appOpen = false
                     }
                 }
-            }
-            SquareSpecimenLine(name: "rest") {
-                SquareFilter(label: "who", open: .constant(false)) { EmptyView() }
-                SquareFilter(label: "when", open: $whenOpen) { EmptyView() }
-            }
-            SquareSpecimenLine(name: "picked") {
-                SquareFilter(label: "slack", active: true, open: .constant(false)) { EmptyView() }
-                SquareFilter(label: "this week", active: true, open: .constant(false)) { EmptyView() }
             }
         }
     }

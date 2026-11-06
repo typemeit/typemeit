@@ -147,9 +147,7 @@ private struct SquareIconButtonBody: View {
 struct SquareButtonSpecimen: View {
     var body: some View {
         SquareSpecimen {
-            ForEach(SquarePose.allCases, id: \.self) { pose in
-                SquareSpecimenLine(name: pose.name, pose: pose) { kinds }
-            }
+            SquareSpecimenLine(name: "try it") { kinds }
             SquareSpecimenLine(name: "disabled") { kinds.disabled(true) }
             SquareSpecimenLine(name: "with icon") {
                 Button {} label: { Label { Text("copy") } icon: { SquareIcon("akar-copy", size: 12) } }
@@ -185,9 +183,7 @@ struct SquareButtonSpecimen: View {
 struct SquareIconButtonSpecimen: View {
     var body: some View {
         SquareSpecimen {
-            ForEach(SquarePose.allCases, id: \.self) { pose in
-                SquareSpecimenLine(name: pose.name, pose: pose) { icons }
-            }
+            SquareSpecimenLine(name: "try it") { icons }
             SquareSpecimenLine(name: "disabled") { icons.disabled(true) }
             SquareSpecimenLine(name: "on slab") {
                 HStack(spacing: 4) { icons }

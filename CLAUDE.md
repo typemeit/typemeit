@@ -84,6 +84,10 @@ newline. The off state reads "off: …". A blocked row says "needs …" or names
 the state ("apple intelligence is off"); the button beside it gives the fix,
 so the caption doesn't repeat it.
 
+## Design system specimens are interactive
+
+A gallery specimen shows a part once, live, not one copy per state. Hover, press, open and any change a click makes happen in the same specimen, so a part that folds folds, and a flow such as ask → answer runs through its stages. Separate lines are for real variants that can't be reached by using the part: disabled, a different shape, different content.
+
 ## Eval variants are observed, never predicted
 
 An `alsoAccepted` entry in `Scripts/cleanup-eval/cases.json` records an output
