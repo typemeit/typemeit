@@ -60,16 +60,12 @@ struct AnswerPill: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
                 actions
-                // An offered question is answered no, copy or ask claude; the cross cancels
-                // one being asked and dismisses an answer.
-                if stage != .offered {
-                    Button { if stage == .asking { model.onCancelAsk?() } else { model.onDismissMeeting?() } } label: {
-                        SquareIcon("akar-cross", size: 12)
-                    }
-                    .buttonStyle(SquareIconButtonStyle())
-                    .help(stage == .asking ? "cancel" : "dismiss")
-                    .accessibilityLabel(stage == .asking ? "cancel" : "dismiss")
-                }
+                // The cross declines an offered question, cancels one being
+                // asked and dismisses an answer.
+                Button(action: cross) { SquareIcon("akar-cross", size: 12) }
+                    .buttonStyle(SquareDismissStyle())
+                    .help(crossHelp)
+                    .accessibilityLabel(crossHelp)
             }
             .fixedSize(horizontal: true, vertical: false)
         }
@@ -77,6 +73,22 @@ struct AnswerPill: View {
         .padding(.trailing, 10)
         .padding(.vertical, Self.rowInset)
         .frame(minHeight: Self.rowHeight)
+    }
+
+    private var crossHelp: String {
+        switch stage {
+        case .offered: "no"
+        case .asking: "cancel"
+        case .queued, .answered: "dismiss"
+        }
+    }
+
+    private func cross() {
+        switch stage {
+        case .offered: model.onDeclineQuestion?(question)
+        case .asking: model.onCancelAsk?()
+        case .queued, .answered: model.onDismissMeeting?()
+        }
     }
 
     @ViewBuilder private var mark: some View {
@@ -99,9 +111,8 @@ struct AnswerPill: View {
     @ViewBuilder private var actions: some View {
         switch stage {
         case .offered:
-            Button("no") { model.onDeclineQuestion?(question) }.buttonStyle(SquareButtonStyle(kind: .quiet))
             if model.offerCopies {
-                Button("copy") { model.onCopyDictation?() }.buttonStyle(SquareButtonStyle(kind: .quiet))
+                SquarePromptIcon(icon: "akar-copy", help: "copy", kind: .quiet) { model.onCopyDictation?() }
             }
             Button("ask claude") { model.onAskClaude?(question) }.buttonStyle(SquareButtonStyle(kind: .primary))
         case .queued:
@@ -118,7 +129,7 @@ struct AnswerPill: View {
                 SquareIcon("akar-chevron-down", size: 12)
                     .rotationEffect(.degrees(model.answerExpanded ? 180 : 0))
             }
-            .buttonStyle(SquareIconButtonStyle())
+            .buttonStyle(SquareDismissStyle())
             .help(model.answerExpanded ? "fold answer" : "show answer")
             .accessibilityLabel(model.answerExpanded ? "fold answer" : "show answer")
             if let sessionID = answer.sessionID, ClaudeDesktop.installed {
@@ -132,7 +143,7 @@ struct AnswerPill: View {
 
     private var openButton: some View {
         Button { model.onOpenAsk?() } label: { SquareIcon("akar-link-out", size: 12) }
-            .buttonStyle(SquareIconButtonStyle())
+            .buttonStyle(SquareDismissStyle())
             .help("open")
             .accessibilityLabel("open")
     }

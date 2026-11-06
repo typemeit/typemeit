@@ -137,14 +137,10 @@ struct SquareKeySpecimen: View {
 
 struct SquareRecorderSpecimen: View {
     @State private var copy: KeyCombo? = KeyCombo(keyCode: 8, modifiers: [.shift, .command], keyLabel: "C")
-    @State private var room: KeyCombo?
 
     var body: some View {
         SquareSpecimen {
-            SquareSpecimenLine(name: "set") { SquareShortcutRecorder(combo: $copy) }
-            SquareSpecimenLine(name: "unset") { SquareShortcutRecorder(combo: $room) }
-            SquareSpecimenLine(name: "hover", pose: .hover) { SquareShortcutRecorder(combo: .constant(nil)) }
-            SquareSpecimenLine(name: "listening") { SquareShortcutRecorder(combo: .constant(nil), listening: true) }
+            SquareSpecimenLine(name: "try it") { SquareShortcutRecorder(combo: $copy) }
         }
     }
 }

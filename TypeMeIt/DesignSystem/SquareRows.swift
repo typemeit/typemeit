@@ -366,7 +366,7 @@ struct SquareSettingsRowSpecimen: View {
                 SquareSettingsRow(label: "mute audio") { Toggle("", isOn: $mute) }
                 SquareSettingsRow(label: "digits", help: "one → 1") { Toggle("", isOn: $digits) }
                 SquareSettingsRow(label: "keep") {
-                    SquareMenu(selection: $keep, options: ["keep everything", "last 500", "a month"], minWidth: 230)
+                    SquareMenu(selection: $keep, options: ["keep everything", "last 500", "a month"])
                 }
                 SquareSettingsRow(label: "mcp", help: "assistants can list, search and read your meetings · a cloud assistant sends what it reads to its servers") {
                     Toggle("", isOn: .constant(true))
