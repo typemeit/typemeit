@@ -12,6 +12,8 @@ struct SquarePrompt<Actions: View>: View {
         /// An akar icon that is also a way somewhere, such as the
         /// dictionary a learned word went to.
         case button(String, help: String, action: () -> Void)
+        /// Claude's mark, turning while it works.
+        case claude(working: Bool)
     }
 
     var mark: Mark = .none
@@ -21,6 +23,8 @@ struct SquarePrompt<Actions: View>: View {
     var dismiss: String?
     var onDismiss: () -> Void = {}
     var minWidth: CGFloat?
+    /// A long message wraps and the row grows, for a width set from outside.
+    var wraps = false
     @ViewBuilder var actions: Actions
 
     /// The pointer's square round a mark that is a button.
@@ -34,11 +38,12 @@ struct SquarePrompt<Actions: View>: View {
             message
                 .font(Square.mono(13))
                 .foregroundStyle(DesignTokens.Colors.onSlab)
-                .lineLimit(1)
+                .lineLimit(wraps ? nil : 1)
                 .truncationMode(.middle)
+                .fixedSize(horizontal: false, vertical: wraps)
                 .centredLowercase()
                 .padding(.horizontal, 6)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: wraps ? .leading : .center)
             HStack(spacing: 6) {
                 actions
                 if let dismiss {
@@ -51,9 +56,10 @@ struct SquarePrompt<Actions: View>: View {
         }
         .padding(.leading, 14)
         .padding(.trailing, 10)
+        .padding(.vertical, wraps ? 11 : 0)
         .frame(minWidth: minWidth)
-        .frame(height: 48)
-        .fixedSize(horizontal: minWidth == nil, vertical: false)
+        .frame(minHeight: 48)
+        .fixedSize(horizontal: minWidth == nil && !wraps, vertical: true)
         .background(DesignTokens.Colors.slab)
         .squareLift()
         .environment(\.squareOnSlab, true)
@@ -72,6 +78,12 @@ struct SquarePrompt<Actions: View>: View {
         switch mark {
         case .none:
             Color.clear.frame(width: 14, height: 14)
+        case .claude(let working):
+            Group {
+                if working { SquareClaudeSpinner(size: 14) } else { SquareClaudeMark() }
+            }
+            .foregroundStyle(DesignTokens.Colors.onSlab)
+            .frame(width: 20, height: 20)
         case .icon(let name):
             SquareIcon(name, size: 14).foregroundStyle(DesignTokens.Colors.onSlab)
         case .button(let name, let help, let action):
@@ -88,7 +100,28 @@ struct SquarePrompt<Actions: View>: View {
 
 /// The cross: on-slab on a faint on-slab square, stronger under the
 /// pointer and when held.
-private struct SquareDismissStyle: ButtonStyle {
+/// A prompt's action as an icon on a square button, named by its tooltip.
+struct SquarePromptIcon: View {
+    let icon: String
+    let help: String
+    var kind = SquareButtonStyle.Kind.primary
+    let action: () -> Void
+
+    var body: some View {
+        Group {
+            if kind == .quiet {
+                Button(action: action) { SquareIcon(icon, size: 12) }.buttonStyle(SquareDismissStyle())
+            } else {
+                Button(action: action) { SquareIcon(icon, size: 12) }.buttonStyle(SquareButtonStyle(kind: kind))
+            }
+        }
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
+/// The prompt's secondary square: the cross, and any action beside the main one.
+struct SquareDismissStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         SquareDismissBody(configuration: configuration)
     }
@@ -146,27 +179,24 @@ struct SquarePromptSpecimen: View {
         VStack(alignment: .leading, spacing: 14) {
             group("dictation")
             SquarePrompt(mark: .icon("akar-clipboard"), message: Text("accessibility is off, so it can't type"), dismiss: "cancel") {
-                Button("system settings") {}.buttonStyle(SquareButtonStyle(kind: .quiet))
-                Button("copy") {}.buttonStyle(SquareButtonStyle(kind: .primary))
+                SquarePromptIcon(icon: "akar-gear", help: "system settings", kind: .quiet) {}
+                SquarePromptIcon(icon: "akar-copy", help: "copy") {}
             }
-            SquarePrompt(mark: .icon("akar-clipboard"), message: Text("nowhere to type it"), dismiss: "cancel") {
-                Button("copy") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-            }
-            SquarePrompt(mark: .icon("akar-clipboard"), message: Text("nowhere to type it"), dismiss: "cancel") {
-                Button("copied") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-            }
+            SquareCopyPromptSpecimen()
             SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") {}, message: Text("added \(Text("typeme.it").fontWeight(.medium)) to dictionary"), dismiss: "dismiss") {
                 Button("undo") {}.buttonStyle(SquareButtonStyle(kind: .primary))
             }
-            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") {}, message: Text("learned \(counted(3, "word"))"), dismiss: "dismiss") {
-                Button("undo") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-            }
-            SquarePrompt(message: Text("undone")) {}
+            SquareUndoPromptSpecimen()
+            SquarePrompt(mark: .icon("akar-microphone"), message: Text("mic didn't start"), failed: true, dismiss: "dismiss") {}
             group("updates")
             SquarePrompt(mark: .icon("akar-sparkles"), message: Text("version \(Text("1.0.1").fontWeight(.medium)) is ready"), dismiss: "later") {
                 Button("install") {}.buttonStyle(SquareButtonStyle(kind: .primary))
             }
             SquarePrompt(mark: .icon("akar-sparkles"), message: Text("version 1.0.1 didn't download"), failed: true, dismiss: "dismiss") {}
+            group("claude")
+            SquareAskPillSpecimen(question: "what did we decide on pricing?")
+            SquareAskPillSpecimen(question: "what did we agree about moving the launch date if the pricing page isn't signed off by the end of next week?")
+            SquareAskPillSpecimen(question: "who owns the rollout?", queues: true)
             group("meetings")
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("record this meeting?"), dismiss: "not now") {
                 Button("record") {}.buttonStyle(SquareButtonStyle(kind: .primary))
@@ -174,21 +204,28 @@ struct SquarePromptSpecimen: View {
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("recording again · slack"), dismiss: "dismiss") {
                 Button("stop") {}.buttonStyle(SquareButtonStyle(kind: .primary))
             }
-            SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"), dismiss: "dismiss") {
-                Button("show") {}.buttonStyle(SquareButtonStyle(kind: .primary))
+            SquarePrompt(mark: .icon("akar-microphone"), message: Text("system audio is off"), dismiss: "dismiss") {
+                SquarePromptIcon(icon: "akar-gear", help: "system settings") {}
             }
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting saved"), dismiss: "dismiss") {
-                Button("run hooks") {}.buttonStyle(SquareButtonStyle(kind: .quiet))
-                Button("show") {}.buttonStyle(SquareButtonStyle(kind: .primary))
+                SquarePromptIcon(icon: "akar-link-out", help: "open") {}
             }
-            SquarePrompt(mark: .icon("akar-people-group"), message: Text("2 hooks done"), dismiss: "dismiss") {
-                Button("view") {}.buttonStyle(SquareButtonStyle(kind: .primary))
+            SquareHooksPromptSpecimen()
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text("transcribe now?")) {
+                Button("later") {}.buttonStyle(SquareButtonStyle(kind: .quiet))
+                Button("okay") {}.buttonStyle(SquareButtonStyle(kind: .primary))
             }
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("meeting not transcribed"), failed: true, dismiss: "dismiss") {
-                Button("show") {}.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-link-out", help: "open") {}
             }
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("disk full · meeting stopped"), failed: true, dismiss: "dismiss") {
-                Button("show") {}.buttonStyle(SquareButtonStyle())
+                SquarePromptIcon(icon: "akar-link-out", help: "open") {}
+            }
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text("meetings folder unavailable"), failed: true, dismiss: "dismiss") {
+                SquarePromptIcon(icon: "akar-gear", help: "settings", kind: .outline) {}
+            }
+            SquarePrompt(mark: .icon("akar-triangle-alert"), message: Text("claude code check failed"), failed: true, dismiss: "dismiss") {
+                SquarePromptIcon(icon: "akar-gear", help: "settings", kind: .outline) {}
             }
         }
         .padding(.horizontal, 40)
@@ -199,6 +236,126 @@ struct SquarePromptSpecimen: View {
 
     private func group(_ name: String) -> some View {
         Text(name).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3).padding(.top, 4)
+    }
+}
+
+/// How long a specimen shows a passing state before it goes back.
+private let specimenPause = Duration.seconds(1.5)
+
+private struct SquareCopyPromptSpecimen: View {
+    @State private var copied = false
+
+    var body: some View {
+        SquarePrompt(mark: .icon("akar-clipboard"), message: Text("nowhere to type it"), dismiss: "cancel") {
+            SquarePromptIcon(icon: copied ? "akar-check" : "akar-copy", help: copied ? "copied" : "copy") {
+                copied = true
+                Task {
+                    try? await Task.sleep(for: specimenPause)
+                    copied = false
+                }
+            }
+        }
+    }
+}
+
+private struct SquareUndoPromptSpecimen: View {
+    @State private var undone = false
+
+    var body: some View {
+        if undone {
+            SquarePrompt(message: Text("undone")) {}
+        } else {
+            SquarePrompt(mark: .button("akar-sparkles", help: "open dictionary") {}, message: Text("learned \(counted(3, "word"))"), dismiss: "dismiss") {
+                Button("undo") {
+                    undone = true
+                    Task {
+                        try? await Task.sleep(for: specimenPause)
+                        undone = false
+                    }
+                }
+                .buttonStyle(SquareButtonStyle(kind: .primary))
+            }
+        }
+    }
+}
+
+private struct SquareHooksPromptSpecimen: View {
+    @State private var ran = false
+
+    var body: some View {
+        SquarePrompt(mark: .icon("akar-people-group"), message: Text(ran ? "2 hooks done" : "meeting saved"), dismiss: "dismiss", onDismiss: { ran = false }) {
+            if !ran {
+                Button { ran = true } label: { SquareClaudeMark(size: 12) }
+                    .buttonStyle(SquareDismissStyle())
+                    .help("run hooks")
+                    .accessibilityLabel("run hooks")
+            }
+            SquarePromptIcon(icon: "akar-link-out", help: "open") {}
+        }
+    }
+}
+
+/// The Claude pill from offer to answer: ask claude runs it, the chevron
+/// folds the answer, and the cross goes back to the offer. With `queues`, it
+/// waits behind another question first.
+private struct SquareAskPillSpecimen: View {
+    private enum Stage { case offered, queued, asking, answered }
+
+    let question: String
+    var queues = false
+    @State private var stage = Stage.offered
+    @State private var expanded = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SquarePrompt(mark: .claude(working: stage == .asking), message: Text(question),
+                         dismiss: stage == .offered ? "no" : stage == .asking ? "cancel" : "dismiss",
+                         onDismiss: { stage = .offered }, wraps: true) {
+                switch stage {
+                case .offered:
+                    SquarePromptIcon(icon: "akar-copy", help: "copy", kind: .quiet) {}
+                    Button("ask claude") { ask() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                case .queued:
+                    Text("queued").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.onSlab.opacity(0.6)).centredLowercase(size: 11)
+                case .asking:
+                    SquarePromptIcon(icon: "akar-link-out", help: "open", kind: .quiet) {}
+                case .answered:
+                    Button { expanded.toggle() } label: {
+                        SquareIcon("akar-chevron-down", size: 12).rotationEffect(.degrees(expanded ? 180 : 0))
+                    }
+                    .buttonStyle(SquareDismissStyle())
+                    .help(expanded ? "fold answer" : "show answer")
+                    SquarePromptIcon(icon: "akar-link-out", help: "open", kind: .quiet) {}
+                }
+            }
+            if stage == .answered, expanded {
+                VStack(spacing: 0) {
+                    Rectangle().fill(DesignTokens.Colors.onSlab.opacity(0.16)).frame(height: DesignTokens.hairline)
+                    ClaudeMarkdown(reply: "Two plans, both monthly:\n\n- **Solo** stays at the current price\n- **Team** moves to per seat\n\n| plan | seats |\n|---|---|\n| solo | 1 |\n| team | 5+ |\n\nThe page goes out once it is signed off.",
+                                   font: Square.mono(12), colour: DesignTokens.Colors.onSlab.opacity(0.92))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 52)
+                        .padding(.trailing, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 12)
+                }
+                .background(DesignTokens.Colors.slab)
+            }
+        }
+        .frame(width: 420)
+        .environment(\.squareOnSlab, true)
+    }
+
+    private func ask() {
+        stage = queues ? .queued : .asking
+        Task {
+            if queues {
+                try? await Task.sleep(for: specimenPause)
+                if stage == .queued { stage = .asking }
+            }
+            try? await Task.sleep(for: specimenPause)
+            if stage == .asking { stage = .answered }
+        }
     }
 }
 

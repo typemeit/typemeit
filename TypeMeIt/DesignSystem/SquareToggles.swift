@@ -126,9 +126,6 @@ struct SquareTickSpecimen: View {
 
     var body: some View {
         SquareSpecimen {
-            ForEach(SquarePose.allCases.filter { $0 != .pressed }, id: \.self) { pose in
-                SquareSpecimenLine(name: pose.name, pose: pose) { ticks(faint: false) }
-            }
             SquareSpecimenLine(name: "disabled") { ticks(faint: false) }
                 .disabled(true)
             SquareSpecimenLine(name: "select box") { ticks(faint: true) }
