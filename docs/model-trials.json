@@ -850,6 +850,23 @@
       "held": "—",
       "verdict": "shipped",
       "link": "`Scripts/asr-eval/diarizers/nemotron_app.py`"
+    },
+    {
+      "name": "Phonon refiner 1.7B",
+      "url": "https://huggingface.co/Infatoshi/phonon-refiner-1.7b",
+      "group": "clean-up",
+      "status": "rejected",
+      "summary": "Phonon refiner 1.7B passed 299/353 on every dictation vs Apple's 353/353; behind the gate 351/353",
+      "date": "2026-11-06",
+      "role": "Clean-up",
+      "model": "Phonon refiner 1.7B, LFM3-1.7B fine-tune (llama.cpp 0.9.0, Q4_K_S)",
+      "against": "Apple on-device model",
+      "hypothesis": "—",
+      "metric": "`make eval` cases passed (of 353), one run per setup, the refiner's own prompt in minimal mode; wishes granted (of 19); ms per call",
+      "result": "Behind the gate (9 calls): 351/353, 0/19 wishes. On every dictation with our guards: 299/353 (8 of 131 inputs fail), 3/19 wishes, p50/p95 453/2749 ms. With Phonon's guards only: 248/353 (20 inputs fail), 3/19 wishes, p50/p95 437/2259 ms. Apple 353/353, 0/19. Many failures remove words such as \"okay so\" and \"you know\", which its spec asks for; it granted the kubectl, numbered-list and \"no wait\" wishes. Not on Phonon's Metal engine, so its speed is not measured here",
+      "held": "—",
+      "verdict": "rejected",
+      "link": "—"
     }
   ]
 }
