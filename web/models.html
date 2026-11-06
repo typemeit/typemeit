@@ -35,7 +35,7 @@
  "name": "type me it model trials",
  "description": "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores.",
  "url": "https://typeme.it/models",
- "dateModified": "2026-10-22",
+ "dateModified": "2026-11-06",
  "creator": {
   "@type": "Organization",
   "name": "type me it",
@@ -377,6 +377,20 @@
    "name": "Tiled voice-name clips",
    "dateCreated": "2026-10-22",
    "description": "short clips named right 2,990 vs 1,183 of 3,306; strangers reaching 0.5 rose from 2 to 18, so the cut moved to 0.8"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "FluidAudio 0.18.2",
+   "dateCreated": "2026-11-05",
+   "description": "FluidAudio 0.18.2 tied 0.17.6: meetings 13.49% vs 13.48% WER, dictation 4.32% on both",
+   "url": "https://github.com/FluidInference/FluidAudio/releases/tag/v0.18.2"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Phonon refiner 1.7B",
+   "dateCreated": "2026-11-06",
+   "description": "Phonon refiner 1.7B passed 299/353 on every dictation vs Apple's 353/353; behind the gate 351/353",
+   "url": "https://huggingface.co/Infatoshi/phonon-refiner-1.7b"
   }
  ]
 }
@@ -387,7 +401,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">48 trials · updated 22 october 2026</p>
+  <p class="meta">50 trials · updated 6 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -400,6 +414,17 @@
 <section id="speech-recognition" data-group="speech-recognition">
 <h2>speech recognition</h2>
 <div>
+<article class="trial" id="fluidaudio-0-18-2" data-group="speech-recognition" data-status="shipped">
+  <time datetime="2026-11-05">5 november 2026</time>
+  <h3><a href="https://github.com/FluidInference/FluidAudio/releases/tag/v0.18.2">FluidAudio 0.18.2</a></h3>
+  <span class="status status-shipped">shipped</span>
+  <p class="summary">FluidAudio 0.18.2 tied 0.17.6: meetings 13.49% vs 13.48% WER, dictation 4.32% on both</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">FluidAudio 0.18.2</p>
+    <dl><dt>against</dt><dd>FluidAudio 0.17.6</dd><dt>measured</dt><dd><code>make asr-eval</code> WER on meetings and dictation, one run each; dictation latency; peak memory; words under the wrong speaker through <code>nemotron_app</code>, 71 meeting tracks</dd><dt>result</dt><dd>Meetings 13.49% vs 13.48%; dictation 4.32% on both; p50/p95 49/135 ms vs 51/97 ms; peak 498 vs 495 MB. Wrong-speaker words 1,691 of 182,436 on both; right number of people on 53 of 71 on both</dd><dt>verdict</dt><dd>shipped</dd></dl>
+  </details>
+</article>
 <article class="trial" id="underdog-bark-3-0-pro" data-group="speech-recognition" data-status="rejected">
   <time datetime="2026-10-22">22 october 2026</time>
   <h3><a href="https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Pro">Underdog Bark 3.0 Pro</a></h3>
@@ -680,6 +705,17 @@
 <section id="clean-up" data-group="clean-up">
 <h2>clean-up</h2>
 <div>
+<article class="trial" id="phonon-refiner-1-7b" data-group="clean-up" data-status="rejected">
+  <time datetime="2026-11-06">6 november 2026</time>
+  <h3><a href="https://huggingface.co/Infatoshi/phonon-refiner-1.7b">Phonon refiner 1.7B</a></h3>
+  <span class="status status-rejected">rejected</span>
+  <p class="summary">Phonon refiner 1.7B passed 299/353 on every dictation vs Apple&#x27;s 353/353; behind the gate 351/353</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Phonon refiner 1.7B, LFM3-1.7B fine-tune (llama.cpp 0.9.0, Q4_K_S)</p>
+    <dl><dt>against</dt><dd>Apple on-device model</dd><dt>measured</dt><dd><code>make eval</code> cases passed (of 353), one run per setup, the refiner's own prompt in minimal mode; wishes granted (of 19); ms per call</dd><dt>result</dt><dd>Behind the gate (9 calls): 351/353, 0/19 wishes. On every dictation with our guards: 299/353 (8 of 131 inputs fail), 3/19 wishes, p50/p95 453/2749 ms. With Phonon's guards only: 248/353 (20 inputs fail), 3/19 wishes, p50/p95 437/2259 ms. Apple 353/353, 0/19. Many failures remove words such as "okay so" and "you know", which its spec asks for; it granted the kubectl, numbered-list and "no wait" wishes. Not on Phonon's Metal engine, so its speed is not measured here</dd><dt>verdict</dt><dd>rejected</dd></dl>
+  </details>
+</article>
 <article class="trial" id="clef-flash" data-group="clean-up" data-status="rejected">
   <time datetime="2026-10-03">3 october 2026</time>
   <h3><a href="https://huggingface.co/Cloudflare/clef-flash">Clef-flash</a></h3>

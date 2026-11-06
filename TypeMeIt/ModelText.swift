@@ -114,6 +114,26 @@ enum ModelText {
         return result
     }
 
+    /// Marks said at the end of a sentence, and what the speech model may
+    /// write after each: "full stop?" is a question about the mark.
+    private static let spokenEnds: [(pattern: NSRegularExpression, mark: String)] = [
+        ("question mark", "?", ".?!"), ("full stop", ".", ".!"), ("exclamation mark", "!", ".!"), ("exclamation point", "!", ".!"),
+    ].map { words, mark, closers in
+        let namedBefore = #"(?<!\b(?:a|an|the|this|that|one|no|each|every|any|some|of|with|my|your|our|their|and|or|add|adding|use|using|remove|removing|put|say|said|type|typed|called|last|first|final|next|trailing|extra|double|same|complete))"#
+        let pattern = #"(?i)(?<=[\p{L}\p{N}'’)"])"# + namedBefore + #"[,.]?\s+"# + words + "(?:[" + closers + #"]+(?=\s|$)|$)"#
+        return (try! NSRegularExpression(pattern: pattern), mark)
+    }
+
+    /// Writes a mark said at the end of a sentence as its symbol, in code:
+    /// the model dropped the words without writing the mark. A sentence that
+    /// names the mark ("a question mark", "add full stop") keeps its words,
+    /// and one going on past them ("question mark icon") is left to the model.
+    static func spokenSentenceEnds(_ text: String) -> String {
+        spokenEnds.reduce(text) { written, end in
+            end.pattern.stringByReplacingMatches(in: written, range: NSRange(written.startIndex..., in: written), withTemplate: end.mark)
+        }
+    }
+
     /// Drops a single trailing full stop, which the model likes to add to a
     /// sentence the user did not finish with one.
     static func stripTrailingFullStop(_ text: String) -> String {

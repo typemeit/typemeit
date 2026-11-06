@@ -34,21 +34,29 @@ struct PageTopBar<Actions: View>: View {
     }
 }
 
-/// The copy icon, which turns to a check once it has copied.
+/// The copy icon, which turns to a check for a moment once it has copied.
 struct PageCopyButton: View {
     /// What the button does, for its tooltip and for VoiceOver.
     let help: String
     let copy: () -> Void
     @State private var copied = false
 
+    /// How long a copy's check shows.
+    static let checkFor: Duration = .seconds(1.5)
+
     var body: some View {
         Button {
             copy()
             copied = true
+            Task {
+                try? await Task.sleep(for: PageCopyButton.checkFor)
+                copied = false
+            }
         } label: {
             SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14)
         }
         .buttonStyle(SquareIconButtonStyle())
+        .animation(.easeOut(duration: DesignTokens.Duration.n1), value: copied)
         .help(help)
         .accessibilityLabel(help)
     }

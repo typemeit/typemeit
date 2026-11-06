@@ -336,7 +336,7 @@ Sources: the macOS 27.0 SDK headers, `insidegui/AudioCap`,
   collides with other static-library xcframeworks under `xcodebuild`.
   TranscribeCpp, which shipped framework slices, is gone; the collision
   re-arms if a static-library xcframework is ever added.
-  Pinned at 0.17.6 since 22 October 2026 (0.17.5 from 12 October, the
+  Pinned at 0.18.2 since 4 November 2026 (0.17.6 from 22 October, 0.17.5 from 12 October, the
   release that added Parakeet Ultra; 0.17.4 from 30 September). 0.17.6
   leaves digitally silent frames out of the FBank mean (FluidAudio #988)
   and tiles short spans in `embedSpan` (#982), which the app never calls;
@@ -1954,7 +1954,7 @@ is the one list of them. Neither `folder` nor `folderSuggestion` goes into a
   folder's name of up to three words, dropped if it repeats the meeting's
   title or a folder's words. The suggestion waits on the meeting's page as
   `folder: X?` or `new folder: X?` with `yes` and `no`, and first in the move
-  menu. A meeting with a summary and no suggestion shows `suggest a folder`.
+  menu.
 
 `make folder-eval` scores the pick and prints the new names
 (Scripts/folder-eval). Tests: `MeetingFolderFilingTests`,

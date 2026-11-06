@@ -238,7 +238,7 @@ struct MeetingPage: View {
                 if coordinator.askPreparing {
                     SquareClaudeThread(lines: [.prompt(asked.question.text)], status: .running, footer: "", stop: { coordinator.cancelAsk() })
                 } else {
-                    ClaudeRunOutput(id: runID)
+                    ClaudeRunOutput(id: runID, meeting: meeting.id)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -291,7 +291,7 @@ struct MeetingPage: View {
     private func hookOutput(_ line: HookLine) -> some View {
         ClaudeRunOutput(id: line.id, kept: line.run.map {
             .init(prompt: $0.prompt, answer: $0.output, failed: $0.failed, sessionID: $0.sessionID, calls: $0.calls, ranAt: $0.ranAt)
-        })
+        }, meeting: meeting.id)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -349,20 +349,20 @@ struct MeetingPage: View {
         meeting.isDone && !meeting.paragraphs.isEmpty && !live && (ClaudeRun.isAvailable || !hookLines.isEmpty)
     }
 
-    /// "hooks" with ▷ for the ones switched on, then each hook's line with
+    /// "hooks" with ▷ for the ones run hooks would run, then each hook's line with
     /// ▷ for that one in the hooks page's order, then the way to a new one.
     @ViewBuilder private var railHooks: some View {
         let runnable = Set(coordinator.runnableHooks.map(\.id))
-        let on = coordinator.runnableHooks.filter(\.on).count
+        let toRun = coordinator.hooksToRun(on: meeting).count
         HStack(alignment: .lastTextBaseline) {
             SquareSubhead(text: "hooks")
             Spacer()
             if coordinator.hooksReady {
-                Button { coordinator.runHooks(meeting.id) } label: { SquareRunLabel(count: on, size: 11) }
+                Button { coordinator.runHooks(meeting.id) } label: { SquareRunLabel(count: toRun, size: 11) }
                     .buttonStyle(SquareButtonStyle(small: true))
-                    .disabled(on == 0 || hooksRunning)
-                    .help("run \(counted(on, "hook"))")
-                    .accessibilityLabel("run \(counted(on, "hook"))")
+                    .disabled(toRun == 0 || hooksRunning)
+                    .help("run \(counted(toRun, "hook"))")
+                    .accessibilityLabel("run \(counted(toRun, "hook"))")
             }
         }
         let lines = hookLines.enumerated()
@@ -411,8 +411,7 @@ struct MeetingPage: View {
     }
 
     /// For a meeting in no folder: the model's folder suggestion to take or
-    /// leave, "new folder" when no meeting is in it yet, or the link that
-    /// asks for one when it has a summary.
+    /// leave, "new folder" when no meeting is in it yet.
     @ViewBuilder private var folderSuggestion: some View {
         if let suggestion = meeting.openFolderSuggestion {
             HStack(spacing: 8) {
@@ -425,16 +424,11 @@ struct MeetingPage: View {
                     .buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
             }
             .padding(.top, 10)
-        } else if meeting.folder == nil {
-            if coordinator.suggestingFolder.contains(meeting.id) {
-                Text("suggesting a folder…")
-                    .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .padding(.top, 10)
-            } else if meeting.isDone, !live, !(meeting.summary ?? "").isEmpty {
-                SquareLink(title: "suggest a folder", size: 12, color: DesignTokens.Colors.ink2) { coordinator.suggestFolder(meeting.id) }
-                    .padding(.top, 10)
-            }
+        } else if meeting.folder == nil, coordinator.suggestingFolder.contains(meeting.id) {
+            Text("suggesting a folder…")
+                .font(Square.mono(12))
+                .foregroundStyle(DesignTokens.Colors.ink3)
+                .padding(.top, 10)
         }
     }
 
@@ -853,9 +847,9 @@ private struct MeetingTranscript: View {
                         .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
                 }
                 if question.result == .asked, let answer = question.answer {
-                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls))
+                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls), meeting: meeting.id)
                 } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
-                    ClaudeRunOutput(id: runID)
+                    ClaudeRunOutput(id: runID, meeting: meeting.id)
                 } else {
                     Text(TranscriptRender.outcome(question.result))
                         .font(Square.mono(12))

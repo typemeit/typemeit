@@ -47,7 +47,7 @@ struct SquareChip: View {
         .font(Square.mono(Square.controlSize))
         .foregroundStyle(DesignTokens.Colors.ink)
         .padding(.leading, 8)
-        .padding(.trailing, remove == nil ? 8 : 4)
+        .padding(.trailing, remove == nil ? 8 : 2)
         .frame(height: 22)
         .background(DesignTokens.Colors.inkA08)
     }
@@ -87,7 +87,7 @@ struct SquareWordChip: View {
         .font(Square.mono(Square.controlSize))
         .foregroundStyle(DesignTokens.Colors.ink)
         .padding(.leading, 9)
-        .padding(.trailing, forget == nil ? 9 : 4)
+        .padding(.trailing, forget == nil ? 9 : 2)
         .frame(height: 26)
         .background(DesignTokens.Colors.inkA08)
         .squareConfirmDelete(isPresented: $forgetting, title: "forget “\(word)”?",
@@ -163,7 +163,7 @@ private struct SquareCross: View {
         Button(action: action) {
             SquareIcon("akar-cross", size: 8)
                 .foregroundStyle(pose.hot(hovering) ? DesignTokens.Colors.ink : rest)
-                .padding(4)
+                .padding(6)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -193,7 +193,7 @@ struct SquareField: View {
                             onSubmit: onSubmit, onCancel: onCancel)
         }
         .padding(.horizontal, 9)
-        .frame(height: 28)
+        .frame(height: SquareButtonStyle.height)
         .overlay(Rectangle().strokeBorder(focused ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
         .contentShape(Rectangle())
         .onTapGesture { focused = true }

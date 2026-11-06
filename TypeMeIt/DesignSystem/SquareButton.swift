@@ -44,7 +44,7 @@ private struct SquareButtonLabel: View {
     var body: some View {
         configuration.label
             .labelStyle(SquareButtonLabelStyle())
-            .environment(\.squareLabelLift, Square.drop(lowercase: true, size: size))
+            .environment(\.squareLabelLift, Square.drop(shortLetters: false, size: size))
             .font(Square.mono(size))
             .lineLimit(1)
             .centredLowercase(size: size)
@@ -211,3 +211,31 @@ struct SquareIconButtonSpecimen: View {
 #Preview("button") { SquareButtonSpecimen() }
 #Preview("icon button") { SquareIconButtonSpecimen() }
 #endif
+
+/// Hands work to Claude: an outline button with Claude Code's mark before
+/// its label, or the mark alone as an icon button where there is no room.
+/// Under the pointer the mark takes Claude's orange.
+struct SquareClaudeButton: View {
+    let title: String
+    var iconOnly = false
+    let action: () -> Void
+    @Environment(\.squareOnSlab) private var onSlab
+    @State private var hovering = false
+
+    var body: some View {
+        let mark = SquareClaudeMark(size: Square.controlSize)
+            .foregroundStyle(hovering ? DesignTokens.Colors.claude : onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
+        Group {
+            if iconOnly {
+                Button(action: action) { mark }
+                    .buttonStyle(SquareIconButtonStyle())
+                    .help(title)
+                    .accessibilityLabel(title)
+            } else {
+                Button(action: action) { Label { Text(title) } icon: { mark } }
+                    .buttonStyle(SquareButtonStyle())
+            }
+        }
+        .onHover { hovering = $0 }
+    }
+}

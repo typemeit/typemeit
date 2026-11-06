@@ -60,7 +60,7 @@ struct AnswerPill: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
                 actions
-                // An offered question is answered no or ask claude; the cross cancels
+                // An offered question is answered no, copy or ask claude; the cross cancels
                 // one being asked and dismisses an answer.
                 if stage != .offered {
                     Button { if stage == .asking { model.onCancelAsk?() } else { model.onDismissMeeting?() } } label: {
@@ -71,6 +71,7 @@ struct AnswerPill: View {
                     .accessibilityLabel(stage == .asking ? "cancel" : "dismiss")
                 }
             }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.leading, Self.rowLeading)
         .padding(.trailing, 10)
@@ -99,6 +100,9 @@ struct AnswerPill: View {
         switch stage {
         case .offered:
             Button("no") { model.onDeclineQuestion?(question) }.buttonStyle(SquareButtonStyle(kind: .quiet))
+            if model.offerCopies {
+                Button("copy") { model.onCopyDictation?() }.buttonStyle(SquareButtonStyle(kind: .quiet))
+            }
             Button("ask claude") { model.onAskClaude?(question) }.buttonStyle(SquareButtonStyle(kind: .primary))
         case .queued:
             Text("queued")
@@ -117,6 +121,9 @@ struct AnswerPill: View {
             .buttonStyle(SquareIconButtonStyle())
             .help(model.answerExpanded ? "fold answer" : "show answer")
             .accessibilityLabel(model.answerExpanded ? "fold answer" : "show answer")
+            if let sessionID = answer.sessionID, ClaudeDesktop.installed {
+                SquareClaudeButton(title: "continue in claude", iconOnly: true) { model.onContinueInClaude?(sessionID) }
+            }
             if model.askOpens {
                 openButton
             }

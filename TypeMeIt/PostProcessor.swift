@@ -135,7 +135,9 @@ actor PostProcessor {
         let keep = CustomWordMatcher.present(in: heard, terms: customWords)
         // Spelled letters and split terms are settled here, before the model,
         // so the transcript as heard gets them too when the model has nothing.
-        let joined = ModelText.joinSpelledLetters(heard)
+        // The speech model's own final full stop goes first, so one left
+        // here is one the user said, and it stays.
+        let joined = ModelText.spokenSentenceEnds(ModelText.stripTrailingFullStop(ModelText.joinSpelledLetters(heard)))
         let terms = screenTerms + keep + hints.map(\.term)
         let fused = ModelText.fuseTerms(joined, terms: terms)
         let reason = PostProcessor.reasonForModel(fused, hints: hints, screenTerms: screenTerms, unknownWords: unknown)
@@ -148,7 +150,7 @@ actor PostProcessor {
         text = WritingStyle.apply(styles, to: text)
         text = Digits.unitFigures(text)
         text = ModelText.currencySymbols(text)
-        text = ModelText.stripTrailingFullStop(text)
+        if joined == ModelText.stripTrailingFullStop(joined) { text = ModelText.stripTrailingFullStop(text) }
         return (text, processed != nil)
     }
 

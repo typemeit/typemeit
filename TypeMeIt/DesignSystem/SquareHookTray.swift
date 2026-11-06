@@ -228,7 +228,7 @@ struct SquareRunLabel: View {
                 Text(counted(count, "hook"))
             } else {
                 Text("\(count)").monospacedDigit()
-                    .offset(y: Square.drop(lowercase: true, size: size) - Square.drop(lowercase: false, size: size))
+                    .offset(y: Square.drop(shortLetters: true, size: size) - Square.drop(shortLetters: false, size: size))
             }
         }
     }

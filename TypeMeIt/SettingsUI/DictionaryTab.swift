@@ -52,8 +52,8 @@ struct DictionaryTab: View {
                 verifyPanel
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 26)
-            .padding(.horizontal, 40)
+            .padding(.top, 16)
+            .padding(.horizontal, SquareListColumns.page)
             .padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -123,11 +123,12 @@ struct DictionaryTab: View {
     /// words before and after.
     private func verifyRow(_ match: VerifyCustomWord.Match) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(match.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+            Text(HistoryTab.shortStamp(match.timestamp))
                 .font(Square.mono(11))
                 .monospacedDigit()
                 .foregroundStyle(DesignTokens.Colors.ink3)
-                .frame(width: 40, alignment: .leading)
+                .frame(width: 100, alignment: .leading)
+                .help(HistoryTab.fullStamp(match.timestamp))
                 .padding(.top, 6)
             ZStack { playButton(match) }.frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {

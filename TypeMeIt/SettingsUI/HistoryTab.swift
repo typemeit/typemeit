@@ -218,7 +218,14 @@ struct HistoryTab: View {
                                 HistoryRow(entry: entry, picked: $selection.box(entry.id) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty, copied: copied == entry.id,
                                            open: { open = entry.id },
-                                           copy: { Output.copyToClipboard(entry.displayText); copied = entry.id },
+                                           copy: {
+                                               Output.copyToClipboard(entry.displayText)
+                                               copied = entry.id
+                                               Task {
+                                                   try? await Task.sleep(for: PageCopyButton.checkFor)
+                                                   if copied == entry.id { copied = nil }
+                                               }
+                                           },
                                            delete: { store.delete(id: entry.id); selection.picked.remove(entry.id) })
                             }
                         }
@@ -329,6 +336,24 @@ struct HistoryTab: View {
         let date = sameYear ? day.formatted(.dateTime.day().month(.wide)) : day.formatted(.dateTime.day().month(.wide).year())
         return (day.formatted(.dateTime.weekday(.wide)).lowercased(), date.lowercased())
     }
+
+    /// "19:16", for a row under its day line.
+    nonisolated static func clock(_ date: Date) -> String {
+        date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+    }
+
+    /// "tuesday 27 october 2026 · 19:16", for a time shown without its day.
+    nonisolated static func fullStamp(_ date: Date) -> String {
+        "\(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()).lowercased()) · \(clock(date))"
+    }
+
+    /// "14:02" today, "yesterday 14:02", then "21 oct 14:02", for a list
+    /// with no day lines.
+    nonisolated static func shortStamp(_ date: Date, calendar: Calendar = .current) -> String {
+        if calendar.isDateInToday(date) { return clock(date) }
+        if calendar.isDateInYesterday(date) { return "yesterday \(clock(date))" }
+        return "\(date.formatted(.dateTime.day().month(.abbreviated)).lowercased()) \(clock(date))"
+    }
 }
 
 /// History's own columns beside the shared ones: its app, what changed and
@@ -348,7 +373,7 @@ enum HistoryColumns {
     /// row, where its words are: this far above the line's baseline.
     static let lineMiddle = Square.appKitMono(12).capHeight / 2
     /// The head and the days leave the actions' room at the end.
-    static var trailing: CGFloat { SquareListColumns.edge + actions + SquareListColumns.inset }
+    static var trailing: CGFloat { actions + SquareListColumns.inset }
     /// A day's total sits over the app, the changes and the words.
     static var total: CGFloat { app + SquareListColumns.gap + changes + SquareListColumns.gap + words }
 
@@ -390,11 +415,12 @@ private struct HistoryRow: View {
                 .padding(.trailing, SquareListColumns.edge)
             Button(action: open) {
                 HStack(alignment: .firstTextBaseline, spacing: SquareListColumns.gap) {
-                    Text(entry.timestamp.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                    Text(HistoryTab.clock(entry.timestamp))
                         .font(Square.mono(12))
                         .monospacedDigit()
                         .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(width: SquareListColumns.time, alignment: .leading)
+                        .help(HistoryTab.fullStamp(entry.timestamp))
                     Text(entry.displayText)
                         .font(Square.sans(13.5))
                         .lineSpacing(2)
@@ -415,7 +441,7 @@ private struct HistoryRow: View {
                     Text(entry.wordCount.formatted())
                         .font(Square.mono(12))
                         .monospacedDigit()
-                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .foregroundStyle(DesignTokens.Colors.ink2)
                         .frame(width: HistoryColumns.words, alignment: .trailing)
                 }
                 .padding(.leading, SquareListColumns.inset)
@@ -426,6 +452,7 @@ private struct HistoryRow: View {
             HStack(spacing: 0) {
                 Button(action: copy) { SquareIcon(copied ? "akar-check" : "akar-copy", size: copied ? 12 : 14) }
                     .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
+                    .animation(.easeOut(duration: DesignTokens.Duration.n1), value: copied)
                     .help("copy")
                     .accessibilityLabel("copy")
                 Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }

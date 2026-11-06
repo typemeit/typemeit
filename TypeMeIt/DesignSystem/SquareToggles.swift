@@ -44,6 +44,8 @@ private struct SquareSwitch: View {
             }
             .frame(width: SquareSwitch.width, height: SquareSwitch.height)
             .opacity(enabled ? 1 : 0.4)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 2)
             .contentShape(Rectangle())
             .animation(.easeOut(duration: DesignTokens.Duration.n1), value: on)
     }
@@ -51,7 +53,7 @@ private struct SquareSwitch: View {
 
 /// The square tick: a 14 pt box on the control rule, filled with the slab
 /// and a check when on. The pointer takes an empty box's edge to ink.
-/// `faint` is a list's select box, on an ink-a32 edge until the pointer
+/// `faint` is a list's select box, on an ink-a48 edge until the pointer
 /// comes.
 struct SquareTickStyle: ToggleStyle {
     var faint = false
@@ -93,7 +95,7 @@ private struct SquareTick: View {
     private var edge: Color {
         if configuration.isOn { return DesignTokens.Colors.slab }
         if enabled && pose.hot(hovering) { return DesignTokens.Colors.ink }
-        return faint ? DesignTokens.Colors.inkA32 : DesignTokens.Colors.ruleControl
+        return faint ? DesignTokens.Colors.inkA48 : DesignTokens.Colors.ruleControl
     }
 }
 

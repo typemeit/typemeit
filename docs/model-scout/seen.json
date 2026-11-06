@@ -891,6 +891,257 @@
       "date": "2026-10-27",
       "role": "speech recognition",
       "why": "gated card, no published number"
+    },
+    {
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "30B MoE speech LLM, offline; 67.5 GB bf16, MLX 4-bit 25 GB and ~22 GB peak, over every budget; AMI, ICSI and Fisher in training, so its AMI 7.81 is not held out"
+    },
+    {
+      "id": "FluidInference/nemotron-3.5-transcribe-lite-coreml",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "its encoder + CTC head without the LLM, Core ML 1.36 GB fp16; LibriSpeech test-clean 5.50% and AMI EN2002c 26.3% WER, far behind Parakeet; speaker side is Nemotron 3 Diarization, which we ship"
+    },
+    {
+      "id": "Sawfwair/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-MLX-4bit",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "MLX 4-bit of the 30B model, 25 GB, 21.8 GiB peak; no word timestamps on that path"
+    },
+    {
+      "id": "akhaliq/nemotron-3.5-transcribe-mini-64e",
+      "date": "2026-10-29",
+      "role": "speech recognition",
+      "why": "REAP expert-pruned 30B model, 38-53 GB bf16"
+    },
+    {
+      "id": "zoom/scribe_v2.1_pro (eval reference)",
+      "date": "2026-11-03",
+      "role": "eval reference"
+    },
+    {
+      "id": "smdesai/TitaNet-Large-CoreML",
+      "date": "2026-11-03",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "LiquidAI/LFM3-Audio-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidInference/lfm3-audio-2b-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "LiquidAI/LFM3-Omni-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "LiquidAI/d1-Omni-2B",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nvidia/nemotron-labs-unified-asr-0.6b",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidInference/nemotron-labs-unified-asr-0.6b-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Muesli-HQ/phonon-2.5-coreml",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "maya-research/maya-transcribe",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "EphAsad/SatellaSTT-27M",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "WhissleAI/arc-v1.1",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "nikioth/diarizen-wavlm-large-s80-md-v2-coreml",
+      "date": "2026-11-03",
+      "role": "diarization"
+    },
+    {
+      "id": "nikioth/diarizen-wavlm-base-s80-md-coreml",
+      "date": "2026-11-03",
+      "role": "diarization"
+    },
+    {
+      "id": "diarizeapp/redimnet2-b3-onnx",
+      "date": "2026-11-03",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "fonada/kapture-v3 (eval reference)",
+      "date": "2026-11-03",
+      "role": "eval reference"
+    },
+    {
+      "id": "category271/whispernow-lfm3-1.7b",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "category271/whispernow-nemotron-bolt-e4b",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "hasanchadaram/dictation-cleanup-qwen3.5-4b-gguf",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "devadathanmb/utter-dictation-cleanup-qwen3-1.7b-mlx-6bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "danielrosehill/S1-ASR-Cleanup",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Glimpse-Dictation/Glimpse-C1-2B",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Muesli-HQ/qwen35-2b-base-cotypist-mlx-4bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Muesli-HQ/qwen35-0.8b-base-cotypist-mlx-4bit",
+      "date": "2026-11-03",
+      "role": "clean-up"
+    },
+    {
+      "id": "Subvocal (Hacker News)",
+      "date": "2026-11-03",
+      "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio campplus-coreml v2",
+      "date": "2026-11-04",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "FluidInference/vela-3.0-coreml",
+      "date": "2026-11-04",
+      "role": "clean-up"
+    },
+    {
+      "id": "Prahaladha/hima-asr-mlx",
+      "date": "2026-11-04",
+      "role": "speech recognition"
+    },
+    {
+      "id": "RadiOtter/RadiOtter-ASR-v1",
+      "date": "2026-11-04",
+      "role": "speech recognition"
+    },
+    {
+      "id": "assemblyai/universal-3-6-pro (eval reference)",
+      "date": "2026-11-05",
+      "role": "eval reference"
+    },
+    {
+      "id": "qualcomm/Parakeet-TDT-0.6B-v3",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "MatterWaveAI/grt-30m-asr",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "rolandnsharp/oscillator-asr",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "JoshHughes/p0pc0rn-voicein-nemotron35-asr-06b",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "keithics/parakeet-tdt-0.6b-v2-coreml",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "coming245/HotBias",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-bf16",
+      "date": "2026-11-05",
+      "role": "speech recognition"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-4bit",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "MLX port of nemotron-labs-unified-asr, seen 2026-11-03"
+    },
+    {
+      "id": "mlx-community/nemotron-labs-unified-asr-0.6b-8bit",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "MLX port of nemotron-labs-unified-asr, seen 2026-11-03"
+    },
+    {
+      "id": "mlx-community/parakeet-ctc-0.6b-Vietnamese",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "not English"
+    },
+    {
+      "id": "balbal-v2 (r/speechtech)",
+      "date": "2026-11-06",
+      "role": "speech recognition",
+      "why": "Turkish, not English"
+    },
+    {
+      "id": "AILogDev/RE-USE-MLX-CoreML",
+      "date": "2026-11-06",
+      "role": "speech enhancement",
+      "why": "port of NVIDIA RE-USE; speech enhancement is not a role we ship"
+    },
+    {
+      "id": "Omi General STT v1 (eval reference)",
+      "date": "2026-11-06",
+      "role": "eval reference",
+      "why": "Voice Arena rank 10 on conversational US English, behind Universal-3 Pro at rank 3"
+    },
+    {
+      "id": "FluidInference/citenet-coreml",
+      "date": "2026-11-06",
+      "role": "none",
+      "why": "legal citation checker, not a role we ship"
     }
   ]
 }

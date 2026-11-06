@@ -128,69 +128,112 @@ struct SquareWeightSpecimen: View {
 
 /// Every part on one sheet, in the order the canvas's parts board runs.
 struct SquareGallery: View {
-    static var parts: [(name: String, view: AnyView)] {
+    typealias Part = (name: String, also: String, view: AnyView)
+
+    private enum Appearance: String, CaseIterable {
+        case auto, light, dark
+
+        var scheme: ColorScheme? {
+            switch self {
+            case .auto: nil
+            case .light: .light
+            case .dark: .dark
+            }
+        }
+    }
+
+    /// `also` holds the other words someone might search for the part by.
+    static var parts: [Part] {
         [
-            ("colour", AnyView(SquareColourSpecimen())),
-            ("type", AnyView(SquareTypeSpecimen())),
-            ("weight", AnyView(SquareWeightSpecimen())),
-            ("cloud palette", AnyView(SquareCloudPaletteSpecimen())),
-            ("button", AnyView(SquareButtonSpecimen())),
-            ("icon button", AnyView(SquareIconButtonSpecimen())),
-            ("switch", AnyView(SquareSwitchSpecimen())),
-            ("tick", AnyView(SquareTickSpecimen())),
-            ("choice", AnyView(SquareChoiceSpecimen())),
-            ("screen", AnyView(SquareScreenPickerSpecimen())),
-            ("menu", AnyView(SquareMenuSpecimen())),
-            ("filter", AnyView(SquareFilterSpecimen())),
-            ("when", AnyView(SquareWhenSpecimen())),
-            ("key", AnyView(SquareKeySpecimen())),
-            ("recorder", AnyView(SquareRecorderSpecimen())),
-            ("chip", AnyView(SquareChipSpecimen())),
-            ("field", AnyView(SquareFieldSpecimen())),
-            ("settings row", AnyView(SquareSettingsRowSpecimen())),
-            ("group", AnyView(SquareGroupSpecimen())),
-            ("box", AnyView(SquareBoxSpecimen())),
-            ("stat", AnyView(SquareStatSpecimen())),
-            ("player", AnyView(SquarePlayerSpecimen())),
-            ("layouts", AnyView(SquareLayoutsSpecimen())),
-            ("list head", AnyView(SquareListHeadSpecimen())),
-            ("status", AnyView(SquareStatusSpecimen())),
-            ("sidebar", AnyView(SquareSidebarSpecimen())),
-            ("page header", AnyView(SquarePageHeaderSpecimen())),
-            ("prompt", AnyView(SquarePromptSpecimen())),
-            ("tabs", AnyView(SquareTabsSpecimen())),
-            ("claude output", AnyView(SquareClaudeThreadSpecimen())),
-            ("confirm and help", AnyView(SquareConfirmSpecimen())),
+            ("colour", "color ink paper token grey diff", AnyView(SquareColourSpecimen())),
+            ("type", "font text typography", AnyView(SquareTypeSpecimen())),
+            ("weight", "font bold", AnyView(SquareWeightSpecimen())),
+            ("cloud palette", "color puff tint", AnyView(SquareCloudPaletteSpecimen())),
+            ("button", "action cta", AnyView(SquareButtonSpecimen())),
+            ("icon button", "glyph symbol", AnyView(SquareIconButtonSpecimen())),
+            ("switch", "toggle on off", AnyView(SquareSwitchSpecimen())),
+            ("tick", "checkbox check", AnyView(SquareTickSpecimen())),
+            ("choice", "radio segmented picker option", AnyView(SquareChoiceSpecimen())),
+            ("screen", "display monitor picker", AnyView(SquareScreenPickerSpecimen())),
+            ("menu", "dropdown select popup", AnyView(SquareMenuSpecimen())),
+            ("filter", "search narrow", AnyView(SquareFilterSpecimen())),
+            ("when", "date time range", AnyView(SquareWhenSpecimen())),
+            ("key", "keycap shortcut hotkey", AnyView(SquareKeySpecimen())),
+            ("recorder", "shortcut hotkey keycap", AnyView(SquareRecorderSpecimen())),
+            ("chip", "tag pill token", AnyView(SquareChipSpecimen())),
+            ("field", "input text search", AnyView(SquareFieldSpecimen())),
+            ("settings row", "preference help caption", AnyView(SquareSettingsRowSpecimen())),
+            ("group", "section card", AnyView(SquareGroupSpecimen())),
+            ("box", "container panel card", AnyView(SquareBoxSpecimen())),
+            ("stat", "number metric insight", AnyView(SquareStatSpecimen())),
+            ("player", "audio playback scrub", AnyView(SquarePlayerSpecimen())),
+            ("layouts", "grid page split", AnyView(SquareLayoutsSpecimen())),
+            ("list head", "table header column", AnyView(SquareListHeadSpecimen())),
+            ("status", "state progress badge", AnyView(SquareStatusSpecimen())),
+            ("sidebar", "navigation nav", AnyView(SquareSidebarSpecimen())),
+            ("page header", "title toolbar", AnyView(SquarePageHeaderSpecimen())),
+            ("prompt", "input ask composer", AnyView(SquarePromptSpecimen())),
+            ("tabs", "navigation segmented", AnyView(SquareTabsSpecimen())),
+            ("claude output", "markdown thread ai stream", AnyView(SquareClaudeThreadSpecimen())),
+            ("confirm and help", "alert dialog popover tooltip", AnyView(SquareConfirmSpecimen())),
         ]
     }
 
     /// `-part prompt` on the command line opens the gallery on that part alone.
     private static let only = UserDefaults.standard.string(forKey: "part")
     @State private var query = ""
+    @State private var selectedPart: String?
+    @AppStorage("appearance") private var appearance = Appearance.auto
 
-    private var shown: [(name: String, view: AnyView)] {
+    private var shown: [Part] {
         SquareGallery.parts.filter { part in
             (SquareGallery.only == nil || part.name == SquareGallery.only)
-                && (query.isEmpty || part.name.localizedCaseInsensitiveContains(query))
+                && (query.isEmpty || part.name.localizedCaseInsensitiveContains(query)
+                    || part.also.localizedCaseInsensitiveContains(query))
         }
     }
 
     var body: some View {
-        NavigationStack {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                ForEach(shown, id: \.name) { part in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(part.name).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink)
-                        part.view
+        let matchingParts = shown
+        NavigationSplitView {
+            List(matchingParts, id: \.name, selection: $selectedPart) { part in
+                Text(part.name).font(Square.mono(12))
+            }
+            .navigationSplitViewColumnWidth(190)
+        } detail: {
+            ScrollViewReader { scroller in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        ForEach(matchingParts, id: \.name) { part in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(part.name).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink)
+                                part.view
+                            }
+                            .id(part.name)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(24)
+                }
+                .onChange(of: selectedPart) { _, part in
+                    guard let part else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(part, anchor: .top) }
                 }
             }
-            .padding(24)
+            .background(DesignTokens.Colors.paperSunk)
+            .overlay {
+                if matchingParts.isEmpty { ContentUnavailableView.search(text: query) }
+            }
+            .navigationTitle(counted(matchingParts.count, "part"))
+            .toolbar {
+                Picker("appearance", selection: $appearance) {
+                    ForEach(Appearance.allCases, id: \.self) { Text($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+            }
         }
-        .background(DesignTokens.Colors.paperSunk)
-        }
-        .searchable(text: $query, placement: .toolbar, prompt: "parts")
+        .searchable(text: $query, placement: .sidebar, prompt: "parts")
+        .preferredColorScheme(appearance.scheme)
     }
 }
 
