@@ -75,8 +75,6 @@ struct OnePageSettings: View {
     @State private var cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var settingUpCamera = false
     @State private var removingCamera = false
-    /// A new hook's name, typed before it is added.
-    @State private var hookName = ""
     @State private var claudeCheck = ClaudeCheck.shared
     @State private var checkDetailsOpen = false
     @State private var devices = AudioCapture.inputDevices()
@@ -201,7 +199,7 @@ struct OnePageSettings: View {
         SquareSettingsRow(label: "system prompt", help: "added to claude's system prompt on every ask") {
             EmptyView()
         } below: {
-            promptEditor($settings.askClaudeSystemPrompt)
+            SquarePromptEditor(text: $settings.askClaudeSystemPrompt)
         }
         SquareSettingsRow(label: "claude code", help: "checks claude code runs the way ask and hooks need · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off · use installs the last version that worked, and claude code updates itself again unless DISABLE_AUTOUPDATER is 1 under env in ~/.claude/settings.json",
                           caption: ClaudeCheck.caption(claudeCheck.status, lastPassed: claudeCheck.lastPassed)) {
@@ -270,7 +268,7 @@ struct OnePageSettings: View {
         })
     }
 
-    /// While ask is on, the camera; and hooks, which only need Claude Code.
+    /// While ask is on, the camera; and the way to the hooks, which only need Claude Code.
     @ViewBuilder private var meetingAskRows: some View {
         if settings.askClaude {
             SquareSettingsRow(label: "on camera", help: "shows the cloud and claude's answer in your video while a meeting records · pick type me it as the camera in your meeting app",
@@ -302,31 +300,10 @@ struct OnePageSettings: View {
                 }
             }
         }
-        SquareSettingsRow(label: "hooks", help: "prompts claude runs on a finished meeting when you press run hooks · results show on the meeting page · ones added over mcp start off") {
-            HStack(spacing: 8) {
-                SquareField(placeholder: "name a new hook", text: $hookName, onSubmit: addHook).frame(width: 200)
-                Button("add", action: addHook)
-                    .buttonStyle(SquareButtonStyle())
-                    .disabled(hookName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        ForEach($settings.meetingHooks) { $hook in
-            SquareSettingsRow(label: hook.name) {
-                HStack(spacing: 10) {
-                    Button {
-                        // Read through the binding before the array changes: reading it
-                        // inside removeAll is a second access to the same array.
-                        let removedID = hook.id
-                        settings.meetingHooks.removeAll { $0.id == removedID }
-                    } label: { SquareIcon("akar-trash-can", size: 14) }
-                        .buttonStyle(SquareIconButtonStyle())
-                        .help("remove")
-                        .accessibilityLabel("remove \(hook.name)")
-                    toggle(hook.name, hookSwitch(hook.id))
-                }
-            } below: {
-                promptEditor($hook.prompt, placeholder: "what claude should do with the meeting")
-            }
+        SquareSettingsRow(label: "hooks", help: "prompts claude runs on a finished meeting",
+                          caption: settings.meetingHooks.isEmpty ? nil : "\(counted(settings.meetingHooks.count, "hook")) · \(settings.meetingHooks.filter(\.on).count) on") {
+            Button("open") { AppState.shared.settingsTab = .hooks }
+            .buttonStyle(SquareButtonStyle())
         }
     }
 
@@ -624,44 +601,6 @@ struct OnePageSettings: View {
     private func stopLearningVoices() {
         settings.meetingLearnVoices = false
         Task { await VoiceLibrary.shared.forgetAll() }
-    }
-
-    /// A prompt typed in over several lines, with what goes in it shown while empty.
-    private func promptEditor(_ text: Binding<String>, placeholder: String? = nil) -> some View {
-        TextEditor(text: text)
-            .font(Square.sans(13))
-            .scrollContentBackground(.hidden)
-            .padding(6)
-            .frame(minHeight: 72)
-            .overlay(alignment: .topLeading) {
-                if let placeholder, text.wrappedValue.isEmpty {
-                    Text(placeholder)
-                        .font(Square.sans(13))
-                        .foregroundStyle(DesignTokens.Colors.ink3)
-                        .padding(.horizontal, 11)
-                        .padding(.top, 6)
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
-    }
-
-    private func addHook() {
-        let name = hookName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        let hook = MeetingHook(name: name)
-        settings.meetingHooks.append(hook)
-        hookName = ""
-        hookSwitch(hook.id).wrappedValue = true
-    }
-
-    /// A hook's switch, by id: the check that runs as it goes on can end after
-    /// the list has changed.
-    private func hookSwitch(_ id: UUID) -> Binding<Bool> {
-        checkedOn(get: { settings.meetingHooks.first { $0.id == id }?.on ?? false }, set: { on in
-            guard let index = settings.meetingHooks.firstIndex(where: { $0.id == id }) else { return }
-            settings.meetingHooks[index].on = on
-        })
     }
 
     private func toggle(_ label: String, _ isOn: Binding<Bool>) -> some View {

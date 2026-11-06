@@ -36,6 +36,7 @@ final class OverlayPanel {
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
         panel.acceptsMouseMovedEvents = true
+        panel.takesKey = { [model] in model.hookTrayOpen }
         let host = NSHostingView(rootView: OverlayRoot(model: model) { [weak self] frame in
             self?.pillFrame = frame
             self?.updateClickThrough()
@@ -122,6 +123,7 @@ final class OverlayPanel {
         // Lightning on the pin, and again as the dictation ends.
         if state == .pinned || (state == .transcribing && model.isRecording) { model.struckAt = Date() }
         model.closeNow = false
+        model.hookTrayOpen = false
         model.state = state
         resample()
         model.copied = false
@@ -229,7 +231,11 @@ final class OverlayPanel {
 /// set. The cloud at the top has to sit over the menu bar, and at a side it
 /// hangs partly off the screen, so this panel takes the frame it is given.
 private final class UnconstrainedPanel: NSPanel {
+    /// Whether it may take keys now; a borderless panel otherwise never does.
+    var takesKey: @MainActor () -> Bool = { false }
+
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+    override var canBecomeKey: Bool { takesKey() }
 }
 
 private struct OverlayRoot: View {

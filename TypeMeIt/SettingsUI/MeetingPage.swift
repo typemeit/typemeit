@@ -24,6 +24,9 @@ struct MeetingPage: View {
     @State private var nameFocused = true
     /// The highlighted name in the field's list.
     @State private var pick = 0
+    /// The rail's hook tray is open, and its ticks; nil until one changes.
+    /// The hook whose result tab is showing; nil for the newest.
+    @State private var hookTab: String?
     /// The open speaker's clips, and which one is showing.
     @State private var clips: [SpeakerAssign.Clip] = []
     @State private var clip = 0
@@ -51,6 +54,8 @@ struct MeetingPage: View {
     }
 
     private static let railWidth: CGFloat = 344
+    /// How tall a hook's result grows before it scrolls inside its tab.
+    private static let hookOutputHeight: CGFloat = 420
 
     private var recording: Bool { coordinator.recording?.id == meeting.id }
     private var live: Bool { coordinator.liveIDs.contains(meeting.id) }
@@ -121,12 +126,6 @@ struct MeetingPage: View {
                 .accessibilityLabel("share")
                 .background(SharePicker(file: sharing) { sharing = nil })
                 .onDrag { store.shareFile(meeting.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
-            }
-            if meeting.isDone, !meeting.paragraphs.isEmpty, !live, coordinator.hooksReady, !coordinator.hooksToRun(on: meeting).isEmpty {
-                let running = coordinator.runningHooks[meeting.id] != nil
-                Button(running ? "running hooks…" : "run hooks") { coordinator.runHooks(meeting.id) }
-                    .buttonStyle(SquareButtonStyle(kind: .quiet))
-                    .disabled(running)
             }
             // Edits the title and every speaker's name, those the meeting gave too.
             Button {
@@ -231,8 +230,6 @@ struct MeetingPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// What the hooks run on the meeting said, oldest first, and a line
-    /// while more are running.
     /// Claude answering a question asked in this meeting, live.
     @ViewBuilder private var asking: some View {
         if let asked = coordinator.askingIn, asked.meeting == meeting.id, let runID = asked.question.runID {
@@ -249,36 +246,145 @@ struct MeetingPage: View {
         }
     }
 
+    /// Each hook's latest result, or its run now, as a tab, the newest picked
+    /// until one is clicked; when it ran and run again at the tab line's end.
+    /// A long result scrolls inside the panel.
     @ViewBuilder private var hooks: some View {
-        let current = coordinator.runningHooks[meeting.id]
-        let runs = meeting.hookRuns ?? []
-        if !runs.isEmpty || current != nil {
-            VStack(alignment: .leading, spacing: 0) {
-                SquareSubhead(text: "hooks", first: true)
-                ForEach(runs, id: \.id) { run in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 10) {
-                            Text(run.name).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink2)
-                            Text(run.ranAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(Square.mono(11))
-                                .foregroundStyle(DesignTokens.Colors.ink3)
-                        }
-                        ClaudeRunOutput(id: run.id, kept: .init(prompt: run.prompt, answer: run.output, failed: run.failed, sessionID: run.sessionID, calls: run.calls), meeting: meeting.id)
-                    }
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
+        let lines = hookLines.filter { if case .notRun = $0.status { false } else { true } }
+        if !lines.isEmpty {
+            let picked = lines.firstIndex { $0.name == hookTab } ?? lines.count - 1
+            SquareTabs(tabs: lines.map { line in
+                           let state: SquareTab.State = switch line.status {
+                           case .ran(let run): run.failed ? .failed : .idle
+                           case .running: .running
+                           case .notRun: .idle
+                           }
+                           return SquareTab(name: line.name, state: state)
+                       },
+                       picked: Binding(get: { picked }, set: { hookTab = lines[$0].name })) {
+                hookTabEnd(lines[picked])
+            } content: { index in
+                ViewThatFits(in: .vertical) {
+                    hookOutput(lines[index]).padding(14)
+                    ScrollView { hookOutput(lines[index]).padding(14) }
                 }
-                if let current {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(current.name).font(Square.mono(12, weight: .medium)).foregroundStyle(DesignTokens.Colors.ink2)
-                        ClaudeRunOutput(id: current.runID, meeting: meeting.id)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
-                }
+                .frame(maxHeight: MeetingPage.hookOutputHeight)
             }
             .padding(.top, 26)
+        }
+    }
+
+    @ViewBuilder private func hookTabEnd(_ line: HookLine) -> some View {
+        if line.run != nil {
+            HStack(spacing: 10) {
+                if let hookID = line.hookID {
+                    Button { coordinator.runHooks(meeting.id, only: [hookID]) } label: { SquareIcon("akar-arrow-cycle", size: 12) }
+                        .buttonStyle(SquareIconButtonStyle())
+                        .disabled(hooksRunning)
+                        .help("run again")
+                        .accessibilityLabel("run \(line.name) again")
+                }
+            }
+        }
+    }
+
+    private func hookOutput(_ line: HookLine) -> some View {
+        ClaudeRunOutput(id: line.id, kept: line.run.map {
+            .init(prompt: $0.prompt, answer: $0.output, failed: $0.failed, sessionID: $0.sessionID, calls: $0.calls, ranAt: $0.ranAt)
+        }, meeting: meeting.id)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A hook's latest run on the meeting, its run going on now, or a hook
+    /// that has not run on it.
+    fileprivate struct HookLine: Identifiable {
+        enum Status {
+            case ran(Meeting.HookRun)
+            case running
+            case notRun
+        }
+
+        /// The run's id, which its live output and its kept output share;
+        /// the hook's own for one not run.
+        let id: UUID
+        let name: String
+        /// The hook it ran, while it is still in settings.
+        let hookID: UUID?
+        let status: Status
+
+        var run: Meeting.HookRun? {
+            if case .ran(let run) = status { run } else { nil }
+        }
+    }
+
+    /// The finished ones by when they ran, then those running, then the
+    /// hooks that could run and have not. Runs started together share a
+    /// second, so ties go in the hooks page's order.
+    private var hookLines: [HookLine] {
+        let running = coordinator.runningHooks[meeting.id] ?? []
+        var latest: [String: Meeting.HookRun] = [:]
+        for run in meeting.hookRuns ?? [] { latest[run.name] = run }
+        let finished = latest.values
+            .filter { run in !running.contains { $0.name == run.name } }
+            .sorted { ($0.ranAt, hookPlace($0.name), $0.name) < ($1.ranAt, hookPlace($1.name), $1.name) }
+        let lines = finished.map { run in HookLine(id: run.id, name: run.name, hookID: settings.meetingHooks.first { $0.name == run.name }?.id, status: .ran(run)) }
+            + running.map { HookLine(id: $0.runID, name: $0.name, hookID: $0.hookID, status: .running) }
+        guard ClaudeRun.isAvailable else { return lines }
+        return lines + coordinator.runnableHooks
+            .filter { hook in !lines.contains { $0.name == hook.name } }
+            .map { HookLine(id: $0.id, name: $0.name, hookID: $0.id, status: .notRun) }
+    }
+
+    /// Where a hook sits on the hooks page; one since deleted goes last.
+    private func hookPlace(_ name: String) -> Int {
+        settings.meetingHooks.firstIndex { $0.name == name } ?? settings.meetingHooks.count
+    }
+
+    private var hooksRunning: Bool { coordinator.runningHooks[meeting.id] != nil }
+
+    /// The rail's hooks: on a finished meeting while Claude Code can run
+    /// them or there are results.
+    private var showsHooks: Bool {
+        meeting.isDone && !meeting.paragraphs.isEmpty && !live && (ClaudeRun.isAvailable || !hookLines.isEmpty)
+    }
+
+    /// "hooks" with ▷ for the ones run hooks would run, then each hook's line with
+    /// ▷ for that one in the hooks page's order, then the way to a new one.
+    @ViewBuilder private var railHooks: some View {
+        let runnable = Set(coordinator.runnableHooks.map(\.id))
+        let toRun = coordinator.hooksToRun(on: meeting).count
+        HStack(alignment: .lastTextBaseline) {
+            SquareSubhead(text: "hooks")
+            Spacer()
+            if coordinator.hooksReady {
+                Button { coordinator.runHooks(meeting.id) } label: { SquareRunLabel(count: toRun) }
+                    .buttonStyle(SquareButtonStyle(small: true))
+                    .disabled(toRun == 0 || hooksRunning)
+                    .help("run \(counted(toRun, "hook"))")
+                    .accessibilityLabel("run \(counted(toRun, "hook"))")
+            }
+        }
+        let lines = hookLines.enumerated()
+            .sorted { (hookPlace($0.element.name), $0.offset) < (hookPlace($1.element.name), $1.offset) }
+            .map(\.element)
+        if !lines.isEmpty {
+            VStack(spacing: 0) {
+                ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                    let hook = line.hookID.flatMap { runnable.contains($0) ? $0 : nil }
+                    HookRailLine(number: index + 1, line: line,
+                                 run: hook.map { hook in { coordinator.runHooks(meeting.id, only: [hook]) } },
+                                 enabled: !hooksRunning)
+                }
+            }
+            .padding(.top, 8)
+        }
+        if ClaudeRun.isAvailable {
+            SquareLink(title: "new hook", color: DesignTokens.Colors.ink2) {
+                AppState.shared.startNewHook = true
+                AppState.shared.settingsTab = .hooks
+            }
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
         }
     }
 
@@ -414,6 +520,7 @@ struct MeetingPage: View {
             }
             SquareSubhead(text: "processing")
             RailFacts(facts: processing)
+            if showsHooks { railHooks }
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 22)
@@ -826,4 +933,57 @@ private struct SharePicker: NSViewRepresentable {
             done()
         }
     }
+}
+
+/// A hook on the meeting's rail: its number, its name, how it went here
+/// (a spinner while it runs) and ▷ to run it alone. The name opens the
+/// hook on the hooks tab.
+private struct HookRailLine: View {
+    let number: Int
+    let line: MeetingPage.HookLine
+    /// nil for a hook no longer in settings, which can't run again.
+    let run: (() -> Void)?
+    let enabled: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SquareRunNumber(number: number)
+            let notRun = if case .notRun = line.status { true } else { false }
+            Button(action: edit) {
+                Text(line.name).font(Square.mono(12)).foregroundStyle(notRun ? DesignTokens.Colors.ink2 : DesignTokens.Colors.ink)
+                    .lineLimit(1).centredLetters(line.name, size: 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(line.hookID == nil)
+            .help("edit \(line.name)")
+            switch line.status {
+            case .running:
+                SquareSpinner().frame(width: 12, height: 12)
+            case .ran(let run):
+                let state = run.failed ? "failed" : "done"
+                Text(state).font(Square.mono(11)).foregroundStyle(run.failed ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
+                    .centredLetters(state, size: 11)
+            case .notRun:
+                Text("not run").font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink3).centredLetters("not run", size: 11)
+            }
+            if let run {
+                Button(action: run) { SquareIcon("akar-play", size: 9) }
+                    .buttonStyle(SquareIconButtonStyle(side: 22))
+                    .disabled(!enabled)
+                    .help("run \(line.name)")
+                    .accessibilityLabel("run \(line.name)")
+            } else {
+                Color.clear.frame(width: 22, height: 22)
+            }
+        }
+        .frame(height: 28)
+    }
+    private func edit() {
+        guard let hook = line.hookID else { return }
+        AppState.shared.editHook = hook
+        AppState.shared.settingsTab = .hooks
+    }
+
 }
