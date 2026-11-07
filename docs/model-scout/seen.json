@@ -1142,6 +1142,61 @@
       "date": "2026-11-06",
       "role": "none",
       "why": "legal citation checker, not a role we ship"
+    },
+    {
+      "id": "notaneimu/fast-b3-speaker-student-onnx",
+      "date": "2026-11-07",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "kkk4oru/nemotron-3.5-speaker-encoder-gguf",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "raymondchins/qwen3-asr-0.6b-coreml",
+      "date": "2026-11-07",
+      "role": "speech recognition"
+    },
+    {
+      "id": "jburtoft/Qwen3-ASR-1.7B-DFlash",
+      "date": "2026-11-07",
+      "role": "speech recognition"
+    },
+    {
+      "id": "okdohyuk/nemotron-3-diarization-coreml",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "okdohyuk/speaker-diarization-coreml",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "ancient-yearner/Nemotron-3-Diarization-GGUF",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "manateelazycat/Nemotron-3-Diarization-AIPod-HF",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "keithics/speaker-diarization-coreml",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "arXiv 2611.02709 S2S refinement for EEND-VC (DiariZen)",
+      "date": "2026-11-07",
+      "role": "diarization"
+    },
+    {
+      "id": "GigaSpeech 3 (Arabic)",
+      "date": "2026-11-07",
+      "role": "speech recognition"
     }
   ]
 }
