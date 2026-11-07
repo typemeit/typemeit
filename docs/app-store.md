@@ -33,9 +33,12 @@ key.
 
 ## Not in place
 
-- Nothing on the record. Version 1.0 has the listing, screenshots, review
-  contact and notes, privacy answers (nothing collected) and age rating
-  (4+), and build 202609201117 is processed. It has not been submitted.
+- Nothing on sale. Every `v*` tag since v1.1.1 uploaded its store build, and
+  the listing step then failed: through v1.4.0 on the API key's role (fixed
+  with the secrets of 24 October 2026), and v1.11.0 on 6 November 2026
+  because App Store Connect refuses ⌥ in the promotional text. The listing
+  spells the key "option" since then. Submission of 1.11.0 (build
+  202611062343) goes through `submit-store` below.
 
 ## Releasing
 
@@ -48,6 +51,15 @@ named by the tag with `fastlane mac listing version:X`, and submits it with
 `fastlane mac submit version:X build:N`, N being the minute of the run. The
 release is manual: once approved, the version is released by hand in App
 Store Connect, so the store and the DMG can go out together.
+
+When `release-store` fails after the upload, `submit-store`
+(`.github/workflows/submit-store.yml`, run by hand from the Actions tab)
+redoes the listing and the submission for a version and build number
+already on App Store Connect, with no rebuild. The two numbers are in the
+failed run's log as `MARKETING_VERSION` and `BUILD_NUMBER`.
+
+Listing text is plain text: App Store Connect rejects the ⌥ symbol in the
+promotional text, so the listing writes "option space".
 
 The screenshots' inputs are committed (the Slack and Claude captures, the
 app tab captures); only the frames are rendered on the runner. Retaking a
