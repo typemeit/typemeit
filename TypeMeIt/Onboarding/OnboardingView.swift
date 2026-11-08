@@ -56,7 +56,8 @@ struct OnboardingView: View {
                 .padding(.top, 24)
                 .id(step)
                 .transition(.opacity)
-            Spacer(minLength: 0)
+            // The footer's gap from the content; a tall step's image shrinks to keep it.
+            Spacer(minLength: 28)
             HStack(spacing: 8) {
                 StepDots(current: position, count: Self.steps.count)
                 Spacer()
@@ -84,7 +85,7 @@ struct OnboardingView: View {
         case .model: "speech model"
         case .microphone: "microphone"
         case .accessibility: "accessibility"
-        case .globeKey: "the 🌐 key"
+        case .globeKey: "the fn key"
         case .cleanup: "clean-up"
         case .tryIt: "try it"
         }
@@ -108,7 +109,7 @@ struct OnboardingView: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .model:
-            SquareRows { ModelDownloadRows() }
+            ModelDownloadRows()
         case .microphone where Sandbox.isStoreBuild:
             storePermission("microphone", granted: micGranted, refused: micStatus == .denied, settings: SecureInput.microphoneSettingsURL)
         case .accessibility where Sandbox.isStoreBuild:
@@ -142,8 +143,7 @@ struct OnboardingView: View {
                     }
                 }
             }
-            Image("fn-key-setting")
-                .resizable().aspectRatio(contentMode: .fit)
+            FnKeyAnimation()
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.md))
                 .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
