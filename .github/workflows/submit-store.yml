@@ -1,0 +1,52 @@
+name: submit-store
+
+# The second half of release-store on its own: put the listing on a store
+# version and submit an already uploaded build for review. For when the
+# `v*` release uploaded the build and then failed on the listing (a
+# character App Store Connect refuses, say), so the fix does not need a new
+# tag and a 20-minute rebuild. The version and build are the ones the
+# failed run printed: MARKETING_VERSION and BUILD_NUMBER.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Store version, e.g. 1.11.0"
+        required: true
+      build:
+        description: "Uploaded build number, e.g. 202611062343"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  submit-store:
+    runs-on: macos-26
+    environment: production
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: brew install fastlane
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+      - name: Render the screenshots
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          "$RUNNER_TEMP/store-venv/bin/pip" install --quiet pillow numpy
+          "$RUNNER_TEMP/store-venv/bin/python" Scripts/store/build.py
+      - name: Put the listing on the version and submit it
+        env:
+          MARKETING_VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ inputs.build }}
+        run: |
+          fastlane mac listing version:"$MARKETING_VERSION"
+          fastlane mac submit version:"$MARKETING_VERSION" build:"$BUILD_NUMBER"
