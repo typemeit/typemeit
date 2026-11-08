@@ -380,6 +380,12 @@ private struct MeetingRow: View {
     @State private var store = MeetingStore.shared
     @State private var diarizer = DiarizerModelStore.shared
     @State private var hovering = false
+    /// The fingerprint folded to the list's size, worked out again only
+    /// when the meeting changes.
+    @State private var square: MeetingFingerprint?
+
+    /// A list square's cells are this many points, so it fits the row.
+    private static let squareCell: CGFloat = 2
 
     var body: some View {
         HStack(spacing: SquareListColumns.edge) {
@@ -395,6 +401,8 @@ private struct MeetingRow: View {
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .frame(width: SquareListColumns.time, alignment: .leading)
+                SquareFingerprint(content: .of(meeting, square, coordinator: coordinator),
+                                  side: MeetingFingerprint.side / MeetingFingerprint.fold, cell: MeetingRow.squareCell)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(meeting.title)
                         .font(Square.sans(13.5))
@@ -428,6 +436,7 @@ private struct MeetingRow: View {
         .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
         .overlay(alignment: .top) { SquareRule() }
         .onHover { hovering = $0 }
+        .onChange(of: meeting, initial: true) { _, changed in square = changed.fingerprint?.folded() }
     }
 
     /// Everyone else with a name first, then you.
@@ -447,10 +456,7 @@ private struct MeetingRow: View {
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
                 // A pause takes effect between chunks, so only while there are chunks left.
-                if case .transcribing = run.progress {
-                    SquareBar(fraction: run.fraction)
-                    if !stopping { stopButton }
-                }
+                if case .transcribing = run.progress, !stopping { stopButton }
             }
         case .queued:
             HStack(spacing: 10) {
