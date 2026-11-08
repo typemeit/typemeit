@@ -85,7 +85,7 @@ struct OnboardingView: View {
         case .model: "speech model"
         case .microphone: "microphone"
         case .accessibility: "accessibility"
-        case .globeKey: "the fn key"
+        case .globeKey: "the \(Shortcuts.fnKeyName) key"
         case .cleanup: "clean-up"
         case .tryIt: "try it"
         }
@@ -93,14 +93,14 @@ struct OnboardingView: View {
 
     private var body_: String {
         switch step {
-        case .model: "hold \(Sandbox.watchesFn ? "the fn key" : Shortcuts.holdKeyName), speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
+        case .model: "hold \(Shortcuts.holdKeyName), speak, let go. a speech model on this mac transcribes your words, apple intelligence tidies them up, and the app types them where your cursor is. nothing leaves your computer."
         case .microphone:
             Sandbox.isStoreBuild ? "type me it listens only while you dictate. the audio stays on this mac." : "type me it needs the microphone."
         case .accessibility:
             Sandbox.watchesFn
-                ? "lets type me it see fn from any app, type where your cursor is, and learn when you correct a word."
+                ? "lets type me it see the \(Shortcuts.fnKeyName) key from any app, type where your cursor is, and learn when you correct a word."
                 : "lets type me it paste your words where your cursor is."
-        case .globeKey: "system settings › keyboard › press 🌐 key to → do nothing."
+        case .globeKey: "system settings › keyboard › press \(Shortcuts.fnKeyName) key to → do nothing."
         case .cleanup: "apple intelligence tidies your words on this mac."
         case .tryIt: "hold \(Shortcuts.holdKeyName) and say something. let go when you are done."
         }
@@ -128,7 +128,7 @@ struct OnboardingView: View {
             }, missing: { !AXIsProcessTrusted() }, settings: SecureInput.accessibilitySettingsURL)
         case .globeKey:
             SquareRows {
-                SquareSettingsRow(label: "press 🌐 key to", help: fnNeedsSettings && !fnOK ? "keyboard settings · the row below" : nil) {
+                SquareSettingsRow(label: "press \(Shortcuts.fnKeyName) key to", help: fnNeedsSettings && !fnOK ? "keyboard settings · the row below" : nil) {
                     if fnOK {
                         SquareStatus("do nothing", done: true)
                     } else if fnNeedsSettings {
