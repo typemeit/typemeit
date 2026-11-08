@@ -1197,6 +1197,78 @@
       "id": "GigaSpeech 3 (Arabic)",
       "date": "2026-11-07",
       "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio v0.18.3",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "released 2026-11-07; no new ASR or diarizer models: Kokoro TTS, streaming seam and vocabulary-boost fixes"
+    },
+    {
+      "id": "litert-community/Phonon-2.5-English",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "LiteRT (Android) conversion of Phonon-2.5-English, seen 2026-10-24; not Core ML, MLX, GGUF or ONNX"
+    },
+    {
+      "id": "litert-community/Phonon-2",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "LiteRT (Android) conversion of Phonon-2; not an Apple Silicon runtime"
+    },
+    {
+      "id": "BuilderHelm/Parakeet-Unified-EN-0.6B-CoreML",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "Core ML port of parakeet-unified-en-0.6b, already in model-trials.md"
+    },
+    {
+      "id": "smoothoperator3/parakeet-unified-en-0.6b-gguf",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "GGUF port of parakeet-unified-en-0.6b, already in model-trials.md"
+    },
+    {
+      "id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-redux",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "sherpa-onnx port of parakeet-redux, seen 2026-10-14"
+    },
+    {
+      "id": "johnpattern/safenotes-parakeet-ultra-ov",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "OpenVINO port of Parakeet Ultra, which we ship"
+    },
+    {
+      "id": "DictionLabs/parakeet-tdt-0.6b-v3-onnx",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "ONNX port of parakeet-tdt-0.6b-v3, seen 2026-10-14"
+    },
+    {
+      "id": "42ailab/Qwen3-ASR-1.7B-GGUF",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "GGUF port of Qwen3-ASR-1.7B, seen 2026-10-13"
+    },
+    {
+      "id": "raymondchins/qwen3-asr-1.7b-coreml",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "Core ML port of Qwen3-ASR-1.7B, seen 2026-10-13"
+    },
+    {
+      "id": "erickvs/whisper-tiny.en-hand-edited",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "whisper-tiny.en with silence hallucinations edited out; no WER against Parakeet"
+    },
+    {
+      "id": "funnelnenad/pip-voice-cleanup",
+      "date": "2026-11-08",
+      "role": "clean-up",
+      "why": "Qwen3-0.6B LoRA for dictation clean-up; no published score"
     }
   ]
 }
