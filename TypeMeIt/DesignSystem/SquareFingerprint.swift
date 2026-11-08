@@ -56,7 +56,7 @@ struct SquareFingerprint: View {
         switch content {
         case .recording: "recording"
         case .transcribing(let fraction): "transcribing \(Int((min(max(fraction, 0), 1) * 100).rounded()))%"
-        case .failed: "failed"
+        case .failed: "transcription failed"
         case .done(let fingerprint): fingerprint.spokenShares
         }
     }

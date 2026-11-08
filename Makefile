@@ -1,6 +1,8 @@
 # The speech model. The app itself builds with xcodegen and xcodebuild -- see
-# CLAUDE.md -- and nothing here touches it.
+# CLAUDE.md.
 #
+#   make fresh-install      build the dev app and run it as a fresh install, to test onboarding
+#   make fresh-install-restore  quit it and put the dev app's own preferences back
 #   make asr-model          fetch the speech model's files and tar them
 #   make asr-model-sums     print the ModelStore.swift constants for the tar
 #   make asr-model-verify   check the tar against what ModelStore.swift pins
@@ -8,11 +10,9 @@
 #   make asr-model-verify-url   re-download the published tar and hash it
 #   make eval               score the clean-up prompt on Apple Intelligence
 #   make meeting-eval       score meeting summaries and titles on Apple Intelligence
-#   make folder-eval        score the meeting folder pick on Apple Intelligence
 #   make asr-eval ARGS=...  score speech models and diarizers against AssemblyAI (Scripts/asr-eval/README.md)
 #   make asr-eval-test      unit tests for the asr-eval scoring
 #   make model-trials       build docs/model-trials.md and typeme.it/models from docs/model-trials.json
-#   make globe-key-image    rebuild the onboarding 🌐 key image from design/onboarding
 #   make diarizer-model     fetch both speaker models' files and tar them
 #   make diarizer-model-sums    print the DiarizerModelStore.swift constants for the tar
 #   make diarizer-model-verify  check the tar against what DiarizerModelStore.swift pins
@@ -54,11 +54,21 @@ DIARIZER_PINNED_SHA := $(shell sed -n 's/.*let sha256 = "\([0-9a-f]*\)".*/\1/p' 
 DIARIZER_PINNED_BYTES := $(shell sed -n 's/.*let expectedBytes: Int64 = \([0-9_]*\).*/\1/p' $(DIARIZER_STORE) | tr -d _)
 
 .DEFAULT_GOAL := help
-.PHONY: help asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval folder-eval asr-eval asr-eval-test model-trials bench \
+.PHONY: help fresh-install fresh-install-restore asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval asr-eval asr-eval-test model-trials bench \
 	diarizer-model diarizer-model-sums diarizer-model-verify diarizer-model-publish diarizer-model-verify-url
 
 help:
 	@sed -n 's/^#   //p' Makefile
+
+# Empty data dir (the speech model downloads again) and empty dev preferences.
+# SKIP_BUILD=1 launches the last build; STEP=globeKey opens onboarding on that
+# step; PERMISSIONS=reset revokes the dev
+# app's grants too.
+fresh-install:
+	Scripts/fresh-install.sh
+
+fresh-install-restore:
+	Scripts/fresh-install.sh restore
 
 # A file target, so a second run does not refetch several hundred MB.
 $(ASR_TAR):
@@ -110,11 +120,6 @@ eval:
 meeting-eval:
 	Scripts/meeting-eval/run.sh
 
-# The folder a new meeting is filed in, on written test folders and meetings,
-# through the app's own MeetingFolderPick. Needs a Mac with Apple Intelligence on.
-folder-eval:
-	Scripts/folder-eval/run.sh
-
 # Speech models and diarizers scored against an AssemblyAI reference whose
 # disagreements were hand-checked, e.g. make asr-eval ARGS="run shipped".
 asr-eval:
@@ -127,12 +132,6 @@ asr-eval-test:
 # the web page from it.
 model-trials:
 	python3 Scripts/model-trials.py
-
-# The onboarding image for the 🌐 key step, light and dark, from the
-# screenshots in design/onboarding.
-.PHONY: globe-key-image
-globe-key-image:
-	swift Scripts/globe-key-image.swift
 
 $(DIARIZER_TAR):
 	Scripts/diarizer-model.sh $(DIARIZER_REVISION) $(NEMOTRON_DIARIZER_REVISION) build/diarizer

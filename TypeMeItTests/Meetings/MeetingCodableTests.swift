@@ -43,6 +43,15 @@ struct MeetingCodableTests {
         #expect(Meeting.decode(withExtraKey) == MeetingFixtures.example)
     }
 
+    @Test func aMeetingSavedInAFolderStillDecodes() throws {
+        let data = try MeetingFixtures.example.encoded()
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["folder"] = "standups"
+        object["folderSuggestion"] = "planning"
+        let filed = try JSONSerialization.data(withJSONObject: object)
+        #expect(Meeting.decode(filed) == MeetingFixtures.example)
+    }
+
     @Test func decodeReturnsNilForANewerSchema() throws {
         let data = try MeetingFixtures.example.encoded()
         var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
