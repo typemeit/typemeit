@@ -25,7 +25,7 @@ enum ClaudeModels {
         // Bare: no hooks, plugins or MCP servers are started just to list models.
         guard let claude = ClaudeRun.command(["-p", "--bare", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"],
                                              timeoutSeconds: timeoutSeconds) else { return [] }
-        claude.input.write(Data((request + "\n").utf8))
+        try? claude.input.write(contentsOf: Data((request + "\n").utf8))
         defer {
             try? claude.input.close()
             if claude.process.isRunning { claude.process.terminate() }

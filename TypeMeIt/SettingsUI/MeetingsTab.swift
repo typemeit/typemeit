@@ -31,9 +31,6 @@ struct MeetingsTab: View {
     @State private var open: UUID?
     /// The page opens on its first unknown speaker's field.
     @State private var nameOnOpen = false
-    /// Re-reads the clock for the recording band's time.
-    private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    @State private var now = Date()
 
     var body: some View {
         Group {
@@ -83,7 +80,7 @@ struct MeetingsTab: View {
             SquarePageHeader(title: "meetings", count: counted(store.meetings.count, "meeting"), status: status,
                              linkTitle: "meeting settings", onLink: showSettings)
             toolbar(shown: rows.count)
-            if let live = coordinator.recording { liveBand(live) }
+            if let live = coordinator.recording { MeetingsLiveBand(live: live) }
             modelStatus
             if store.meetings.isEmpty {
                 message { Text("nothing yet") }
@@ -126,8 +123,6 @@ struct MeetingsTab: View {
                 }
             }
         }
-        // Only while the band shows: a tick redraws the whole list.
-        .onReceive(clock) { if coordinator.recording != nil { now = $0 } }
     }
 
     private func message(@ViewBuilder _ text: () -> some View) -> some View {
@@ -186,20 +181,6 @@ struct MeetingsTab: View {
         .padding(.top, 16)
         .padding(.horizontal, SquareListColumns.page)
         .padding(.bottom, 14)
-    }
-
-    /// What records now: where, how loud each side is, the time so far, and
-    /// stop. It names no one.
-    private func liveBand(_ live: MeetingCoordinator.Live) -> some View {
-        SquareLiveBand(place: live.kind == .room ? "the room" : store.meeting(live.id)?.app?.name.lowercased() ?? "a call",
-                       time: TranscriptRender.timestamp(ms: Int(max(0, now.timeIntervalSince(live.started)) * 1000)),
-                       you: Double(coordinator.levels.mic),
-                       call: coordinator.levels.others.map(Double.init),
-                       stop: { coordinator.stopMeeting() },
-                       transcribeNow: { coordinator.transcribeNow() },
-                       transcribeBusy: coordinator.snapshotting)
-            .padding(.horizontal, SquareListColumns.page)
-            .padding(.bottom, 12)
     }
 
     /// The speaker model, while it downloads or when it could not.
@@ -355,6 +336,29 @@ enum MeetingColumns {
             Text("where").frame(width: place, alignment: .leading)
             Text("length").frame(width: length, alignment: .trailing)
         }
+    }
+}
+
+/// What records now: where, how loud each side is, the time so far, and
+/// stop. It names no one. Its own view, so the levels, which change with
+/// every audio buffer, and the second's tick redraw only the band.
+private struct MeetingsLiveBand: View {
+    let live: MeetingCoordinator.Live
+    @State private var coordinator = MeetingCoordinator.shared
+    @State private var store = MeetingStore.shared
+
+    var body: some View {
+        TimelineView(.periodic(from: live.started, by: 1)) { timeline in
+            SquareLiveBand(place: live.kind == .room ? "the room" : store.meeting(live.id)?.app?.name.lowercased() ?? "a call",
+                           time: TranscriptRender.timestamp(ms: Int(max(0, timeline.date.timeIntervalSince(live.started)) * 1000)),
+                           you: Double(coordinator.levels.mic),
+                           call: coordinator.levels.others.map(Double.init),
+                           stop: { coordinator.stopMeeting() },
+                           transcribeNow: { coordinator.transcribeNow() },
+                           transcribeBusy: coordinator.snapshotting)
+        }
+        .padding(.horizontal, SquareListColumns.page)
+        .padding(.bottom, 12)
     }
 }
 

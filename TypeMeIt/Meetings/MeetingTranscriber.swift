@@ -110,6 +110,7 @@ enum MeetingTranscriber {
                 }
             }
 
+            if Task.isCancelled { throw Failure.cancelled }
             progress(.findingSpeakers)
             // The far-end people the window showed talking (8.3): how many
             // the diarizer is told, and the name a one-voice far end takes.
@@ -131,7 +132,9 @@ enum MeetingTranscriber {
             let previousSpeakers = meeting.speakers
             let speakersBegan = ContinuousClock.now
             let segments = await speakers(of: &meeting, in: folder, count: count)
+            if Task.isCancelled { throw Failure.cancelled }
             let room = await roomVoices(of: meeting, in: folder, silent: silent, farEnd: farEndWords, farEndVoices: max(talkers.count, 1), micEnvelope: rms[.mic])
+            if Task.isCancelled { throw Failure.cancelled }
             meeting.transcription.speakersMs = (ContinuousClock.now - speakersBegan).milliseconds
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
             // New paragraphs carry no merges, so nothing is left to split.
@@ -172,19 +175,21 @@ enum MeetingTranscriber {
             let spoken = Set(meeting.paragraphs.map(\.speaker))
             meeting.speakers.removeAll { !$0.isYou && !spoken.contains($0.id) }
             meeting.transcription.asr = ModelStore.version
-            for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             await save(meeting)
+            if Task.isCancelled { throw Failure.cancelled }
             // Before the transcode, while every track is still here even with
             // the audio setting off (8.7).
             if await MainActor.run(body: { Settings.shared.meetingLearnVoices }) {
                 await VoiceLibrary.shared.learn(meeting, folder: folder)
             }
+            if Task.isCancelled { throw Failure.cancelled }
             if !meeting.paragraphs.isEmpty {
                 progress(.summarising)
                 let summaryBegan = ContinuousClock.now
                 meeting.summary = await MeetingSummary.summarise(meeting.turns)
                 meeting.transcription.summaryMs = (ContinuousClock.now - summaryBegan).milliseconds
             }
+            if Task.isCancelled { throw Failure.cancelled }
             // The title ladder (9.2): what it was about, then who was there, then the app.
             if meeting.titleSource == .app, !meeting.paragraphs.isEmpty, let title = await MeetingSummary.title(summary: meeting.summary, turns: meeting.turns, callName: meeting.names?.name) {
                 meeting.title = title
@@ -193,7 +198,10 @@ enum MeetingTranscriber {
                 meeting.title = title
                 meeting.titleSource = .roster
             }
+            if Task.isCancelled { throw Failure.cancelled }
             meeting = await transcode(meeting, in: folder)
+            // A pass cancelled before here runs again from these words.
+            for track in meeting.tracks { try? FileManager.default.removeItem(at: folder.appendingPathComponent("words-\(track.role.rawValue).json")) }
             // Done last: the store publishes any done meeting it sees, and the
             // folder must not move while the transcode is still writing into it.
             meeting.transcription.state = .done
