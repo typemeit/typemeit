@@ -249,9 +249,7 @@ enum MeetingSummary {
         }
     }
 
-    /// One guided call on a session of its own, sampled greedily, so the
-    /// same prompt gets the same answer. Shared by the meeting model calls.
-    static func guided<Content: Generable>(_ content: Content.Type, _ instructions: String, to prompt: String) async throws -> Content {
+    private static func guided<Content: Generable>(_ content: Content.Type, _ instructions: String, to prompt: String) async throws -> Content {
         try await LanguageModelSession(instructions: instructions)
             .respond(to: prompt, generating: content, options: GenerationOptions(sampling: .greedy)).content
     }
