@@ -76,7 +76,11 @@ final class OverlayModel {
 
     /// Whether `toast`'s countdown runs: it is the one on screen and the
     /// pointer is not resting on it.
-    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused }
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !editingQuestion }
+    /// The offered question as edited in the pill; nil while untouched.
+    var questionDraft: String?
+    /// The offered question's field has the keyboard, which holds its countdown.
+    var editingQuestion = false
     /// Whether the answer pill shows the answer or only its question.
     var answerExpanded = true
     /// When the cloud last arrived. Each dictation gets a new one, so the

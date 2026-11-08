@@ -106,25 +106,38 @@ extension View {
     }
 
     /// The one shadow, for what floats: the prompt, menus and popovers.
-    func squareLift() -> some View { modifier(SquareLift()) }
+    /// `overApps` for a part floating over other apps' windows, often white
+    /// ones: the light lift in both appearances, since the dark one smears
+    /// round a white slab, and in dark mode an edge so the slab still ends
+    /// on a white page.
+    func squareLift(overApps: Bool = false) -> some View { modifier(SquareLift(overApps: overApps)) }
 }
 
 /// Every part that floats is a rectangle, so the shadow is cast by a
 /// rectangle behind it, one per layer of `shadow.lift`.
 private struct SquareLift: ViewModifier {
+    let overApps: Bool
     @Environment(\.colorScheme) private var scheme
+    /// The edge round a white slab over other apps, faint enough to vanish on a dark page.
+    private static let edgeOpacity = 0.12
 
     func body(content: Content) -> some View {
-        let layers = scheme == .dark ? DesignTokens.Shadow.liftDark : DesignTokens.Shadow.liftLight
-        content.background {
-            ZStack {
-                ForEach(layers.indices, id: \.self) { i in
-                    Rectangle()
-                        .fill(DesignTokens.Colors.paper)
-                        .shadow(color: layers[i].color, radius: layers[i].radius, x: layers[i].x, y: layers[i].y)
+        let layers = scheme == .dark && !overApps ? DesignTokens.Shadow.liftDark : DesignTokens.Shadow.liftLight
+        content
+            .overlay {
+                if overApps, scheme == .dark {
+                    Rectangle().strokeBorder(DesignTokens.Colors.paper.opacity(Self.edgeOpacity), lineWidth: DesignTokens.hairline)
                 }
             }
-        }
+            .background {
+                ZStack {
+                    ForEach(layers.indices, id: \.self) { i in
+                        Rectangle()
+                            .fill(DesignTokens.Colors.paper)
+                            .shadow(color: layers[i].color, radius: layers[i].radius, x: layers[i].x, y: layers[i].y)
+                    }
+                }
+            }
     }
 }
 
