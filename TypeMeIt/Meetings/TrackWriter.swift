@@ -69,7 +69,13 @@ final class TrackWriter: @unchecked Sendable {
     private let queue = DispatchQueue(label: "it.typeme.typemeit.meeting-track-writer")
     private let handle: FileHandle
     private let framesPerSecond = Int(AudioCapture.targetFormat.sampleRate)
+    /// Called once, on the writer's queue, when a write fails; nothing more
+    /// is written after it.
+    private let onWriteFailed: (@Sendable (Error) -> Void)?
 
+    /// False once `finish` closed the handle or a write failed, so a late
+    /// append never writes to a closed or broken file.
+    private var acceptsWrites = true
     private var framesWrittenStorage = 0
     /// One peak per second of audio written, at most `Fixed.meetingSilentSeconds`
     /// long, oldest first.
@@ -79,7 +85,8 @@ final class TrackWriter: @unchecked Sendable {
     /// The loudest sample of the whole track.
     private var overallPeak: Float = 0
 
-    init(url: URL) throws {
+    init(url: URL, onWriteFailed: (@Sendable (Error) -> Void)? = nil) throws {
+        self.onWriteFailed = onWriteFailed
         FileManager.default.createFile(atPath: url.path, contents: nil)
         handle = try FileHandle(forWritingTo: url)
 
@@ -99,7 +106,7 @@ final class TrackWriter: @unchecked Sendable {
         header.appendASCII("data")
         header.appendBE(Int64(-1)) // unknown size: runs to end of file
         header.appendBE(UInt32(0)) // edit count
-        handle.write(header)
+        try handle.write(contentsOf: header)
     }
 
     /// Clamps to ±1, converts to Int16 little-endian, and appends. Runs on
@@ -113,9 +120,11 @@ final class TrackWriter: @unchecked Sendable {
         queue.async { [self] in appendOnQueue([Float](repeating: 0, count: frames)) }
     }
 
-    /// Drains the queue and closes the handle. `peak` is the whole track's.
+    /// Drains the queue and closes the handle; later appends are dropped.
+    /// `peak` is the whole track's.
     func finish() -> (frames: Int, peak: Float) {
         queue.sync {
+            acceptsWrites = false
             try? handle.close()
             return (framesWrittenStorage, overallPeak)
         }
@@ -132,7 +141,7 @@ final class TrackWriter: @unchecked Sendable {
     }
 
     private func appendOnQueue(_ pcm: [Float]) {
-        guard !pcm.isEmpty else { return }
+        guard !pcm.isEmpty, acceptsWrites else { return }
         var data = Data(capacity: pcm.count * MemoryLayout<Int16>.size)
         for sample in pcm {
             let clamped = max(-1, min(1, sample))
@@ -141,7 +150,15 @@ final class TrackWriter: @unchecked Sendable {
             withUnsafeBytes(of: quantised.littleEndian) { data.append(contentsOf: $0) }
             noteSecondPeak(abs(clamped))
         }
-        handle.write(data)
+        do {
+            try handle.write(contentsOf: data)
+        } catch {
+            acceptsWrites = false
+            Log.meetings.error("Meeting track write failed: \(error.localizedDescription)")
+            DebugLog.write("Meeting track write failed: \(error.localizedDescription)")
+            onWriteFailed?(error)
+            return
+        }
         framesWrittenStorage += pcm.count
     }
 

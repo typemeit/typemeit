@@ -32,15 +32,14 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
 
     /// True once every track has stayed at the floor for
     /// `Fixed.meetingSilentSeconds`; false when signal returns.
-    var onSilenceChanged: (@Sendable (Bool) -> Void)?
+    private let onSilenceChanged: @Sendable (Bool) -> Void
     /// Every drain, for the tab's meters.
-    var onLevels: (@Sendable (_ mic: Float, _ others: Float?) -> Void)?
-    /// Every drain while not paused, the same 16 kHz audio the writers get.
-    /// Runs on the drain queue, so it must hand the audio off and return.
-    var onAudio: (@Sendable (_ mic: [Float], _ others: [Float]?) -> Void)?
+    private let onLevels: @Sendable (_ mic: Float, _ others: Float?) -> Void
     /// The staging volume fell under `Fixed.meetingMinimumFreeBytes`.
-    var onDiskFull: (@Sendable () -> Void)?
-    var onFailed: (@Sendable (Error) -> Void)?
+    private let onDiskFull: @Sendable () -> Void
+    /// The capture gave up, or a track's file could not be written; the
+    /// latter arrives on that writer's queue.
+    private let onFailed: @Sendable (Error) -> Void
 
     private let lock = NSLock()
     private var capture: MeetingCapture?
@@ -64,10 +63,20 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
 
     /// `preRoll` is the live capture and the audio held since the call
     /// became a candidate (D20): the capture carries on into the tracks with
-    /// no gap at the seam, and the held audio is their first frames.
-    init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device, preRoll: (capture: MeetingCapture, held: PreRoll)? = nil) throws {
+    /// no gap at the seam, and the held audio is their first frames. The
+    /// callbacks are set before the capture is attached, since a pre-roll's
+    /// drains reach them as soon as `handOver` returns.
+    init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device, preRoll: (capture: MeetingCapture, held: PreRoll)? = nil,
+         onLevels: @escaping @Sendable (_ mic: Float, _ others: Float?) -> Void,
+         onSilenceChanged: @escaping @Sendable (Bool) -> Void,
+         onDiskFull: @escaping @Sendable () -> Void,
+         onFailed: @escaping @Sendable (Error) -> Void) throws {
         self.kind = kind
         self.folder = folder
+        self.onLevels = onLevels
+        self.onSilenceChanged = onSilenceChanged
+        self.onDiskFull = onDiskFull
+        self.onFailed = onFailed
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -81,7 +90,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         case .call(let o, let p): roles = [.mic, .others]; owner = o; processes = p
         case .room: roles = [.room]; owner = nil; processes = nil
         }
-        writers = try roles.map { ($0, try TrackWriter(url: folder.appendingPathComponent("\($0.rawValue).caf"))) }
+        writers = try roles.map { ($0, try TrackWriter(url: folder.appendingPathComponent("\($0.rawValue).caf"), onWriteFailed: onFailed)) }
         let speakers: [Meeting.Speaker] = owner == nil
             ? [Meeting.Speaker(id: Meeting.Speaker.room, name: "Room", isYou: false, talkMs: 0)]
             : [Meeting.Speaker(id: Meeting.Speaker.you, name: "You", isYou: true, talkMs: 0), Meeting.Speaker(id: Meeting.Speaker.them, name: Meeting.Speaker.themName, isYou: false, talkMs: 0)]
@@ -180,8 +189,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             }
             if isPaused { writer.appendSilence(frames: pcm.count) } else { writer.append(pcm) }
         }
-        onLevels?(AudioCapture.level(forPeak: AudioCapture.peak(mic)), others.map { AudioCapture.level(forPeak: AudioCapture.peak($0)) })
-        if !isPaused { onAudio?(mic, others) }
+        onLevels(AudioCapture.level(forPeak: AudioCapture.peak(mic)), others.map { AudioCapture.level(forPeak: AudioCapture.peak($0)) })
         checkSilence()
         checkDisk()
     }
@@ -189,6 +197,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     func captureGap(_ capture: MeetingCapture, frames: Int) {
         guard frames > 0 else { return }
         lock.lock()
+        guard !stopped else { lock.unlock(); return }
         let ws = writers
         let start = ws.first?.writer.framesWritten ?? 0
         gaps.append(Meeting.Span(startMs: start / Meeting.framesPerMs, endMs: (start + frames) / Meeting.framesPerMs))
@@ -200,7 +209,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     func captureFailed(_ capture: MeetingCapture, error: Error) {
         Log.meetings.error("Meeting capture failed: \(error.localizedDescription)")
         DebugLog.write("Meeting capture failed: \(error.localizedDescription)")
-        onFailed?(error)
+        onFailed(error)
     }
 
     /// Every track at the floor for the whole window means the tap is
@@ -220,7 +229,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         lock.unlock()
         if changed {
             DebugLog.write("Meeting tracks \(allAtFloor ? "at the floor for \(Fixed.meetingSilentSeconds) s" : "have signal again")")
-            onSilenceChanged?(allAtFloor)
+            onSilenceChanged(allAtFloor)
         }
     }
 
@@ -232,7 +241,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         guard let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
               let free = values.volumeAvailableCapacityForImportantUsage, free < Fixed.meetingMinimumFreeBytes else { return }
         Log.meetings.error("Staging volume has \(free) bytes free; stopping the meeting")
-        onDiskFull?()
+        onDiskFull()
     }
 
     // MARK: Snapshot
@@ -296,6 +305,8 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             paused = false
         }
         let ws = writers
+        // `captureGap` adds nothing once `stopped` is set, so this copy is final.
+        let recordedGaps = gaps
         if let id = sleepAssertion { IOPMAssertionRelease(id); sleepAssertion = nil }
         lock.unlock()
         cap?.stop()
@@ -307,7 +318,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         var peaks: [Meeting.Track.Role: Float] = [:]
         for (role, writer) in ws {
             let finished = writer.finish()
-            tracks.append(Meeting.Track(role: role, file: "\(role.rawValue).caf", frames: finished.frames, gaps: gaps, peak: finished.peak))
+            tracks.append(Meeting.Track(role: role, file: "\(role.rawValue).caf", frames: finished.frames, gaps: recordedGaps, peak: finished.peak))
             peaks[role] = finished.peak
         }
         lock.lock()
@@ -316,8 +327,8 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         let spans = dictations
         lock.unlock()
         let durationMs = longest / Meeting.framesPerMs
-        let gapMs = gaps.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
-        if !alreadyStopped { DebugLog.write("Meeting recording stopped: \(durationMs) ms, \(counted(gaps.count, "gap")), \(counted(spans.count, "dictation"))") }
+        let gapMs = recordedGaps.reduce(0) { $0 + max(0, $1.endMs - $1.startMs) }
+        if !alreadyStopped { DebugLog.write("Meeting recording stopped: \(durationMs) ms, \(counted(recordedGaps.count, "gap")), \(counted(spans.count, "dictation"))") }
         return Result(tracks: tracks, peaks: peaks, dictations: spans, durationMs: durationMs, recordedMs: max(0, durationMs - gapMs),
                       bothSilentMs: silentFrames / Meeting.framesPerMs, firstHostTime: (cap?.firstHostTime ?? 0) == 0 ? 0 : cap!.firstHostTime + hostOffset)
     }
