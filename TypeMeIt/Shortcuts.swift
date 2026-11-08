@@ -183,7 +183,9 @@ final class Shortcuts {
     }
 
     /// The key held to dictate, as running text names it.
-    static var holdKeyName: String { Sandbox.watchesFn ? "fn" : Settings.shared.dictationShortcut.inline }
+    /// The fn key by both its labels: Macs print fn, 🌐 or both on it.
+    nonisolated static let fnKeyName = "fn 🌐"
+    static var holdKeyName: String { Sandbox.watchesFn ? "the \(fnKeyName) key" : Settings.shared.dictationShortcut.inline }
 
     /// The pipeline tells the shortcuts where it is so Esc means the right thing.
     func setPhase(_ p: Phase) { phase = p }

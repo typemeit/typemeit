@@ -541,8 +541,12 @@ final class MeetingCapture: @unchecked Sendable {
         let lastHostTime = old?.lastHostTime.load(ordering: .acquiring) ?? 0
         drainQueue.asyncAfter(deadline: .now() + .milliseconds(Fixed.meetingDrainMs * 2)) { [weak self] in
             guard let self else { return }
+            // A `stop` during the wait may already have finished the sink's writers.
+            self.lock.lock()
+            let stoppedSinceRebuild = self.stopped
+            self.lock.unlock()
             let first = built.firstHostTime.load(ordering: .acquiring)
-            guard lastHostTime > 0, first > lastHostTime else { return }
+            guard !stoppedSinceRebuild, lastHostTime > 0, first > lastHostTime else { return }
             let frames = Int(MeetingCapture.seconds(fromHostTime: lastHostTime, to: first) * AudioCapture.targetFormat.sampleRate)
             self.sink?.captureGap(self, frames: frames)
         }

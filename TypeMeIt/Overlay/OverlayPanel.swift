@@ -36,7 +36,6 @@ final class OverlayPanel {
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
         panel.acceptsMouseMovedEvents = true
-        panel.takesKey = { [model] in model.hookTrayOpen }
         let host = NSHostingView(rootView: OverlayRoot(model: model) { [weak self] frame in
             self?.pillFrame = frame
             self?.updateClickThrough()
@@ -108,10 +107,9 @@ final class OverlayPanel {
     func show(_ state: OverlayModel.State) {
         // A dictation over a meeting pill: a prompt that stands until
         // answered is parked and comes back when the cloud leaves; a toast
-        // is let go. Either way the panel goes back into display shares.
-        if model.state.isMeeting, !state.isMeeting {
-            if model.state.isStanding { model.pendingMeeting = model.state }
-            panel.sharingType = .readOnly
+        // is let go.
+        if model.state.isMeeting, !state.isMeeting, model.state.isStanding {
+            model.pendingMeeting = model.state
         }
         if state == .arming {
             model.level = 0
@@ -138,14 +136,13 @@ final class OverlayPanel {
 
     /// Shows a meeting state now, or parks it while the cloud is up so a
     /// dictation loses neither a prompt nor a toast; `hide` shows it when
-    /// the cloud leaves. A meeting pill is kept out of display shares.
+    /// the cloud leaves.
     func showMeeting(_ state: OverlayModel.State) {
         if model.presentation == .cloud {
             model.pendingMeeting = state
             return
         }
         model.pendingMeeting = nil
-        panel.sharingType = .none
         show(state)
     }
 
@@ -158,7 +155,6 @@ final class OverlayPanel {
     func hide() {
         sampling?.cancel()
         sampling = nil
-        if model.state.isMeeting { panel.sharingType = .readOnly }
         let closeNow = model.closeNow
         model.closeNow = false
         guard panel.isVisible else { model.state = .hidden; showPendingMeeting(); return }
@@ -230,12 +226,12 @@ final class OverlayPanel {
 /// AppKit keeps a window's top edge under the menu bar whenever its frame is
 /// set. The cloud at the top has to sit over the menu bar, and at a side it
 /// hangs partly off the screen, so this panel takes the frame it is given.
+/// It can become key, which a borderless panel otherwise refuses, so the
+/// offered question's field takes typing; `becomesKeyOnlyIfNeeded` keeps
+/// the buttons from taking the keyboard.
 private final class UnconstrainedPanel: NSPanel {
-    /// Whether it may take keys now; a borderless panel otherwise never does.
-    var takesKey: @MainActor () -> Bool = { false }
-
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
-    override var canBecomeKey: Bool { takesKey() }
+    override var canBecomeKey: Bool { true }
 }
 
 private struct OverlayRoot: View {

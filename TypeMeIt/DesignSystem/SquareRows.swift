@@ -449,7 +449,17 @@ struct SquareStatusSpecimen: View {
                 SquareBar(fraction: 0.64)
             }
             SquareSpecimenLine(name: "download") {
-                SquareBar(fraction: 0.4, width: nil, height: 6, track: DesignTokens.Colors.inkA08).frame(width: 300)
+                // Runs a download from empty to full every six seconds.
+                TimelineView(.periodic(from: .now, by: 0.1)) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6)
+                    let fraction = min(max((t - 0.5) / 4.5, 0), 1)
+                    VStack(spacing: 12) {
+                        SquarePuffProgress(fraction: fraction)
+                        Text("\(String(format: "%.2f", 1.2 * fraction)) gb of 1.2 gb")
+                            .font(DesignTokens.Fonts.body.monospaced())
+                            .foregroundStyle(DesignTokens.Colors.ink2)
+                    }
+                }
             }
             SquareSpecimenLine(name: "done") { SquareStatus("installed", done: true) }
             SquareSpecimenLine(name: "pending") { SquareStatus("checking the model…") }

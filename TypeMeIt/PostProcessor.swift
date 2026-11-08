@@ -48,7 +48,6 @@ actor PostProcessor {
     static var promptPrefix: String { template.components(separatedBy: "${output}")[0] }
 
     private var model: SystemLanguageModel { SystemLanguageModel(guardrails: .permissiveContentTransformations) }
-    private var current: Task<String?, Never>?
     /// The session the next clean-up uses when its instructions still match.
     private var prepared: (instructions: String, session: LanguageModelSession)?
 
@@ -124,6 +123,7 @@ actor PostProcessor {
         // written in code, without asking the model; a real word that sounds
         // like a term ("whisper", wispr) is still the model's call.
         let unknown = matched.hints.isEmpty && screenTerms.isEmpty ? [] : await ScreenContext.unknownWords(in: matched.text)
+        guard !Task.isCancelled else { return (matched.text, false) }
         let settled = matched.hints.filter { $0.heard.split(separator: " ").contains { unknown.contains(CustomWordMatcher.letters(String($0))) } }
         let hints = matched.hints.filter { !settled.contains($0) }
         var heard = CustomWordMatcher.applyHints(settled, to: matched.text)
@@ -155,8 +155,10 @@ actor PostProcessor {
     }
 
     /// nil means: use the locally cleaned transcript (cancelled, rejected, unavailable or failed).
+    /// A cancelled dictation returns before taking `prepared`, which by then
+    /// may be the next dictation's.
     func run(_ transcript: String, keep: [String] = [], hints: [CustomWordMatcher.Hint] = [], screenTerms: [String] = [], styles: Set<WritingStyle> = []) async -> String? {
-        current?.cancel()
+        guard !Task.isCancelled else { return nil }
         let transcript = ModelText.joinSpelledLetters(transcript)
         let model = self.model
         let instructions = PostProcessor.instructions(screenTerms: screenTerms, styles: styles)
@@ -191,17 +193,8 @@ actor PostProcessor {
                 return nil
             }
         }
-        current = task
-        let result = await task.value
-        if current == task { current = nil }
-        return result
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
-
-    nonisolated func cancel() {
-        Task { await self.cancelCurrent() }
-    }
-
-    private func cancelCurrent() { current?.cancel() }
 
     // MARK: Opening guard
 

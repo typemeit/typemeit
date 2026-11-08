@@ -21,3 +21,6 @@ Scripts/asr-eval/echofold/Sources/echofold/EchoBleedDetector.swift
 Scripts/asr-eval/echofold/Sources/echofold/EchoFold.swift
 Scripts/asr-eval/echofold/Sources/echofold/EchoLag.swift
 Scripts/asr-eval/echofold/Sources/echofold/ModelText.swift
+
+# Scripts/store/app: the throwaway store the captures seed
+Scripts/store/app/store/

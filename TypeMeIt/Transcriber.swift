@@ -10,7 +10,6 @@ actor Transcriber {
     static let shared = Transcriber()
 
     private var manager: AsrManager?
-    private let abortFlag = AbortFlag()
     private let meetingAbortFlag = AbortFlag()
     /// Callers waiting for the run in flight, in order.
     private var runWaiters: [CheckedContinuation<Void, Never>] = []
@@ -159,15 +158,14 @@ actor Transcriber {
 
     /// A dictation of any length: FluidAudio cuts what is longer than the
     /// model's window itself and keeps its memory flat.
+    /// Cancelled through the caller's task, so a dictation cancelled while
+    /// it waits its turn stays cancelled whoever asks next.
     func transcribeScored(_ pcm: [Float]) async throws -> Transcript {
-        abortFlag.set(false)
         let started = ContinuousClock.now
-        let transcript = try await run(pcm, abort: abortFlag)
+        let transcript = try await run(pcm, aborted: { Task.isCancelled })
         Log.transcriber.info("Transcribed \(pcm.count / 16000) s of audio in \(ContinuousClock.now - started)")
         return transcript
     }
-
-    nonisolated func cancel() { abortFlag.set(true) }
 
     // MARK: Meetings
 
@@ -176,7 +174,7 @@ actor Transcriber {
     func transcribeMeetingChunk(_ pcm: [Float]) async throws -> Transcript {
         meetingAbortFlag.set(false)
         let started = ContinuousClock.now
-        let transcript = try await run(pcm, abort: meetingAbortFlag)
+        let transcript = try await run(pcm, aborted: meetingAbortFlag.get)
         Log.transcriber.info("Meeting chunk: \(pcm.count / 16000) s of audio in \(ContinuousClock.now - started)")
         DebugLog.write("Meeting chunk: \(pcm.count / 16000) s of audio in \((ContinuousClock.now - started).milliseconds) ms")
         return transcript
@@ -188,13 +186,13 @@ actor Transcriber {
 
     // MARK: Running
 
-    private func run(_ pcm: [Float], abort flag: AbortFlag) async throws -> Transcript {
+    private func run(_ pcm: [Float], aborted: () -> Bool) async throws -> Transcript {
         let asked = ContinuousClock.now
         await acquire()
         defer { release() }
         let queued = ContinuousClock.now - asked
         if queued > Fixed.slowTranscriberWait { DebugLog.write("Transcription waited \(queued.milliseconds) ms for the speech model's turn") }
-        if flag.get() { throw Error.aborted }
+        if aborted() { throw Error.aborted }
         let loaded = try await ensureLoaded()
         var state = try TdtDecoderState(decoderLayers: await loaded.decoderLayerCount)
         let result: ASRResult
@@ -204,7 +202,7 @@ actor Transcriber {
             // Shorter than the model's minimum: nothing was said.
             return Transcript(words: [])
         }
-        if flag.get() { throw Error.aborted }
+        if aborted() { throw Error.aborted }
         guard let timings = result.tokenTimings else { return Transcript(text: result.text.trimmingCharacters(in: .whitespacesAndNewlines)) }
         return Transcript(words: Transcriber.words(from: timings.map { Token(text: $0.token, confidence: $0.confidence, start: $0.startTime, end: $0.endTime) }))
     }

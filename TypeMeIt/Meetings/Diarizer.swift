@@ -21,14 +21,19 @@ import Foundation
 actor Diarizer {
     static let shared = Diarizer()
 
-    /// FluidAudio's types are not Sendable; each is used from one detached
-    /// task at a time, serialised by this actor.
+    /// FluidAudio's types are not Sendable, and this actor does not
+    /// serialise their use: it takes the next call at every await, so a
+    /// `voices(of:)` can run beside a `run`. Only `run` drives `turns` and
+    /// `embedder`, and the coordinator transcribes one meeting at a time.
     private struct Loaded: @unchecked Sendable {
         let turns: Nemotron3Diarizer
         let models: OfflineDiarizerModels
         let embedder: OfflineDiarizerManager
     }
     private var loaded: Loaded?
+    /// The load under way, which a second caller awaits instead of loading
+    /// the models again; cleared when it ends, so a failed load is retried.
+    private var loading: Task<Loaded, any Swift.Error>?
 
     enum Error: LocalizedError {
         case notInstalled
@@ -65,19 +70,25 @@ actor Diarizer {
 
     private func ensureLoaded() async throws -> Loaded {
         if let loaded { return loaded }
+        if let loading { return try await loading.value }
         guard DiarizerModelStore.isInstalled else { throw Error.notInstalled }
-        ModelHub.offlineMode = true
-        let started = ContinuousClock.now
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = .cpuAndNeuralEngine
-        let models = try await OfflineDiarizerModels.load(from: DiarizerModelStore.directory, configuration: configuration)
-        let embedder = OfflineDiarizerManager(config: Diarizer.configuration.withSpeakers(exactly: 1))
-        embedder.initialize(models: models)
-        let turnModels = try await Nemotron3Models.load(config: Diarizer.turnConfig, directory: DiarizerModelStore.nemotronFolder, computeUnits: .all)
-        let loaded = Loaded(turns: Nemotron3Diarizer(config: Diarizer.turnConfig, models: turnModels), models: models, embedder: embedder)
-        self.loaded = loaded
-        Log.meetings.info("Speaker models loaded in \(ContinuousClock.now - started)")
-        return loaded
+        let load = Task {
+            defer { self.loading = nil }
+            ModelHub.offlineMode = true
+            let started = ContinuousClock.now
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = .cpuAndNeuralEngine
+            let models = try await OfflineDiarizerModels.load(from: DiarizerModelStore.directory, configuration: configuration)
+            let embedder = OfflineDiarizerManager(config: Diarizer.configuration.withSpeakers(exactly: 1))
+            embedder.initialize(models: models)
+            let turnModels = try await Nemotron3Models.load(config: Diarizer.turnConfig, directory: DiarizerModelStore.nemotronFolder, computeUnits: .all)
+            let loaded = Loaded(turns: Nemotron3Diarizer(config: Diarizer.turnConfig, models: turnModels), models: models, embedder: embedder)
+            self.loaded = loaded
+            Log.meetings.info("Speaker models loaded in \(ContinuousClock.now - started)")
+            return loaded
+        }
+        loading = load
+        return try await load.value
     }
 
     /// Who spoke when on one track, with one embedding per speaker for the
@@ -89,16 +100,16 @@ actor Diarizer {
     func run(url: URL, count: SpeakerCount? = nil, spans: [MeetingNames.Span] = []) async throws -> (segments: [SpeakerSegment], embeddings: [String: [Float]]) {
         let loaded = try await ensureLoaded()
         let started = ContinuousClock.now
-        let segments = try await Task.detached { try Diarizer.turns(of: url, with: loaded.turns) }.value
+        let segments = try await Diarizer.turns(of: url, with: loaded)
         var embeddings: [String: [Float]] = [:]
         for speaker in Set(segments.map(\.speaker)) {
+            try Task.checkCancellation()
             let clip = try Diarizer.clip(of: speaker, segments: segments, in: url, budgetMs: Fixed.meetingEmbeddingClipSeconds * 1000)
             guard !clip.isEmpty else { continue }
             // Too little speech for the embedding model throws ("No speech
             // detected"); that speaker goes without, and SpeakerMerge places
             // them by the turns they sit next to.
-            let result = try? await Task.detached { try await loaded.embedder.process(audio: clip) }.value
-            embeddings[speaker] = result?.speakerDatabase?.values.first
+            embeddings[speaker] = try? await Diarizer.embedding(of: clip, with: loaded)
         }
         var voices: [String: [[Float]]] = [:]
         if let count, embeddings.count > count.maximum, !spans.isEmpty {
@@ -106,8 +117,9 @@ actor Diarizer {
             for speaker in embeddings.keys {
                 let joined = try Diarizer.clip(of: speaker, segments: segments, in: url, budgetMs: Fixed.meetingVoiceClipSeconds * Fixed.meetingVoiceClips * 1000)
                 for start in stride(from: 0, to: joined.count - clipSamples + 1, by: clipSamples) {
+                    try Task.checkCancellation()
                     let piece = Array(joined[start..<start + clipSamples])
-                    if let voice = try? await Task.detached(operation: { try await loaded.embedder.process(audio: piece) }).value.speakerDatabase?.values.first {
+                    if let voice = try? await Diarizer.embedding(of: piece, with: loaded) {
                         voices[speaker, default: []].append(voice)
                     }
                 }
@@ -121,6 +133,12 @@ actor Diarizer {
         return (capped, embeddings)
     }
 
+    /// The embedder's one embedding of `clip`, made off the actor. Too
+    /// little speech throws ("No speech detected").
+    private nonisolated static func embedding(of clip: [Float], with loaded: Loaded) async throws -> [Float]? {
+        try await loaded.embedder.process(audio: clip).speakerDatabase?.values.first
+    }
+
     /// One WeSpeaker embedding per clip, made the way FluidAudio's
     /// `embedSpan` makes one: the clip repeated to fill the model's window,
     /// every frame weighted. Zero padding would not do: the FBank model
@@ -129,7 +147,15 @@ actor Diarizer {
     /// `Settings.meetingLearnVoices` is on.
     func voices(of clips: [[Float]]) async throws -> [[Float]] {
         let loaded = try await ensureLoaded()
-        return try await Task.detached { try clips.map { try Diarizer.voice(of: $0, models: loaded.models) } }.value
+        return try await Diarizer.embedded(clips, with: loaded)
+    }
+
+    /// `voice(of:models:)` for each clip, off the actor.
+    private nonisolated static func embedded(_ clips: [[Float]], with loaded: Loaded) async throws -> [[Float]] {
+        try clips.map { clip in
+            try Task.checkCancellation()
+            return try Diarizer.voice(of: clip, models: loaded.models)
+        }
     }
 
     /// The samples `voices(of:)` hears at most: the embedding model's window.
@@ -168,8 +194,9 @@ actor Diarizer {
     /// Nemotron over the whole track, fed a second at a time: one read of
     /// a long stretch of a kept Opus track does not come back
     /// (`MeetingTranscriber.read`), and a second at a time also keeps the
-    /// hour's samples out of memory.
-    private static func turns(of url: URL, with diarizer: Nemotron3Diarizer) throws -> [SpeakerSegment] {
+    /// hour's samples out of memory. Runs off the actor.
+    private nonisolated static func turns(of url: URL, with loaded: Loaded) async throws -> [SpeakerSegment] {
+        let diarizer = loaded.turns
         let file = try AVAudioFile(forReading: url)
         let rate = file.processingFormat.sampleRate
         guard Int(rate) == Diarizer.turnConfig.sampleRate else { throw Error.sampleRate(rate) }
@@ -177,6 +204,7 @@ actor Diarizer {
         diarizer.reset()
         var probabilities: [Float] = []
         while file.framePosition < file.length {
+            try Task.checkCancellation()
             try file.read(into: buffer, frameCount: buffer.frameCapacity)
             guard buffer.frameLength > 0, let data = buffer.floatChannelData?[0] else { break }
             diarizer.appendAudio(Array(UnsafeBufferPointer(start: data, count: Int(buffer.frameLength))))
@@ -214,12 +242,17 @@ actor Diarizer {
             manager.initialize(models: loaded.models)
             let boxed = Loaded(turns: loaded.turns, models: loaded.models, embedder: manager)
             let started = ContinuousClock.now
-            let result = try await Task.detached { try await boxed.embedder.process(url) }.value
+            let result = try await Diarizer.diarized(url, with: boxed)
             let segments = result.segments.map {
                 SpeakerSegment(speaker: $0.speakerId, startMs: Int($0.startTimeSeconds * 1000), endMs: Int($0.endTimeSeconds * 1000))
             }
             out.append((name, segments, result.speakerDatabase ?? [:], ContinuousClock.now - started))
         }
         return out
+    }
+
+    /// The embedder's whole pyannote pass over `url`, off the actor.
+    private nonisolated static func diarized(_ url: URL, with loaded: Loaded) async throws -> DiarizationResult {
+        try await loaded.embedder.process(url)
     }
 }

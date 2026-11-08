@@ -7,7 +7,7 @@ struct MeetingHookTests {
     private let actions = MeetingHook(name: "action items", prompt: "list the action items")
 
     private func meeting(_ runs: [(name: String, failed: Bool)]) -> Meeting {
-        var meeting = MeetingFixtures.meeting()
+        var meeting = MeetingFixtures.example
         meeting.hookRuns = runs.map { Meeting.HookRun(id: UUID(), name: $0.name, prompt: "", ranAt: Date(), output: "", failed: $0.failed) }
         return meeting
     }

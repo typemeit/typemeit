@@ -20,12 +20,12 @@ struct UpgradeView: View {
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            SquareRows { ModelDownloadRows() }
+            ModelDownloadRows()
                 .padding(.top, 24)
             Spacer(minLength: 0)
         }
         .padding(28)
-        .frame(width: 520, height: 240)
+        .frame(width: 520, height: 420)
         .background(DesignTokens.Colors.paper)
         .tint(DesignTokens.Colors.ink)
         .onAppear { if modelStore.state == .installed { installed() } }
@@ -34,30 +34,37 @@ struct UpgradeView: View {
 }
 
 /// The speech model's row, whatever state its download is in: the download
-/// button, the bar with its progress, a retry. Onboarding's model step and
+/// button, the puff filling in as it downloads, a retry. Onboarding's model step and
 /// the upgrade panel both show it.
 struct ModelDownloadRows: View {
     @State private var modelStore = ModelStore.shared
 
     var body: some View {
+        VStack(spacing: 0) {
+            SquareRows { row }
+            // Under the row, not in its help popover: the popover redrew on
+            // every progress tick and flickered.
+            if case .downloading(let received, let total) = modelStore.state {
+                VStack(spacing: 12) {
+                    SquarePuffProgress(fraction: Double(received) / Double(max(total, 1)))
+                    Text(modelStore.reconnecting ? "reconnecting…" : "\(ModelStore.sizeLabel(received)) of \(ModelStore.sizeLabel(total))")
+                        .font(DesignTokens.Fonts.body.monospaced())
+                        .foregroundStyle(DesignTokens.Colors.ink2)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
+    @ViewBuilder private var row: some View {
         switch modelStore.state {
         case .installed:
-            SquareSettingsRow(label: ModelStore.displayName) { SquareStatus("installed", done: true) }
-        case .downloading(let received, let total):
+            SquareSettingsRow(label: ModelStore.displayName, caption: "parakeet") { SquareStatus("installed", done: true) }
+        case .downloading:
             SquareSettingsRow(label: ModelStore.displayName) {
                 Button("cancel") { modelStore.cancel() }.buttonStyle(SquareButtonStyle())
             }
-            // Under the bar, not in the row's help popover: the
-            // popover redrew on every progress tick and flickered.
-            VStack(alignment: .leading, spacing: 8) {
-                SquareBar(fraction: Double(received) / Double(max(total, 1)), width: nil, height: 6, track: DesignTokens.Colors.inkA08)
-                    .animation(.easeOut(duration: DesignTokens.Duration.n2), value: received)
-                Text(modelStore.reconnecting ? "reconnecting…" : "\(ModelStore.sizeLabel(received)) of \(ModelStore.sizeLabel(total))")
-                    .font(DesignTokens.Fonts.micro.monospaced())
-                    .foregroundStyle(DesignTokens.Colors.ink2)
-            }
-            .padding(.vertical, 12)
-            .overlay(alignment: .top) { SquareRule() }
         case .verifying:
             SquareSettingsRow(label: ModelStore.displayName) { SquareStatus("checking the model…") }
         case .failed(let message):
@@ -65,7 +72,7 @@ struct ModelDownloadRows: View {
                 Button("retry") { modelStore.download() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         case .missing:
-            SquareSettingsRow(label: ModelStore.displayName, help: "\(ModelStore.sizeLabel(ModelStore.expectedBytes)), downloaded once") {
+            SquareSettingsRow(label: ModelStore.displayName, caption: "parakeet · \(ModelStore.sizeLabel(ModelStore.expectedBytes))") {
                 Button("download") { modelStore.download() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         }

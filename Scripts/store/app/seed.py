@@ -3,7 +3,7 @@
 with TYPEMEIT_SUPPORT_DIR pointing there shows it in its Insights tab.
 
     python3 Scripts/store/app/seed.py
-    TYPEMEIT_SUPPORT_DIR=Scripts/store/app/store "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev"
+    TYPEMEIT_SUPPORT_DIR=Scripts/store/app/store "/tmp/typemeit-dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev"
 
 The dev app otherwise reads the real history in ~/Library, which this never
 touches. Deterministic: the same numbers come out every

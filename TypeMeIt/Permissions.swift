@@ -20,7 +20,7 @@ enum MissingPermission: CaseIterable {
         switch self {
         case .microphone: "type me it can't record"
         case .accessibility:
-            Sandbox.watchesFn ? "type me it can't see the fn key or type where your cursor is" : "type me it can't type where your cursor is"
+            Sandbox.watchesFn ? "type me it can't see the \(Shortcuts.fnKeyName) key or type where your cursor is" : "type me it can't type where your cursor is"
         }
     }
 

@@ -76,9 +76,12 @@ final class OverlayModel {
 
     /// Whether `toast`'s countdown runs: it is the one on screen and the
     /// pointer is not resting on it.
-    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !hookTrayOpen }
-    /// The saved pill is grown into the hook tray: it stands, and takes
-    /// keys for its find line.
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !editingQuestion && !hookTrayOpen }
+    /// The offered question as edited in the pill; nil while untouched.
+    var questionDraft: String?
+    /// The offered question's field has the keyboard, which holds its countdown.
+    var editingQuestion = false
+    /// The saved pill is grown into the hook tray, which holds its countdown.
     var hookTrayOpen = false
     /// Whether the answer pill shows the answer or only its question.
     var answerExpanded = true

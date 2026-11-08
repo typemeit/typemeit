@@ -61,7 +61,7 @@ struct SquarePrompt<Actions: View>: View {
         .frame(minHeight: 48)
         .fixedSize(horizontal: minWidth == nil && !wraps, vertical: true)
         .background(DesignTokens.Colors.slab)
-        .squareLift()
+        .squareLift(overApps: true)
         .environment(\.squareOnSlab, true)
     }
 
