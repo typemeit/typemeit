@@ -93,6 +93,8 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleIconFile: "$(APP_ICON_FILE)"
         LSMinimumSystemVersion: "26.0"
+        # A menu bar app: no Dock icon until a window opens (AppDelegate.updateDockPresence).
+        LSUIElement: true
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the Fn key so it can transcribe it."
         NSAudioCaptureUsageDescription: "type me it records the other side of a call when you ask it to record a meeting."
         NSCameraUsageDescription: "type me it shows your camera through the type me it camera, with Claude's answers when you ask."
@@ -219,6 +221,8 @@ targets:
         CFBundleIconFile: AppIcon
         LSMinimumSystemVersion: "26.0"
         LSApplicationCategoryType: public.app-category.productivity
+        # A menu bar app: no Dock icon until a window opens (AppDelegate.updateDockPresence).
+        LSUIElement: true
         NSMicrophoneUsageDescription: "type me it records your voice while you hold the dictation shortcut, and transcribes it on this Mac."
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication

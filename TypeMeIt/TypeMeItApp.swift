@@ -265,6 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         _ = Settings.shared
         _ = Store.shared
+        followWindowsInDock()
         OutputMute.restoreLeftover()
         applyDevIcon()
         applyAppearance()
@@ -282,6 +283,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             showOnboarding()
         }
+    }
+
+    /// The app is in the Dock and the app switcher only while one of its
+    /// windows is open, so closing the last one leaves just the puff in the
+    /// menu bar. `LSUIElement` starts it out of the Dock.
+    private func followWindowsInDock() {
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.willCloseNotification] {
+            // On willClose the closing window still counts as visible, so the
+            // check waits a turn.
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in AppDelegate.updateDockPresence() }
+            }
+        }
+    }
+
+    /// Panels (the overlay, toasts, popovers) and untitled windows (the
+    /// status item's) don't count; a minimised window does, so the Dock can
+    /// bring it back.
+    private static func updateDockPresence() {
+        let windowOpen = NSApp.windows.contains { window in
+            !(window is NSPanel) && window.styleMask.contains(.titled) && (window.isVisible || window.isMiniaturized)
+        }
+        let policy: NSApplication.ActivationPolicy = windowOpen ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        // An app made regular while already active keeps the previous app's
+        // menus in the menu bar, and activating it again does nothing while
+        // it is active, so activation goes to the Dock and comes back.
+        guard policy == .regular, NSApp.isActive,
+              let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return }
+        dock.activate()
+        Task { @MainActor in NSApp.activate() }
     }
 
     /// A meeting being recorded is stopped and saved first, and a dictation's
