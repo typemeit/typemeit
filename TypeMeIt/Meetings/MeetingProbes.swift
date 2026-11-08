@@ -299,8 +299,8 @@ enum MeetingProbes {
 
     // MARK: The answer pill
 
-    /// Meeting pills are kept out of screen capture, so the answer pill is
-    /// drawn in an offscreen window instead, each stage on the desk colour.
+    /// The answer pill's stages, each drawn in an offscreen window on the
+    /// desk colour.
     private static func renderAnswerPill(into folder: URL) {
         let question = "So before we go any further, how many calls did we have last week across all the tracked numbers, and how does that compare with the same week last year, and did the new forwarding rules change anything?"
         let answer = ClaudeRun.Answer(

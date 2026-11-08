@@ -185,10 +185,7 @@ final class MeetingCoordinator {
         model.onTranscribeMeeting = { [weak self] id, now in self?.answerTranscribe(id, now: now) }
         model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
         model.onDismissMeeting = { [weak self] in self?.dismissToast() }
-        model.onAskClaude = { [weak self] question in
-            self?.logAnswer(.ask)
-            self?.askClaude(question)
-        }
+        model.onAskClaude = { [weak self] question in self?.askOffered(question) }
         model.onDeclineQuestion = { [weak self] _ in
             self?.logAnswer(.no)
             self?.dismissToast()
@@ -239,9 +236,20 @@ final class MeetingCoordinator {
     private func askDictatedOnReturn() -> Bool {
         guard offeredDictationID != nil, offeredLogID != nil, let question = offered,
               overlay.model.state == .meetingQuestion(text: question.text) else { return false }
-        logAnswer(.ask)
-        askClaude(question.text)
+        askOffered(overlay.model.questionDraft ?? question.text)
         return true
+    }
+
+    /// Asks the offered question as the pill shows it. An edit is a
+    /// correction of what was heard, so it teaches its words too.
+    private func askOffered(_ question: String) {
+        logAnswer(.ask)
+        overlay.model.questionDraft = nil
+        if let heard = offered, heard.text != question {
+            LearningCoordinator.shared.learn(original: heard.text, edited: question, source: "question", historyId: offeredDictationID)
+            offered = SpottedQuestion(text: question, track: heard.track, start: heard.start, end: heard.end, addressed: heard.addressed)
+        }
+        askClaude(question)
     }
 
     // MARK: The machine
@@ -1048,6 +1056,7 @@ final class MeetingCoordinator {
         offeredDictationID = dictation
         offeredDictationText = dictatedText
         overlay.model.offerCopies = dictatedText != nil
+        overlay.model.questionDraft = nil
         toast(.meetingQuestion(text: question.text)) { [weak self] in self?.logAnswer(.ignored) }
     }
 
