@@ -2,7 +2,7 @@ import SwiftUI
 
 enum SettingsTab: String, CaseIterable {
     // The order the sidebar lists them in.
-    case insights, history, meetings, dictionary, settings
+    case meetings, history, insights, dictionary, settings
 
     /// The tabs this build shows. Insights are built on window titles, which
     /// the sandbox cannot read, so a sandboxed build has no insights page.
