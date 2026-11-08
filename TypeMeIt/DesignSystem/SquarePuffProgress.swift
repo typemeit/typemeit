@@ -114,6 +114,6 @@ enum PuffPixels {
                 found.append((Cell(column: column, row: row), turn))
             }
         }
-        return found.sorted { $0.turn < $1.turn }.map(\.cell)
+        return found.sorted { $0.turn < $1.turn }.map { $0.cell }
     }
 }
