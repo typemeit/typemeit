@@ -51,6 +51,24 @@ struct MeetingPage: View {
     }
 
     private static let railWidth: CGFloat = 344
+    /// Between the fingerprint and the title beside it.
+    private static let fingerprintGap: CGFloat = 24
+    private static let titleSize: CGFloat = 30
+    private static let dateSize: CGFloat = 12
+    /// Between the title and the date line under it.
+    private static let dateGap: CGFloat = 10
+    /// From the top of the title's line to the top of its capitals, so the
+    /// fingerprint beside it starts level with the letters.
+    private static let titleCapInset: CGFloat = {
+        let font = Square.appKitMono(titleSize)
+        return font.ascender - font.capHeight
+    }()
+    /// The fingerprint's side: from the title's capitals down to the date
+    /// line's baseline.
+    private static let fingerprintSide: CGFloat = {
+        let title = Square.appKitMono(titleSize), date = Square.appKitMono(dateSize)
+        return title.ascender - title.descender + title.leading + dateGap + date.ascender - titleCapInset
+    }()
 
     private var recording: Bool { coordinator.recording?.id == meeting.id }
     private var live: Bool { coordinator.liveIDs.contains(meeting.id) }
@@ -197,12 +215,18 @@ struct MeetingPage: View {
 
     private var article: some View {
         VStack(alignment: .leading, spacing: 0) {
-            titleView
-            Text(dateLine)
-                .font(Square.mono(12))
-                .foregroundStyle(DesignTokens.Colors.ink2)
-                .padding(.top, 10)
-            folderSuggestion
+            HStack(alignment: .top, spacing: MeetingPage.fingerprintGap) {
+                MeetingPageFingerprint(meeting: meeting, content: .of(meeting, meeting.fingerprint, coordinator: coordinator), audio: audioURLs,
+                                       side: MeetingPage.fingerprintSide)
+                    .padding(.top, MeetingPage.titleCapInset)
+                VStack(alignment: .leading, spacing: 0) {
+                    titleView
+                    Text(dateLine)
+                        .font(Square.mono(MeetingPage.dateSize))
+                        .foregroundStyle(DesignTokens.Colors.ink2)
+                        .padding(.top, MeetingPage.dateGap)
+                }
+            }
             state.padding(.top, 20)
             asking
             hooks
@@ -286,7 +310,7 @@ struct MeetingPage: View {
     /// it, esc gives up.
     @ViewBuilder private var titleView: some View {
         if renaming {
-            SquareTextInput(placeholder: "title", text: $title, font: Square.appKitMono(30), focused: $titleFocused,
+            SquareTextInput(placeholder: "title", text: $title, font: Square.appKitMono(MeetingPage.titleSize), focused: $titleFocused,
                             onSubmit: {
                                 store.rename(id: meeting.id, title: title)
                                 renaming = false
@@ -297,32 +321,10 @@ struct MeetingPage: View {
                 .overlay(alignment: .bottom) { SquareRule(color: DesignTokens.Colors.ink) }
         } else {
             Text(meeting.title)
-                .font(Square.mono(30))
+                .font(Square.mono(MeetingPage.titleSize))
                 .tracking(-0.6)
                 .foregroundStyle(DesignTokens.Colors.ink)
                 .textSelection(.enabled)
-        }
-    }
-
-    /// For a meeting in no folder: the model's folder suggestion to take or
-    /// leave, "new folder" when no meeting is in it yet.
-    @ViewBuilder private var folderSuggestion: some View {
-        if let suggestion = meeting.openFolderSuggestion {
-            HStack(spacing: 8) {
-                Text(store.folderCounts.contains { $0.name == suggestion } ? "folder: \(suggestion)?" : "new folder: \(suggestion)?")
-                    .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink)
-                Button("yes") { store.file(ids: [meeting.id], in: suggestion) }
-                    .buttonStyle(SquareButtonStyle(small: true))
-                Button("no") { store.file(ids: [meeting.id], in: nil) }
-                    .buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
-            }
-            .padding(.top, 10)
-        } else if meeting.folder == nil, coordinator.suggestingFolder.contains(meeting.id) {
-            Text("suggesting a folder…")
-                .font(Square.mono(12))
-                .foregroundStyle(DesignTokens.Colors.ink3)
-                .padding(.top, 10)
         }
     }
 
@@ -332,7 +334,7 @@ struct MeetingPage: View {
         let time = Date.FormatStyle.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
         if recording { return "\(day) · \(meeting.started.formatted(time))– · live" }
         let end = meeting.ended ?? meeting.started.addingTimeInterval(Double(meeting.durationMs) / 1000)
-        return "\(day) · \(meeting.started.formatted(time))–\(end.formatted(time))"
+        return "\(day) · \(meeting.started.formatted(time))–\(end.formatted(time)) · \(Meeting.durationLabel(meeting.duration))"
     }
 
     /// How far its transcription has got, what it still needs, or its summary.
@@ -384,9 +386,12 @@ struct MeetingPage: View {
     private var rail: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !meeting.speakers.isEmpty {
+                let fingerprint = meeting.fingerprint
                 SquareSubhead(text: "people", first: true)
                 VStack(spacing: 8) {
-                    ForEach(meeting.speakers) { speaker in person(speaker) }
+                    ForEach(meeting.speakers) { speaker in
+                        person(speaker, colour: fingerprint?.tone(ofSpeaker: speaker.id).map(SquareFingerprint.colour) ?? DesignTokens.Colors.ink)
+                    }
                 }
                 .onChange(of: name) { old, new in typed(old, new) }
             }
@@ -422,10 +427,11 @@ struct MeetingPage: View {
 
     private static let nameHeight: CGFloat = 20
 
-    /// A speaker, how much of the talking they did, and its name. An unknown
-    /// speaker's name, or any name while the page is edited, is a field; a
-    /// click opens it, plays the speaker, and lists names to give it.
-    private func person(_ speaker: Meeting.Speaker) -> some View {
+    /// A speaker, how much of the talking they did in their fingerprint
+    /// colour, and its name. An unknown speaker's name, or any name while the
+    /// page is edited, is a field; a click opens it, plays the speaker, and
+    /// lists names to give it.
+    private func person(_ speaker: Meeting.Speaker, colour: Color) -> some View {
         let total = max(1, meeting.speakers.reduce(0) { $0 + $1.talkMs })
         let share = Double(speaker.talkMs) / Double(total)
         let unknown = SpeakerAssign.isUnknown(speaker)
@@ -461,7 +467,7 @@ struct MeetingPage: View {
                     .frame(height: 6)
                     .overlay(alignment: .leading) {
                         GeometryReader { geo in
-                            Rectangle().fill(DesignTokens.Colors.ink).frame(width: geo.size.width * share)
+                            Rectangle().fill(colour).frame(width: geo.size.width * share)
                         }
                     }
                 Text("\(Int((share * 100).rounded()))%")
@@ -579,6 +585,7 @@ struct MeetingPage: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    /// What the rail's square shows for where the meeting has got to.
     /// What ran on the meeting and what it came to, from what the meeting
     /// records about itself.
     private var processing: [RailFact] {
@@ -643,6 +650,45 @@ struct MeetingPage: View {
         let parts = folder.pathComponents
         guard parts.count > 2 else { return folder.path }
         return "~/…/" + parts.suffix(2).joined(separator: "/")
+    }
+}
+
+extension SquareFingerprint.Content {
+    /// What a meeting's square shows for where it has got to: `fingerprint`
+    /// (the page's, or the list's folded one) once it is transcribed.
+    @MainActor static func of(_ meeting: Meeting, _ fingerprint: MeetingFingerprint?, coordinator: MeetingCoordinator) -> Self {
+        if coordinator.recording?.id == meeting.id { return .recording }
+        if let run = coordinator.transcribing, run.id == meeting.id { return .transcribing(run.fraction) }
+        switch meeting.transcription.state {
+        case .failed: return .failed
+        case .pending, .running: return .transcribing(0)
+        case .done: return fingerprint.map { .done($0) } ?? .failed
+        }
+    }
+}
+
+/// The meeting's fingerprint beside its title. A click plays from that
+/// cell while the audio is kept. The cell playing is
+/// outlined, checked twice a second while the recording plays.
+private struct MeetingPageFingerprint: View {
+    let meeting: Meeting
+    let content: SquareFingerprint.Content
+    let audio: [URL]?
+    /// How tall and wide the square is drawn.
+    let side: CGFloat
+    @State private var player = RecordingPlayer.shared
+
+    var body: some View {
+        let fingerprint: MeetingFingerprint? = if case .done(let f) = content { f } else { nil }
+        let loaded = player.playing == meeting.id
+        TimelineView(.animation(minimumInterval: 0.5, paused: !loaded || player.paused)) { _ in
+            SquareFingerprint(
+                content: content,
+                cell: side / CGFloat(MeetingFingerprint.side),
+                playingCell: loaded ? fingerprint?.cell(atMs: Int(player.currentTime * 1000)) : nil,
+                questionCells: Set((meeting.questions ?? []).compactMap { fingerprint?.cell(atMs: $0.atMs) }),
+                click: fingerprint.flatMap { f in audio.map { urls in { player.play(id: meeting.id, urls: urls, from: Double(f.startMs(ofCell: $0)) / 1000) } } })
+        }
     }
 }
 

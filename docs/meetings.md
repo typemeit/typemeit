@@ -507,7 +507,7 @@ Rules for every task below:
 | `AudioCapture.swift` | `deviceID(forUID:)` becomes internal (7.5) |
 | `Pipeline.swift` | Skip `OutputMute`, `MediaPause` and cues while a meeting records (D12); report dictation host-time spans to the coordinator; route the room shortcut |
 | `Shortcuts.swift` | A second user combo, `recordRoomShortcut`, matched while idle (phase 2) |
-| `Overlay/OverlayModel.swift`, `PillView.swift`, `OverlayPanel.swift` | The states in 7.7; closures `onRecordMeeting`, `onDeclineMeeting`, `onStopMeeting`, `onShowMeeting`, `onOpenSystemAudio`; `showMeeting(_:)` with the `pendingMeeting` slot so a dictation loses neither a prompt nor a toast; `sharingType` per state |
+| `Overlay/OverlayModel.swift`, `PillView.swift`, `OverlayPanel.swift` | The states in 7.7; closures `onRecordMeeting`, `onDeclineMeeting`, `onStopMeeting`, `onShowMeeting`, `onOpenSystemAudio`; `showMeeting(_:)` with the `pendingMeeting` slot so a dictation loses neither a prompt nor a toast |
 | `TypeMeItApp.swift` | Menu items (7.11); `AppState.meeting`; `applicationShouldTerminate` |
 | `MenuBarIcon.swift` | `puff(…, meeting:)`: a dot at the bottom left in `recordingTint`, cut out like the update dot |
 | `Updates.swift` | `installWhenIdle` also waits for `MeetingCoordinator.shared.isIdle` |
@@ -1228,10 +1228,8 @@ Pill states (`OverlayModel.State`, all `.pill`):
 | `.meetingResumed(app: Owner)` | app icon | `recording again · slack` | `stop` (primary), cross | toast timer |
 | `.meetingFolderUnavailable` | `akar-people-group` | `meetings folder unavailable` | `settings` (primary), cross | toast timer |
 
-`OverlayPanel` sets `panel.sharingType = .none` while any meeting state is
-shown and `.readOnly` otherwise, so the prompt is not drawn into a display
-share; `NSWindow` warns that `.none` windows lose some system services, so
-it is scoped to these states. `show`, and the folder toast's `settings`, set `AppState.shared.settingsTab = .meetings`
+Meeting pills are drawn into display shares and screenshots like the rest
+of the overlay. `show`, and the folder toast's `settings`, set `AppState.shared.settingsTab = .meetings`
 and opens the window like the learned toast's sparkle does. `system settings`
 opens `SecureInput.systemAudioSettingsURL`
 (`x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`,
@@ -1930,35 +1928,6 @@ line that only looks like a heading stays words; CRLF line endings; a
 forwarded meeting names who forwarded it; plain Markdown, and front matter
 without an id, are not meetings; `format: 2` is refused. `MeetingInsightsTests`
 and `MCPTests`: a shared meeting is not counted.
-
-### 7.17 Folders
-
-A meeting is in at most one folder: `folder` in `meeting.json`, a name, nil
-for none. A folder exists while a meeting is in it; `MeetingStore.folderCounts`
-is the one list of them. Neither `folder` nor `folderSuggestion` goes into a
-`.tmi` file.
-
-- The meetings page has a `folder` filter beside where, who and when: any
-  folder, each folder, `no folder`. With meetings picked, `move N` opens a
-  menu of the folders, `new folder…` and `no folder`. A typed name that
-  matches a folder ignoring case files into that folder.
-- A meeting is filed by itself in one case: when recording stops, it takes
-  the folder of the newest earlier meeting with the same call key
-  (`names.call`) in the same app (`Meeting.seriesFolder`). A folder the user
-  picked while it was live wins.
-- Every other folder is a suggestion. When a transcription finishes with a
-  summary, `MeetingFolderPick` asks Apple's on-device model to grade each
-  folder (up to 12, newest first) as `belongs`, `loose` or `unrelated`
-  against the meeting's title and summary. Exactly one `belongs` suggests
-  that folder; two or more suggest nothing; none asks the model for a new
-  folder's name of up to three words, dropped if it repeats the meeting's
-  title or a folder's words. The suggestion waits on the meeting's page as
-  `folder: X?` or `new folder: X?` with `yes` and `no`, and first in the move
-  menu.
-
-`make folder-eval` scores the pick and prints the new names
-(Scripts/folder-eval). Tests: `MeetingFolderFilingTests`,
-`MeetingFolderPickTests`.
 
 ## 8. Phase 2: the room, and speakers
 
@@ -2660,7 +2629,7 @@ was an argument; this is a spec. What changed in substance:
   CAF files with an open-ended data chunk so a crash loses nothing.
 - **Consent is scoped to the call**: a cross survives a drop and rejoin of
   up to two minutes, a recording resumes after a drop of up to 30 s and says
-  so, the prompt has no timer, is not drawn into a display share, and
+  so, the prompt has no timer and
   survives a dictation. Never-ask is an
   explicit menu item, never inferred, because two crosses on two unrelated
   Chrome calls would have silenced Google Meet.

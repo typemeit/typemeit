@@ -90,6 +90,9 @@ final class MeetingCoordinator {
     /// Settings.askClaude: the live transcript that spots questions, and the
     /// Claude Code run answering one.
     @ObservationIgnored private var askRun: ClaudeRun?
+    /// The ask in progress, which its task checks after each wait: two asks
+    /// in a row show the same pill state, so the overlay cannot tell them apart.
+    @ObservationIgnored private var currentAskID: UUID?
     /// The question the pill offered last, for when it was asked, its line
     /// in `QuestionLog`, and the meeting it is kept in.
     @ObservationIgnored private var offered: SpottedQuestion?
@@ -182,10 +185,7 @@ final class MeetingCoordinator {
         model.onTranscribeMeeting = { [weak self] id, now in self?.answerTranscribe(id, now: now) }
         model.onOpenSystemAudio = { [weak self] in self?.dismissToast(); NSWorkspace.shared.open(SecureInput.systemAudioSettingsURL) }
         model.onDismissMeeting = { [weak self] in self?.dismissToast() }
-        model.onAskClaude = { [weak self] question in
-            self?.logAnswer(.ask)
-            self?.askClaude(question)
-        }
+        model.onAskClaude = { [weak self] question in self?.askOffered(question) }
         model.onDeclineQuestion = { [weak self] _ in
             self?.logAnswer(.no)
             self?.dismissToast()
@@ -236,9 +236,20 @@ final class MeetingCoordinator {
     private func askDictatedOnReturn() -> Bool {
         guard offeredDictationID != nil, offeredLogID != nil, let question = offered,
               overlay.model.state == .meetingQuestion(text: question.text) else { return false }
-        logAnswer(.ask)
-        askClaude(question.text)
+        askOffered(overlay.model.questionDraft ?? question.text)
         return true
+    }
+
+    /// Asks the offered question as the pill shows it. An edit is a
+    /// correction of what was heard, so it teaches its words too.
+    private func askOffered(_ question: String) {
+        logAnswer(.ask)
+        overlay.model.questionDraft = nil
+        if let heard = offered, heard.text != question {
+            LearningCoordinator.shared.learn(original: heard.text, edited: question, source: "question", historyId: offeredDictationID)
+            offered = SpottedQuestion(text: question, track: heard.track, start: heard.start, end: heard.end, addressed: heard.addressed)
+        }
+        askClaude(question)
     }
 
     // MARK: The machine
@@ -360,11 +371,12 @@ final class MeetingCoordinator {
             discardPreRoll()
         }
         do {
-            let recorder = try MeetingRecorder(id: id, kind: kind, folder: MeetingFolder.staged(id), mic: handOver?.capture.mic ?? mic, preRoll: handOver)
-            recorder.onLevels = { [weak self] mic, others in Task { @MainActor in self?.levels = (mic, others) } }
-            recorder.onSilenceChanged = { [weak self] silent in Task { @MainActor in self?.silenceChanged(silent) } }
-            recorder.onDiskFull = { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } }
-            recorder.onFailed = { [weak self] _ in Task { @MainActor in self?.send(.stop) } }
+            let recorder = try MeetingRecorder(
+                id: id, kind: kind, folder: MeetingFolder.staged(id), mic: handOver?.capture.mic ?? mic, preRoll: handOver,
+                onLevels: { [weak self] mic, others in Task { @MainActor in self?.levels = (mic, others) } },
+                onSilenceChanged: { [weak self] silent in Task { @MainActor in self?.silenceChanged(silent) } },
+                onDiskFull: { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } },
+                onFailed: { [weak self] _ in Task { @MainActor in self?.send(.stop) } })
             self.recorder = recorder
             // Names come from the call's own window whenever a build can read
             // other apps; a sandboxed one cannot (docs/meetings.md 8.6).
@@ -433,7 +445,6 @@ final class MeetingCoordinator {
             // After the meeting just recorded is queued, so its own pass goes first.
             resumeTranscribingAfterRecording()
         }
-        let filedWhileLive = [recordingMeeting?.id, snapshotID].compactMap { $0.flatMap(store.meeting)?.folder }.first
         discardSnapshot()
         guard var meeting = recordingMeeting else { return }
         let folder = MeetingFolder.staged(meeting.id)
@@ -458,7 +469,6 @@ final class MeetingCoordinator {
             meeting.continues = earlier.id
             DebugLog.write("Meeting \(meeting.id) is a rejoin of \(earlier.id); joining them")
         }
-        meeting.folder = filedWhileLive ?? Meeting.seriesFolder(for: meeting, among: store.meetings)
         store.save(meeting)
         if stoppedForDisk { toast(.meetingDiskFull(id: meeting.id)) }
         if settings.meetingAskBeforeTranscribing, !stoppedForDisk { askBeforeTranscribing(meeting.id) } else { enqueue(meeting) }
@@ -710,27 +720,6 @@ final class MeetingCoordinator {
         }
     }
 
-    /// Meetings a folder is being suggested for, for the page's placeholder.
-    private(set) var suggestingFolder: Set<UUID> = []
-
-    /// Asks the model where a meeting with a summary and no folder belongs:
-    /// an existing folder or a new one's name (`MeetingFolderPick.suggestion`).
-    /// The answer waits on the meeting's page and in the move menu; nothing
-    /// is filed until the user takes it.
-    func suggestFolder(_ id: UUID) {
-        guard let meeting = store.meeting(id), meeting.folder == nil, meeting.folderSuggestion == nil,
-              let summary = meeting.summary, !summary.isEmpty, !suggestingFolder.contains(id) else { return }
-        let folders = meeting.folderChoices(store.folderCounts.map(\.name), among: store.meetings)
-        suggestingFolder.insert(id)
-        Task {
-            let suggestion = await MeetingFolderPick.suggestion(title: meeting.title, summary: summary, among: folders)
-            suggestingFolder.remove(id)
-            guard let suggestion else { return }
-            store.suggestFolder(suggestion, for: id)
-            DebugLog.write("Meeting \(id) has a folder suggestion, from \(counted(folders.count, "folder"))")
-        }
-    }
-
     private static func titleIsPlaceholder(_ meeting: Meeting) -> Bool {
         meeting.titleSource == .app || meeting.titleSource == .roster
     }
@@ -823,7 +812,6 @@ final class MeetingCoordinator {
             } else {
                 toast(.meetingFolderUnavailable)
             }
-            suggestFolder(meeting.id)
         case .failed:
             toast(.meetingFailed(id: meeting.id))
         case .pending, .running:
@@ -1068,6 +1056,7 @@ final class MeetingCoordinator {
         offeredDictationID = dictation
         offeredDictationText = dictatedText
         overlay.model.offerCopies = dictatedText != nil
+        overlay.model.questionDraft = nil
         toast(.meetingQuestion(text: question.text)) { [weak self] in self?.logAnswer(.ignored) }
     }
 
@@ -1094,6 +1083,7 @@ final class MeetingCoordinator {
         CameraFeed.shared.asking()
         let dictationID = offered?.text == question ? offeredDictationID : nil
         let runID = UUID()
+        currentAskID = runID
         if recording != nil || dictationID != nil {
             let heard = heardAt ?? (offered?.text == question ? offered?.start : nil) ?? secondsRecorded
             self.asking = (Meeting.Question(atMs: meetingMs(heard), text: shown, outcome: .asked, runID: runID), recording?.id, dictationID)
@@ -1111,7 +1101,8 @@ final class MeetingCoordinator {
         Task { [weak self] in
             let transcript = await self?.transcribeSoFar().map(TranscriptRender.markdown)
             // Cancelled while the transcript was gathered.
-            guard let self, self.askOpened || self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking else { return }
+            guard let self, self.currentAskID == runID,
+                  self.askOpened || self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking else { return }
             // The page shows the new text, and the pill too while it is up.
             let show = { (text: String) in
                 self.asking?.question.text = text
@@ -1247,6 +1238,7 @@ final class MeetingCoordinator {
     }
 
     func cancelAsk() {
+        currentAskID = nil
         askRun?.cancel()
         askRun = nil
         askingIn = nil

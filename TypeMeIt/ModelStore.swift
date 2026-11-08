@@ -40,8 +40,12 @@ final class ModelStore: PinnedDownload {
     nonisolated static let legacyModelURL = modelsDirectory.appendingPathComponent("parakeet-unified-en-0.6b-Q8_0.gguf")
 
     /// The size as the panel and the onboarding row show it.
+    /// In whole megabytes, so the download's count changes once a megabyte
+    /// rather than on every tick.
     nonisolated static func sizeLabel(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file).lowercased()
+        Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes).converted(to: .megabytes)
+            .formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0))))
+            .lowercased()
     }
 
     /// Someone who finished onboarding on a model that is no longer the

@@ -165,7 +165,16 @@ final class ClaudeRun: @unchecked Sendable {
         process.standardError = withErrors ? stdout : FileHandle.nullDevice
         guard (try? process.run()) != nil else { return nil }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeoutSeconds) { if process.isRunning { process.terminate() } }
+        ignoreBrokenPipe(stdin.fileHandleForWriting)
         return Command(process: process, input: stdin.fileHandleForWriting, output: stdout.fileHandleForReading)
+    }
+
+    /// A write to `handle` after Claude Code has exited fails with EPIPE
+    /// instead of raising SIGPIPE, whose default action ends this app.
+    private static func ignoreBrokenPipe(_ handle: FileHandle) {
+        if fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1) == -1 {
+            DebugLog.write("Claude run: could not turn off SIGPIPE on stdin (errno \(errno))")
+        }
     }
 
     /// `transcript` is the meeting's so far, or nil for a question dictated
@@ -247,9 +256,16 @@ final class ClaudeRun: @unchecked Sendable {
         } catch {
             return Answer(text: "Claude Code did not start: \(error.localizedDescription)", seconds: 0, costUSD: nil, failed: true)
         }
-        stdin.fileHandleForWriting.write(input)
-        try? stdin.fileHandleForWriting.close()
         DispatchQueue.global().asyncAfter(deadline: .now() + timeoutSeconds) { [weak self] in self?.cancel() }
+        // On its own thread: an input bigger than the pipe's buffer blocks
+        // until Claude reads it, and this thread has to drain stdout meanwhile.
+        let stdinWriter = stdin.fileHandleForWriting
+        let input = input
+        Self.ignoreBrokenPipe(stdinWriter)
+        DispatchQueue.global().async {
+            try? stdinWriter.write(contentsOf: input)
+            try? stdinWriter.close()
+        }
 
         var errorData = Data()
         let errorRead = DispatchGroup()

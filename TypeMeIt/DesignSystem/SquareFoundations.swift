@@ -167,6 +167,7 @@ struct SquareGallery: View {
             ("box", "container panel card", AnyView(SquareBoxSpecimen())),
             ("stat", "number metric insight", AnyView(SquareStatSpecimen())),
             ("player", "audio playback scrub", AnyView(SquarePlayerSpecimen())),
+            ("fingerprint", "meeting speakers who spoke when grid", AnyView(SquareFingerprintSpecimen())),
             ("layouts", "grid page split", AnyView(SquareLayoutsSpecimen())),
             ("list head", "table header column", AnyView(SquareListHeadSpecimen())),
             ("status", "state progress badge", AnyView(SquareStatusSpecimen())),

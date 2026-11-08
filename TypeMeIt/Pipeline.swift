@@ -23,6 +23,9 @@ final class Pipeline {
     private var toastTask: Task<Void, Never>?
     /// Waits out `Fixed.recordingTail` between the stop and closing the microphone.
     private var tailTask: Task<Void, Never>?
+    /// Transcription and clean-up of the stopped dictation, until it reaches
+    /// the paste. Cancelling it stops the speech model and the clean-up.
+    private var dictationTask: Task<Void, Never>?
     private var lastRecordingFirstBuffer = false
     /// Screen terms for the dictation in progress: nil until the read
     /// finishes. The read starts with the recording and is never waited
@@ -207,8 +210,7 @@ final class Pipeline {
         if wasRecording { capture.cancel() }
         OutputMute.restore()
         MediaPause.resume()
-        Task { Transcriber.shared.cancel() }
-        PostProcessor.shared.cancel()
+        dictationTask?.cancel()
         overlay.hide()
     }
 
@@ -258,7 +260,7 @@ final class Pipeline {
         shortcuts.setPhase(.transcribing)
         overlay.show(.transcribing)
 
-        Task { [weak self] in
+        dictationTask = Task { [weak self] in
             guard let self else { return }
             let raw: Transcriber.Transcript
             let transcribeStart = ContinuousClock.now
@@ -269,10 +271,16 @@ final class Pipeline {
                     Log.transcriber.error("\(error.localizedDescription)")
                     DebugLog.write("Dictation discarded: transcription failed (\(error.localizedDescription))")
                     self.finishIdle(discarding: recordingFile)
+                } else if let recordingFile {
+                    // Cancelled: the phase and pill may belong to a newer dictation, so only the recording goes.
+                    RecordingArchive.delete([recordingFile])
                 }
                 return
             }
-            guard gen == self.generation else { return }
+            guard gen == self.generation else {
+                if let recordingFile { RecordingArchive.delete([recordingFile]) }
+                return
+            }
             let transcribeMs = Pipeline.elapsedMs(since: transcribeStart)
             Log.transcriber.info("Transcribed \(durationMs) ms of audio in \(transcribeMs) ms")
             await self.deliver(raw: raw, durationMs: durationMs, transcribeMs: transcribeMs, target: target, entryId: entryId, recordingFile: recordingFile, generation: gen)
@@ -320,7 +328,10 @@ final class Pipeline {
             let ms = Pipeline.elapsedMs(since: start)
             postProcessMs = ms
             Log.postProcess.info("Post-processing took \(ms) ms (\(cleaned.applied ? "applied" : "no result, local clean-up only"))")
-            guard gen == generation else { return }
+            guard gen == generation else {
+                if let recordingFile { RecordingArchive.delete([recordingFile]) }
+                return
+            }
             if cleaned.applied { postProcessed = cleaned.text }
             finalText = cleaned.text
         } else {
@@ -349,9 +360,11 @@ final class Pipeline {
         // A space after each paste keeps the next dictation from running into this one.
         finalText += " "
         let focusedIsTextInput = Focus.focusedElementIsTextInput()
+        // Once the text is on the clipboard, Cmd+V follows its delay; a
+        // cancel from here on leaves the task alone, and the dictation is kept.
+        dictationTask = nil
         let paste = await Output.paste(finalText)
         let pasted = paste.posted
-        guard gen == generation else { return }
 
         let entry = HistoryEntry(
             id: entryId, timestamp: Date(), transcript: raw.text, postProcessed: postProcessed, postProcessRequested: requested,
@@ -359,6 +372,7 @@ final class Pipeline {
             durationMs: durationMs, transcribeMs: transcribeMs, postProcessMs: postProcessMs, appId: target?.appId, appName: target?.appName, windowTitle: target?.windowTitle,
             dictionaryFixes: matched.fixes, recordingFile: recordingFile)
         store.append(entry, limit: settings.historyLimit)
+        guard gen == generation else { return }
 
         phase = .idle
         shortcuts.setPhase(.idle)

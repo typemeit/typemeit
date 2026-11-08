@@ -33,6 +33,10 @@ actor VoiceLibrary {
     /// Bumped by `forgetAll`, so a meeting still being learned when the
     /// setting goes off is not written.
     private var generation = 0
+    /// Meetings `forget` was told of, so a `learn` still running for one
+    /// does not write its file back. They were deleted, or have no audio
+    /// left to learn from, so no later `learn` is wanted for them either.
+    private var forgotten: Set<UUID> = []
     /// Every file read so far, by meeting; `learn` and `forget` keep it current.
     private var voices: [UUID: [String: [[Float]]]] = [:]
     private var readAll = false
@@ -62,12 +66,13 @@ actor VoiceLibrary {
             let tracks = Dictionary(meeting.tracks.map { ($0.role, folder.appendingPathComponent($0.file)) }, uniquingKeysWith: { first, _ in first })
             var bySpeaker: [String: [[Float]]] = [:]
             for start in stride(from: 0, to: clips.count, by: VoiceLibrary.clipsPerBatch) {
+                try Task.checkCancellation()
                 let batch = Array(clips[start..<min(start + VoiceLibrary.clipsPerBatch, clips.count)])
-                let audio = try await Task.detached { try VoiceLibrary.read(batch, tracks: tracks) }.value
+                let audio = try await VoiceLibrary.read(batch, tracks: tracks)
                 let embedded = try await Diarizer.shared.voices(of: audio)
                 for (clip, vector) in zip(batch, embedded) where !vector.isEmpty { bySpeaker[clip.speaker, default: []].append(vector) }
             }
-            guard generation == self.generation, let dimensions = bySpeaker.values.first?.first?.count else { return }
+            guard generation == self.generation, !forgotten.contains(meeting.id), let dimensions = bySpeaker.values.first?.first?.count else { return }
             let file = VoiceFile(dimensions: dimensions, embedding: VoiceLibrary.embedding, speakers: bySpeaker.mapValues { VoiceLibrary.data($0) })
             try FileManager.default.createDirectory(at: VoiceLibrary.directory, withIntermediateDirectories: true)
             try JSONEncoder().encode(file).write(to: VoiceLibrary.url(for: meeting.id), options: .atomic)
@@ -98,6 +103,7 @@ actor VoiceLibrary {
     }
 
     func forget(_ ids: Set<UUID>) {
+        forgotten.formUnion(ids)
         for id in ids {
             try? FileManager.default.removeItem(at: VoiceLibrary.url(for: id))
             voices[id] = nil
@@ -183,7 +189,8 @@ actor VoiceLibrary {
         return file
     }
 
-    private static func read(_ clips: [VoiceNames.Clip], tracks: [Meeting.Track.Role: URL]) throws -> [[Float]] {
+    /// Runs off the actor.
+    private nonisolated static func read(_ clips: [VoiceNames.Clip], tracks: [Meeting.Track.Role: URL]) async throws -> [[Float]] {
         var files: [Meeting.Track.Role: AVAudioFile] = [:]
         return try clips.map { clip in
             guard let url = tracks[clip.role] else { return [] }

@@ -19,7 +19,8 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-APP = os.path.join(ROOT, "build/dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev")
+# The shared Debug build every worktree writes (CLAUDE.md).
+APP = "/tmp/typemeit-dd/Build/Products/Debug/type me it dev.app/Contents/MacOS/type me it dev"
 TABS = ["history", "dictionary", "settings"]  # sidebar order in the store build
 # The settings groups opened for the capture, by position in the page
 # (dictation, clean-up, ...), bottom one first so the positions above it

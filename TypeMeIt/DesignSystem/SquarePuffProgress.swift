@@ -6,7 +6,7 @@ import SwiftUI
 /// the start and the gap left reads as what is still to come.
 struct SquarePuffProgress: View {
     let fraction: Double
-    var side: CGFloat = 56
+    var side: CGFloat = 112
 
     var body: some View {
         Canvas { context, size in

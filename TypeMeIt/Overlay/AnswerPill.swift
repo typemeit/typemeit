@@ -33,6 +33,7 @@ struct AnswerPill: View {
     private static let answerLeading = rowLeading + markSide + markGap + questionInset
 
     @State private var answerHeight: CGFloat = 0
+    @FocusState private var questionFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,14 +46,14 @@ struct AnswerPill: View {
         .frame(width: Self.width)
         .background(DesignTokens.Colors.slab)
         .clipped()
-        .squareLift()
+        .squareLift(overApps: true)
         .environment(\.squareOnSlab, true)
     }
 
     private var row: some View {
         HStack(alignment: .center, spacing: Self.markGap) {
             mark.frame(width: Self.markSide, height: SquareButtonStyle.height)
-            Text(question)
+            questionText
                 .font(Square.mono(13, weight: .medium))
                 .foregroundStyle(DesignTokens.Colors.onSlab)
                 .fixedSize(horizontal: false, vertical: true)
@@ -73,6 +74,25 @@ struct AnswerPill: View {
         .padding(.trailing, 10)
         .padding(.vertical, Self.rowInset)
         .frame(minHeight: Self.rowHeight)
+    }
+
+    /// An offered question can be edited before it is asked; Return asks it.
+    @ViewBuilder private var questionText: some View {
+        if stage == .offered {
+            TextField("", text: Binding(get: { model.questionDraft ?? question }, set: { model.questionDraft = $0 }), axis: .vertical)
+                .textFieldStyle(.plain)
+                .tint(DesignTokens.Colors.onSlab)
+                .focused($questionFocused)
+                .onSubmit(ask)
+                .onChange(of: questionFocused) { _, focused in model.editingQuestion = focused }
+                .onDisappear { model.editingQuestion = false }
+        } else {
+            Text(question)
+        }
+    }
+
+    private func ask() {
+        model.onAskClaude?(model.questionDraft ?? question)
     }
 
     private var crossHelp: String {
@@ -114,7 +134,7 @@ struct AnswerPill: View {
             if model.offerCopies {
                 SquarePromptIcon(icon: "akar-copy", help: "copy", kind: .quiet) { model.onCopyDictation?() }
             }
-            Button("ask claude") { model.onAskClaude?(question) }.buttonStyle(SquareButtonStyle(kind: .primary))
+            Button("ask claude", action: ask).buttonStyle(SquareButtonStyle(kind: .primary))
         case .queued:
             Text("queued")
                 .font(Square.mono(11))

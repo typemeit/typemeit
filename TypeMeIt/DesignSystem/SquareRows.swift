@@ -453,10 +453,10 @@ struct SquareStatusSpecimen: View {
                 TimelineView(.periodic(from: .now, by: 0.1)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6)
                     let fraction = min(max((t - 0.5) / 4.5, 0), 1)
-                    HStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         SquarePuffProgress(fraction: fraction)
                         Text("\(String(format: "%.2f", 1.2 * fraction)) gb of 1.2 gb")
-                            .font(DesignTokens.Fonts.micro.monospaced())
+                            .font(DesignTokens.Fonts.body.monospaced())
                             .foregroundStyle(DesignTokens.Colors.ink2)
                     }
                 }
