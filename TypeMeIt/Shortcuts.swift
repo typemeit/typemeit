@@ -56,8 +56,13 @@ final class Shortcuts {
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var fnIsDown = false
-    private var fnSeenUp = false
+    enum Fn: Equatable {
+        case up, down
+        /// Already held when the tap appeared: ignored until it comes up.
+        case heldSinceInstall
+    }
+    /// Fn as the tap last saw it. Hotkeys never see it, so it stays up there.
+    private var fn = Fn.heldSinceInstall
     private var fnDownAt: ContinuousClock.Instant?
     /// The Return whose key down `onReturn` took, so its key up is kept too.
     private var swallowingReturn = false
@@ -100,7 +105,7 @@ final class Shortcuts {
         CGEvent.tapEnable(tap: tap, enable: true)
         tapInstalled = true
         // Ignore an Fn that was already held when the tap appeared.
-        fnSeenUp = !CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
+        fn = CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) ? .heldSinceInstall : .up
         Log.shortcuts.info("Event tap installed")
         return true
     }
@@ -114,7 +119,7 @@ final class Shortcuts {
         }
         hotKeys.onKey = { [weak self] key, down in self?.handle(key, down: down) }
         self.hotKeys = hotKeys
-        fnSeenUp = true
+        fn = .up
         registerHotKeys()
         Log.shortcuts.info("Hotkeys installed")
         return true
@@ -271,7 +276,7 @@ final class Shortcuts {
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            DebugLog.write("Shortcuts: event tap disabled by \(type == .tapDisabledByTimeout ? "timeout" : "user input"), re-enabled; Fn was \(fnIsDown ? "down" : "up")")
+            DebugLog.write("Shortcuts: event tap disabled by \(type == .tapDisabledByTimeout ? "timeout" : "user input"), re-enabled; Fn was \(fn == .up ? "up" : "down")")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return true
         case .flagsChanged:
@@ -279,9 +284,11 @@ final class Shortcuts {
                 return true
             }
             let down = event.flags.contains(.maskSecondaryFn)
-            if down != fnIsDown {
-                fnIsDown = down
-                if down { fnDown() } else { fnUp() }
+            if down != (fn != .up) {
+                // A press held since the tap appeared ends here, and starts nothing.
+                let ignored = fn == .heldSinceInstall
+                fn = down ? .down : .up
+                if down { fnDown() } else if !ignored { fnUp() }
             }
             return true
         case .keyDown, .keyUp:
@@ -294,7 +301,7 @@ final class Shortcuts {
                 if type == .keyDown { onEvent?(.roomRequested) }
                 return false
             }
-            if keycode == Shortcuts.spaceKeycode, fnIsDown || phase == .pinned, phase == .recording || phase == .pinned {
+            if keycode == Shortcuts.spaceKeycode, fn == .down || phase == .pinned, phase == .recording || phase == .pinned {
                 if type == .keyDown, phase == .recording {
                     phase = .pinned
                     onEvent?(.pinned)
@@ -334,7 +341,7 @@ final class Shortcuts {
     }
 
     private func fnDown() {
-        guard fnSeenUp else { return }
+        guard fn != .heldSinceInstall else { return }
         switch phase {
         case .idle:
             fnDownAt = .now
@@ -349,7 +356,6 @@ final class Shortcuts {
     }
 
     private func fnUp() {
-        fnSeenUp = true
         switch phase {
         case .recording:
             let held = fnDownAt.map { ContinuousClock.now - $0 } ?? .zero
