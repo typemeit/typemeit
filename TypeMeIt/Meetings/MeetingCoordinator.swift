@@ -397,6 +397,12 @@ final class MeetingCoordinator {
             recordingMinutes = 0
             pauseTranscribingForRecording()
             AppState.shared.meeting = true
+            // The update pill's button relaunches the app and would end this
+            // recording. remind() holds it until the meeting is done.
+            if case .updateReady = overlay.model.state {
+                overlay.hide()
+                Updates.shared.remind()
+            }
         } catch {
             Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")
             DebugLog.write("Meeting recorder failed to start: \(error.localizedDescription)")
