@@ -35,7 +35,11 @@ final class MeetingCoordinator {
     /// Any holder with input and output, for the menu's item.
     private(set) var detected: Owner?
     private(set) var prompting: Owner?
-    private(set) var recording: Live?
+    /// The meeting being recorded, from the recorder's start until
+    /// `finished` keeps or drops it.
+    var recording: Live? {
+        inProgress.map { Live(id: $0.meeting.id, kind: $0.meeting.kind, started: $0.meeting.started) }
+    }
     /// Whole minutes the live recording has run. The menu redraws only when
     /// state it reads changes, so the tick advances this for it.
     private(set) var recordingMinutes = 0
@@ -77,8 +81,10 @@ final class MeetingCoordinator {
     /// The capture running since the current candidate formed, and what it
     /// has held so far (D20). Nothing of it reaches a file before `record`.
     @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
-    @ObservationIgnored private var recordingMeeting: Meeting?
-    @ObservationIgnored private var recordingOwner: Owner?
+    /// The meeting being recorded, as it will be saved, and the app it was
+    /// recorded from; nil owner for the room. Outlives `recorder`, which
+    /// goes when the recording stops, until `finished`.
+    private var inProgress: (meeting: Meeting, owner: Owner?)?
     @ObservationIgnored private var tapObjects: [AudioObjectID] = []
     @ObservationIgnored private var silenceDeadline: Task<Void, Never>?
     @ObservationIgnored private var shownSystemAudioOff = false
@@ -278,7 +284,7 @@ final class MeetingCoordinator {
         if roster?.showsOtherCall == true { send(.otherCall) }
         send(.holders(holders))
         // A helper that restarted mid-call is a new process object: retarget the tap.
-        if let owner = recordingOwner, let recorder {
+        if let owner = inProgress?.owner, let recorder {
             let objects = holders.first { $0.owner == owner }?.objectIDs ?? []
             if !objects.isEmpty, objects != tapObjects {
                 tapObjects = objects
@@ -395,12 +401,10 @@ final class MeetingCoordinator {
                 }
                 roster?.start()
             }
-            recordingMeeting = recorder.meeting
-            recordingOwner = owner
+            inProgress = (recorder.meeting, owner)
             shownSystemAudioOff = false
             stoppedForDisk = false
             store.adopt(recorder.meeting, folder: recorder.folder)
-            recording = Live(id: id, kind: recorder.meeting.kind, started: recorder.meeting.started)
             recordingMinutes = 0
             pauseTranscribingForRecording()
             AppState.shared.meeting = true
@@ -449,9 +453,7 @@ final class MeetingCoordinator {
 
     private func finished(keep: Bool) {
         defer {
-            recording = nil
-            recordingMeeting = nil
-            recordingOwner = nil
+            inProgress = nil
             tapObjects = []
             lastResult = nil
             AppState.shared.meeting = false
@@ -459,7 +461,7 @@ final class MeetingCoordinator {
             resumeTranscribingAfterRecording()
         }
         discardSnapshot()
-        guard var meeting = recordingMeeting else { return }
+        guard var meeting = inProgress?.meeting else { return }
         let folder = MeetingFolder.staged(meeting.id)
         guard keep, let result = lastResult else {
             DebugLog.write("Meeting dropped: \(lastResult?.recordedMs ?? 0) ms recorded")
@@ -599,7 +601,7 @@ final class MeetingCoordinator {
         discardPreRoll()
         let names = roster?.finish()
         roster = nil
-        guard let recorder, let meeting = recordingMeeting else { return }
+        guard let recorder, let meeting = inProgress?.meeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
         let box = ResultBox()
@@ -1038,7 +1040,7 @@ final class MeetingCoordinator {
     /// Seconds into the live transcript as meeting time, which counts the
     /// pre-roll; the live transcript starts at the click.
     private func meetingMs(_ seconds: TimeInterval) -> Int {
-        (recordingMeeting?.preRollMs ?? 0) + Int(seconds * 1000)
+        (inProgress?.meeting.preRollMs ?? 0) + Int(seconds * 1000)
     }
 
     /// An open answer is not swept away by the next question.
@@ -1201,9 +1203,9 @@ final class MeetingCoordinator {
 
     /// Adds an answered question to its meeting, recording or finished.
     private func keep(_ question: Meeting.Question, in id: UUID) {
-        if var recorded = recordingMeeting, recorded.id == id {
+        if var recorded = inProgress?.meeting, recorded.id == id {
             recorded.questions = Meeting.Question.union(recorded.questions ?? [], [question])
-            recordingMeeting = recorded
+            inProgress?.meeting = recorded
         }
         guard var meeting = store.meeting(id) else { return }
         meeting.questions = Meeting.Question.union(meeting.questions ?? [], [question])
