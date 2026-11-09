@@ -1269,6 +1269,76 @@
       "date": "2026-11-08",
       "role": "clean-up",
       "why": "Qwen3-0.6B LoRA for dictation clean-up; no published score"
+    },
+    {
+      "id": "Infatoshi/phonon-asr-parakeet-tdt-0.6b-v2-onnx",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/azure-speech-09-2026 (eval reference)",
+      "date": "2026-11-09",
+      "role": "eval reference"
+    },
+    {
+      "id": "netease-youdao/Confucius4-R2T2",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "arXiv 2611.04394 attendance-guided speaker enrollment",
+      "date": "2026-11-09",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "GersonHMG/lapwing",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "GersonHMG/lapwing-small",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Glimpse-Dictation/Nemotron-Unified-ASR-0.6B-coreml",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "oluwagbotty/fastconformer-ctc-en-ft-10ep-noise",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "avericaai GGUF ports",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "quickasr/Qwen3-ASR-1.7B-q8",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "littoralai/parakeet-tdt-0.6b-v3-mlx-8bit",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ijar/parakeet-ultra-onnx-latin-int8",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "SoldaLabs/parakeet-tdt-0.6b-v3-onnx-int8-mm",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "vksbhandary/buddy-pronunciation-en",
+      "date": "2026-11-09",
+      "role": "none"
     }
   ]
 }
