@@ -42,7 +42,8 @@ final class OverlayModel {
         case meetingFolderUnavailable
         /// A check of Claude Code the user did not start failed (`ClaudeCheck`).
         case claudeCheckFailed
-        /// A question heard in the meeting, offered to Claude Code.
+        /// A question heard in the meeting, offered to Claude Code. Stays
+        /// until it is asked or dismissed.
         case meetingQuestion(text: String)
         /// Claude Code is answering. Stays until it answers or is cancelled.
         case meetingAsking(text: String)
@@ -59,7 +60,7 @@ final class OverlayModel {
         /// Stays up until a button answers it, never on a timer.
         var isStanding: Bool {
             switch self {
-            case .updateReady, .meetingPrompt, .meetingDiskFull, .meetingAsking, .meetingAnswer: true
+            case .updateReady, .meetingPrompt, .meetingDiskFull, .meetingQuestion, .meetingAsking, .meetingAnswer: true
             default: false
             }
         }
@@ -76,11 +77,9 @@ final class OverlayModel {
 
     /// Whether `toast`'s countdown runs: it is the one on screen and the
     /// pointer is not resting on it.
-    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !editingQuestion && !hookTrayOpen }
+    func isCounting(_ toast: State) -> Bool { state == toast && !toastPaused && !hookTrayOpen }
     /// The offered question as edited in the pill; nil while untouched.
     var questionDraft: String?
-    /// The offered question's field has the keyboard, which holds its countdown.
-    var editingQuestion = false
     /// The saved pill is grown into the hook tray, which holds its countdown.
     var hookTrayOpen = false
     /// Whether the answer pill shows the answer or only its question.

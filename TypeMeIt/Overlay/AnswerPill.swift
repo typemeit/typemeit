@@ -33,7 +33,6 @@ struct AnswerPill: View {
     private static let answerLeading = rowLeading + markSide + markGap + questionInset
 
     @State private var answerHeight: CGFloat = 0
-    @FocusState private var questionFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,10 +81,7 @@ struct AnswerPill: View {
             TextField("", text: Binding(get: { model.questionDraft ?? question }, set: { model.questionDraft = $0 }), axis: .vertical)
                 .textFieldStyle(.plain)
                 .tint(DesignTokens.Colors.onSlab)
-                .focused($questionFocused)
                 .onSubmit(ask)
-                .onChange(of: questionFocused) { _, focused in model.editingQuestion = focused }
-                .onDisappear { model.editingQuestion = false }
         } else {
             Text(question)
         }
