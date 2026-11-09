@@ -25,11 +25,29 @@ enum ShortcutEvent: Sendable {
 /// pinned recording, and Esc cancels. Return is not taken there.
 @MainActor
 final class Shortcuts {
-    enum Phase: Sendable { case idle, recording, pinned, transcribing, cleaningUp }
+    /// The one dictation phase: the keys move it through recording and
+    /// pinned, the pipeline through transcribing and cleaning up, and
+    /// `Pipeline.phase` only mirrors it.
+    enum Phase: Sendable {
+        case idle, recording, pinned
+        /// Released: the mic runs on for `Fixed.recordingTail`, then the
+        /// pipeline stops it and moves on to transcribing.
+        case ending
+        case transcribing, cleaningUp
+
+        /// The mic is open.
+        var isCapturing: Bool { self == .recording || self == .pinned || self == .ending }
+    }
 
     private(set) var phase: Phase = .idle {
-        didSet { if phase != oldValue { phaseChanged() } }
+        didSet {
+            guard phase != oldValue else { return }
+            onPhaseChanged?(phase)
+            phaseChanged()
+        }
     }
+    /// Every change of `phase`, before the event that caused it is sent.
+    var onPhaseChanged: (@MainActor (Phase) -> Void)?
     private(set) var tapInstalled = false
     var onEvent: (@MainActor (ShortcutEvent) -> Void)?
     /// A plain Return while idle: answers the prompt waiting for it and says
@@ -200,7 +218,7 @@ final class Shortcuts {
     /// The pill's stop button while pinned.
     func stopFromOverlay() {
         guard phase == .pinned else { return }
-        phase = .transcribing
+        phase = .ending
         onEvent?(.recordingEnded)
     }
 
@@ -217,7 +235,7 @@ final class Shortcuts {
     /// still held.
     func stopFromMenu() {
         guard phase == .recording || phase == .pinned else { return }
-        phase = .transcribing
+        phase = .ending
         onEvent?(.recordingEnded)
     }
 
@@ -228,7 +246,7 @@ final class Shortcuts {
         switch phase {
         case .idle: startFromMenu()
         case .recording, .pinned: stopFromMenu()
-        case .transcribing, .cleaningUp: return false
+        case .ending, .transcribing, .cleaningUp: return false
         }
         return true
     }
@@ -296,7 +314,7 @@ final class Shortcuts {
             }
             if keycode == Shortcuts.escKeycode, type == .keyDown {
                 switch phase {
-                case .recording, .pinned, .transcribing, .cleaningUp:
+                case .recording, .pinned, .ending, .transcribing, .cleaningUp:
                     phase = .idle
                     onEvent?(.cancelled)
                     return false
@@ -323,7 +341,7 @@ final class Shortcuts {
             phase = .recording
             onEvent?(.recordingStarted)
         case .pinned:
-            phase = .transcribing
+            phase = .ending
             onEvent?(.recordingEnded)
         default:
             break
@@ -339,7 +357,7 @@ final class Shortcuts {
                 phase = .idle
                 onEvent?(.cancelled)  // a tap
             } else {
-                phase = .transcribing
+                phase = .ending
                 onEvent?(.recordingEnded)
             }
         case .pinned:

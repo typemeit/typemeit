@@ -8,7 +8,10 @@ import Observation
 final class Pipeline {
     static let shared = Pipeline()
 
-    enum Phase: Equatable { case idle, recording, transcribing, cleaningUp }
+    typealias Phase = Shortcuts.Phase
+    /// A mirror of `shortcuts.phase`, the one dictation phase, kept here so
+    /// views can observe it. Only `onPhaseChanged` writes it; change the
+    /// phase with `shortcuts.setPhase`.
     private(set) var phase: Phase = .idle { didSet { if phase == .idle { Updates.shared.remind() } } }
     let shortcuts = Shortcuts()
     let overlay = OverlayPanel()
@@ -35,6 +38,7 @@ final class Pipeline {
     private var lastScreen: (pid: pid_t, title: String?, at: ContinuousClock.Instant, terms: [String])?
 
     private init() {
+        shortcuts.onPhaseChanged = { [weak self] phase in self?.phase = phase }
         shortcuts.onEvent = { [weak self] event in self?.handle(event) }
         SquareShortcutRecorder.listeningChanged = { [weak self] listening in self?.shortcuts.pauseHotKeys(listening) }
         capture.onLevel = { [weak self] level in
@@ -128,12 +132,13 @@ final class Pipeline {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { Feedback.play(kind) }
         guard wasMuted else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + wait + Feedback.duration(kind)) { [weak self] in
-            if self?.phase == .recording, self?.generation == gen { OutputMute.mute() }
+            if self?.phase.isCapturing == true, self?.generation == gen { OutputMute.mute() }
         }
     }
 
+    /// The shortcuts have already moved to recording, or to pinned.
     private func beginRecording() {
-        guard phase == .idle else { return }
+        guard phase == .recording || phase == .pinned else { return }
         guard ModelStore.isInstalled else {
             shortcuts.setPhase(.idle)
             AppDelegate.shared?.showUpgrade()
@@ -141,7 +146,6 @@ final class Pipeline {
         }
         MissingPermission.refreshMicrophone()
         generation += 1
-        phase = .recording
         recordingStartedAt = Date()
         copyPromptTask?.cancel()
         toastTask?.cancel()
@@ -156,7 +160,6 @@ final class Pipeline {
         } catch {
             Log.audio.error("Could not start capture: \(error.localizedDescription)")
             DebugLog.write("Dictation not started: the mic failed to start: \(error.localizedDescription)")
-            phase = .idle
             shortcuts.setPhase(.idle)
             OutputMute.restore()
             MediaPause.resume()
@@ -199,13 +202,13 @@ final class Pipeline {
     }
 
     private func cancel() {
-        let wasRecording = phase == .recording
+        // The shortcuts are idle already, so whether the mic was open is
+        // not known here; cancelling a stopped capture does nothing.
         generation += 1
-        phase = .idle
         shortcuts.setPhase(.idle)
         tailTask?.cancel()
         tailTask = nil
-        if wasRecording { capture.cancel() }
+        capture.cancel()
         OutputMute.restore()
         MediaPause.resume()
         dictationTask?.cancel()
@@ -215,7 +218,7 @@ final class Pipeline {
     /// Keeps recording for `Fixed.recordingTail`, then stops. A cancel in
     /// the meantime throws the recording away as usual.
     private func endRecording() {
-        guard phase == .recording, tailTask == nil else { return }
+        guard phase == .ending, tailTask == nil else { return }
         let gen = generation
         tailTask = Task { [weak self] in
             try? await Task.sleep(for: Fixed.recordingTail)
@@ -226,7 +229,7 @@ final class Pipeline {
     }
 
     private func stopRecording() {
-        guard phase == .recording else { return }
+        guard phase == .ending else { return }
         let gen = generation
         let pcm = capture.stop()
         let stoppedAt = mach_absolute_time()
@@ -244,7 +247,6 @@ final class Pipeline {
         if duration < Fixed.minimumRecordingSeconds || AudioCapture.peak(pcm) < Fixed.silencePeak {
             Log.app.info("Empty recording discarded (\(duration) s)")
             DebugLog.write("Dictation discarded: \(durationMs) ms of audio, \(duration < Fixed.minimumRecordingSeconds ? "too short" : "silent")")
-            phase = .idle
             shortcuts.setPhase(.idle)
             overlay.hide()
             return
@@ -254,7 +256,6 @@ final class Pipeline {
         let entryId = UUID()
         MeetingCoordinator.shared.dictationEnded(hostTime: stoppedAt, historyId: entryId)
         let recordingFile = settings.keepRecordings && settings.historyLimit >= 0 ? RecordingArchive.save(pcm, id: entryId) : nil
-        phase = .transcribing
         shortcuts.setPhase(.transcribing)
         overlay.show(.transcribing)
 
@@ -289,7 +290,6 @@ final class Pipeline {
     /// for it would otherwise sit in the archive with no history entry.
     private func finishIdle(discarding recordingFile: String? = nil) {
         if let recordingFile { RecordingArchive.delete([recordingFile]) }
-        phase = .idle
         shortcuts.setPhase(.idle)
         overlay.hide()
     }
@@ -315,7 +315,6 @@ final class Pipeline {
 
         if requested {
             modelState = PostProcessor.state
-            phase = .cleaningUp
             shortcuts.setPhase(.cleaningUp)
             overlay.show(.cleaningUp)
             let screenTerms = self.screenTerms ?? []
@@ -372,7 +371,6 @@ final class Pipeline {
         store.append(entry, limit: settings.historyLimit)
         guard gen == generation else { return }
 
-        phase = .idle
         shortcuts.setPhase(.idle)
 
         if pasted, focusedIsTextInput == true, settings.learnFromCorrections {

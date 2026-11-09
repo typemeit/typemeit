@@ -159,7 +159,7 @@ struct MenuContent: View {
             Button("Install Update \(version)") { Updates.shared.install() }
         }
         Divider()
-        if Pipeline.shared.phase == .recording {
+        if Pipeline.shared.phase == .recording || Pipeline.shared.phase == .pinned {
             Button("Stop Recording") { Pipeline.shared.shortcuts.stopFromMenu() }
         }
         if Pipeline.shared.isBusy {
@@ -400,7 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Mirror the pipeline phase into the menu bar icon.
         withObservationTracking {
             let phase = Pipeline.shared.phase
-            AppState.shared.recording = phase == .recording
+            AppState.shared.recording = phase.isCapturing
             AppState.shared.transcribing = phase == .transcribing || phase == .cleaningUp
         } onChange: {
             Task { @MainActor in self.observePipeline() }
