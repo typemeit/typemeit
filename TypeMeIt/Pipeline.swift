@@ -17,7 +17,6 @@ final class Pipeline {
     private var store: Store { Store.shared }
 
     private var recordingStartedAt: Date?
-    private var pinned = false
     private var generation = 0
     private var copyPromptTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
@@ -96,7 +95,6 @@ final class Pipeline {
         switch event {
         case .recordingStarted: beginRecording()
         case .pinned:
-            pinned = true
             if settings.audioFeedback { playWhileMuted(.pin) }
             if overlay.model.isRecording { overlay.show(.pinned) }
         case .recordingEnded: endRecording()
@@ -144,12 +142,12 @@ final class Pipeline {
         MissingPermission.refreshMicrophone()
         generation += 1
         phase = .recording
-        pinned = false
         recordingStartedAt = Date()
         copyPromptTask?.cancel()
         toastTask?.cancel()
         ReadBack.shared.finishNow()
-        shortcuts.setPhase(.recording)
+        // No setPhase here: the shortcuts are already .recording, or .pinned
+        // for a menu start, and .recording would undo that pin.
         if settings.muteWhileRecording, !meetingRecording { OutputMute.mute() }
         if settings.pauseWhileRecording, !meetingRecording { MediaPause.pause() }
         do {
