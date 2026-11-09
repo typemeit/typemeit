@@ -1,6 +1,9 @@
 import AppKit
 import SwiftUI
 
+/// The strip's coordinate space, where the slab and the tabs' frames are measured.
+private let squareTabsStrip = "square-tabs"
+
 /// One tab in a `SquareTabs` strip.
 struct SquareTab: Hashable {
     enum State { case idle, running, failed }
@@ -12,11 +15,30 @@ struct SquareTab: Hashable {
 /// ink frame, the rest are ink3 labels. A running tab shows a spinner, a
 /// failed one says so after its name. The content brings its own padding, so
 /// a scroll inside the panel runs to the frame.
+///
+/// Picking another tab moves the slab there in four hard steps, and the tab
+/// it left keeps a dithered ghost of it that thins out over a few frames.
+/// Under Reduce Motion the slab just moves.
 struct SquareTabs<Trailing: View, Content: View>: View {
     let tabs: [SquareTab]
     @Binding var picked: Int
     @ViewBuilder var trailing: () -> Trailing
     @ViewBuilder var content: (Int) -> Content
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Each tab's frame in the strip.
+    @State private var frames: [Int: CGRect] = [:]
+    /// Where the slab is drawn; nil until the tabs are laid out.
+    @State private var slab: CGRect?
+    /// The tab the slab left, while its ghost fades.
+    @State private var ghost: CGRect?
+    /// How many of each 4 × 4 block of the ghost's cells are inked, 0...16.
+    @State private var ghostLevel = 0
+    @State private var jump: Task<Void, Never>?
+
+    private static var jumpSteps: Int { 4 }
+    private static var ghostStart: Int { 10 }
+    private static var frameTime: Duration { .milliseconds(35) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,9 +46,7 @@ struct SquareTabs<Trailing: View, Content: View>: View {
                 // Tabs past the panel's width scroll sideways, the picked one kept in view.
                 ScrollViewReader { reader in
                     ScrollView(.horizontal) {
-                        HStack(spacing: 0) {
-                            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in tabButton(index, tab).id(index) }
-                        }
+                        strip
                     }
                     .scrollIndicators(.never)
                     .onAppear { reader.scrollTo(picked) }
@@ -39,29 +59,120 @@ struct SquareTabs<Trailing: View, Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(Rectangle().stroke(DesignTokens.Colors.ink, lineWidth: 1))
         }
+        .onChange(of: picked) { _, index in jumpSlab(to: index) }
     }
 
-    private func tabButton(_ index: Int, _ tab: SquareTab) -> some View {
-        let isPicked = picked == index
-        return Button { picked = index } label: {
-            HStack(spacing: 6) {
-                if tab.state == .running {
-                    SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, isPicked)
+    /// The tabs over the slab and the ghost it leaves, measured in their own space.
+    private var strip: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                let onSlab = isUnderSlab(index)
+                Button { picked = index } label: {
+                    HStack(spacing: 6) {
+                        if tab.state == .running {
+                            SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, onSlab)
+                        }
+                        Text(tab.name)
+                        if tab.state == .failed {
+                            Text("· failed").foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
+                        }
+                    }
+                    .font(Square.mono(12))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .contentShape(Rectangle())
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(squareTabsStrip)) } action: { frame in
+                        frames[index] = frame
+                        if index == picked && jump == nil { slab = frame }
+                    }
                 }
-                Text(tab.name)
-                if tab.state == .failed {
-                    Text("· failed").foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
+                .buttonStyle(.plain)
+                .id(index)
+            }
+        }
+        .background(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                if let ghost, ghostLevel > 0 {
+                    SquareDither(level: ghostLevel, color: DesignTokens.Colors.slab)
+                        .frame(width: ghost.width, height: ghost.height)
+                        .offset(x: ghost.minX, y: ghost.minY)
+                }
+                if let slab {
+                    Rectangle()
+                        .fill(DesignTokens.Colors.slab)
+                        .frame(width: slab.width, height: slab.height)
+                        .offset(x: slab.minX, y: slab.minY)
                 }
             }
-            .font(Square.mono(12))
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundStyle(isPicked ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(isPicked ? DesignTokens.Colors.slab : .clear)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .coordinateSpace(.named(squareTabsStrip))
+    }
+
+    /// The slab covers the middle of this tab, so its label is drawn on the
+    /// slab. Before layout, that is the picked tab.
+    private func isUnderSlab(_ index: Int) -> Bool {
+        guard let slab, let frame = frames[index] else { return index == picked }
+        return slab.minX <= frame.midX && frame.midX <= slab.maxX
+    }
+
+    private func jumpSlab(to index: Int) {
+        jump?.cancel()
+        jump = nil
+        guard let target = frames[index] else { return }
+        guard let from = slab, from != target, !reduceMotion else {
+            slab = target
+            ghost = nil
+            return
+        }
+        ghost = from
+        ghostLevel = SquareTabs.ghostStart
+        jump = Task { @MainActor in
+            var step = 0
+            while step < SquareTabs.jumpSteps || ghostLevel > 0 {
+                try? await Task.sleep(for: SquareTabs.frameTime)
+                if Task.isCancelled { return }
+                if step < SquareTabs.jumpSteps {
+                    step += 1
+                    let k = CGFloat(step) / CGFloat(SquareTabs.jumpSteps)
+                    slab = CGRect(x: (from.minX + (target.minX - from.minX) * k).rounded(),
+                                  y: target.minY,
+                                  width: (from.width + (target.width - from.width) * k).rounded(),
+                                  height: target.height)
+                }
+                ghostLevel = max(0, ghostLevel - 2)
+            }
+            // The layout may have moved while it jumped.
+            slab = frames[index] ?? target
+            ghost = nil
+            jump = nil
+        }
+    }
+}
+
+/// The order a 4 × 4 block's cells fill in, for `SquareDither`.
+private let squareBayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+
+/// A 2 pt ordered dither: `level` of every 16 cells in a 4 × 4 Bayer block
+/// are filled, so 8 is a checker and 16 is solid.
+struct SquareDither: View {
+    let level: Int
+    var color: Color = DesignTokens.Colors.ink
+    var cell: CGFloat = 2
+
+    var body: some View {
+        Canvas { context, size in
+            let columns = Int((size.width / cell).rounded(.up)), rows = Int((size.height / cell).rounded(.up))
+            var path = Path()
+            for row in 0..<rows {
+                for column in 0..<columns where squareBayer[(row % 4) * 4 + column % 4] < level {
+                    path.addRect(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell))
+                }
+            }
+            context.fill(path, with: .color(color))
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -243,7 +354,7 @@ struct SquareTabsSpecimen: View {
             SquareTabs(tabs: tabs, picked: $picked) {
                 Button("run hooks") {}.buttonStyle(SquareButtonStyle(kind: .quiet))
             } content: { index in
-                panel(tabs[index], isSummary: index == 0).padding(14)
+                panel(tabs[index], isSummary: index == 0)
             }
             VStack(alignment: .leading, spacing: 12) {
                 SquareSubhead(text: "transcript")

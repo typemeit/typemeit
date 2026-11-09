@@ -331,25 +331,44 @@ struct SquareStatus: View {
     }
 }
 
-/// Something running with no known end: a quarter of a ring turning on an
-/// ink-a20 ring, or on-slab on the slab. Still when reduce motion is on.
+/// Something running with no known end: a 3 × 3 square of cells whose eight
+/// edge cells carry a three-cell tail round clockwise, one cell every
+/// 95 ms, on faint cells; in on-slab on the slab. Still when reduce motion
+/// is on.
 struct SquareSpinner: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.squareOnSlab) private var onSlab
-    @State private var turned = false
-    private static let turn: TimeInterval = 0.9
+
+    /// The edge cells clockwise from the top left, as (column, row).
+    private static let ring = [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1)]
+    /// The head's opacity, then the two cells behind it; the rest are the track.
+    private static let tail: [Double] = [1, 0.55, 0.28]
+    private static let track = 0.12
+    private static let step: TimeInterval = 0.095
 
     var body: some View {
-        let ink = onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink
-        ZStack {
-            Circle().stroke(onSlab ? DesignTokens.Colors.onSlab.opacity(0.2) : DesignTokens.Colors.inkA20, lineWidth: 1.5)
-            Circle().trim(from: 0, to: 0.25).stroke(ink, lineWidth: 1.5)
-                .rotationEffect(.degrees(turned ? 360 : 0))
+        TimelineView(.periodic(from: .now, by: SquareSpinner.step)) { context in
+            let head = reduceMotion ? 0 : Int(context.date.timeIntervalSinceReferenceDate / SquareSpinner.step) % SquareSpinner.ring.count
+            cells(head: head)
         }
         .frame(width: 10, height: 10)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: SquareSpinner.turn).repeatForever(autoreverses: false)) { turned = true }
+        .accessibilityHidden(true)
+    }
+
+    private func cells(head: Int) -> some View {
+        let ink = onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink
+        let ring = SquareSpinner.ring, tail = SquareSpinner.tail, track = SquareSpinner.track
+        return Canvas { context, size in
+            // Three cells and two gaps of a fifth of a cell across the side.
+            let cell = min(size.width, size.height) / 3.4
+            let pitch = cell * 1.2
+            let count = ring.count
+            for (index, (column, row)) in ring.enumerated() {
+                let behind = (head - index + count) % count
+                let opacity = behind < tail.count ? tail[behind] : track
+                let rect = CGRect(x: CGFloat(column) * pitch, y: CGFloat(row) * pitch, width: cell, height: cell)
+                context.fill(Path(rect), with: .color(ink.opacity(opacity)))
+            }
         }
     }
 }
