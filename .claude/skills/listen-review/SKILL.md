@@ -60,6 +60,14 @@ answers can be extrapolated. Spans a truth already settles are skipped.
   `truths-import` refuses them, and the counts go in `docs/model-trials.json`
   (then `make model-trials`).
   Speaker references are unprompted: run it with `ASSEMBLYAI_PROMPT=''`.
+- **Which person spoke, by name:** for a meeting the user was in, use
+  `people-set <name> --track <audio> --segments <diarizer json> --names
+  <json>` instead: it plays a stretch and asks who it is, with one button per
+  person by name ({"P1": "Ana", ...}), keys 1–9, 0 for several or can't tell.
+  No voice samples: the user knows the people. The names file stays in the
+  scratchpad; truths keep only P1, P2…, since the vault is in the public repo.
+  Seed it with what the user already named (`people-add`), and score
+  diarizers with `speaker-score`. Answers here are truths (`truths-import`).
 
 Serve it with `review --set <name> --html` (127.0.0.1 only). Before handing it
 over, serve it on a copy of the reference dir (`ASR_EVAL_DIR`), answer one span

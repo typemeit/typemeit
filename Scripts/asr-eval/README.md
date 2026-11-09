@@ -31,6 +31,9 @@ make asr-eval ARGS="score --meaning"     # also count only errors in spans judge
 make asr-eval ARGS="pick-set NAME --a fluid-ultra --b parakeet"  # judged spans that change the meaning where the two disagree; then review --set NAME --html picks the reading that was said, blind
 ASSEMBLYAI_PROMPT='' make asr-eval ARGS="who-set NAME --a nemotron_app-0.17.5 --b nemotron_app-0.17.6"  # stretches two diarizers give to different people; review --set NAME --html plays a sample of each voice, then the words
 make asr-eval ARGS="truths-import NAME --by max"   # a set's answers become truths (truths.jsonl), applied by every later score
+make asr-eval ARGS="people-add heard.jsonl --track <path> --by max"  # who-spoke-when truths heard outside a set: {startMs, endMs, person: "P3", note} per line
+make asr-eval ARGS="people-set NAME --track <path> --segments <json> --names <json>"  # stretches of a track to name by ear; names {"P1": "a name"} show on the page, truths keep P1, P2…; review --set NAME --html, then truths-import NAME --by max
+make asr-eval ARGS="speaker-score --track <path> <segments.json>..."  # each diarizer's share of truth time on the right person, and how many people it found
 make asr-eval ARGS="vault-save"   # truths + audio snippets, gzipped then AES-256-GCM, into vault/truths.tmv; ASR_EVAL_VAULT_KEY from 1Password ("type me it eval vault key")
 make asr-eval ARGS="vault-load"   # restore them on another Mac
 make asr-eval ARGS="judge-export --out spans.jsonl"  # disputed spans not yet judged; Claude Code agents label each, then:

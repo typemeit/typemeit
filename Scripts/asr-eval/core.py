@@ -1,6 +1,6 @@
 """Pure logic: tokenising, alignment, disagreement spans, WER, wrong-speaker rate.
 No I/O, so tests run on fixture text."""
-import difflib, hashlib, itertools, re
+import collections, difflib, hashlib, itertools, re
 
 def tokens(text):
     return re.findall(r"[a-z0-9']+", text.lower().replace('’', "'"))
@@ -210,3 +210,26 @@ def lone_insertions(ref, hyp, other):
                 runs.append({'refIndex': i1, 'hypStart': run[0], 'words': [hyp[k] for k in run]})
                 run = []
     return runs
+
+def overlap_ms(a_start, a_end, b_start, b_end):
+    return max(0, min(a_end, b_end) - max(a_start, b_start))
+
+def speaker_agreement(truths, segments):
+    """How a diarizer's segments agree with truths that say which person spoke between two times.
+    Each label is mapped to the person it overlaps most; a truth is right when the label covering most
+    of it maps to its person. Returns the right share of truth time, the people some label maps to,
+    and the people the truths hold."""
+    covering = [(truth, collections.Counter()) for truth in truths if truth.get('person')]
+    by_label = collections.defaultdict(collections.Counter)
+    for truth, labels in covering:
+        for segment in segments:
+            shared = overlap_ms(truth['startMs'], truth['endMs'], segment['startMs'], segment['endMs'])
+            if shared:
+                labels[segment['speaker']] += shared
+                by_label[segment['speaker']][truth['person']] += shared
+    person_of = {label: people.most_common(1)[0][0] for label, people in by_label.items()}
+    total = sum(truth['endMs'] - truth['startMs'] for truth, _ in covering)
+    right = sum(truth['endMs'] - truth['startMs'] for truth, labels in covering
+                if labels and person_of[labels.most_common(1)[0][0]] == truth['person'])
+    return {'right': right / total if total else 0.0, 'found': sorted(set(person_of.values())),
+            'people': sorted({truth['person'] for truth, _ in covering})}

@@ -188,5 +188,23 @@ class VoiceSample(unittest.TestCase):
     def test_no_run_long_enough(self):
         self.assertIsNone(core.voice_sample(self.words, self.labels, self.labels, 'A', 0, 11000, 12000, 600))
 
+
+class SpeakerAgreement(unittest.TestCase):
+    truths = [{'startMs': 0, 'endMs': 1000, 'person': 'P1'}, {'startMs': 2000, 'endMs': 3000, 'person': 'P2'},
+              {'startMs': 4000, 'endMs': 6000, 'person': 'P3'}, {'startMs': 7000, 'endMs': 8000, 'person': None}]
+
+    def test_each_person_on_their_own_label_is_all_right(self):
+        segments = [{'speaker': 'a', 'startMs': 0, 'endMs': 1000}, {'speaker': 'b', 'startMs': 2000, 'endMs': 3000},
+                    {'speaker': 'c', 'startMs': 4000, 'endMs': 6000}]
+        self.assertEqual(core.speaker_agreement(self.truths, segments), {'right': 1.0, 'found': ['P1', 'P2', 'P3'], 'people': ['P1', 'P2', 'P3']})
+
+    def test_two_people_on_one_label_lose_the_shorter(self):
+        segments = [{'speaker': 'a', 'startMs': 0, 'endMs': 1000}, {'speaker': 'b', 'startMs': 2000, 'endMs': 6000}]
+        self.assertEqual(core.speaker_agreement(self.truths, segments), {'right': 0.75, 'found': ['P1', 'P3'], 'people': ['P1', 'P2', 'P3']})
+
+    def test_a_truth_no_segment_covers_is_wrong(self):
+        segments = [{'speaker': 'a', 'startMs': 0, 'endMs': 1000}]
+        self.assertEqual(core.speaker_agreement(self.truths, segments)['right'], 0.25)
+
 if __name__ == '__main__':
     unittest.main()
