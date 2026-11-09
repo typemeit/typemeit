@@ -466,16 +466,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let window = AppDelegate.fixedSizeWindow(for: view)
         window.title = "type me it needs Apple Intelligence"
         window.styleMask = [.titled, .closable]
-        window.center()
+        AppDelegate.centre(window)
         gateWindow = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
+    /// Puts the window in the middle of the screen. `NSWindow.center()`
+    /// places it a third of the way down instead.
+    private static func centre(_ window: NSWindow) {
+        guard let screen = window.screen ?? NSScreen.main else { return window.center() }
+        let area = screen.visibleFrame
+        let size = window.frame.size
+        window.setFrameOrigin(NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+    }
+
     private static func fixedSizeWindow<V: View>(for view: V) -> NSWindow {
         let hosting = NSHostingController(rootView: view)
         hosting.sizingOptions = []
-        let size = hosting.view.fittingSize
+        // The view's `fittingSize` is zero before its first layout, and a
+        // window centred at 0×0 grows off to the bottom right.
+        let size = hosting.sizeThatFits(in: NSSize(width: CGFloat.infinity, height: .infinity))
         let window = NSWindow(contentViewController: hosting)
         window.isReleasedWhenClosed = false
         window.setContentSize(size)
@@ -493,7 +504,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let window = AppDelegate.fixedSizeWindow(for: view)
         window.title = ModelStore.upgradeTitle
         window.styleMask = [.titled, .closable]
-        window.center()
+        AppDelegate.centre(window)
         upgradeWindow = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -511,7 +522,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let window = AppDelegate.fixedSizeWindow(for: view)
         window.title = "welcome"
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.center()
+        AppDelegate.centre(window)
         onboardingWindow = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
