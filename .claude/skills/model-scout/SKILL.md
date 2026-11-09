@@ -23,7 +23,7 @@ model to update it.
 |---|---|---|---|
 | Speech recognition | FluidAudio Parakeet Ultra (Core ML, Neural Engine), HF revision `95eaa59a`, via FluidAudio 0.18.2 | `TypeMeIt/ModelStore.swift`, `Scripts/asr-model.sh`, `project.yml` | `make asr-eval` (Scripts/asr-eval): WER against an AssemblyAI reference with disagreements hand-checked; add the candidate as one file in `systems/` |
 | Clean-up | Apple Foundation Models, permissive guardrails | `TypeMeIt/PostProcessor.swift` | `make eval` (Scripts/cleanup-eval) |
-| Meeting summaries and titles | Apple Foundation Models | `TypeMeIt/Meetings/MeetingSummary.swift` | `make meeting-eval` |
+| Meeting summaries, titles and tags (standup, 1:1, interview…) | Apple Foundation Models | `TypeMeIt/Meetings/MeetingSummary.swift` | `make meeting-eval` |
 | Opening "Can" check | Apple Foundation Models | `TypeMeIt/OpeningCan.swift` | `make eval` cases |
 | Diarization | Nemotron 3 Diarization, CoreML offline, weights `ga-2026-09-23` | `TypeMeIt/Meetings/Diarizer.swift`, `DiarizerModelStore.swift` | `make asr-eval ARGS=score`: wrong-speaker word rate vs AssemblyAI labels. The Nemotron baseline adapter is still a stub |
 | Ask Claude: finding the question | Claude Haiku via Claude Code (`--model haiku`, no tools or MCP) | `TypeMeIt/Meetings/ClaudeRun.swift` `latestQuestion` | None |

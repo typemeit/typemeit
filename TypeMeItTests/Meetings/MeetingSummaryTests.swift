@@ -43,4 +43,39 @@ struct MeetingSummaryTests {
     @Test func noWordsIsNoParts() {
         #expect(MeetingSummary.parts(of: turns([]), maxWords: 10).isEmpty)
     }
+
+    @Test func aTagKeepsItsRawValueInMeetingJSON() throws {
+        var meeting = MeetingFixtures.meeting(speakers: [], paragraphs: [])
+        meeting.tag = .oneOnOne
+        let read = try #require(Meeting.decode(try meeting.encoded()))
+        #expect(read.tag == .oneOnOne)
+        #expect(String(decoding: try meeting.encoded(), as: UTF8.self).contains("\"oneOnOne\""))
+    }
+
+    @Test func aTagThisBuildDoesNotKnowReadsAsOther() throws {
+        let tag = try JSONDecoder().decode([MeetingTag].self, from: Data(#"["offsite"]"#.utf8))
+        #expect(tag == [.other])
+    }
+
+    @Test func aPlainTextAnswerNamesTheFirstKindInIt() {
+        #expect(MeetingTag(answer: "interview") == .interview)
+        #expect(MeetingTag(answer: "Kind: oneOnOne.") == .oneOnOne)
+        #expect(MeetingTag(answer: "**Standup**") == .standup)
+        #expect(MeetingTag(answer: "a weekly meeting") == nil)
+    }
+
+    @Test func labelsAreShort() {
+        #expect(MeetingTag.oneOnOne.label == "1:1")
+        #expect(MeetingTag.allHands.label == "all hands")
+        #expect(MeetingTag.standup.label == "standup")
+    }
+
+    @Test func theTagPromptCountsSpeakersOnlyOnceSplit() {
+        let split = [MeetingSummary.Turn(speaker: "You", text: "hi"), MeetingSummary.Turn(speaker: "Ana", text: "hello")]
+        #expect(MeetingSummary.tagPrompt(summary: "You and Ana met.", turns: split, words: "hi hello", callName: "Weekly")
+            == "<calendar>Weekly</calendar>\n<speakers>2</speakers>\n<summary>You and Ana met.</summary>\n<transcript>\nhi hello\n</transcript>")
+        let whole = [MeetingSummary.Turn(speaker: "You", text: "hi"), MeetingSummary.Turn(speaker: "Them", text: "hello")]
+        #expect(MeetingSummary.tagPrompt(summary: nil, turns: whole, words: "hi hello", callName: nil)
+            == "<transcript>\nhi hello\n</transcript>")
+    }
 }

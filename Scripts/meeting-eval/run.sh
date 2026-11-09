@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scores the shipped meeting summary and title on cases.json: the app's
+# Scores the shipped meeting summary, title and tag on cases.json: the app's
 # MeetingSummary compiled in, run against Apple Intelligence. Needs macOS 26
 # with Apple Intelligence on.
 set -e

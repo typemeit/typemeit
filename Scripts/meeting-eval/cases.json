@@ -156,7 +156,10 @@
         ]
       ],
       "avoid": []
-    }
+    },
+    "tags": [
+      "review"
+    ]
   },
   {
     "name": "bug-triage-checkout-crash-hotfix",
@@ -241,7 +244,11 @@
         ]
       ],
       "avoid": []
-    }
+    },
+    "tags": [
+      "review",
+      "planning"
+    ]
   },
   {
     "name": "office-move-after-hiking-smalltalk",
@@ -533,6 +540,10 @@
         "owen"
       ]
     },
+    "tags": [
+      "interview",
+      "review"
+    ],
     "wish": "The title names the candidate (\"Owen Backend Candidate\") although the instructions say never to name a person; the candidate is not a speaker."
   },
   {
@@ -623,7 +634,10 @@
       "avoid": [
         "rachel"
       ]
-    }
+    },
+    "tags": [
+      "oneOnOne"
+    ]
   },
   {
     "name": "database-migration-rejected-optimize-instead",
@@ -1064,6 +1078,9 @@
       ],
       "avoid": []
     },
+    "tags": [
+      "planning"
+    ],
     "wish": "The summary runs to 41 words: the outcome sentence lists all three decisions."
   },
   {
@@ -1372,6 +1389,9 @@
         "maria"
       ]
     },
+    "tags": [
+      "customer"
+    ],
     "wish": "The summary runs to 41 words and the title is two (\"App Improvements\"), naming neither scheduling nor the shifts."
   }
 ]

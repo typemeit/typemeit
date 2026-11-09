@@ -7,7 +7,8 @@ import FoundationModels
 /// "Speaker" placeholder, misses every alternative in one of its `mention`
 /// groups, or says anything in `avoid`. A title fails outside
 /// `MeetingSummary.titleWords`, when it names a speaker other than You, or
-/// on its own `mention` and `avoid`. Words match case-insensitively from a word start, so
+/// on its own `mention` and `avoid`. A tag fails when it is not one of the
+/// case's `tags`, the kinds a person would file it under. Words match case-insensitively from a word start, so
 /// "price" also finds "prices". A case with `wish` is reported but never
 /// fails the run.
 struct Checks: Decodable {
@@ -20,6 +21,8 @@ struct Case: Decodable {
     let turns: [MeetingSummary.Turn]
     let summary: Checks
     let title: Checks
+    /// Raw `MeetingTag` values; nil leaves the tag unchecked.
+    let tags: [String]?
     let wish: String?
 }
 
@@ -28,6 +31,7 @@ struct Result: Encodable {
     let words: Int
     let summary: String?
     let title: String?
+    let tag: String?
     let problems: [String]
     let wish: String?
 }
@@ -52,6 +56,7 @@ struct Eval {
         for c in cases {
             let summary = await MeetingSummary.summarise(c.turns)
             let title = await MeetingSummary.title(summary: summary, turns: c.turns)
+            let tag = await MeetingSummary.tag(summary: summary, turns: c.turns)
             var found: [String] = []
             if let summary {
                 let sentences = MeetingSummary.sentenceCount(summary)
@@ -72,11 +77,18 @@ struct Eval {
             } else {
                 found.append("no title")
             }
+            if let tags = c.tags {
+                if let tag {
+                    if !tags.contains(tag.rawValue) { found.append("tag: \(tag.rawValue), not \(tags.joined(separator: " / "))") }
+                } else {
+                    found.append("no tag")
+                }
+            }
             let words = c.turns.reduce(0) { $0 + $1.text.split(separator: " ").count }
             let mark = c.wish != nil ? (found.isEmpty ? "WISH  granted" : "WISH  not yet") : (found.isEmpty ? "PASS" : "FAIL")
-            print("\(mark)  \(c.name) (\(words) words)\n      title:   \(title ?? "none")\n      summary: \(summary ?? "none")")
+            print("\(mark)  \(c.name) (\(words) words)\n      title:   \(title ?? "none")\n      tag:     \(tag?.rawValue ?? "none")\n      summary: \(summary ?? "none")")
             for problem in found { print("      ✗ \(problem)") }
-            results.append(Result(name: c.name, words: words, summary: summary, title: title, problems: found, wish: c.wish))
+            results.append(Result(name: c.name, words: words, summary: summary, title: title, tag: tag?.rawValue, problems: found, wish: c.wish))
         }
         let counted = results.filter { $0.wish == nil }
         let passed = counted.filter(\.problems.isEmpty).count

@@ -109,7 +109,8 @@ enum MeetingProbes {
                     let started = ContinuousClock.now
                     meeting.summary = await MeetingSummary.summarise(meeting.turns)
                     let title = await MeetingSummary.title(summary: meeting.summary, turns: meeting.turns)
-                    DebugLog.write("Meeting probe summary \(meeting.title) → \(title ?? "no title") (\(MeetingSummary.parts(of: meeting.turns, maxWords: MeetingSummary.chunkWords).count) parts, \(ContinuousClock.now - started)): \(meeting.summary ?? "none")")
+                    let tag = await MeetingSummary.tag(summary: meeting.summary, turns: meeting.turns)
+                    DebugLog.write("Meeting probe summary \(meeting.title) → \(title ?? "no title") [\(tag?.label ?? "no tag")] (\(MeetingSummary.parts(of: meeting.turns, maxWords: MeetingSummary.chunkWords).count) parts, \(ContinuousClock.now - started)): \(meeting.summary ?? "none")")
                 }
             }
         }
@@ -135,6 +136,7 @@ enum MeetingProbes {
         meeting.transcription.done = [:]
         meeting.paragraphs = []
         meeting.summary = nil
+        meeting.tag = nil
         // Each save follows a chunk, when the track's words file holds every
         // word so far; kept under another name, since the pass deletes the
         // file at the end, for trying the echo and merge steps against it.

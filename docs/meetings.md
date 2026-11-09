@@ -1877,8 +1877,8 @@ skips everything before the first heading. Strings are written in JSON's
 string syntax, which YAML reads as double-quoted strings, so a title with a
 quote or a line break stays on its line. The user's own speaker is written under the sender's name unless the
 user renamed it: in anyone else's copy, `You` is the wrong person. No audio,
-summary, dictations, device kinds or window names go in the file; the
-recipient's app writes its own summary when the page opens.
+summary, tag, dictations, device kinds or window names go in the file; the
+recipient's app writes its own summary and tag when the page opens.
 
 ```markdown
 ---

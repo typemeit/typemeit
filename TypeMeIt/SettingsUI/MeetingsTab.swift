@@ -18,11 +18,14 @@ struct MeetingsTab: View {
     /// The who filter: meetings with everyone in it.
     @State private var people: Set<String> = []
     @State private var when = SquareWhen.any
+    /// The what filter: one kind of meeting.
+    @State private var tag: MeetingTag?
     @State private var from = ""
     @State private var to = ""
     @State private var whereOpen = false
     @State private var whoOpen = false
     @State private var whenOpen = false
+    @State private var whatOpen = false
     @State private var selection = ListSelection()
     /// Meetings whose stop was clicked, until their transcription lets go.
     @State private var stopping: Set<UUID> = []
@@ -56,6 +59,7 @@ struct MeetingsTab: View {
             search = ""
             place = nil
             people = []
+            tag = nil
             when = .any
             from = ""
             to = ""
@@ -157,6 +161,16 @@ struct MeetingsTab: View {
                          clear: { people = [] }, open: $whoOpen) {
                 WhoMenu(people: $people, counts: personCounts)
             }
+            // Only once Apple Intelligence has tagged a meeting.
+            if tag != nil || store.meetings.contains(where: { $0.tag != nil }) {
+                SquareFilter(label: tag?.label ?? "what", active: tag != nil, clear: { tag = nil }, open: $whatOpen) {
+                    let items = whatItems
+                    SquareMenuList(items: items.map(\.item), minWidth: 180) { i in
+                        tag = items[i].value
+                        whatOpen = false
+                    }
+                }
+            }
             SquareFilter(label: whenLabel, active: whenActive, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
                 SquareWhenPicker(when: $when, from: $from, to: $to)
             }
@@ -217,12 +231,13 @@ struct MeetingsTab: View {
     // MARK: Filtering
 
     private var filtering: Bool {
-        place != nil || !people.isEmpty || whenActive || !search.trimmingCharacters(in: .whitespaces).isEmpty
+        place != nil || !people.isEmpty || tag != nil || whenActive || !search.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func clearFilters() {
         place = nil
         people = []
+        tag = nil
         when = .any
         from = ""
         to = ""
@@ -235,6 +250,7 @@ struct MeetingsTab: View {
         return store.meetings.filter { m in
             if let place, MeetingsTab.app(of: m) != place, MeetingsTab.channel(of: m) != place { return false }
             if !people.isEmpty, !people.isSubset(of: Set(MeetingsTab.others(in: m))) { return false }
+            if let tag, m.tag != tag { return false }
             if !time.contains(m.started) { return false }
             if !q.isEmpty, !MeetingsTab.matches(m, q) { return false }
             return true
@@ -242,9 +258,9 @@ struct MeetingsTab: View {
     }
 
     /// Whether the search finds `query` in the meeting's title, summary,
-    /// speakers' names or what was said.
+    /// tag, speakers' names or what was said.
     nonisolated static func matches(_ meeting: Meeting, _ query: String) -> Bool {
-        let fields = [meeting.title, meeting.summary ?? ""] + meeting.speakers.map(\.name) + meeting.paragraphs.map(\.text)
+        let fields = [meeting.title, meeting.summary ?? "", meeting.tag?.label ?? ""] + meeting.speakers.map(\.name) + meeting.paragraphs.map(\.text)
         return fields.contains { TextSearch.matches($0, query) }
     }
 
@@ -283,6 +299,20 @@ struct MeetingsTab: View {
             for (channel, n) in (channels[app] ?? [:]).sorted(by: { $0.key < $1.key }) {
                 out.append((channel, SquareMenuList.Item(label: channel, checked: place == channel, count: n.formatted(), indent: true)))
             }
+        }
+        return out
+    }
+
+    /// "Any kind", then each kind the meetings have, by how many.
+    private var whatItems: [(value: MeetingTag?, item: SquareMenuList.Item)] {
+        var counts: [MeetingTag: Int] = [:]
+        for m in store.meetings { if let t = m.tag { counts[t, default: 0] += 1 } }
+        let kinds = counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key.label < $1.key.label }
+        var out: [(value: MeetingTag?, item: SquareMenuList.Item)] = [
+            (nil, SquareMenuList.Item(label: "any kind", checked: tag == nil, count: store.meetings.count.formatted())),
+        ]
+        for (kind, count) in kinds {
+            out.append((kind, SquareMenuList.Item(label: kind.label, checked: tag == kind, count: count.formatted())))
         }
         return out
     }
@@ -363,7 +393,7 @@ private struct MeetingsLiveBand: View {
 }
 
 /// A meeting in the list: its select box under the pointer, when, its title
-/// over its summary or how its transcription stands, who was in it, where
+/// and tag over its summary or how its transcription stands, who was in it, where
 /// and how long. A click on the rest opens its page.
 private struct MeetingRow: View {
     let meeting: Meeting
@@ -404,10 +434,19 @@ private struct MeetingRow: View {
                 SquareFingerprint(content: .of(meeting, square, coordinator: coordinator),
                                   side: MeetingFingerprint.side / MeetingFingerprint.fold, cell: MeetingRow.squareCell)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(meeting.title)
-                        .font(Square.sans(13.5))
-                        .foregroundStyle(DesignTokens.Colors.ink)
-                        .lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(meeting.title)
+                            .font(Square.sans(13.5))
+                            .foregroundStyle(DesignTokens.Colors.ink)
+                            .lineLimit(1)
+                        if let tag = meeting.tag, tag != .other {
+                            Text(tag.label)
+                                .font(Square.mono(11))
+                                .foregroundStyle(DesignTokens.Colors.ink3)
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                    }
                     state
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

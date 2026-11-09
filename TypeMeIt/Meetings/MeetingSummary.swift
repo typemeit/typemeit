@@ -33,6 +33,9 @@ enum MeetingSummary {
     static let titleWords = 3...5
     /// The speaker name the app gives the person recording.
     static let you = "You"
+    /// The far end of a call no one has split into speakers yet: one name
+    /// for everyone, so the count of speakers says nothing.
+    static let them = "Them"
 
     /// One paragraph of the transcript under its speaker's name.
     struct Turn: Decodable, Equatable, Sendable {
@@ -224,6 +227,87 @@ enum MeetingSummary {
         }
     }
 
+    /// The kinds the model picks from. Case names are the schema the model
+    /// sees, so they read as words; `tagRules` defines each.
+    @Generable
+    enum Kind: Sendable {
+        case standup, oneOnOne, interview, planning, review, retro, demo, sales, customer, allHands, brainstorm, lesson, catchUp, other
+    }
+
+    @Generable
+    struct Sorted: Sendable {
+        @Guide(description: "the one kind that fits the meeting best")
+        let kind: Kind
+    }
+
+    private static let tagRules = """
+    Pick the one kind that fits best. \
+    standup: a short team round of updates and blockers, each person in turn. \
+    oneOnOne: two people, usually a manager and a report, on work, growth or feedback. \
+    interview: someone assessing a candidate for a job. \
+    planning: deciding scope, priorities, a roadmap or a schedule. \
+    review: going over a piece of work such as a design, code, a document or results, or triaging bugs. \
+    retro: looking back at how a project or sprint went. \
+    demo: showing a product or feature working. \
+    sales: pitching or selling to a prospect. \
+    customer: hearing from or helping an existing customer or user, including user research. \
+    allHands: an update from leaders to a whole team or company. \
+    brainstorm: generating ideas. \
+    lesson: someone teaching or tutoring. \
+    catchUp: social or informal chat with no work agenda. \
+    other: none of these.
+    """
+
+    /// What kind of meeting it was, from the calendar name, how many spoke,
+    /// the summary and words spread across the transcript: the format of a
+    /// standup or an interview shows in the words more than in a summary.
+    /// Nil when Apple Intelligence is unavailable, the meeting has no
+    /// words, or the model declines.
+    static func tag(summary: String?, turns: [Turn], callName: String? = nil) async -> MeetingTag? {
+        guard case .available = SystemLanguageModel.default.availability else { return nil }
+        let words = titleSample(of: turns)
+        guard !words.isEmpty else { return nil }
+        let instructions = "You sort meetings by kind. The user message describes one meeting: its calendar name when it has one, how many people spoke, a summary and words from its transcript. \(tagRules)"
+        let prompt = tagPrompt(summary: summary, turns: turns, words: words, callName: callName)
+        do {
+            return MeetingTag(try await guided(Sorted.self, instructions, to: prompt).kind)
+        } catch let error as LanguageModelSession.GenerationError {
+            switch error {
+            case .guardrailViolation, .refusal: break
+            default:
+                Log.meetings.notice("No meeting tag: \(error.localizedDescription)")
+                return nil
+            }
+            // Interviews and hard conversations are the meetings the default
+            // guardrails refuse; the permissive model answers in plain text.
+            do {
+                let answer = try await LanguageModelSession(model: permissive, instructions: instructions + " Answer with the kind's name only.")
+                    .respond(to: prompt, options: GenerationOptions(sampling: .greedy)).content
+                if let tag = MeetingTag(answer: answer) { return tag }
+                Log.meetings.notice("No meeting tag: answered \(answer.count) characters naming no kind")
+            } catch {
+                Log.meetings.notice("No meeting tag: \(error.localizedDescription)")
+            }
+            return nil
+        } catch {
+            Log.meetings.notice("No meeting tag: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// The tag call's user message. The count of speakers is left out while
+    /// the far end is one `them`, where it would read as a two-person
+    /// meeting whatever the call was. Pure.
+    static func tagPrompt(summary: String?, turns: [Turn], words: String, callName: String?) -> String {
+        var lines: [String] = []
+        if let callName, !callName.isEmpty { lines.append("<calendar>\(callName)</calendar>") }
+        let speakers = Set(turns.map(\.speaker))
+        if !speakers.contains(them) { lines.append("<speakers>\(speakers.count)</speakers>") }
+        if let summary, !summary.isEmpty { lines.append("<summary>\(summary)</summary>") }
+        lines.append("<transcript>\n\(words)\n</transcript>")
+        return lines.joined(separator: "\n")
+    }
+
     /// Guardrails that allow transforming what the user's meeting said, for
     /// a call the default guardrails refuse. They apply to plain-text
     /// answers only, not to `@Generable` ones.
@@ -252,5 +336,57 @@ enum MeetingSummary {
     private static func guided<Content: Generable>(_ content: Content.Type, _ instructions: String, to prompt: String) async throws -> Content {
         try await LanguageModelSession(instructions: instructions)
             .respond(to: prompt, generating: content, options: GenerationOptions(sampling: .greedy)).content
+    }
+}
+
+/// What kind of meeting it was, picked by Apple Intelligence from a fixed
+/// list so the list's filter groups like with like. Stored by raw value in
+/// `meeting.json`; a value this build does not know reads as `other`.
+enum MeetingTag: String, CaseIterable, Codable, Sendable {
+    case standup, oneOnOne, interview, planning, review, retro, demo, sales, customer, allHands, brainstorm, lesson, catchUp, other
+
+    init(_ kind: MeetingSummary.Kind) {
+        switch kind {
+        case .standup: self = .standup
+        case .oneOnOne: self = .oneOnOne
+        case .interview: self = .interview
+        case .planning: self = .planning
+        case .review: self = .review
+        case .retro: self = .retro
+        case .demo: self = .demo
+        case .sales: self = .sales
+        case .customer: self = .customer
+        case .allHands: self = .allHands
+        case .brainstorm: self = .brainstorm
+        case .lesson: self = .lesson
+        case .catchUp: self = .catchUp
+        case .other: self = .other
+        }
+    }
+
+    /// The kind a plain-text answer names: the first raw value it holds as
+    /// a word, ignoring case. Nil when it names none. Pure.
+    init?(answer: String) {
+        for word in answer.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init) {
+            if let tag = MeetingTag.allCases.first(where: { $0.rawValue.lowercased() == word }) {
+                self = tag
+                return
+            }
+        }
+        return nil
+    }
+
+    init(from decoder: Decoder) throws {
+        self = MeetingTag(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .other
+    }
+
+    /// As the list, the filter and the page show it.
+    var label: String {
+        switch self {
+        case .oneOnOne: "1:1"
+        case .allHands: "all hands"
+        case .catchUp: "catch-up"
+        default: rawValue
+        }
     }
 }

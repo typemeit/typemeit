@@ -67,6 +67,7 @@ enum MeetingMerge {
         m.transcription = Meeting.Transcription(state: .pending)
         m.paragraphs = []
         m.summary = nil
+        m.tag = nil
         let moved = (later.questions ?? []).map { question in
             var shifted = question
             shifted.atMs += offset

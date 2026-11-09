@@ -641,6 +641,7 @@ final class MeetingCoordinator {
         meeting.transcription.done = [:]
         meeting.paragraphs = []
         meeting.summary = nil
+        meeting.tag = nil
         // A generated or roster title is made again from the new words; a typed one stays.
         if meeting.titleSource == .generated || meeting.titleSource == .roster {
             meeting.title = meeting.app?.name ?? "Room"
@@ -687,21 +688,23 @@ final class MeetingCoordinator {
     /// Meetings whose summary is being written, for the page's placeholder.
     private(set) var summarising: Set<UUID> = []
 
-    /// Writes what a transcribed meeting lacks from the model: a summary,
-    /// for one from before summaries or one the model declined last time,
-    /// and a title in place of one from the app or the roster, for one
-    /// from before generated titles led the ladder (9.2).
+    /// Writes what a transcribed meeting lacks from the model: a summary
+    /// and a tag, for one from before them or one the model declined last
+    /// time, and a title in place of one from the app or the roster, for
+    /// one from before generated titles led the ladder (9.2).
     func summarise(_ id: UUID) {
         guard let meeting = store.meeting(id), meeting.isDone, !meeting.paragraphs.isEmpty,
               !summarising.contains(id), !liveIDs.contains(id), transcribing?.id != id else { return }
         let needsSummary = meeting.summary == nil
         let needsTitle = Self.titleIsPlaceholder(meeting)
-        guard needsSummary || needsTitle else { return }
+        let needsTag = meeting.tag == nil
+        guard needsSummary || needsTitle || needsTag else { return }
         summarising.insert(id)
         Task {
             var written = meeting
             if needsSummary { written.summary = await MeetingSummary.summarise(meeting.turns) }
             let title = needsTitle ? await MeetingSummary.title(summary: written.summary, turns: meeting.turns, callName: meeting.names?.name) : nil
+            let tag = needsTag ? await MeetingSummary.tag(summary: written.summary, turns: meeting.turns, callName: meeting.names?.name) : nil
             summarising.remove(id)
             guard var latest = store.meeting(id) else { return }
             var changed = false
@@ -712,6 +715,10 @@ final class MeetingCoordinator {
             if let title, Self.titleIsPlaceholder(latest) {
                 latest.title = title
                 latest.titleSource = .generated
+                changed = true
+            }
+            if let tag, latest.tag == nil {
+                latest.tag = tag
                 changed = true
             }
             guard changed else { return }

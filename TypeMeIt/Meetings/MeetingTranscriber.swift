@@ -198,6 +198,9 @@ enum MeetingTranscriber {
                 meeting.title = title
                 meeting.titleSource = .roster
             }
+            if !meeting.paragraphs.isEmpty {
+                meeting.tag = await MeetingSummary.tag(summary: meeting.summary, turns: meeting.turns, callName: meeting.names?.name)
+            }
             if Task.isCancelled { throw Failure.cancelled }
             meeting = await transcode(meeting, in: folder)
             // A pass cancelled before here runs again from these words.

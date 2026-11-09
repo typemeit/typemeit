@@ -399,6 +399,12 @@ struct MeetingPage: View {
             Text(whereLine)
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink)
+            if let tag = meeting.tag {
+                SquareSubhead(text: "what")
+                Text(tag.label)
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink)
+            }
             if let callLine {
                 SquareSubhead(text: "call")
                 Text(callLine)
