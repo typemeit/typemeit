@@ -5,12 +5,12 @@ import store
 
 RUN = pathlib.Path(__file__).resolve().parents[1] / 'diar' / 'run.sh'
 
-def diarize_with(system, name, path):
+def diarize_with(system, name, path, extra=()):
     clip_id = hashlib.sha256(str(path).encode()).hexdigest()[:12]
     target = store.sub('wav') / f'{clip_id}.wav'
     if not target.exists():
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(path), '-ac', '1', '-ar', '16000', str(target)], check=True)
-    stdout = subprocess.run([str(RUN), system, str(target)], capture_output=True, text=True, check=True).stdout
+    stdout = subprocess.run([str(RUN), system, str(target), *extra], capture_output=True, text=True, check=True).stdout
     # FluidAudio's offline pipeline can print to stdout after the result; the result is the first value.
     out, end = json.JSONDecoder().raw_decode(stdout)
     if stdout[end:].strip():

@@ -22,6 +22,7 @@ make asr-eval ARGS="run fluid-speech-mini"  # FluidVoice's Fluid Speech Mini, Co
 make asr-eval ARGS="run granite-nar"     # Granite Speech 4.1 2B NAR, transcribe.cpp Q8_0 on Metal; first run builds transcribe.cpp and downloads 2.5 GB
 make asr-eval ARGS="run nemotron"        # diarizer; needs a CLI, see below
 make asr-eval ARGS="run nemotron_app"    # diarizer: the turns plus the app's per-speaker embeddings and short-speaker merge; FLUIDAUDIO_VERSION=x.y.z builds against another tag
+make asr-eval ARGS="run nemotron_app_window"  # nemotron_app plus the cap the call's meeting window sets (SpeakerCount, SpeakerMerge.capped)
 make asr-eval ARGS="disagree"            # writes review.jsonl
 make asr-eval ARGS="review"              # plays each span (ffmpeg + afplay); number, t=type, r=replay, s=skip, q=quit
 make asr-eval ARGS="review --between fluid-ultra fluid-orukeet"  # only spans where those two differ, dictations first
@@ -96,6 +97,10 @@ that disagree, the metric in `Diarizer.swift` and docs/meetings.md 8.2.
 `SpeakerMerge.swift` copied in and its constants read from `Settings.swift`. `nemotron` is
 `Diarizer.turns`; `nemotron_app` adds what `Diarizer.run` and `MeetingTranscriber.speakers` do next on
 a track with no window count: one WeSpeaker embedding per speaker from its longest 30 s, then
-`SpeakerMerge.absorbingShort`. It builds against the FluidAudio tag `project.yml` pins, or
+`SpeakerMerge.absorbingShort`. `nemotron_app_window` (`run.sh nemotron-app-window <audio.wav>
+<meeting.json>`) also applies the window's count, as a call does: `SpeakerCount.swift` is copied in,
+reads the roster and speaking spans from the meeting.json beside the track, with its stored paragraphs
+standing in for the words, and `SpeakerMerge.capped` folds voices down to that cap. Score it against a
+track's who-spoke-when truths with `speaker-score` to check a change to how many voices a call keeps. It builds against the FluidAudio tag `project.yml` pins, or
 `FLUIDAUDIO_VERSION`, each in its own `build/asr-eval-diar-<version>`. Outputs are cached by
 diarizer name: rename the reference dir's `diarizers/nemotron_app` (e.g. to `nemotron_app-0.17.5`) to keep one version's run beside the next.
