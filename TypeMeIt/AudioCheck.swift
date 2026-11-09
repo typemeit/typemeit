@@ -129,16 +129,11 @@ enum AudioCheck {
         let lines = AudioProcesses.snapshot().filter { $0.input || $0.output }.map { info in
             let name = ProcessOwner.owner(of: info, apps: apps)?.name ?? info.bundleID ?? "pid \(info.pid)"
             var uses: [String] = []
-            if info.input { uses.append("in on \(deviceNames(AudioProcesses.devices(of: info.objectID, input: true)))") }
-            if info.output { uses.append("out on \(deviceNames(AudioProcesses.devices(of: info.objectID, input: false)))") }
+            if info.input { uses.append("in on \(AudioProcesses.deviceNames(AudioProcesses.devices(of: info.objectID, input: true)))") }
+            if info.output { uses.append("out on \(AudioProcesses.deviceNames(AudioProcesses.devices(of: info.objectID, input: false)))") }
             return "  \(name)\(info.pid == ourPID ? " (type me it)" : ""): " + uses.joined(separator: " · ")
         }
         return lines.isEmpty ? ["  none"] : lines
-    }
-
-    private static func deviceNames(_ ids: [AudioObjectID]) -> String {
-        let names = ids.map { MeetingCapture.string($0, kAudioDevicePropertyDeviceNameCFString) ?? "device \($0)" }
-        return names.isEmpty ? "unknown" : names.joined(separator: ", ")
     }
 
     private static func ourStateLine() -> String {

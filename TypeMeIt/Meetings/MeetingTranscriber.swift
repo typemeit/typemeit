@@ -122,18 +122,23 @@ enum MeetingTranscriber {
             let talkers = meeting.names.map {
                 SpeakerCount.farEndTalkers(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
             } ?? []
+            let farEndSpoke = SpeakerCount.spoke(farEndWords, minimumMs: speakerMs)
             let userTile = meeting.names.flatMap {
-                SpeakerCount.userTile(spans: $0.spans, farEnd: farEndWords, mic: micWords, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
+                SpeakerCount.user(roster: $0.roster, macName: NSFullUserName(), spans: $0.spans, farEnd: farEndWords, mic: micWords,
+                                  farEndSpoke: farEndSpoke, lagMs: Fixed.meetingUILagMs, minimumMs: speakerMs)
             }
-            if let userTile { meeting.names?.user = userTile }
+            meeting.names?.user = userTile
             let userName = userTile ?? NSFullUserName()
             let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: userName) }
-            let silent = meeting.names.map { RoomVoices.silentNames($0, userName: userName) } ?? []
+            let silent = meeting.names.map { RoomVoices.silentNames($0, userName: userName, farEndSpoke: farEndSpoke) } ?? []
             let previousSpeakers = meeting.speakers
             let speakersBegan = ContinuousClock.now
             let segments = await speakers(of: &meeting, in: folder, count: count)
             if Task.isCancelled { throw Failure.cancelled }
-            let room = await roomVoices(of: meeting, in: folder, silent: silent, farEnd: farEndWords, farEndVoices: max(talkers.count, 1), micEnvelope: rms[.mic])
+            // With the far end silent, the other people's lit tiles say which mic voice is theirs.
+            let othersLit = farEndSpoke ? [] : (meeting.names?.spans ?? []).filter { !SpeakerAssign.isUser($0.name, userName: userName) }
+            let room = await roomVoices(of: meeting, in: folder, silent: silent, othersLit: othersLit, farEnd: farEndWords,
+                                        farEndVoices: max(talkers.count, 1), micEnvelope: rms[.mic])
             if Task.isCancelled { throw Failure.cancelled }
             meeting.transcription.speakersMs = (ContinuousClock.now - speakersBegan).milliseconds
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
@@ -303,7 +308,7 @@ enum MeetingTranscriber {
     /// would risk being split in two, with nobody to name the second half.
     /// The diarizer is capped at the user, the silent names and, on an
     /// echo-affected call, the far end's voices coming back.
-    private static func roomVoices(of meeting: Meeting, in folder: URL, silent: [String], farEnd: [Transcriber.Word], farEndVoices: Int, micEnvelope: [Float]?) async -> RoomVoices.Split? {
+    private static func roomVoices(of meeting: Meeting, in folder: URL, silent: [String], othersLit: [MeetingNames.Span], farEnd: [Transcriber.Word], farEndVoices: Int, micEnvelope: [Float]?) async -> RoomVoices.Split? {
         guard meeting.kind == .call, !silent.isEmpty, let micEnvelope, DiarizerModelStore.isInstalled,
               let track = meeting.tracks.first(where: { $0.role == .mic }) else { return nil }
         let cap = 1 + silent.count + (meeting.echo == .affected ? farEndVoices : 0)
@@ -311,7 +316,8 @@ enum MeetingTranscriber {
             let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: .atMost(cap))
             let segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
             let echo = RoomVoices.echoVoices(segments, farEnd: farEnd, echoShare: Fixed.meetingEchoVoiceShare)
-            let split = RoomVoices.split(segments, echo: echo, loudness: RoomVoices.loudness(segments, envelope: micEnvelope, envelopeHz: rmsEnvelopeHz))
+            let split = RoomVoices.split(segments, echo: echo, loudness: RoomVoices.loudness(segments, envelope: micEnvelope, envelopeHz: rmsEnvelopeHz),
+                                         othersLit: othersLit)
             DebugLog.write("Meeting room voices: \(counted(Set(segments.map(\.speaker)).count, "voice")) on the mic, \(echo.count) echo, \(counted(split?.others.count ?? 0, "person")) beside the user")
             return split
         } catch {
