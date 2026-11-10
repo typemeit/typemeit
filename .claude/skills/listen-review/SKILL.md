@@ -66,6 +66,9 @@ answers can be extrapolated. Spans a truth already settles are skipped.
   person by name ({"P1": "Ana", ...}), keys 1–9, 0 for several or can't tell.
   No voice samples: the user knows the people. The names file stays in the
   scratchpad; truths keep only P1, P2…, since the vault is in the public repo.
+  Notes typed on the page stay out of the truths (`truths-import` prints
+  them instead): a person not on the buttons goes in with `people-add` under
+  the next P id.
   Seed it with what the user already named (`people-add`), and score
   diarizers with `speaker-score`. Answers here are truths (`truths-import`).
 

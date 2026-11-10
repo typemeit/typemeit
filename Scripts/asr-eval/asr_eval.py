@@ -350,15 +350,19 @@ def truths_import(args):
     answers = latest_answers(args.set)
     add_truths([{'id': hashlib.sha1(f"{args.set}|{item['key']}|{answer['at']}".encode()).hexdigest()[:16],
                  'clip': item['clip'], 'startMs': item['gapStartMs'], 'endMs': item['gapEndMs'], **answer_fields(item, answer),
-                 'note': answer.get('note', ''), 'set': args.set, 'by': args.by, 'at': answer['at']}
+                 'set': args.set, 'by': args.by, 'at': answer['at']}
                 for item in built['items'] if (answer := answers.get(item['key']))], f'from {args.set}')
+    for item in built['items']:
+        if item.get('people') and (note := answers.get(item['key'], {}).get('note')):
+            print(f"note left out of {item['key']}: {note} (a person off the buttons goes in with people-add)")
 
 def answer_fields(item, answer):
-    """What an answer says: which person spoke, for a people item, or else what was said."""
+    """What an answer says: which person spoke, for a people item, or else what was said. A people answer's
+    note stays out: typed beside a row of names it is usually a name, and the vault sits in the public repo."""
     if item.get('people'):
-        return {'said': None, 'person': None if answer['choice'] == review_server.NONE_OF_THESE else item['names'][answer['choice']]}
+        return {'said': None, 'person': None if answer['choice'] == review_server.NONE_OF_THESE else item['names'][answer['choice']], 'note': ''}
     return {'said': said_by_answer(item, answer), 'answer': answer['answer'], 'choice': answer.get('choice'),
-            'before': item['before'], 'after': item['after']}
+            'before': item['before'], 'after': item['after'], 'note': answer.get('note', '')}
 
 def add_truths(truths, origin):
     known = {t['id'] for t in store.read_jsonl(truths_path())}
