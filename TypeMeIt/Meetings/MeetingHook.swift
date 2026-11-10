@@ -10,8 +10,11 @@ struct MeetingHook: Codable, Identifiable, Equatable, Sendable {
     var id = UUID()
     var name: String
     var prompt = ""
-    /// Off, run hooks leaves it out.
+    /// Off, run hooks leaves it out unless it is ticked for one run.
     var on = true
+
+    /// Only a hook with a prompt has anything to run.
+    var runnable: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     /// The hooks kept in `defaults`; none when there are none or they can't be read.
     static func stored(in defaults: UserDefaults) -> [MeetingHook] {

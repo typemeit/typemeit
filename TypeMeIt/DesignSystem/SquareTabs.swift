@@ -13,7 +13,8 @@ struct SquareTab: Hashable {
 
 /// Tabs over a framed panel: the picked tab is a slab joined to the panel's
 /// ink frame, the rest are ink3 labels. A running tab shows a spinner, a
-/// failed one says so after its name.
+/// failed one says so after its name. The content brings its own padding, so
+/// a scroll inside the panel runs to the frame.
 ///
 /// Picking another tab moves the slab there in four hard steps, and the tab
 /// it left keeps a dithered ghost of it that thins out over a few frames.
@@ -42,54 +43,71 @@ struct SquareTabs<Trailing: View, Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    let onSlab = isUnderSlab(index)
-                    Button { picked = index } label: {
-                        HStack(spacing: 6) {
-                            if tab.state == .running {
-                                SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, onSlab)
-                            }
-                            Text(tab.name)
-                            if tab.state == .failed {
-                                Text("· failed").foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
-                            }
-                        }
-                        .font(Square.mono(12))
-                        .foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .contentShape(Rectangle())
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(squareTabsStrip)) } action: { frame in
-                            frames[index] = frame
-                            if index == picked && jump == nil { slab = frame }
-                        }
+                // Tabs past the panel's width scroll sideways, the picked one kept in view.
+                ScrollViewReader { reader in
+                    ScrollView(.horizontal) {
+                        strip
                     }
-                    .buttonStyle(.plain)
+                    .scrollIndicators(.never)
+                    .onAppear { reader.scrollTo(picked) }
+                    .onChange(of: picked) { _, now in withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(now) } }
                 }
                 Spacer(minLength: 12)
                 trailing()
             }
-            .background(alignment: .topLeading) {
-                ZStack(alignment: .topLeading) {
-                    if let ghost, ghostLevel > 0 {
-                        SquareDither(level: ghostLevel, color: DesignTokens.Colors.slab)
-                            .frame(width: ghost.width, height: ghost.height)
-                            .offset(x: ghost.minX, y: ghost.minY)
-                    }
-                    if let slab {
-                        Rectangle()
-                            .fill(DesignTokens.Colors.slab)
-                            .frame(width: slab.width, height: slab.height)
-                            .offset(x: slab.minX, y: slab.minY)
-                    }
-                }
-            }
-            .coordinateSpace(.named(squareTabsStrip))
             content(picked)
-                .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(Rectangle().stroke(DesignTokens.Colors.ink, lineWidth: 1))
         }
         .onChange(of: picked) { _, index in jumpSlab(to: index) }
+    }
+
+    /// The tabs over the slab and the ghost it leaves, measured in their own space.
+    private var strip: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                let onSlab = isUnderSlab(index)
+                Button { picked = index } label: {
+                    HStack(spacing: 6) {
+                        if tab.state == .running {
+                            SquareSpinner().frame(width: 9, height: 9).environment(\.squareOnSlab, onSlab)
+                        }
+                        Text(tab.name)
+                        if tab.state == .failed {
+                            Text("· failed").foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.diffRemove)
+                        }
+                    }
+                    .font(Square.mono(12))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink3)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .contentShape(Rectangle())
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(squareTabsStrip)) } action: { frame in
+                        frames[index] = frame
+                        if index == picked && jump == nil { slab = frame }
+                    }
+                }
+                .buttonStyle(.plain)
+                .id(index)
+            }
+        }
+        .background(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                if let ghost, ghostLevel > 0 {
+                    SquareDither(level: ghostLevel, color: DesignTokens.Colors.slab)
+                        .frame(width: ghost.width, height: ghost.height)
+                        .offset(x: ghost.minX, y: ghost.minY)
+                }
+                if let slab {
+                    Rectangle()
+                        .fill(DesignTokens.Colors.slab)
+                        .frame(width: slab.width, height: slab.height)
+                        .offset(x: slab.minX, y: slab.minY)
+                }
+            }
+        }
+        .coordinateSpace(.named(squareTabsStrip))
     }
 
     /// The slab covers the middle of this tab, so its label is drawn on the

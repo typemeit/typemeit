@@ -20,6 +20,11 @@ struct MeetingHookTests {
         #expect(MeetingHook.notYetRun([decisions, actions], on: meeting([("decisions", false)])) == [actions])
     }
 
+    @Test func onlyAHookWithAPromptIsRunnable() {
+        #expect(decisions.runnable)
+        #expect(!MeetingHook(name: "blank", prompt: " \n").runnable)
+    }
+
     @Test func aHookThatFailedRunsAgain() {
         #expect(MeetingHook.notYetRun([decisions, actions], on: meeting([("decisions", true), ("action items", false)])) == [decisions])
     }

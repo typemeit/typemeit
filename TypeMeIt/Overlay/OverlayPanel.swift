@@ -121,6 +121,7 @@ final class OverlayPanel {
         // Lightning on the pin, and again as the dictation ends.
         if state == .pinned || (state == .transcribing && model.isRecording) { model.struckAt = Date() }
         model.closeNow = false
+        model.hookTrayOpen = false
         model.state = state
         resample()
         model.copied = false

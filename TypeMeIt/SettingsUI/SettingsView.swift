@@ -2,12 +2,12 @@ import SwiftUI
 
 enum SettingsTab: String, CaseIterable {
     // The order the sidebar lists them in.
-    case meetings, history, insights, dictionary, settings
+    case meetings, hooks, history, insights, dictionary, settings
 
     /// The tabs this build shows. Insights are built on window titles, which
     /// the sandbox cannot read, so a sandboxed build has no insights page.
     static var available: [SettingsTab] {
-        allCases.filter { ($0 != .insights || Sandbox.readsOtherApps) && ($0 != .meetings || Sandbox.hasMeetings) }
+        allCases.filter { ($0 != .insights || Sandbox.readsOtherApps) && ($0 != .meetings && $0 != .hooks || Sandbox.hasMeetings) }
     }
 
     var title: String { self == .history ? "dictations" : rawValue }
@@ -17,6 +17,7 @@ enum SettingsTab: String, CaseIterable {
         case .insights: "akar-statistic-up"
         case .history: "akar-chat-dots"
         case .meetings: "akar-people-group"
+        case .hooks: "akar-sparkles"
         case .dictionary: "akar-text-align-left"
         case .settings: "akar-gear"
         }
@@ -100,7 +101,7 @@ struct SettingsView: View {
     /// meeting's page replaces.
     @ViewBuilder private var header: some View {
         switch tab {
-        case .history, .meetings:
+        case .history, .meetings, .hooks:
             EmptyView()
         case .dictionary:
             SquarePageHeader(title: tab.title, count: counted(settings.customWords.count, "word"), status: learnedStatus)
@@ -116,6 +117,7 @@ struct SettingsView: View {
             switch tab {
             case .history, .insights: EmptyView()
             case .meetings: MeetingsTab(showSettings: { open(.meetings) })
+            case .hooks: HooksPage()
             case .dictionary: DictionaryTab()
             case .settings: OnePageSettings(open: $openSections, reveal: $reveal)
             }

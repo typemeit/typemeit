@@ -45,8 +45,8 @@ final class MeetingCoordinator {
     private(set) var recordingMinutes = 0
     private(set) var levels: (mic: Float, others: Float?) = (0, nil)
     private(set) var transcribing: Transcribing?
-    /// The hook running now on each meeting whose hooks are running.
-    private(set) var runningHooks: [UUID: RunningHook] = [:]
+    /// The hooks running now on each meeting whose hooks are running.
+    private(set) var runningHooks: [UUID: [RunningHook]] = [:]
     /// `transcribeSoFar` is running.
     private(set) var transcribingSoFar = false
     /// The question Claude is answering for a meeting, shown on its page.
@@ -56,14 +56,15 @@ final class MeetingCoordinator {
     /// Ask is transcribing or finding its question, before Claude Code
     /// starts on it; until then the question's text names the step.
     private(set) var askPreparing = false
-    /// The Claude Code run of each meeting's running hook, for its cancel.
+    /// The Claude Code run of each running hook, by its run's id, for its cancel.
     @ObservationIgnored private var hookRuns: [UUID: ClaudeRun] = [:]
-    /// Meetings whose hooks were cancelled: the running one stops and the rest are skipped.
+    /// Meetings whose hooks were cancelled: every one still running stops.
     @ObservationIgnored private var cancelledHooks: Set<UUID> = []
 
     /// A hook running on a meeting: its run's id, which its output is kept under.
     struct RunningHook: Equatable {
         let runID: UUID
+        let hookID: UUID
         let name: String
     }
     private(set) var systemAudioTest: SystemAudioTest = .notTested
@@ -210,7 +211,11 @@ final class MeetingCoordinator {
             self.dismissToast()
         }
         model.onCancelAsk = { [weak self] in self?.cancelAsk() }
-        model.onRunHooks = { [weak self] id in self?.dismissToast(); self?.runHooks(id) }
+        model.onRunHooks = { [weak self] id, hookIDs in
+            self?.dismissToast()
+            self?.showTab(id)
+            self?.runHooks(id, only: hookIDs)
+        }
         Pipeline.shared.shortcuts.onReturn = { [weak self] in self?.askDictatedOnReturn() ?? false }
         model.onOpenAsk = { [weak self] in self?.openAsk() }
         model.onContinueInClaude = { [weak self] sessionID in
@@ -856,77 +861,90 @@ final class MeetingCoordinator {
 
     // MARK: Hooks
 
-    /// The hooks run hooks runs: switched on, with a prompt.
-    private var hooksToRun: [MeetingHook] {
-        settings.meetingHooks.filter { $0.on && !$0.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    }
+    /// The hooks that can run: those with a prompt.
+    var runnableHooks: [MeetingHook] { settings.meetingHooks.filter(\.runnable) }
 
     /// Claude Code can run and there is a hook to run.
-    var hooksReady: Bool { ClaudeRun.isAvailable && !hooksToRun.isEmpty }
+    var hooksReady: Bool { ClaudeRun.isAvailable && !runnableHooks.isEmpty }
 
     /// The hooks run hooks would run on the meeting now.
     func hooksToRun(on meeting: Meeting) -> [MeetingHook] {
-        MeetingHook.notYetRun(hooksToRun, on: meeting)
+        MeetingHook.notYetRun(runnableHooks.filter(\.on), on: meeting)
     }
 
-    /// Runs every hook switched on that has not run on the finished meeting,
-    /// one after another, keeping each output in the meeting as it lands.
-    /// Only ever from a button: the meeting's pill or its page.
-    func runHooks(_ id: UUID) {
-        guard runningHooks[id] == nil, var source = store.meeting(id), source.isDone else { return }
-        let hooks = hooksToRun(on: source)
-        guard let first = hooks.first else { return }
+    /// Runs hooks over the finished meeting all at once, keeping each output
+    /// in the meeting as it lands: `only` those, or every hook switched on
+    /// that has not run on it. Only ever from a button: the meeting's pill
+    /// or its page.
+    func runHooks(_ id: UUID, only hookIDs: [UUID]? = nil) {
+        guard runningHooks[id] == nil, let source = store.meeting(id), source.isDone else { return }
+        let hooks = hookIDs.map { picked in runnableHooks.filter { picked.contains($0.id) } } ?? hooksToRun(on: source)
+        guard !hooks.isEmpty else { return }
         ClaudeCheck.shared.recheckIfStale()
-        runningHooks[id] = RunningHook(runID: UUID(), name: first.name)
+        let running = hooks.map { RunningHook(runID: UUID(), hookID: $0.id, name: $0.name) }
+        runningHooks[id] = running
         cancelledHooks.remove(id)
+        var meeting = source
         // Earlier runs' output is not the meeting.
-        source.hookRuns = nil
-        let transcript = TranscriptRender.markdown(source)
+        meeting.hookRuns = nil
+        let transcript = TranscriptRender.markdown(meeting)
         let folder = URL(fileURLWithPath: settings.askClaudeFolder, isDirectory: true)
         let model = settings.askClaudeModel
         let tools = settings.askClaudeTools
         let permissionMode = settings.askClaudePermissionMode
         let userSystemPrompt = settings.askClaudeSystemPrompt
         DebugLog.write("Hooks: running \(counted(hooks.count, "hook")) on meeting \(id)")
+        // Each hook starts now in a task of its own; each waits on its own
+        // Claude Code process, so they run side by side.
+        let runs = zip(hooks, running).map { hook, slot in
+            Task { [weak self] in
+                await self?.runHook(hook, runID: slot.runID, on: id, transcript: transcript, folder: folder, model: model,
+                                    tools: tools, permissionMode: permissionMode, userSystemPrompt: userSystemPrompt) ?? true
+            }
+        }
         Task { [weak self] in
             var failures = 0
-            for hook in hooks {
-                guard let self, !self.cancelledHooks.contains(id) else { break }
-                let runID = UUID()
-                self.runningHooks[id] = RunningHook(runID: runID, name: hook.name)
-                var answer = ClaudeRun.Answer(text: "Claude Code isn't installed. Get it at claude.com/claude-code.", seconds: 0, costUSD: nil, failed: true)
-                var calls: [Meeting.ToolCall]?
-                if let run = ClaudeRun.hook(prompt: hook.prompt, transcript: transcript, folder: folder, model: model, allowedTools: tools,
-                                            permissionMode: permissionMode, userSystemPrompt: userSystemPrompt) {
-                    self.hookRuns[id] = run
-                    ClaudeLive.shared.start(runID, prompt: hook.prompt, run: run) { [weak self] in self?.cancelHooks(id) }
-                    answer = await run.answer()
-                    ClaudeLive.shared.finish(runID)
-                    calls = ClaudeLive.shared.calls(runID)
-                    self.hookRuns[id] = nil
-                }
-                if self.cancelledHooks.contains(id) {
-                    answer = ClaudeRun.Answer(text: "Cancelled.", seconds: answer.seconds, costUSD: answer.costUSD, failed: true)
-                }
-                if answer.failed { failures += 1 }
-                self.keep(Meeting.HookRun(id: runID, name: hook.name, prompt: hook.prompt, ranAt: Date(), output: answer.text, failed: answer.failed, sessionID: answer.sessionID, calls: calls), in: id)
-            }
+            for run in runs where !(await run.value) { failures += 1 }
             guard let self else { return }
             self.runningHooks[id] = nil
             let cancelled = self.cancelledHooks.remove(id) != nil
             DebugLog.write("Hooks: \(counted(hooks.count, "hook")) on meeting \(id) \(cancelled ? "cancelled" : "done"), \(failures) failed")
-            // Cancelled from the page, which shows how far they got. A prompt or
-            // answer standing in the pill is left alone too.
-            guard !cancelled, !self.overlay.model.state.isStanding else { return }
+            // Cancelled from the page, which shows how far they got; the
+            // meetings page shows the results itself. A prompt or answer
+            // standing in the pill is left alone too.
+            guard !cancelled, AppState.shared.visibleTab != .meetings, !self.overlay.model.state.isStanding else { return }
             self.toast(.meetingHooksDone(id: id, ran: hooks.count, failed: failures))
         }
     }
 
-    /// Stops the meeting's running hook and skips the ones after it.
-    private func cancelHooks(_ id: UUID) {
-        guard runningHooks[id] != nil else { return }
+    /// One hook's run, kept in the meeting when it ends; true when it worked.
+    private func runHook(_ hook: MeetingHook, runID: UUID, on id: UUID, transcript: String, folder: URL, model: String,
+                         tools: [String], permissionMode: String, userSystemPrompt: String) async -> Bool {
+        var answer = ClaudeRun.Answer(text: "Claude Code isn't installed. Get it at claude.com/claude-code.", seconds: 0, costUSD: nil, failed: true)
+        var calls: [Meeting.ToolCall]?
+        if let run = ClaudeRun.hook(prompt: hook.prompt, transcript: transcript, folder: folder, model: model, allowedTools: tools,
+                                    permissionMode: permissionMode, userSystemPrompt: userSystemPrompt) {
+            hookRuns[runID] = run
+            ClaudeLive.shared.start(runID, prompt: hook.prompt, run: run) { [weak self] in self?.cancelHooks(id) }
+            answer = await run.answer()
+            ClaudeLive.shared.finish(runID)
+            calls = ClaudeLive.shared.calls(runID)
+            hookRuns[runID] = nil
+        }
+        if cancelledHooks.contains(id) {
+            answer = ClaudeRun.Answer(text: "Cancelled.", seconds: answer.seconds, costUSD: answer.costUSD, failed: true)
+        }
+        runningHooks[id]?.removeAll { $0.runID == runID }
+        keep(Meeting.HookRun(id: runID, name: hook.name, prompt: hook.prompt, ranAt: Date(), output: answer.text, failed: answer.failed,
+                             sessionID: answer.sessionID, calls: calls), in: id)
+        return !answer.failed
+    }
+
+    /// Stops every hook running on the meeting.
+    func cancelHooks(_ id: UUID) {
+        guard let running = runningHooks[id] else { return }
         cancelledHooks.insert(id)
-        hookRuns[id]?.cancel()
+        for slot in running { hookRuns[slot.runID]?.cancel() }
     }
 
     private func keep(_ run: Meeting.HookRun, in id: UUID) {

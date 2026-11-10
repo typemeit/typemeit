@@ -101,15 +101,18 @@ private struct SquareButtonLabelStyle: LabelStyle {
 /// square; held, ink-a12. Disabled fades to 40%.
 struct SquareIconButtonStyle: ButtonStyle {
     var side: CGFloat = 26
+    /// A hairline box, for an icon that is one of a prompt's actions.
+    var bordered = false
 
     func makeBody(configuration: Configuration) -> some View {
-        SquareIconButtonBody(configuration: configuration, side: side)
+        SquareIconButtonBody(configuration: configuration, side: side, bordered: bordered)
     }
 }
 
 private struct SquareIconButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let side: CGFloat
+    let bordered: Bool
     @Environment(\.isEnabled) private var enabled
     @Environment(\.squarePose) private var pose
     @Environment(\.squareOnSlab) private var onSlab
@@ -123,6 +126,7 @@ private struct SquareIconButtonBody: View {
             .foregroundStyle(foreground)
             .frame(width: side, height: side)
             .background(Rectangle().fill(wash))
+            .overlay { if bordered { Rectangle().strokeBorder(foreground, lineWidth: DesignTokens.hairline) } }
             .opacity(enabled ? 1 : 0.4)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
