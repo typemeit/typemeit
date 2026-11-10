@@ -48,6 +48,34 @@ enum SpeakerCount: Equatable, Sendable {
             .max { heard.micMs[$0]! < heard.micMs[$1]! }
     }
 
+    /// The user's name as the call shows it. The one roster name that is
+    /// the Mac's own name, the first name shortened or not, comes first;
+    /// then the user's tile, but only when `farEndSpoke`: with the far end
+    /// silent the loudspeaker put everyone on the mic, and every lit tile
+    /// looks like the user's.
+    static func user(roster: [String], macName: String, spans: [MeetingNames.Span], farEnd: [Transcriber.Word], mic: [Transcriber.Word],
+                     farEndSpoke: Bool, lagMs: Int, minimumMs: Int) -> String? {
+        let own = roster.filter { SpeakerAssign.isUser($0, userName: macName) }
+        if own.count == 1 { return own[0] }
+        guard farEndSpoke else { return nil }
+        return userTile(spans: spans, farEnd: farEnd, mic: mic, lagMs: lagMs, minimumMs: minimumMs)
+    }
+
+    /// The names lit since `sinceMs`, the user's own tile left out by the
+    /// Mac's name.
+    static func talking(_ spans: [MeetingNames.Span], sinceMs: Int, excluding macName: String) -> [String] {
+        var lit: [String] = []
+        for span in spans where span.endMs > sinceMs && !SpeakerAssign.isUser(span.name, userName: macName) && !lit.contains(span.name) {
+            lit.append(span.name)
+        }
+        return lit
+    }
+
+    /// Whether `words` hold at least `minimumMs` of speech.
+    static func spoke(_ words: [Transcriber.Word], minimumMs: Int) -> Bool {
+        wordMs(words, from: .min, to: .max) >= minimumMs
+    }
+
     /// Milliseconds of each track's words inside each name's spans, names in first-span order.
     private static func heard(spans: [MeetingNames.Span], farEnd: [Transcriber.Word], mic: [Transcriber.Word], lagMs: Int) -> (order: [String], farEndMs: [String: Int], micMs: [String: Int]) {
         var order: [String] = []

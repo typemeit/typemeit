@@ -247,7 +247,7 @@ enum SpeakerNaming {
         }
     }
 
-    private static func overlap(segments: [SpeakerSegment], spans: [MeetingNames.Span]) -> Int {
+    static func overlap(segments: [SpeakerSegment], spans: [MeetingNames.Span]) -> Int {
         var total = 0
         for segment in segments {
             for span in spans {

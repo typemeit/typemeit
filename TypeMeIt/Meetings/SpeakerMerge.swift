@@ -100,7 +100,7 @@ enum SpeakerMerge {
     /// Two turns this close count as next to each other.
     private static let borderMs = 1000
 
-    private static func talkMs(_ segments: [SpeakerSegment]) -> [String: Int] {
+    static func talkMs(_ segments: [SpeakerSegment]) -> [String: Int] {
         var talk: [String: Int] = [:]
         for s in segments { talk[s.speaker, default: 0] += s.endMs - s.startMs }
         return talk

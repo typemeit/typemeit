@@ -388,6 +388,7 @@ final class MeetingCoordinator {
                 id: id, kind: kind, folder: MeetingFolder.staged(id), mic: handOver?.capture.mic ?? mic, preRoll: handOver,
                 onLevels: { [weak self] mic, others in Task { @MainActor in self?.levels = (mic, others) } },
                 onSilenceChanged: { [weak self] silent in Task { @MainActor in self?.silenceChanged(silent) } },
+                onFarEndSilent: { [weak self] in Task { @MainActor in self?.farEndSilent() } },
                 onDiskFull: { [weak self] in Task { @MainActor in self?.stoppedForDisk = true; self?.send(.stop) } },
                 onFailed: { [weak self] _ in Task { @MainActor in self?.send(.stop) } })
             self.recorder = recorder
@@ -503,6 +504,22 @@ final class MeetingCoordinator {
             guard !Task.isCancelled else { return }
             self?.send(.bothSilent)
         }
+    }
+
+    /// The tap at the floor while the mic hears the call: rebuilt once per
+    /// stretch when the window showed someone other than the user talking
+    /// in it. Without names, only when the far end has never been heard:
+    /// a user talking alone for the window is common, and a rebuild cuts
+    /// their mic for a moment. A far end that only listens is left alone.
+    private func farEndSilent() {
+        guard recording?.kind == .call, let recorder else { return }
+        DebugLog.write("Meeting far end silent: \(recorder.tapDelivery) · \(AudioProcesses.route(of: inProgress?.owner))")
+        let sinceMs = Int((secondsRecorded - TimeInterval(Fixed.meetingSilentSeconds)) * 1000)
+        let talking = roster?.peek().map { SpeakerCount.talking($0.spans, sinceMs: sinceMs, excluding: NSFullUserName()) }
+        if let talking, talking.isEmpty { return }
+        if talking == nil, recorder.farEndWasHeard { return }
+        DebugLog.write("Meeting tap silent while \(talking.map { counted($0.count, "other person") + " talked" } ?? "names are not read and the far end was never heard"); rebuilding the capture")
+        recorder.capture?.rebuildTap()
     }
 
     // MARK: The user
