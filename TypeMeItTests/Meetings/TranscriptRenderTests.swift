@@ -38,6 +38,53 @@ struct TranscriptRenderTests {
         #expect(TranscriptRender.markdown(MeetingFixtures.example) == expected)
     }
 
+    /// What a hook reads: the name the user gave beside the one the call
+    /// showed, a name only the call gave, and whom each voice sounds like.
+    @Test func speakersSayWhereEachNameCameFrom() {
+        var meeting = MeetingFixtures.example
+        meeting.speakers = [
+            Meeting.Speaker(id: "you", name: "You", isYou: true, talkMs: 394_000),
+            Meeting.Speaker(id: "s1", name: "Ines Varga", isYou: false, talkMs: 700_000, nameSource: .user,
+                            predicted: Meeting.Speaker.Prediction(name: "Theo Brandt", source: .speaking)),
+            Meeting.Speaker(id: "s2", name: "Rosa Pell", isYou: false, talkMs: 713_000, nameSource: .captions),
+            Meeting.Speaker(id: "s3", name: "Speaker 3", isYou: false, talkMs: 0),
+        ]
+        meeting.paragraphs = [
+            Meeting.Paragraph(speaker: "s1", startMs: 14_000, endMs: 21_000, text: "Deploy went out at nine."),
+            Meeting.Paragraph(speaker: "s2", startMs: 21_000, endMs: 30_000, text: "I'm on the billing bug today."),
+        ]
+        let voices = [
+            "s1": Meeting.Speaker.VoiceGuess(name: "Theo Brandt", posterior: 0.548),
+            "s2": Meeting.Speaker.VoiceGuess(name: "Rosa Pell", posterior: 0.97),
+        ]
+        let expected = """
+        ---
+        title: "Slack"
+        kind: call
+        started: "2026-09-19 14:30 +01:00"
+        duration: 34:36
+        app: "Slack"
+        speakers: ["You", "Ines Varga", "Rosa Pell", "Speaker 3"]
+        echo: affected
+        ---
+
+        ## Speakers
+
+        - **Ines Varga**: named by you · call: Theo Brandt (speaking) · voice: Theo Brandt 55%
+        - **Rosa Pell**: named by captions · voice: Rosa Pell 97%
+
+        ## Transcript
+
+        **Ines Varga** · 0:14
+        Deploy went out at nine.
+
+        **Rosa Pell** · 0:21
+        I'm on the billing bug today.
+
+        """
+        #expect(TranscriptRender.markdown(meeting, voices: voices) == expected)
+    }
+
     @Test func questionsOfferedToClaudeFollowTheTranscript() {
         var meeting = MeetingFixtures.example
         meeting.questions = [

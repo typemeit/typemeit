@@ -99,6 +99,22 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         /// How this speaker got its name (docs/meetings.md 8.6). Nil for a
         /// speaker still labelled by number.
         var nameSource: MeetingNames.Source? = nil
+        /// The name the meeting window gave this speaker before the user
+        /// named them otherwise, so a hook can weigh one against the other.
+        /// Nil while the window's name still stands, or it gave none.
+        var predicted: Prediction? = nil
+
+        struct Prediction: Codable, Equatable, Sendable {
+            var name: String
+            var source: MeetingNames.Source
+        }
+
+        /// The voice model's likeliest person for a speaker (docs/meetings.md
+        /// 8.7), with its posterior, 0 to 1.
+        struct VoiceGuess: Equatable, Sendable {
+            var name: String
+            var posterior: Float
+        }
     }
 
     struct Transcription: Codable, Equatable, Sendable {

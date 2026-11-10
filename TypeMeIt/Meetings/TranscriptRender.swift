@@ -34,8 +34,11 @@ enum TranscriptRender {
     }
 
     /// The front matter plus one `**speaker** · timestamp` / text block per
-    /// paragraph, blank-line separated, ending in one newline.
-    static func markdown(_ meeting: Meeting) -> String {
+    /// paragraph, blank-line separated, ending in one newline. When a
+    /// speaker's name has a source to tell, a `## Speakers` list comes first
+    /// and the paragraphs follow under `## Transcript`. `voices` are the
+    /// voice model's guesses by speaker id, for a hook run.
+    static func markdown(_ meeting: Meeting, voices: [String: Meeting.Speaker.VoiceGuess] = [:]) -> String {
         var frontMatter = [
             "---",
             "title: \(quoted(meeting.title))",
@@ -60,10 +63,38 @@ enum TranscriptRender {
         frontMatter.append("echo: \(meeting.echo.rawValue)")
         frontMatter.append("---")
         frontMatter.append("")
-        var body = [paragraphs(meeting)]
+        let who = meeting.speakers.compactMap { speakerLine($0, voice: voices[$0.id]) }
+        var body = [who.isEmpty ? paragraphs(meeting) : (["## Speakers", who.joined(separator: "\n"), "## Transcript", paragraphs(meeting)]).joined(separator: "\n\n")]
         if let questions = meeting.questions, !questions.isEmpty { body.append("\n" + offered(questions)) }
         if let runs = meeting.hookRuns, !runs.isEmpty { body.append("\n" + hooks(runs)) }
         return (frontMatter + body).joined(separator: "\n") + "\n"
+    }
+
+    /// `- **name**: ` and who named them, what the meeting window said
+    /// before the user renamed them, and whom the voice sounds like, `·`
+    /// between. Nil for a speaker with none of these: the user, or one
+    /// still numbered.
+    static func speakerLine(_ speaker: Meeting.Speaker, voice: Meeting.Speaker.VoiceGuess?) -> String? {
+        var said: [String] = []
+        if let source = speaker.nameSource {
+            said.append("named by \(source == .user ? "you" : sourceLabel(source))")
+        }
+        if let predicted = speaker.predicted {
+            said.append("call: \(predicted.name) (\(sourceLabel(predicted.source)))")
+        }
+        if let voice {
+            said.append("voice: \(voice.name) \(Int((voice.posterior * 100).rounded()))%")
+        }
+        guard !said.isEmpty else { return nil }
+        return "- **\(speaker.name)**: \(said.joined(separator: " · "))"
+    }
+
+    private static func sourceLabel(_ source: MeetingNames.Source) -> String {
+        switch source {
+        case .captions: "captions"
+        case .speaking: "speaking"
+        case .roster, .user: "roster"
+        }
     }
 
     /// The questions offered to Claude Code: a heading per question with
