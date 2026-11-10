@@ -1122,8 +1122,18 @@ var onLevels: (@Sendable (_ mic: Float, _ others: Float?) -> Void)?   // 10 Hz, 
   either kind, arm a deadline of `Fixed.meetingBothSilentEndSeconds` (600 s)
   minus `meetingSilentSeconds` on its tick, cancelled by `false`, that sends
   `bothSilent` to the machine when it fires. A room shows no pill, since
-  there is no tap to blame. A far end at the floor while the mic is alive
-  means everyone else is muted, and nothing is said.
+  there is no tap to blame. A far end at the floor for
+  `meetingSilentSeconds` while the mic has signal fires
+  `onFarEndSilenceChanged(true)`. The coordinator logs what the tap
+  delivered and which of the call app's processes play to which device,
+  then rebuilds the tap and aggregate together (`rebuildTap`) when 8.6
+  read someone other than the user talking in that window. Without names
+  (an app 8.6 cannot read, or a sandboxed build) it rebuilds only when the
+  far end has never been above the floor, since a rebuild cuts the mic for
+  a moment and a user talking alone for 90 s is common. Otherwise everyone
+  else is muted, and nothing is done. On 6 November one Meet's
+  tap delivered silence for all 22 minutes while the other person talked;
+  the cause is unknown.
 - Sleep. Hold `kIOPMAssertionTypePreventUserIdleSystemSleep` (never the
   display variant: the screen should still dim and lock) from the first
   capture callback to `stop()`, named "type me it is recording a meeting".
@@ -2028,16 +2038,17 @@ and `MCPTests`: a shared meeting is not counted.
   a name 8.6 read as speaking while the far-end track had at least 10 s of
   words inside its spans, and more there than on the mic. That leaves out
   the user under whatever name the call shows them by, and a tile lit by
-  noise. With any talkers the diarizer is told `withSpeakers(exactly:)`
-  their number, and a far end left as one voice takes the one talker's
-  name. With none, the roster minus the user caps it
-  (`withSpeakers(max:)`); the roster never sets an exact count, since it
-  lists silent listeners too. Measured on 24 September (`-diarizeCounts`):
-  told the right count, the diarizer matched its own; told one too many, it
-  split the Slack call's one far-end voice into 87 s and 37 s, and cut
-  agreement with AssemblyAI on the 0831 room from 87% to 69%. A tile shared
-  by two people (a meeting room on one laptop) is counted as one, and they
-  merge.
+  noise. Nemotron finds its own voices, and the count only caps them: the
+  quietest fold into the nearest until the cap is met. The cap is the
+  roster minus the user, or the talkers when there are more of them; a far
+  end left as one voice takes the one talker's name. Capping at the talkers
+  merged real people, because Meet lights some people's tiles late or not
+  at all: on 9 November one far-end person was lit for 4 s while saying
+  four lines, which went to someone else. On the seven past calls where
+  the uncapped diarizer found more voices than Meet lit and the roster
+  allowed more, every voice the talker cap merged away was a different
+  person by ear (listen review `extra-voices-1109`). A tile shared by two
+  people (a meeting room on one laptop) is counted as one.
 - `TranscriptMerge` assigns each far-end word to the speaker whose segments
   cover most of it; if none touches it, to the segment nearest its midpoint
   within 1 s; else to the previous word's speaker. On 13 recordings against
@@ -2064,10 +2075,15 @@ and `MCPTests`: a shared meeting is not counted.
   the roster but never lights a tile, and their words arrive on the mic.
   When the roster lists such a silent name, the mic track is diarized too,
   capped at the user, the silent names and, on an echo-affected call, the
-  far end's voices. A mic voice the far end has words over for
+  far end's voices. When the far end never spoke (a silent tap, or
+  everyone remote on the laptop speakers), every roster name but the
+  user's counts as silent. A mic voice the far end has words over for
   `meetingEchoVoiceShare` (0.3) of its time is the loudspeaker coming back
-  and stays `you`. Of the rest, the loudest is the user, who sits nearest
-  the laptop; each other voice becomes `r1`, `r2`…, and one such voice with
+  and stays `you`. Of the rest, the user is the voice least under other
+  people's lit tiles when the far end never spoke, and otherwise the
+  loudest, who sits nearest the laptop. On 6 November's silent tap the
+  laptop speaker was louder than the user, and its voice sat under the
+  other person's tile 93% of its time against the user's 26%. Each other voice becomes `r1`, `r2`…, and one such voice with
   one silent name takes the name (source `roster`); otherwise it is numbered
   on from the far end. A mic word takes the voice whose segment holds its
   midpoint, by the far end's rule. With no silent name the mic is not
@@ -2216,9 +2232,12 @@ names on a screen into names on paragraphs):
 4. **Roster only:** names are offered in the rename field (8.4) as a pick
    list; nothing is assigned, except the 1:1 case, where the one other name
    is `Them`.
-5. The user's own name — the tile Meet marks as the user, else
-   `NSFullUserName()` — is removed before any of this: the mic track is
-   already **You**.
+5. The user's own name is removed before any of this: the mic track is
+   already **You**. It is the one roster name that is the Mac's
+   `NSFullUserName()` (same last name, and a first name the Mac's starts
+   with, so "Max Mitchell" matches "Maximilian Mitchell"); with none or
+   several, the tile lit while the mic spoke (`SpeakerCount.userTile`);
+   with a far end that never spoke, none.
 6. Record `names.source` per speaker (`captions`, `speaking`, `roster`,
    `user`), so the transcript can say how sure it is and a wrong name is
    traceable to the rung that produced it.

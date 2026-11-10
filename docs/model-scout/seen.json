@@ -1197,6 +1197,208 @@
       "id": "GigaSpeech 3 (Arabic)",
       "date": "2026-11-07",
       "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio v0.18.3",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "released 2026-11-07; no new ASR or diarizer models: Kokoro TTS, streaming seam and vocabulary-boost fixes"
+    },
+    {
+      "id": "litert-community/Phonon-2.5-English",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "LiteRT (Android) conversion of Phonon-2.5-English, seen 2026-10-24; not Core ML, MLX, GGUF or ONNX"
+    },
+    {
+      "id": "litert-community/Phonon-2",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "LiteRT (Android) conversion of Phonon-2; not an Apple Silicon runtime"
+    },
+    {
+      "id": "BuilderHelm/Parakeet-Unified-EN-0.6B-CoreML",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "Core ML port of parakeet-unified-en-0.6b, already in model-trials.md"
+    },
+    {
+      "id": "smoothoperator3/parakeet-unified-en-0.6b-gguf",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "GGUF port of parakeet-unified-en-0.6b, already in model-trials.md"
+    },
+    {
+      "id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-redux",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "sherpa-onnx port of parakeet-redux, seen 2026-10-14"
+    },
+    {
+      "id": "johnpattern/safenotes-parakeet-ultra-ov",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "OpenVINO port of Parakeet Ultra, which we ship"
+    },
+    {
+      "id": "DictionLabs/parakeet-tdt-0.6b-v3-onnx",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "ONNX port of parakeet-tdt-0.6b-v3, seen 2026-10-14"
+    },
+    {
+      "id": "42ailab/Qwen3-ASR-1.7B-GGUF",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "GGUF port of Qwen3-ASR-1.7B, seen 2026-10-13"
+    },
+    {
+      "id": "raymondchins/qwen3-asr-1.7b-coreml",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "Core ML port of Qwen3-ASR-1.7B, seen 2026-10-13"
+    },
+    {
+      "id": "erickvs/whisper-tiny.en-hand-edited",
+      "date": "2026-11-08",
+      "role": "speech recognition",
+      "why": "whisper-tiny.en with silence hallucinations edited out; no WER against Parakeet"
+    },
+    {
+      "id": "funnelnenad/pip-voice-cleanup",
+      "date": "2026-11-08",
+      "role": "clean-up",
+      "why": "Qwen3-0.6B LoRA for dictation clean-up; no published score"
+    },
+    {
+      "id": "Infatoshi/phonon-asr-parakeet-tdt-0.6b-v2-onnx",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/azure-speech-09-2026 (eval reference)",
+      "date": "2026-11-09",
+      "role": "eval reference"
+    },
+    {
+      "id": "netease-youdao/Confucius4-R2T2",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "arXiv 2611.04394 attendance-guided speaker enrollment",
+      "date": "2026-11-09",
+      "role": "speaker embeddings"
+    },
+    {
+      "id": "GersonHMG/lapwing",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "GersonHMG/lapwing-small",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Glimpse-Dictation/Nemotron-Unified-ASR-0.6B-coreml",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "oluwagbotty/fastconformer-ctc-en-ft-10ep-noise",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "avericaai GGUF ports",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "quickasr/Qwen3-ASR-1.7B-q8",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "littoralai/parakeet-tdt-0.6b-v3-mlx-8bit",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "ijar/parakeet-ultra-onnx-latin-int8",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "SoldaLabs/parakeet-tdt-0.6b-v3-onnx-int8-mm",
+      "date": "2026-11-09",
+      "role": "speech recognition"
+    },
+    {
+      "id": "vksbhandary/buddy-pronunciation-en",
+      "date": "2026-11-09",
+      "role": "none"
+    },
+    {
+      "id": "lee1jun/LES-eg2-665M-asr-en",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "88M word-CTC reader on frozen EmbeddingGemma 2, Apache-2.0; card mean WER 6.89 vs 5.53 for Parakeet TDT 0.6B v2 on the same eight sets, worse on each; PyTorch only, lower-case with no punctuation"
+    },
+    {
+      "id": "Fritter-ASR/Fritter",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Parakeet TDT 0.6B v2 dictation fine-tune; CC-BY-NC-4.0"
+    },
+    {
+      "id": "Fritter-ASR/Fritter-Nemotron-0.6B",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Nemotron streaming fine-tune; CC-BY-NC-4.0"
+    },
+    {
+      "id": "Andivee/dictando-english-plus-coreml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Core ML repackage of Underdog Bark 3.0 Plus, rejected 2026-10-22"
+    },
+    {
+      "id": "DictionLabs/parakeet-ultra-coreml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Core ML port of Parakeet Ultra, which we ship; no new numbers"
+    },
+    {
+      "id": "ymalick/whisper-large-v3-ydictation",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Whisper large-v3 dictation fine-tune; card publishes no numbers"
+    },
+    {
+      "id": "DojoWorkspace/Dojo-Speech-v1.0-ggml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "stock Whisper ggml files under new names"
+    },
+    {
+      "id": "error0229/echora-kara-300m-onnx",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "CC-BY-NC-4.0"
+    },
+    {
+      "id": "arXiv 2611.10659 (Pandemonium, DiCoP)",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "paper for BUT-FIT/Pandemonium, seen 2026-10-24; no Apple Silicon build"
+    },
+    {
+      "id": "arXiv 2611.12246 (Nemotron 3 Diarization)",
+      "date": "2026-11-10",
+      "role": "diarization",
+      "why": "paper for the diarizer we ship; no new weights"
     }
   ]
 }

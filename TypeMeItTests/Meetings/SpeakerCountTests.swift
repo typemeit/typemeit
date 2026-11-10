@@ -31,6 +31,35 @@ struct SpeakerCountTests {
         #expect(user == nil)
     }
 
+    @Test func theRosterNameThatIsTheMacsNameIsTheUser() {
+        // Ana's tile lit while the mic spoke, as the loudspeaker's echo makes it.
+        let spans = [span("Ana", 0, 30_000), span("Max Mitchell", 30_000, 35_000)]
+        let user = SpeakerCount.user(roster: ["Ana", "Max Mitchell"], macName: "Maximilian Mitchell", spans: spans,
+                                     farEnd: words(0, 30_000), mic: words(0, 35_000), farEndSpoke: true, lagMs: 0, minimumMs: Self.minimumMs)
+        #expect(user == "Max Mitchell")
+    }
+
+    @Test func withoutTheMacsNameTheTileDecides() {
+        let spans = [span("Max Mitchell", 0, 30_000), span("Ana", 30_000, 60_000)]
+        let user = SpeakerCount.user(roster: ["Ana", "Max M"], macName: "Maximilian Mitchell", spans: spans,
+                                     farEnd: words(30_000, 60_000), mic: words(0, 30_000), farEndSpoke: true, lagMs: 0, minimumMs: Self.minimumMs)
+        #expect(user == "Max Mitchell")
+    }
+
+    @Test func aSilentFarEndNamesNoUser() {
+        // The tap heard nothing: Ana came through the loudspeaker, lighting her tile while the mic spoke.
+        let user = SpeakerCount.user(roster: ["Ana"], macName: "Maximilian Mitchell", spans: [span("Ana", 0, 30_000)],
+                                     farEnd: words(0, 5_000), mic: words(0, 60_000),
+                                     farEndSpoke: SpeakerCount.spoke(words(0, 5_000), minimumMs: Self.minimumMs), lagMs: 0, minimumMs: Self.minimumMs)
+        #expect(user == nil)
+    }
+
+    @Test func talkingNamesAreTheOthersLitSinceTheWindowOpened() {
+        let spans = [span("Ben", 0, 10_000), span("Max Mitchell", 20_000, 40_000), span("Ana", 25_000, 35_000), span("Ana", 50_000, 60_000)]
+        #expect(SpeakerCount.talking(spans, sinceMs: 15_000, excluding: "Maximilian Mitchell") == ["Ana"])
+        #expect(SpeakerCount.talking(spans, sinceMs: 60_000, excluding: "Maximilian Mitchell").isEmpty)
+    }
+
     @Test func crosstalkUnderTheUsersTileDoesNotMakeThemATalker() {
         // Twenty seconds of Ana talking over the user, inside the user's long turn.
         let spans = [span("Max Mitchell", 0, 120_000), span("Ana", 120_000, 150_000)]
@@ -60,8 +89,19 @@ struct SpeakerCountTests {
         #expect(talkers == ["Ana", "Ben"])
     }
 
-    @Test func peopleShownTalkingSetTheCountExactly() {
+    @Test func everyoneListedCapsTheCountWhenMeetLitFewer() {
+        // Cy spoke but Meet never lit their tile long enough to make them a talker.
         let names = names(roster: ["Ana", "Ben", "Cy"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
+        #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: nil) == .atMost(3))
+    }
+
+    @Test func peopleShownTalkingSetTheCountWhenTheyAreEveryoneListed() {
+        let names = names(roster: ["Ana", "Ben", "Maximilian Mitchell"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
+        #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: "Maximilian Mitchell") == .exactly(2))
+    }
+
+    @Test func talkersMissingFromTheListStillCount() {
+        let names = names(roster: ["Ana"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
         #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: nil) == .exactly(2))
     }
 

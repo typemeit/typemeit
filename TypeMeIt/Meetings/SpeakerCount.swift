@@ -1,13 +1,13 @@
 import Foundation
 
-/// How many voices the diarizer is told a call's far end holds, from what
-/// the meeting window showed (docs/meetings.md 8.3). Pure.
+/// How many voices the diarizer may keep on a call's far end, from what the
+/// meeting window showed (docs/meetings.md 8.3). Pure.
 ///
-/// Measured on 24 September with `-diarizeCounts`: told the right count, the
-/// diarizer matched its own; told one too many, it split a real voice, the
-/// Slack call's one far-end person into 87 s and 37 s. So only people shown
-/// speaking set an exact count. The list holds everyone who joined, silent
-/// listeners included, and only caps the count.
+/// The diarizer finds its own voices; the count only folds the quietest into
+/// the nearest. Meet lights some people's tiles late or not at all, so the
+/// cap is everyone listed other than the user, not just the people lit:
+/// capped at the lit, real people were merged on every one of seven past
+/// calls checked by ear (listen review `extra-voices-1109`).
 enum SpeakerCount: Equatable, Sendable {
     case exactly(Int)
     case atMost(Int)
@@ -19,13 +19,13 @@ enum SpeakerCount: Equatable, Sendable {
         }
     }
 
-    /// Exactly the far-end talkers when the window showed anyone speaking;
-    /// otherwise at most the people listed other than the user; nil when
+    /// At most the people listed other than the user; exactly the far-end
+    /// talkers when the window showed at least that many speaking; nil when
     /// the window gave neither.
     static func of(_ names: MeetingNames, talkers: [String], userName: String?) -> SpeakerCount? {
-        if !talkers.isEmpty { return .exactly(talkers.count) }
         let listed = names.roster.filter { !SpeakerNaming.isUser($0, userName: userName) }.count
-        return listed > 0 ? .atMost(listed) : nil
+        if listed > talkers.count { return .atMost(listed) }
+        return talkers.isEmpty ? nil : .exactly(talkers.count)
     }
 
     /// The names shown speaking while the far end said at least `minimumMs`
@@ -46,6 +46,34 @@ enum SpeakerCount: Equatable, Sendable {
         let heard = heard(spans: spans, farEnd: farEnd, mic: mic, lagMs: lagMs)
         return heard.order.filter { heard.micMs[$0]! >= minimumMs && heard.micMs[$0]! > heard.farEndMs[$0]! }
             .max { heard.micMs[$0]! < heard.micMs[$1]! }
+    }
+
+    /// The user's name as the call shows it. The one roster name that is
+    /// the Mac's own name, the first name shortened or not, comes first;
+    /// then the user's tile, but only when `farEndSpoke`: with the far end
+    /// silent the loudspeaker put everyone on the mic, and every lit tile
+    /// looks like the user's.
+    static func user(roster: [String], macName: String, spans: [MeetingNames.Span], farEnd: [Transcriber.Word], mic: [Transcriber.Word],
+                     farEndSpoke: Bool, lagMs: Int, minimumMs: Int) -> String? {
+        let own = roster.filter { SpeakerAssign.isUser($0, userName: macName) }
+        if own.count == 1 { return own[0] }
+        guard farEndSpoke else { return nil }
+        return userTile(spans: spans, farEnd: farEnd, mic: mic, lagMs: lagMs, minimumMs: minimumMs)
+    }
+
+    /// The names lit since `sinceMs`, the user's own tile left out by the
+    /// Mac's name.
+    static func talking(_ spans: [MeetingNames.Span], sinceMs: Int, excluding macName: String) -> [String] {
+        var lit: [String] = []
+        for span in spans where span.endMs > sinceMs && !SpeakerAssign.isUser(span.name, userName: macName) && !lit.contains(span.name) {
+            lit.append(span.name)
+        }
+        return lit
+    }
+
+    /// Whether `words` hold at least `minimumMs` of speech.
+    static func spoke(_ words: [Transcriber.Word], minimumMs: Int) -> Bool {
+        wordMs(words, from: .min, to: .max) >= minimumMs
     }
 
     /// Milliseconds of each track's words inside each name's spans, names in first-span order.

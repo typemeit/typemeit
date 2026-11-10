@@ -123,6 +123,7 @@ final class MeetingCapture: @unchecked Sendable {
         installListeners()
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical], reason: "capturing a meeting")
         startDrain()
+        if let tapProcesses { DebugLog.write("Meeting tap targets: \(AudioProcesses.describe(tapProcesses))") }
         DebugLog.write("Meeting capture: mic \(mic.bluetooth ? "bluetooth" : "wired or built-in"), \(tapProcesses.map { "tap on \($0.count) process objects" } ?? "no tap"), \(built.outputIsClock ? "output" : "mic") clock, \(built.rate) Hz, mic buffers \(built.micBuffers), tap buffer \(built.tapBuffer.map(String.init) ?? "-")")
     }
 
@@ -574,8 +575,13 @@ final class MeetingCapture: @unchecked Sendable {
             DebugLog.write("Meeting tap retargeted at \(processes.count) process objects")
         } else {
             Log.meetings.notice("Tap description update refused (\(status)); rebuilding")
-            listenerQueue.async { [weak self] in self?.rebuild() }
+            rebuildTap()
         }
+    }
+
+    /// Builds the tap and aggregate again, on the listener queue.
+    func rebuildTap() {
+        listenerQueue.async { [weak self] in self?.rebuild() }
     }
 
     // MARK: Stop

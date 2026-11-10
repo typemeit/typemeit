@@ -61,6 +61,39 @@ enum AudioProcesses {
             output: property(object, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0)
     }
 
+    /// `pid 812 com.google.Chrome.helper playing to MacBook Pro Speakers,
+    /// recording from MacBook Pro Microphone` per object, for the log: a
+    /// silent tap is told apart from audio routed past it by which
+    /// processes play, and to which devices.
+    static func describe(_ objects: [AudioObjectID]) -> String {
+        objects.map { object in
+            guard let info = info(of: object) else { return "object \(object) gone" }
+            let name = info.bundleID ?? info.path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "?"
+            let output = devices(of: object, input: false), input = devices(of: object, input: true)
+            return "pid \(info.pid) \(name) \(info.output ? "playing" : "not playing")\(output.isEmpty ? "" : " to " + deviceNames(output)), "
+                + "\(info.input ? "recording" : "not recording")\(input.isEmpty ? "" : " from " + deviceNames(input))"
+        }.joined(separator: " · ")
+    }
+
+    /// The default output and every process object of `owner`, running or
+    /// not, for the log: the helper that plays a call can be one the tap
+    /// was never pointed at.
+    @MainActor
+    static func route(of owner: ProcessOwner.Owner?) -> String {
+        let output = MeetingCapture.defaultDevice(input: false).map {
+            "\(deviceNames([$0])) at \(Int(MeetingCapture.property($0, kAudioDevicePropertyNominalSampleRate, Double(0)) ?? 0)) Hz"
+        } ?? "none"
+        guard let owner else { return "default output \(output) · no owner" }
+        let apps = ProcessOwner.runningApps()
+        let objects = objectIDs().filter { object in info(of: object).flatMap { ProcessOwner.owner(of: $0, apps: apps) } == owner }
+        return "default output \(output) · \(describe(objects))"
+    }
+
+    static func deviceNames(_ ids: [AudioObjectID]) -> String {
+        let names = ids.map { string($0, kAudioDevicePropertyDeviceNameCFString) ?? "device \($0)" }
+        return names.isEmpty ? "unknown" : names.joined(separator: ", ")
+    }
+
     /// The devices a process object has open at input or output scope.
     static func devices(of object: AudioObjectID, input: Bool) -> [AudioObjectID] {
         var address = global(kAudioProcessPropertyDevices, scope: input ? kAudioObjectPropertyScopeInput : kAudioObjectPropertyScopeOutput)

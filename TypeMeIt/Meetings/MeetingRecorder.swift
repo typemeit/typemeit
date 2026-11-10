@@ -33,6 +33,10 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     /// True once every track has stayed at the floor for
     /// `Fixed.meetingSilentSeconds`; false when signal returns.
     private let onSilenceChanged: @Sendable (Bool) -> Void
+    /// Once the far end has stayed at the floor for
+    /// `Fixed.meetingSilentSeconds` while the mic had signal, and again
+    /// only after that stretch ends.
+    private let onFarEndSilent: @Sendable () -> Void
     /// Every drain, for the tab's meters.
     private let onLevels: @Sendable (_ mic: Float, _ others: Float?) -> Void
     /// The staging volume fell under `Fixed.meetingMinimumFreeBytes`.
@@ -42,14 +46,21 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     private let onFailed: @Sendable (Error) -> Void
 
     private let lock = NSLock()
-    private var capture: MeetingCapture?
+    private(set) var capture: MeetingCapture?
     private var writers: [(role: Meeting.Track.Role, writer: TrackWriter)] = []
-    private var paused = false
-    private var pauseStartFrame: Int?
+    /// Paused, since this frame of the tracks.
+    private var pausedAt: Int?
     private var gaps: [Meeting.Span] = []
     private var dictations: [Meeting.Dictation] = []
-    private var silent = false
-    private var silentSinceFrame: Int?
+    /// Every track at the floor, since this frame.
+    private var silentSince: Int?
+    private var farEndSilent = false
+    private var farEndHeard = false
+    /// Frames the mic and the tap have delivered, and the tap's exactly
+    /// zero ones: a tap with no callbacks and one passing zeros fail apart.
+    private var micFrames = 0
+    private var tapFrames = 0
+    private var tapZeroFrames = 0
     private var bothSilentFrames = 0
     private var lastDiskCheck = ContinuousClock.now
     private var stopped = false
@@ -69,12 +80,14 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     init(id: UUID, kind: Kind, folder: URL, mic: MeetingCapture.Device, preRoll: (capture: MeetingCapture, held: PreRoll)? = nil,
          onLevels: @escaping @Sendable (_ mic: Float, _ others: Float?) -> Void,
          onSilenceChanged: @escaping @Sendable (Bool) -> Void,
+         onFarEndSilent: @escaping @Sendable () -> Void,
          onDiskFull: @escaping @Sendable () -> Void,
          onFailed: @escaping @Sendable (Error) -> Void) throws {
         self.kind = kind
         self.folder = folder
         self.onLevels = onLevels
         self.onSilenceChanged = onSilenceChanged
+        self.onFarEndSilent = onFarEndSilent
         self.onDiskFull = onDiskFull
         self.onFailed = onFailed
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -138,21 +151,19 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     /// The app released the mic: the writers take silence until `resume`.
     func pause() {
         lock.lock()
-        guard !paused else { lock.unlock(); return }
-        paused = true
-        pauseStartFrame = writers.first?.writer.framesWritten ?? 0
+        guard pausedAt == nil else { lock.unlock(); return }
+        pausedAt = writers.first?.writer.framesWritten ?? 0
         lock.unlock()
         DebugLog.write("Meeting recording paused")
     }
 
     func resume() {
         lock.lock()
-        guard paused else { lock.unlock(); return }
-        paused = false
-        if let start = pauseStartFrame, let end = writers.first?.writer.framesWritten {
+        guard let start = pausedAt else { lock.unlock(); return }
+        pausedAt = nil
+        if let end = writers.first?.writer.framesWritten {
             gaps.append(Meeting.Span(startMs: start / Meeting.framesPerMs, endMs: end / Meeting.framesPerMs))
         }
-        pauseStartFrame = nil
         lock.unlock()
         DebugLog.write("Meeting recording resumed")
     }
@@ -179,8 +190,13 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
                 sleepAssertion = id
             }
         }
-        let isPaused = paused
+        let isPaused = pausedAt != nil
         let ws = writers
+        micFrames += mic.count
+        if let others {
+            tapFrames += others.count
+            tapZeroFrames += others.lazy.filter { $0 == 0 }.count
+        }
         lock.unlock()
         for (role, writer) in ws {
             let pcm: [Float] = switch role {
@@ -192,6 +208,21 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         onLevels(AudioCapture.level(forPeak: AudioCapture.peak(mic)), others.map { AudioCapture.level(forPeak: AudioCapture.peak($0)) })
         checkSilence()
         checkDisk()
+    }
+
+    /// Whether the far end has been above the floor at any point.
+    var farEndWasHeard: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return farEndHeard
+    }
+
+    /// `tap delivered 1,302 s for the mic's 1,310 s, 99% exactly zero`, for the log.
+    var tapDelivery: String {
+        lock.lock()
+        defer { lock.unlock() }
+        let rate = Int(AudioCapture.targetFormat.sampleRate)
+        return "tap delivered \(tapFrames / rate) s for the mic's \(micFrames / rate) s, \(tapFrames == 0 ? 0 : 100 * tapZeroFrames / tapFrames)% exactly zero"
     }
 
     func captureGap(_ capture: MeetingCapture, frames: Int) {
@@ -220,16 +251,24 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         let ws = writers
         let window = Fixed.meetingSilentSeconds * Int(AudioCapture.targetFormat.sampleRate)
         let written = ws.first?.writer.framesWritten ?? 0
-        let allAtFloor = written >= window && ws.allSatisfy { $0.writer.recentPeak < Fixed.meetingSilenceFloor }
-        let changed = allAtFloor != silent
+        let atFloor = ws.map { (role: $0.role, atFloor: $0.writer.recentPeak < Fixed.meetingSilenceFloor) }
+        let allAtFloor = written >= window && atFloor.allSatisfy(\.atFloor)
+        let farEndAtFloor = written >= window && atFloor.contains { $0.role == .mic && !$0.atFloor } && atFloor.contains { $0.role == .others && $0.atFloor }
+        if atFloor.contains(where: { $0.role == .others && !$0.atFloor }) { farEndHeard = true }
+        let farEndChanged = farEndAtFloor != farEndSilent
+        farEndSilent = farEndAtFloor
+        let changed = allAtFloor != (silentSince != nil)
         if changed {
-            if allAtFloor { silentSinceFrame = written - window } else if let since = silentSinceFrame { bothSilentFrames += written - since; silentSinceFrame = nil }
-            silent = allAtFloor
+            if allAtFloor { silentSince = written - window } else if let since = silentSince { bothSilentFrames += written - since; silentSince = nil }
         }
         lock.unlock()
         if changed {
             DebugLog.write("Meeting tracks \(allAtFloor ? "at the floor for \(Fixed.meetingSilentSeconds) s" : "have signal again")")
             onSilenceChanged(allAtFloor)
+        }
+        if farEndChanged {
+            DebugLog.write("Meeting far end \(farEndAtFloor ? "at the floor for \(Fixed.meetingSilentSeconds) s while the mic has signal" : "no longer alone at the floor")")
+            if farEndAtFloor { onFarEndSilent() }
         }
     }
 
@@ -300,9 +339,9 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
         stopped = true
         let cap = capture
         capture = nil
-        if paused, let start = pauseStartFrame, let end = writers.first?.writer.framesWritten {
+        if let start = pausedAt, let end = writers.first?.writer.framesWritten {
             gaps.append(Meeting.Span(startMs: start / Meeting.framesPerMs, endMs: end / Meeting.framesPerMs))
-            paused = false
+            pausedAt = nil
         }
         let ws = writers
         // `captureGap` adds nothing once `stopped` is set, so this copy is final.
@@ -322,7 +361,7 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
             peaks[role] = finished.peak
         }
         lock.lock()
-        if silent, let since = silentSinceFrame { bothSilentFrames += longest - since; silentSinceFrame = nil }
+        if let since = silentSince { bothSilentFrames += longest - since; silentSince = nil }
         let silentFrames = bothSilentFrames
         let spans = dictations
         lock.unlock()

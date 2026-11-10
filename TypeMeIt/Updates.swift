@@ -230,12 +230,13 @@ final class Updates: NSObject, SPUUpdaterDelegate {
     }
 
     /// Shows a toast for `version`, waiting for a moment when nothing else is
-    /// on screen. One retry at a time, so a reminder on every idle does not
-    /// stack timers.
+    /// on screen and no meeting is recording or transcribing, since the
+    /// update pill's button relaunches the app. One retry at a time, so a
+    /// reminder on every idle does not stack timers.
     private func announce(_ version: String, toast: OverlayModel.State) {
         guard !announced.contains(version) else { return }
         retry?.invalidate()
-        if Pipeline.shared.showToast(toast) {
+        if MeetingCoordinator.shared.isIdle, Pipeline.shared.showToast(toast) {
             if case .updateReady = toast {} else { announced.insert(version) }
             return
         }

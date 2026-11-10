@@ -25,11 +25,29 @@ enum ShortcutEvent: Sendable {
 /// pinned recording, and Esc cancels. Return is not taken there.
 @MainActor
 final class Shortcuts {
-    enum Phase: Sendable { case idle, recording, pinned, transcribing, cleaningUp }
+    /// The one dictation phase: the keys move it through recording and
+    /// pinned, the pipeline through transcribing and cleaning up, and
+    /// `Pipeline.phase` only mirrors it.
+    enum Phase: Sendable {
+        case idle, recording, pinned
+        /// Released: the mic runs on for `Fixed.recordingTail`, then the
+        /// pipeline stops it and moves on to transcribing.
+        case ending
+        case transcribing, cleaningUp
+
+        /// The mic is open.
+        var isCapturing: Bool { self == .recording || self == .pinned || self == .ending }
+    }
 
     private(set) var phase: Phase = .idle {
-        didSet { if phase != oldValue { phaseChanged() } }
+        didSet {
+            guard phase != oldValue else { return }
+            onPhaseChanged?(phase)
+            phaseChanged()
+        }
     }
+    /// Every change of `phase`, before the event that caused it is sent.
+    var onPhaseChanged: (@MainActor (Phase) -> Void)?
     private(set) var tapInstalled = false
     var onEvent: (@MainActor (ShortcutEvent) -> Void)?
     /// A plain Return while idle: answers the prompt waiting for it and says
@@ -38,8 +56,13 @@ final class Shortcuts {
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var fnIsDown = false
-    private var fnSeenUp = false
+    enum Fn: Equatable {
+        case up, down
+        /// Already held when the tap appeared: ignored until it comes up.
+        case heldSinceInstall
+    }
+    /// Fn as the tap last saw it. Hotkeys never see it, so it stays up there.
+    private var fn = Fn.heldSinceInstall
     private var fnDownAt: ContinuousClock.Instant?
     /// The Return whose key down `onReturn` took, so its key up is kept too.
     private var swallowingReturn = false
@@ -82,7 +105,7 @@ final class Shortcuts {
         CGEvent.tapEnable(tap: tap, enable: true)
         tapInstalled = true
         // Ignore an Fn that was already held when the tap appeared.
-        fnSeenUp = !CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
+        fn = CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) ? .heldSinceInstall : .up
         Log.shortcuts.info("Event tap installed")
         return true
     }
@@ -96,7 +119,7 @@ final class Shortcuts {
         }
         hotKeys.onKey = { [weak self] key, down in self?.handle(key, down: down) }
         self.hotKeys = hotKeys
-        fnSeenUp = true
+        fn = .up
         registerHotKeys()
         Log.shortcuts.info("Hotkeys installed")
         return true
@@ -200,7 +223,7 @@ final class Shortcuts {
     /// The pill's stop button while pinned.
     func stopFromOverlay() {
         guard phase == .pinned else { return }
-        phase = .transcribing
+        phase = .ending
         onEvent?(.recordingEnded)
     }
 
@@ -217,7 +240,7 @@ final class Shortcuts {
     /// still held.
     func stopFromMenu() {
         guard phase == .recording || phase == .pinned else { return }
-        phase = .transcribing
+        phase = .ending
         onEvent?(.recordingEnded)
     }
 
@@ -228,7 +251,7 @@ final class Shortcuts {
         switch phase {
         case .idle: startFromMenu()
         case .recording, .pinned: stopFromMenu()
-        case .transcribing, .cleaningUp: return false
+        case .ending, .transcribing, .cleaningUp: return false
         }
         return true
     }
@@ -253,7 +276,7 @@ final class Shortcuts {
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            DebugLog.write("Shortcuts: event tap disabled by \(type == .tapDisabledByTimeout ? "timeout" : "user input"), re-enabled; Fn was \(fnIsDown ? "down" : "up")")
+            DebugLog.write("Shortcuts: event tap disabled by \(type == .tapDisabledByTimeout ? "timeout" : "user input"), re-enabled; Fn was \(fn == .up ? "up" : "down")")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return true
         case .flagsChanged:
@@ -261,9 +284,11 @@ final class Shortcuts {
                 return true
             }
             let down = event.flags.contains(.maskSecondaryFn)
-            if down != fnIsDown {
-                fnIsDown = down
-                if down { fnDown() } else { fnUp() }
+            if down != (fn != .up) {
+                // A press held since the tap appeared ends here, and starts nothing.
+                let ignored = fn == .heldSinceInstall
+                fn = down ? .down : .up
+                if down { fnDown() } else if !ignored { fnUp() }
             }
             return true
         case .keyDown, .keyUp:
@@ -276,7 +301,7 @@ final class Shortcuts {
                 if type == .keyDown { onEvent?(.roomRequested) }
                 return false
             }
-            if keycode == Shortcuts.spaceKeycode, fnIsDown || phase == .pinned, phase == .recording || phase == .pinned {
+            if keycode == Shortcuts.spaceKeycode, fn == .down || phase == .pinned, phase == .recording || phase == .pinned {
                 if type == .keyDown, phase == .recording {
                     phase = .pinned
                     onEvent?(.pinned)
@@ -296,7 +321,7 @@ final class Shortcuts {
             }
             if keycode == Shortcuts.escKeycode, type == .keyDown {
                 switch phase {
-                case .recording, .pinned, .transcribing, .cleaningUp:
+                case .recording, .pinned, .ending, .transcribing, .cleaningUp:
                     phase = .idle
                     onEvent?(.cancelled)
                     return false
@@ -316,14 +341,14 @@ final class Shortcuts {
     }
 
     private func fnDown() {
-        guard fnSeenUp else { return }
+        guard fn != .heldSinceInstall else { return }
         switch phase {
         case .idle:
             fnDownAt = .now
             phase = .recording
             onEvent?(.recordingStarted)
         case .pinned:
-            phase = .transcribing
+            phase = .ending
             onEvent?(.recordingEnded)
         default:
             break
@@ -331,7 +356,6 @@ final class Shortcuts {
     }
 
     private func fnUp() {
-        fnSeenUp = true
         switch phase {
         case .recording:
             let held = fnDownAt.map { ContinuousClock.now - $0 } ?? .zero
@@ -339,7 +363,7 @@ final class Shortcuts {
                 phase = .idle
                 onEvent?(.cancelled)  // a tap
             } else {
-                phase = .transcribing
+                phase = .ending
                 onEvent?(.recordingEnded)
             }
         case .pinned:

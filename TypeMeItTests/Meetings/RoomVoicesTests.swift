@@ -7,12 +7,30 @@ struct RoomVoicesTests {
             MeetingNames.Span(name: "Hugh Ashby-Clarke", startMs: 0, endMs: 5_000),
             MeetingNames.Span(name: "Max Mitchell", startMs: 5_000, endMs: 9_000),
         ], captions: nil)
-        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell") == ["Edie O'Neill"])
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: true) == ["Edie O'Neill"])
     }
 
     @Test func theUserIsNeverASilentName() {
         let names = MeetingNames(source: .roster, roster: ["Max Mitchell", "Ana"], channel: nil, spans: [], captions: nil)
-        #expect(RoomVoices.silentNames(names, userName: "max mitchell") == ["Ana"])
+        #expect(RoomVoices.silentNames(names, userName: "max mitchell", farEndSpoke: true) == ["Ana"])
+    }
+
+    @Test func withTheFarEndSilentEveryoneListedIsOnTheMic() {
+        // The tap heard nothing, so Ana's lit tile was the loudspeaker in the mic.
+        let names = MeetingNames(source: .speaking, roster: ["Ana", "Max Mitchell"], channel: nil, spans: [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 30_000),
+        ], captions: nil)
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: false) == ["Ana"])
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: true).isEmpty)
+    }
+
+    @Test func withOthersLitTheUserIsTheVoiceLeastUnderTheirTiles() {
+        // A is the loudspeaker beside the mic, louder than the user B, and talks while Ana's tile is lit.
+        let segments = [segment("A", 0, 10_000), segment("B", 10_000, 20_000), segment("A", 20_000, 30_000)]
+        let lit = [MeetingNames.Span(name: "Ana", startMs: 0, endMs: 10_000), MeetingNames.Span(name: "Ana", startMs: 21_000, endMs: 30_000)]
+        let split = RoomVoices.split(segments, echo: [], loudness: ["A": 0.5, "B": 0.2], othersLit: lit)
+        #expect(split?.others == ["r1"])
+        #expect(split?.segments.map(\.speaker) == ["r1", "you", "r1"])
     }
 
     @Test func aVoiceTheFarEndTalksOverIsEcho() {

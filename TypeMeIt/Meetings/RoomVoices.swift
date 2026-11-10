@@ -25,10 +25,12 @@ enum RoomVoices {
         speaker.hasPrefix(idPrefix) && Int(speaker.dropFirst(idPrefix.count)) != nil
     }
 
-    /// Roster names that never lit a tile, the user left out: people who
-    /// joined but whose own device carried no speech.
-    static func silentNames(_ names: MeetingNames, userName: String?) -> [String] {
-        let lit = Set(names.spans.map(\.name))
+    /// Roster names whose speech is on the mic, the user left out: people
+    /// who joined but never lit a tile, their own device carrying no
+    /// speech; and, when the far end said nothing, everyone, since the
+    /// loudspeaker played them into the mic.
+    static func silentNames(_ names: MeetingNames, userName: String?, farEndSpoke: Bool) -> [String] {
+        let lit = farEndSpoke ? Set(names.spans.map(\.name)) : []
         return names.roster.filter { !lit.contains($0) && !SpeakerNaming.isUser($0, userName: userName) }
     }
 
@@ -44,6 +46,14 @@ enum RoomVoices {
             }
         }
         return Set(talkMs.keys.filter { Double(farEndMs[$0]!) >= echoShare * Double(max(talkMs[$0]!, 1)) })
+    }
+
+    /// The share of each voice's time that falls inside `spans`.
+    static func share(_ segments: [SpeakerSegment], under spans: [MeetingNames.Span]) -> [String: Double] {
+        let bySpeaker = Dictionary(grouping: segments, by: \.speaker)
+        return SpeakerMerge.talkMs(segments).reduce(into: [:]) { share, talk in
+            share[talk.key] = Double(SpeakerNaming.overlap(segments: bySpeaker[talk.key]!, spans: spans)) / Double(max(talk.value, 1))
+        }
     }
 
     /// How loud each voice is on the mic: the 90th percentile of the RMS
@@ -62,15 +72,29 @@ enum RoomVoices {
         }
     }
 
-    /// The loudest voice that is not echo is the user; every other one that
+    /// The user is the voice that is not echo: the one least under
+    /// `othersLit`, the tiles of other people lit while the far end was
+    /// silent, when there are any; else the loudest. Every other voice that
     /// is not echo becomes `r1`, `r2`…. Nil when fewer than two voices are
     /// left, so the mic stays `you` as before.
-    static func split(_ segments: [SpeakerSegment], echo: Set<String>, loudness: [String: Float]) -> Split? {
+    ///
+    /// The lit tiles come first because a loudspeaker beside the mic can be
+    /// louder than the user: on the 6 November Meet with the far-end track
+    /// silent, the loudest voice was under the other person's tile 93% of
+    /// its time.
+    static func split(_ segments: [SpeakerSegment], echo: Set<String>, loudness: [String: Float], othersLit: [MeetingNames.Span] = []) -> Split? {
         var order: [String] = []
         for segment in segments.sorted(by: { $0.startMs < $1.startMs }) where !echo.contains(segment.speaker) && !order.contains(segment.speaker) {
             order.append(segment.speaker)
         }
-        guard order.count >= 2, let user = order.max(by: { (loudness[$0] ?? 0) < (loudness[$1] ?? 0) }) else { return nil }
+        guard order.count >= 2 else { return nil }
+        let user: String
+        if othersLit.isEmpty {
+            user = order.max { (loudness[$0] ?? 0) < (loudness[$1] ?? 0) }!
+        } else {
+            let litShare = share(segments, under: othersLit)
+            user = order.min { (litShare[$0] ?? 0) < (litShare[$1] ?? 0) }!
+        }
         let others = order.filter { $0 != user }
         let ids = Dictionary(uniqueKeysWithValues: others.enumerated().map { ($1, "\(idPrefix)\($0 + 1)") })
         return Split(
