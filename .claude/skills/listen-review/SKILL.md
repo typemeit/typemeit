@@ -1,6 +1,6 @@
 ---
 name: listen-review
-description: Decide when a human must listen to check speech-to-text, and run that check with the least listening. Use when models or transcripts disagree and the scores can't settle who is right, when a trial's verdict hangs on disputed spans, when asked to review transcription output, or when told a dictation or meeting transcript was bad.
+description: Decide when a human must listen to check speech-to-text, and run that check with the least listening. Use when models or transcripts disagree and the scores can't settle who is right, when a trial's verdict hangs on disputed spans, when asked to review transcription output, when told a dictation or meeting transcript was bad, or whenever the user is to listen to recorded audio to judge anything: what was said, who said it, or whether two voices are one person.
 ---
 
 # Listen review
@@ -9,6 +9,14 @@ Scores against a reference only say who agrees with the reference. The user's
 ear is the ground truth, and the scarcest resource in the eval: machines settle
 everything they can first, and the ear gets only the spans that change the
 meaning and that no machine can settle. Every answer is kept for good.
+
+**One page for every listening check.** Whenever the user listens to past
+meetings or dictations to judge something, it runs through `review --set
+<name> --html`, never a page, player or clip list made for the occasion. A
+one-off page looks and works differently each time, takes answers in chat
+instead of keys, and keeps none of them. Map the question onto a set kind
+below. If none asks it, add a kind to `asr_eval.py` and `review_server.py`
+before building the set.
 
 Commands are `make asr-eval ARGS="..."` (Scripts/asr-eval/README.md). Paid calls,
 judgements and answers are all cached; never pay, judge or ask twice.
@@ -67,9 +75,12 @@ and confirm the real answers file is unchanged. Give the user one command and
 the listening time. The clips and transcripts are private: never publish the
 page or a snippet, and never paste transcript text in chat.
 
-## 4. Keep the answers
+## 4. Turn the answers into an eval
 
-Done means all three:
+Every listen review ends as an eval, whatever its question: answers that stay
+in chat or a set file are lost the next time the code changes. Done means all
+three, and the change the review decided is checked against the truths it
+left, not only against the clips the user heard:
 
 1. `truths-import <name> --by <listener>` turns the answers into truths: what was
    said in a clip between two times. Truths survive any change of reference or

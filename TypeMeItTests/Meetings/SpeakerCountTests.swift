@@ -89,8 +89,19 @@ struct SpeakerCountTests {
         #expect(talkers == ["Ana", "Ben"])
     }
 
-    @Test func peopleShownTalkingSetTheCountExactly() {
+    @Test func everyoneListedCapsTheCountWhenMeetLitFewer() {
+        // Cy spoke but Meet never lit their tile long enough to make them a talker.
         let names = names(roster: ["Ana", "Ben", "Cy"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
+        #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: nil) == .atMost(3))
+    }
+
+    @Test func peopleShownTalkingSetTheCountWhenTheyAreEveryoneListed() {
+        let names = names(roster: ["Ana", "Ben", "Maximilian Mitchell"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
+        #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: "Maximilian Mitchell") == .exactly(2))
+    }
+
+    @Test func talkersMissingFromTheListStillCount() {
+        let names = names(roster: ["Ana"], spans: [span("Ana", 0, 1), span("Ben", 1, 2)])
         #expect(SpeakerCount.of(names, talkers: ["Ana", "Ben"], userName: nil) == .exactly(2))
     }
 

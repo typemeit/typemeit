@@ -26,11 +26,11 @@ struct ShortcutsTests {
         let seen = events { handled = shortcuts.toggleFromMenuBar() }
         #expect(handled)
         #expect(seen == [.recordingEnded])
-        #expect(shortcuts.phase == .transcribing)
+        #expect(shortcuts.phase == .ending)
     }
 
     @Test func menuBarToggleDoesNothingWhileTranscribing() {
-        for phase in [Shortcuts.Phase.transcribing, .cleaningUp] {
+        for phase in [Shortcuts.Phase.ending, .transcribing, .cleaningUp] {
             shortcuts.setPhase(phase)
             var handled = true
             let seen = events { handled = shortcuts.toggleFromMenuBar() }
@@ -38,5 +38,21 @@ struct ShortcutsTests {
             #expect(seen.isEmpty)
             #expect(shortcuts.phase == phase)
         }
+    }
+
+    @Test func thePhaseMovesBeforeItsEventIsSent() {
+        var log: [String] = []
+        shortcuts.onPhaseChanged = { log.append("phase \($0)") }
+        shortcuts.onEvent = { log.append("event \($0)") }
+        shortcuts.startFromMenu()
+        #expect(log == ["phase pinned", "event recordingStarted", "event pinned"])
+    }
+
+    @Test func aPinnedStopEndsThroughTheTail() {
+        shortcuts.startFromMenu()
+        let seen = events { shortcuts.stopFromOverlay() }
+        #expect(seen == [.recordingEnded])
+        #expect(shortcuts.phase == .ending)
+        #expect(shortcuts.phase.isCapturing)
     }
 }

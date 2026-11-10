@@ -1,13 +1,13 @@
 import Foundation
 
-/// How many voices the diarizer is told a call's far end holds, from what
-/// the meeting window showed (docs/meetings.md 8.3). Pure.
+/// How many voices the diarizer may keep on a call's far end, from what the
+/// meeting window showed (docs/meetings.md 8.3). Pure.
 ///
-/// Measured on 24 September with `-diarizeCounts`: told the right count, the
-/// diarizer matched its own; told one too many, it split a real voice, the
-/// Slack call's one far-end person into 87 s and 37 s. So only people shown
-/// speaking set an exact count. The list holds everyone who joined, silent
-/// listeners included, and only caps the count.
+/// The diarizer finds its own voices; the count only folds the quietest into
+/// the nearest. Meet lights some people's tiles late or not at all, so the
+/// cap is everyone listed other than the user, not just the people lit:
+/// capped at the lit, real people were merged on every one of seven past
+/// calls checked by ear (listen review `extra-voices-1109`).
 enum SpeakerCount: Equatable, Sendable {
     case exactly(Int)
     case atMost(Int)
@@ -19,13 +19,13 @@ enum SpeakerCount: Equatable, Sendable {
         }
     }
 
-    /// Exactly the far-end talkers when the window showed anyone speaking;
-    /// otherwise at most the people listed other than the user; nil when
+    /// At most the people listed other than the user; exactly the far-end
+    /// talkers when the window showed at least that many speaking; nil when
     /// the window gave neither.
     static func of(_ names: MeetingNames, talkers: [String], userName: String?) -> SpeakerCount? {
-        if !talkers.isEmpty { return .exactly(talkers.count) }
         let listed = names.roster.filter { !SpeakerNaming.isUser($0, userName: userName) }.count
-        return listed > 0 ? .atMost(listed) : nil
+        if listed > talkers.count { return .atMost(listed) }
+        return talkers.isEmpty ? nil : .exactly(talkers.count)
     }
 
     /// The names shown speaking while the far end said at least `minimumMs`

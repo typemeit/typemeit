@@ -121,5 +121,8 @@ looks for alternatives to models on that list.
 ## The user's ear settles disputed transcripts
 
 When transcripts or models disagree and the scores can't say who is right, when
-asked to review transcription output, or when told a transcript was bad, use
-the `listen-review` skill: build a short listening set and let the user judge.
+asked to review transcription output, when told a transcript was bad, or when
+the user is to listen to past audio for any reason (who said a line, whether a
+voice is someone new), use the `listen-review` skill: build a short listening
+set and let the user judge on its review page. Never hand-build a listening
+page.

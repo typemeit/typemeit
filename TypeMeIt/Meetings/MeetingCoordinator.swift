@@ -35,7 +35,11 @@ final class MeetingCoordinator {
     /// Any holder with input and output, for the menu's item.
     private(set) var detected: Owner?
     private(set) var prompting: Owner?
-    private(set) var recording: Live?
+    /// The meeting being recorded, from the recorder's start until
+    /// `finished` keeps or drops it.
+    var recording: Live? {
+        inProgress.map { Live(id: $0.meeting.id, kind: $0.meeting.kind, started: $0.meeting.started) }
+    }
     /// Whole minutes the live recording has run. The menu redraws only when
     /// state it reads changes, so the tick advances this for it.
     private(set) var recordingMinutes = 0
@@ -46,7 +50,9 @@ final class MeetingCoordinator {
     /// `transcribeSoFar` is running.
     private(set) var transcribingSoFar = false
     /// The question Claude is answering for a meeting, shown on its page.
-    private(set) var askingIn: (meeting: UUID, question: Meeting.Question)?
+    var askingIn: (meeting: UUID, question: Meeting.Question)? {
+        asking.flatMap { asked in asked.meeting.map { ($0, asked.question) } }
+    }
     /// Ask is transcribing or finding its question, before Claude Code
     /// starts on it; until then the question's text names the step.
     private(set) var askPreparing = false
@@ -75,8 +81,10 @@ final class MeetingCoordinator {
     /// The capture running since the current candidate formed, and what it
     /// has held so far (D20). Nothing of it reaches a file before `record`.
     @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
-    @ObservationIgnored private var recordingMeeting: Meeting?
-    @ObservationIgnored private var recordingOwner: Owner?
+    /// The meeting being recorded, as it will be saved, and the app it was
+    /// recorded from; nil owner for the room. Outlives `recorder`, which
+    /// goes when the recording stops, until `finished`.
+    private var inProgress: (meeting: Meeting, owner: Owner?)?
     @ObservationIgnored private var tapObjects: [AudioObjectID] = []
     @ObservationIgnored private var silenceDeadline: Task<Void, Never>?
     @ObservationIgnored private var shownSystemAudioOff = false
@@ -93,21 +101,26 @@ final class MeetingCoordinator {
     /// The ask in progress, which its task checks after each wait: two asks
     /// in a row show the same pill state, so the overlay cannot tell them apart.
     @ObservationIgnored private var currentAskID: UUID?
-    /// The question the pill offered last, for when it was asked, its line
-    /// in `QuestionLog`, and the meeting it is kept in.
-    @ObservationIgnored private var offered: SpottedQuestion?
-    @ObservationIgnored private var offeredLogID: UUID?
-    @ObservationIgnored private var offeredMeetingID: UUID?
-    /// The dictation that asked the offered question by name.
-    @ObservationIgnored private var offeredDictationID: UUID?
-    /// The offered dictation as it would have been typed, name included.
-    @ObservationIgnored private var offeredDictationText: String?
+    /// The question the pill offered last, kept after its answer for when
+    /// it was asked and where it is kept.
+    struct Offer {
+        var question: SpottedQuestion
+        /// Its line in `QuestionLog`; nil once the user's answer is logged.
+        var logID: UUID?
+        /// The meeting it is kept in.
+        let meeting: UUID?
+        /// The dictation that asked it by name, and that dictation as it
+        /// would have been typed, name included.
+        let dictation: UUID?
+        let dictatedText: String?
+    }
+    @ObservationIgnored private var lastOffer: Offer?
     /// What the pill's open shows for the question asked last, through its answer.
     /// The ask was opened: its answer goes to its page, not the pill.
     @ObservationIgnored private var askOpened = false
     @ObservationIgnored private var openTarget: (meeting: UUID?, dictation: UUID?)?
     /// The question Claude Code is answering, as its meeting keeps it.
-    @ObservationIgnored private var asking: (question: Meeting.Question, meeting: UUID?, dictation: UUID?)?
+    private var asking: (question: Meeting.Question, meeting: UUID?, dictation: UUID?)?
     @ObservationIgnored private var dictationStart: UInt64?
     @ObservationIgnored private var started = false
     /// The newest mid-meeting transcript of the live recording, replaced by
@@ -191,7 +204,7 @@ final class MeetingCoordinator {
             self?.dismissToast()
         }
         model.onCopyDictation = { [weak self] in
-            guard let self, let text = self.offeredDictationText else { return }
+            guard let self, let text = self.lastOffer?.dictatedText else { return }
             Output.copyToClipboard(text)
             self.logAnswer(.no)
             self.dismissToast()
@@ -234,7 +247,7 @@ final class MeetingCoordinator {
     /// pill's ask claude does. A question spotted in a meeting leaves Return
     /// alone: the user may be typing in the call's chat.
     private func askDictatedOnReturn() -> Bool {
-        guard offeredDictationID != nil, offeredLogID != nil, let question = offered,
+        guard let offer = lastOffer, offer.dictation != nil, offer.logID != nil, case let question = offer.question,
               overlay.model.state == .meetingQuestion(text: question.text) else { return false }
         askOffered(overlay.model.questionDraft ?? question.text)
         return true
@@ -245,9 +258,9 @@ final class MeetingCoordinator {
     private func askOffered(_ question: String) {
         logAnswer(.ask)
         overlay.model.questionDraft = nil
-        if let heard = offered, heard.text != question {
-            LearningCoordinator.shared.learn(original: heard.text, edited: question, source: "question", historyId: offeredDictationID)
-            offered = SpottedQuestion(text: question, track: heard.track, start: heard.start, end: heard.end, addressed: heard.addressed)
+        if let heard = lastOffer?.question, heard.text != question {
+            LearningCoordinator.shared.learn(original: heard.text, edited: question, source: "question", historyId: lastOffer?.dictation)
+            lastOffer?.question = SpottedQuestion(text: question, track: heard.track, start: heard.start, end: heard.end, addressed: heard.addressed)
         }
         askClaude(question)
     }
@@ -271,7 +284,7 @@ final class MeetingCoordinator {
         if roster?.showsOtherCall == true { send(.otherCall) }
         send(.holders(holders))
         // A helper that restarted mid-call is a new process object: retarget the tap.
-        if let owner = recordingOwner, let recorder {
+        if let owner = inProgress?.owner, let recorder {
             let objects = holders.first { $0.owner == owner }?.objectIDs ?? []
             if !objects.isEmpty, objects != tapObjects {
                 tapObjects = objects
@@ -389,15 +402,19 @@ final class MeetingCoordinator {
                 }
                 roster?.start()
             }
-            recordingMeeting = recorder.meeting
-            recordingOwner = owner
+            inProgress = (recorder.meeting, owner)
             shownSystemAudioOff = false
             stoppedForDisk = false
             store.adopt(recorder.meeting, folder: recorder.folder)
-            recording = Live(id: id, kind: recorder.meeting.kind, started: recorder.meeting.started)
             recordingMinutes = 0
             pauseTranscribingForRecording()
             AppState.shared.meeting = true
+            // The update pill's button relaunches the app and would end this
+            // recording. remind() holds it until the meeting is done.
+            if case .updateReady = overlay.model.state {
+                overlay.hide()
+                Updates.shared.remind()
+            }
         } catch {
             Log.meetings.error("Could not start the meeting recorder: \(error.localizedDescription)")
             DebugLog.write("Meeting recorder failed to start: \(error.localizedDescription)")
@@ -437,9 +454,7 @@ final class MeetingCoordinator {
 
     private func finished(keep: Bool) {
         defer {
-            recording = nil
-            recordingMeeting = nil
-            recordingOwner = nil
+            inProgress = nil
             tapObjects = []
             lastResult = nil
             AppState.shared.meeting = false
@@ -447,7 +462,7 @@ final class MeetingCoordinator {
             resumeTranscribingAfterRecording()
         }
         discardSnapshot()
-        guard var meeting = recordingMeeting else { return }
+        guard var meeting = inProgress?.meeting else { return }
         let folder = MeetingFolder.staged(meeting.id)
         guard keep, let result = lastResult else {
             DebugLog.write("Meeting dropped: \(lastResult?.recordedMs ?? 0) ms recorded")
@@ -498,7 +513,7 @@ final class MeetingCoordinator {
     /// their mic for a moment. A far end that only listens is left alone.
     private func farEndSilent() {
         guard recording?.kind == .call, let recorder else { return }
-        DebugLog.write("Meeting far end silent: \(recorder.tapDelivery) · \(AudioProcesses.route(of: recordingOwner))")
+        DebugLog.write("Meeting far end silent: \(recorder.tapDelivery) · \(AudioProcesses.route(of: inProgress?.owner))")
         let sinceMs = Int((secondsRecorded - TimeInterval(Fixed.meetingSilentSeconds)) * 1000)
         let talking = roster?.peek().map { SpeakerCount.talking($0.spans, sinceMs: sinceMs, excluding: NSFullUserName()) }
         if let talking, talking.isEmpty { return }
@@ -603,7 +618,7 @@ final class MeetingCoordinator {
         discardPreRoll()
         let names = roster?.finish()
         roster = nil
-        guard let recorder, let meeting = recordingMeeting else { return }
+        guard let recorder, let meeting = inProgress?.meeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
         let box = ResultBox()
@@ -1019,16 +1034,17 @@ final class MeetingCoordinator {
     /// keeps a question not asked in its meeting; an asked one is kept with
     /// its answer.
     private func logAnswer(_ answer: QuestionLog.Answer) {
-        guard let id = offeredLogID, let question = offered else { return }
-        offeredLogID = nil
-        QuestionLog.append(QuestionLog.Entry(id: id, at: Date(), step: .answered, question: question.text, meeting: offeredMeetingID, answer: answer))
+        guard let offer = lastOffer, let id = offer.logID else { return }
+        let question = offer.question
+        lastOffer?.logID = nil
+        QuestionLog.append(QuestionLog.Entry(id: id, at: Date(), step: .answered, question: question.text, meeting: offer.meeting, answer: answer))
         let outcome: Meeting.Question.Outcome? = switch answer {
         case .ask: nil
         case .no: .dismissed
         case .ignored: .ignored
         }
         guard let outcome else { return }
-        keep(Meeting.Question(atMs: meetingMs(question.start), text: question.text, outcome: outcome), meeting: offeredMeetingID, dictation: offeredDictationID)
+        keep(Meeting.Question(atMs: meetingMs(question.start), text: question.text, outcome: outcome), meeting: offer.meeting, dictation: offer.dictation)
     }
 
     /// Seconds since the recording's first audio; 0 with nothing recording.
@@ -1041,7 +1057,7 @@ final class MeetingCoordinator {
     /// Seconds into the live transcript as meeting time, which counts the
     /// pre-roll; the live transcript starts at the click.
     private func meetingMs(_ seconds: TimeInterval) -> Int {
-        (recordingMeeting?.preRollMs ?? 0) + Int(seconds * 1000)
+        (inProgress?.meeting.preRollMs ?? 0) + Int(seconds * 1000)
     }
 
     /// An open answer is not swept away by the next question.
@@ -1066,12 +1082,8 @@ final class MeetingCoordinator {
     private func offer(_ question: SpottedQuestion, logID: UUID, dictation: UUID? = nil, dictatedText: String? = nil) {
         guard canOffer else { return }
         // A question offered and left unanswered says nothing either way.
-        if offeredLogID != nil { logAnswer(.ignored) }
-        offered = question
-        offeredLogID = logID
-        offeredMeetingID = recording?.id
-        offeredDictationID = dictation
-        offeredDictationText = dictatedText
+        if lastOffer?.logID != nil { logAnswer(.ignored) }
+        lastOffer = Offer(question: question, logID: logID, meeting: recording?.id, dictation: dictation, dictatedText: dictatedText)
         overlay.model.offerCopies = dictatedText != nil
         overlay.model.questionDraft = nil
         toast(.meetingQuestion(text: question.text)) { [weak self] in self?.logAnswer(.ignored) }
@@ -1098,15 +1110,15 @@ final class MeetingCoordinator {
         var asking = OverlayModel.State.meetingAsking(text: shown)
         overlay.showMeeting(asking)
         CameraFeed.shared.asking()
-        let dictationID = offered?.text == question ? offeredDictationID : nil
+        let offered = lastOffer?.question.text == question ? lastOffer : nil
+        let dictationID = offered?.dictation
         let runID = UUID()
         currentAskID = runID
         if recording != nil || dictationID != nil {
-            let heard = heardAt ?? (offered?.text == question ? offered?.start : nil) ?? secondsRecorded
+            let heard = heardAt ?? offered?.question.start ?? secondsRecorded
             self.asking = (Meeting.Question(atMs: meetingMs(heard), text: shown, outcome: .asked, runID: runID), recording?.id, dictationID)
         }
         askPreparing = true
-        askingIn = self.asking.flatMap { asked in asked.meeting.map { ($0, asked.question) } }
         openTarget = self.asking.map { ($0.meeting, $0.dictation) }
         askOpened = false
         overlay.model.askOpens = openTarget != nil
@@ -1123,7 +1135,6 @@ final class MeetingCoordinator {
             // The page shows the new text, and the pill too while it is up.
             let show = { (text: String) in
                 self.asking?.question.text = text
-                self.askingIn?.question.text = text
                 if !self.askOpened, self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking {
                     asking = .meetingAsking(text: text)
                     self.overlay.showMeeting(asking)
@@ -1209,9 +1220,9 @@ final class MeetingCoordinator {
 
     /// Adds an answered question to its meeting, recording or finished.
     private func keep(_ question: Meeting.Question, in id: UUID) {
-        if var recorded = recordingMeeting, recorded.id == id {
+        if var recorded = inProgress?.meeting, recorded.id == id {
             recorded.questions = Meeting.Question.union(recorded.questions ?? [], [question])
-            recordingMeeting = recorded
+            inProgress?.meeting = recorded
         }
         guard var meeting = store.meeting(id) else { return }
         meeting.questions = Meeting.Question.union(meeting.questions ?? [], [question])
@@ -1245,7 +1256,6 @@ final class MeetingCoordinator {
             kept.question.calls = calls
             keep(kept.question, meeting: kept.meeting, dictation: kept.dictation)
         }
-        askingIn = nil
         askPreparing = false
         guard !askOpened else { return }
         if overlay.model.pendingMeeting == asking { overlay.model.pendingMeeting = nil }
@@ -1258,7 +1268,6 @@ final class MeetingCoordinator {
         currentAskID = nil
         askRun?.cancel()
         askRun = nil
-        askingIn = nil
         askPreparing = false
         if var kept = asking {
             asking = nil
