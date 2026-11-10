@@ -32,8 +32,18 @@ enum ClaudeDesktop {
         if meetingToolReachable() {
             return "\(session) It ran on meeting \(meeting.uuidString); read that with the \(MCPSetup.name) \(meetingTool) tool."
         }
-        guard let folder = MeetingStore.shared.folder(for: meeting) else { return session }
-        return "\(session) The meeting's transcript is \(folder.appendingPathComponent(SupportPaths.transcriptFile).path)."
+        guard let transcript = transcriptFile(meeting) else { return session }
+        return "\(session) The meeting's transcript is \(transcript.path)."
+    }
+
+    /// Starts a session on a meeting, named the same way as a resumed one's.
+    static func prompt(meeting: UUID) -> String? {
+        if meetingToolReachable() { return "Read meeting \(meeting.uuidString) with the \(MCPSetup.name) \(meetingTool) tool." }
+        return transcriptFile(meeting).map { "The meeting's transcript is \($0.path)." }
+    }
+
+    private static func transcriptFile(_ meeting: UUID) -> URL? {
+        MeetingStore.shared.folder(for: meeting)?.appendingPathComponent(SupportPaths.transcriptFile)
     }
 
     private static func meetingToolReachable() -> Bool {

@@ -128,6 +128,11 @@ struct MeetingPage: View {
                         onSubmit: step, onCancel: { if find.isEmpty { back() } else { find = "" } })
                 .frame(width: 200)
                 .padding(.trailing, 4)
+            if ClaudeDesktop.installed, meeting.isDone, !meeting.paragraphs.isEmpty, !live {
+                SquareClaudeButton(title: "open in claude", iconOnly: true) {
+                    if let prompt = ClaudeDesktop.prompt(meeting: meeting.id) { ClaudeDesktop.open(prompt: prompt) }
+                }
+            }
             PageCopyButton(help: "copy the transcript") { Output.copyToClipboard(meeting.transcriptText) }
                 .disabled(meeting.paragraphs.isEmpty)
             if meeting.isDone, !meeting.paragraphs.isEmpty, !live {
