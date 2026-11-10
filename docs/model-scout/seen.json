@@ -1339,6 +1339,66 @@
       "id": "vksbhandary/buddy-pronunciation-en",
       "date": "2026-11-09",
       "role": "none"
+    },
+    {
+      "id": "lee1jun/LES-eg2-665M-asr-en",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "88M word-CTC reader on frozen EmbeddingGemma 2, Apache-2.0; card mean WER 6.89 vs 5.53 for Parakeet TDT 0.6B v2 on the same eight sets, worse on each; PyTorch only, lower-case with no punctuation"
+    },
+    {
+      "id": "Fritter-ASR/Fritter",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Parakeet TDT 0.6B v2 dictation fine-tune; CC-BY-NC-4.0"
+    },
+    {
+      "id": "Fritter-ASR/Fritter-Nemotron-0.6B",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Nemotron streaming fine-tune; CC-BY-NC-4.0"
+    },
+    {
+      "id": "Andivee/dictando-english-plus-coreml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Core ML repackage of Underdog Bark 3.0 Plus, rejected 2026-10-22"
+    },
+    {
+      "id": "DictionLabs/parakeet-ultra-coreml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Core ML port of Parakeet Ultra, which we ship; no new numbers"
+    },
+    {
+      "id": "ymalick/whisper-large-v3-ydictation",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "Whisper large-v3 dictation fine-tune; card publishes no numbers"
+    },
+    {
+      "id": "DojoWorkspace/Dojo-Speech-v1.0-ggml",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "stock Whisper ggml files under new names"
+    },
+    {
+      "id": "error0229/echora-kara-300m-onnx",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "CC-BY-NC-4.0"
+    },
+    {
+      "id": "arXiv 2611.10659 (Pandemonium, DiCoP)",
+      "date": "2026-11-10",
+      "role": "speech recognition",
+      "why": "paper for BUT-FIT/Pandemonium, seen 2026-10-24; no Apple Silicon build"
+    },
+    {
+      "id": "arXiv 2611.12246 (Nemotron 3 Diarization)",
+      "date": "2026-11-10",
+      "role": "diarization",
+      "why": "paper for the diarizer we ship; no new weights"
     }
   ]
 }
