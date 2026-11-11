@@ -92,15 +92,16 @@ struct MeetingsTab: View {
                     }
                 }
             } else {
-                MeetingColumns.head.padding(.horizontal, SquareListColumns.page)
+                let placeWidth = MeetingColumns.place(rows)
+                MeetingColumns.head(place: placeWidth).padding(.horizontal, SquareListColumns.page)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(MeetingsTab.lines(rows)) { line in
                             switch line {
                             case .day(_, let day, let date, let total):
-                                SquareDayHeader(day: day, date: date, total: total, totalWidth: MeetingColumns.total, trailing: MeetingColumns.trail)
+                                SquareDayHeader(day: day, date: date, total: total, totalWidth: MeetingColumns.total(place: placeWidth), trailing: MeetingColumns.trail)
                             case .row(let meeting):
-                                MeetingRow(meeting: meeting, picked: $selection.box(meeting.id) { filtered.map(\.id) },
+                                MeetingRow(meeting: meeting, place: placeWidth, picked: $selection.box(meeting.id) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty,
                                            stopping: stopping.contains(meeting.id),
                                            open: {
@@ -321,14 +322,21 @@ struct MeetingsTab: View {
 /// its length. The head, the days and the rows share them.
 enum MeetingColumns {
     static let who: CGFloat = 170
-    static let place: CGFloat = 80
+    /// The widest the where column grows before names truncate.
+    static let placeMax: CGFloat = 160
+    /// The where column fits the widest app or channel shown, up to placeMax.
+    @MainActor static func place(_ meetings: [Meeting]) -> CGFloat {
+        let font = Square.appKitMono(11)
+        let widest = meetings.map { (MeetingsTab.app(of: $0) as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return min(placeMax, max(widest, ("where" as NSString).size(withAttributes: [.font: Square.appKitMono(12)]).width).rounded(.up))
+    }
     static let length: CGFloat = 48
     /// How far the columns sit inside the row's right edge.
     static let trail: CGFloat = 12
     /// A day's total sits over who, where and the length.
-    static var total: CGFloat { who + place + length + 2 * SquareListColumns.gap }
+    static func total(place: CGFloat) -> CGFloat { who + place + length + 2 * SquareListColumns.gap }
 
-    static var head: some View {
+    static func head(place: CGFloat) -> some View {
         SquareListHead(trailing: trail) {
             Text("time").frame(width: SquareListColumns.time, alignment: .leading)
             Text("meeting").frame(maxWidth: .infinity, alignment: .leading)
@@ -367,6 +375,7 @@ private struct MeetingsLiveBand: View {
 /// and how long. A click on the rest opens its page.
 private struct MeetingRow: View {
     let meeting: Meeting
+    let place: CGFloat
     @Binding var picked: Bool
     /// Something is picked, so every box shows.
     let picking: Bool
@@ -420,7 +429,7 @@ private struct MeetingRow: View {
                     .font(Square.mono(11))
                     .foregroundStyle(DesignTokens.Colors.ink3)
                     .lineLimit(1)
-                    .frame(width: MeetingColumns.place, alignment: .leading)
+                    .frame(width: place, alignment: .leading)
                 Text(MeetingsTab.length(meeting.durationMs))
                     .font(Square.mono(12))
                     .monospacedDigit()
