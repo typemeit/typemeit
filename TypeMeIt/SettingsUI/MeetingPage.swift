@@ -798,8 +798,7 @@ private struct MeetingPageFingerprint: View {
                 content: content,
                 cell: side / CGFloat(MeetingFingerprint.side),
                 playingCell: loaded ? fingerprint?.cell(atMs: Int(player.currentTime * 1000)) : nil,
-                questionCells: Set((meeting.questions ?? []).compactMap { fingerprint?.cell(atMs: $0.atMs) }),
-                click: fingerprint.flatMap { f in audio.map { urls in { player.play(id: meeting.id, urls: urls, from: Double(f.startMs(ofCell: $0)) / 1000) } } })
+                questionCells: Set((meeting.questions ?? []).compactMap { fingerprint?.cell(atMs: $0.atMs) }))
         }
     }
 }
