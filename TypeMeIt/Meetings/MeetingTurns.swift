@@ -7,7 +7,7 @@ extension Meeting {
         MeetingFingerprint(
             durationMs: durationMs,
             voices: speakers.map {
-                MeetingFingerprint.Voice(id: $0.id, isYou: $0.isYou, talkMs: $0.talkMs, name: Speaker.isPlaceholder($0.name) ? nil : $0.name)
+                MeetingFingerprint.Voice(id: $0.id, isYou: $0.isYou || $0.name == VoiceNames.youName, talkMs: $0.talkMs, name: Speaker.isPlaceholder($0.name) ? nil : $0.name)
             },
             turns: paragraphs.map { MeetingFingerprint.Turn(speaker: $0.speaker, startMs: $0.startMs, endMs: $0.endMs, aside: $0.aside == true) })
     }
