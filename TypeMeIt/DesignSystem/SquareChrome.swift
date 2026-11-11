@@ -182,7 +182,11 @@ private struct SidebarIcon: View {
     }
 
     var body: some View {
-        if name == "akar-chat-dots" { ChatDots(talking: hovering && !reduceMotion) } else { parted }
+        switch name {
+        case "akar-chat-dots": ChatDots(talking: hovering && !reduceMotion)
+        case "akar-thunder": FlickeringBolt(striking: hovering && !reduceMotion)
+        default: parted
+        }
     }
 
     private var parted: some View {
@@ -197,6 +201,28 @@ private struct SidebarIcon: View {
         }
         .frame(width: SquareSidebarLayout.icon, height: SquareSidebarLayout.icon)
         .animation(SidebarIcon.spring, value: hot)
+    }
+}
+
+/// The bolt, dimming twice and coming back like a flickering light once as
+/// the pointer arrives, in the same time as the other icons' hovers.
+private struct FlickeringBolt: View {
+    let striking: Bool
+    @State private var strikes = 0
+
+    var body: some View {
+        SquareIcon("akar-thunder", size: SquareSidebarLayout.icon)
+            .keyframeAnimator(initialValue: 1.0, trigger: strikes) { icon, opacity in
+                icon.opacity(opacity)
+            } keyframes: { (_: Double) in
+                KeyframeTrack(\.self) {
+                    LinearKeyframe(0.25, duration: SidebarIcon.duration / 4)
+                    LinearKeyframe(1.0, duration: SidebarIcon.duration / 4)
+                    LinearKeyframe(0.25, duration: SidebarIcon.duration / 4)
+                    LinearKeyframe(1.0, duration: SidebarIcon.duration / 4)
+                }
+            }
+            .onChange(of: striking) { _, now in if now { strikes += 1 } }
     }
 }
 
