@@ -1399,6 +1399,90 @@
       "date": "2026-11-10",
       "role": "diarization",
       "why": "paper for the diarizer we ship; no new weights"
+    },
+    {
+      "id": "Musci-research/Musci-ASR-qwen-1019-hf",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "new leaderboard row (5.70 average, AMI 6.53); GRPO fine-tune of Qwen3-ASR-1.7B, same architecture as Qwen3-ASR rejected 2026-10-12, trained on the leaderboard's training sets"
+    },
+    {
+      "id": "reson8/rumble-2 (eval reference)",
+      "date": "2026-11-11",
+      "role": "eval reference",
+      "why": "new leaderboard row replacing resonant-1: AMI-Cleaned 8.74, private conversational 12.30, behind Zoom Scribe v2.1 Pro (5.96 / 11.67)"
+    },
+    {
+      "id": "ElevenLabs Scribe v3 (eval reference)",
+      "date": "2026-11-11",
+      "role": "eval reference",
+      "why": "Voice Arena US English rank 14, behind Universal-3 Pro at rank 3"
+    },
+    {
+      "id": "audeolabs/kea-b-0.1",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "1-bit Parakeet TDT 0.6B v2, 91 MB; card mean WER 6.77 vs 6.44 for v2, less accurate than what we ship; AMI in its training data"
+    },
+    {
+      "id": "audeolabs/kea-b-0.1-coreml",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "Core ML build of audeolabs/kea-b-0.1"
+    },
+    {
+      "id": "Banafo/Kroko-ASR-XL-EN-Offline",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "gated, Kroko Community Model License 2.0 caps commercial use at US$1M group revenue; numbers not readable without accepting it"
+    },
+    {
+      "id": "Level5Tech/clef-GGUF",
+      "date": "2026-11-11",
+      "role": "clean-up",
+      "why": "GGUF quants of Cloudflare Clef 27B; over the memory budget, and Clef-flash was rejected 2026-10-03"
+    },
+    {
+      "id": "pisar/parakeet-ultra-mlx",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "MLX port of Parakeet Ultra, which we ship"
+    },
+    {
+      "id": "DictionLabs/parakeet-ultra",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "repackage of Parakeet Ultra, which we ship"
+    },
+    {
+      "id": "SchumiPres/parakeet-tdt-0.6b-v3-int8",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "int8 port of parakeet-tdt-0.6b-v3, no new numbers"
+    },
+    {
+      "id": "thepytales/parakeet-tdt-0.6b-v3-lora-edition",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "byte-identical copy of the sherpa-onnx parakeet-tdt-0.6b-v3 int8 export"
+    },
+    {
+      "id": "vocabulary11/nemotron-speech-streaming-en-0.6b-gguf",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "GGUF port of nemotron-speech-streaming-en-0.6b, seen before"
+    },
+    {
+      "id": "raymondchins/qwen3-asr-1.7b-coreml-ane",
+      "date": "2026-11-11",
+      "role": "speech recognition",
+      "why": "Core ML port of Qwen3-ASR-1.7B; Qwen3-ASR rejected 2026-10-12"
+    },
+    {
+      "id": "sherpa-onnx VoxLock",
+      "date": "2026-11-11",
+      "role": "speech enhancement",
+      "why": "target-speaker voice isolation in sherpa-onnx v2.0.1; not a role we ship"
     }
   ]
 }
