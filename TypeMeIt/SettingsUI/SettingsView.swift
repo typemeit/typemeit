@@ -17,7 +17,7 @@ enum SettingsTab: String, CaseIterable {
         case .insights: "akar-statistic-up"
         case .history: "akar-chat-dots"
         case .meetings: "akar-people-group"
-        case .hooks: "akar-sparkles"
+        case .hooks: "akar-thunder"
         case .dictionary: "akar-text-align-left"
         case .settings: "akar-gear"
         }
