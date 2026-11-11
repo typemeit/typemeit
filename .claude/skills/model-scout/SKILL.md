@@ -40,6 +40,12 @@ llama.cpp, transcribe.cpp, sherpa-onnx, mlx-audio, Apple Foundation Models.
 
 ## Scout
 
+0. Stop if a pick is waiting for a trial. A waiting pick is a `seen.json`
+   entry with `"pick": true` and no `"skipped"` field, that has no entry in
+   `docs/model-trials.json` other than an `open` one whose result is "Not run
+   yet". If any pick is waiting, stop here: scout nothing, write no report,
+   open no PR. End the run by listing each waiting pick with its report link
+   and the eval to run. Only the user adds `"skipped": "<reason>"`.
 1. Read `docs/model-trials.md`, `docs/model-scout/seen.json`, and the report
    and `seen.json` on every open `model-scout-*` PR (`gh pr list --state open
    --search "Model scout"`). Skip any model already in one of them.
@@ -177,6 +183,8 @@ llama.cpp, transcribe.cpp, sherpa-onnx, mlx-audio, Apple Foundation Models.
    and a **Source status** list of any fetch that failed.
 8. Append every pick and near miss to `seen.json` as
    `{"id": "<hf id or name>", "date": "YYYY-MM-DD", "role": "<role>"}`.
+   Picks also get `"pick": true`, so the next run stops at step 0 until
+   they are tried or skipped.
 9. Commit on a branch `model-scout-YYYY-MM-DD`, then open and merge the PR
    (see PRs). The title is "Model scout YYYY-MM-DD". The body is the top pick
    in one sentence.
