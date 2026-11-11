@@ -37,6 +37,21 @@ class SaidByAnswer(unittest.TestCase):
         self.assertEqual(asr_eval.said_by_answer(self.insertion, {'answer': 'h'}), '')
         self.assertIsNone(asr_eval.said_by_answer(self.insertion, {'answer': 'w'}))
 
+class AnswerFields(unittest.TestCase):
+    people = {'people': True, 'names': ['P1', 'P2']}
+
+    def test_people_answer_keeps_the_person_and_drops_the_note(self):
+        self.assertEqual(asr_eval.answer_fields(self.people, {'answer': 'who', 'choice': 1, 'note': 'Ana again'}),
+                         {'said': None, 'person': 'P2', 'note': ''})
+
+    def test_people_answer_for_several_or_cant_tell_has_no_person(self):
+        self.assertIsNone(asr_eval.answer_fields(self.people, {'answer': 'who', 'choice': -1, 'note': 'Ben'})['person'])
+
+    def test_word_answer_keeps_its_note(self):
+        item = {'words': ['we', 'left'], 'before': 'so', 'after': 'early'}
+        self.assertEqual(asr_eval.answer_fields(item, {'answer': 'r', 'note': 'clear'}),
+                         {'said': 'we left', 'answer': 'r', 'choice': None, 'before': 'so', 'after': 'early', 'note': 'clear'})
+
 class Seal(unittest.TestCase):
     def test_round_trip(self):
         secret = secrets.token_bytes(32)

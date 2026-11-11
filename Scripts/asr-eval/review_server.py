@@ -13,9 +13,10 @@ LOOPBACK = '127.0.0.1'
 # A pick item asks which of its readings was said: choice is the reading's index, NONE_OF_THESE for none.
 PICK = 'pick'
 NONE_OF_THESE = -1
-# A who item asks whose voice its words are: choice is the index of the voice sample.
+# A who item asks whose voice its words are: choice is the index of the voice sample. A people item
+# (`people` set) asks which of the meeting's people it is, by name, with no samples: the listener knows
+# their voices. Choice is the index into its names.
 WHO = 'who'
-WHO_VOICES = 2
 # The words alone, played after the voice samples, with this much either side.
 TIGHT_PAD_S = 0.2
 
@@ -24,7 +25,7 @@ def answer_line(item, payload, now=None):
     answer = payload.get('answer') if isinstance(payload, dict) else None
     if item.get('who'):
         choice = payload.get('choice') if answer == WHO else None
-        if not isinstance(choice, int) or isinstance(choice, bool) or not NONE_OF_THESE <= choice < WHO_VOICES:
+        if not isinstance(choice, int) or isinstance(choice, bool) or not NONE_OF_THESE <= choice < len(item['names'] if item.get('people') else item['samples']):
             return None
     elif item.get('pick'):
         choice = payload.get('choice') if answer == PICK else None
@@ -54,12 +55,12 @@ def cut_window(item, context_s, max_play_s):
 
 def part_window(item, part, context_s, max_play_s):
     """Start and length in seconds of one of a who item's sounds: `tight` (its words alone),
-    `voice0` or `voice1` (a sample of each voice), or else the window with context."""
+    `voice<n>` (a sample of each voice), or else the window with context."""
     if part == 'tight':
         begin = max(0.0, item['gapStartMs'] / 1000 - TIGHT_PAD_S)
         return begin, min(item['gapEndMs'] / 1000 + TIGHT_PAD_S - begin, max_play_s)
-    if part in ('voice0', 'voice1'):
-        sample = item['samples'][int(part[-1])]
+    if part.startswith('voice'):
+        sample = item['samples'][int(part[len('voice'):])]
         return sample['startMs'] / 1000, (sample['endMs'] - sample['startMs']) / 1000
     window = cut_window(item, context_s, max_play_s)
     return window['begin'], window['length']
@@ -109,8 +110,9 @@ def make_handler(state):
                 return self.send(200, json.dumps(state['describe']()), 'application/json')
             if path == '/api/summary':
                 return self.send(200, json.dumps({'text': state['summary']()}), 'application/json')
-            found = re.match(r'^/clip/(\d+)(?:/(tight|voice0|voice1))?\.wav$', path)
-            if found and int(found.group(1)) < len(state['items']) and (not found.group(2) or state['items'][int(found.group(1))].get('who')):
+            found = re.match(r'^/clip/(\d+)(?:/(tight|voice(\d+)))?\.wav$', path)
+            item = found and int(found.group(1)) < len(state['items']) and state['items'][int(found.group(1))]
+            if item and (not found.group(2) or item.get('who')) and (not found.group(3) or int(found.group(3)) < len(item.get('samples') or [])):
                 return self.serve_clip(int(found.group(1)), found.group(2) or 'window')
             self.send(404, 'not found', 'text/plain')
 
@@ -171,7 +173,8 @@ def serve(name, items, clip_file, answers_path, latest_answers, summary, context
         answered = latest_answers()
         return {'name': name, 'items': [{
             'key': i['key'], 'clip': i['clip'], 'readings': [] if i.get('who') else default_readings(i),
-            'window': cut_window(i, context_s, max_play_s), 'pick': bool(i.get('pick')), 'who': bool(i.get('who')), 'choice': answered.get(i['key'], {}).get('choice'),
+            'window': cut_window(i, context_s, max_play_s), 'pick': bool(i.get('pick')), 'who': bool(i.get('who')), 'people': bool(i.get('people')),
+            'voices': i.get('labels') or [f'person {chr(ord("A") + n)}' for n in range(len(i.get('samples') or []))], 'choice': answered.get(i['key'], {}).get('choice'),
             'answer': answered.get(i['key'], {}).get('answer'), 'note': answered.get(i['key'], {}).get('note', '')} for i in items]}
 
     state = {'items': items, 'by_key': {i['key']: i for i in items}, 'cut': cut, 'describe': describe, 'summary': summary,
@@ -245,10 +248,10 @@ pre{white-space:pre-wrap;font:14px/1.5 ui-monospace,monospace}
 <button class="big fake" id="bH">Made up<kbd>H</kbd></button></div>
 <div class="picks" id="picks" hidden></div>
 <div id="whopanel" hidden>
-<div class="steps"><button data-part="voice0"><b>1.</b>person A</button><button data-part="voice1"><b>2.</b>person B</button><button data-part="tight"><b>3.</b>who is this?</button></div>
-<button class="quiet" data-part="window">hard to tell? hear 3 with a few seconds either side</button>
-<p class="ask">3 is:</p>
-<div class="picks" id="whopicks" style="margin-top:0"><button data-i="0"><kbd>1</kbd> person A</button><button data-i="1"><kbd>2</kbd> person B</button><button data-i="-1"><kbd>0</kbd> someone else / can't tell</button></div>
+<div class="steps" id="whosteps"></div>
+<button class="quiet" data-part="window">hard to tell? hear it with a few seconds either side</button>
+<p class="ask">who is this?</p>
+<div class="picks" id="whopicks" style="margin-top:0"></div>
 </div>
 <div class="row"><button id="bB">Back<kbd>&larr;</kbd></button><button id="bP">Replay<kbd>Space</kbd></button><button id="bS">Skip<kbd>S</kbd></button></div>
 <textarea id="note" rows="2" placeholder="Note (N)"></textarea>
@@ -261,7 +264,7 @@ pre{white-space:pre-wrap;font:14px/1.5 ui-monospace,monospace}
 <script>
 const $=id=>document.getElementById(id);
 let items=[],idx=0,started=false,queue=[];
-const WHO_NAMES={'0':'person A','1':'person B','-1':'someone else / can\'t tell'};
+function whoName(it,i){return i<0?'someone else / can\'t tell':it.voices[i]}
 const audio=$('audio');
 function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function firstOpen(){const i=items.findIndex(x=>!x.answer);return i<0?items.length:i}
@@ -279,7 +282,13 @@ function show(){
   $('readings').innerHTML=it.pick||it.who?'':it.readings.map(reading).join('');
   document.querySelector('.buttons').hidden=it.pick||it.who;$('picks').hidden=!it.pick;$('whopanel').hidden=!it.who;
   $('timeline').hidden=it.who;document.querySelector('.ticks').hidden=it.who;
-  $('whopicks').querySelectorAll('button').forEach(b=>b.classList.toggle('picked',it.who&&it.choice===+b.dataset.i));
+  if(it.who){
+    $('whosteps').hidden=it.people;
+    $('whosteps').innerHTML=it.people?'':it.voices.map((v,i)=>'<button data-part="voice'+i+'"><b>'+(i+1)+'.</b>'+esc(v)+'</button>').join('')+'<button data-part="tight"><b>'+(it.voices.length+1)+'.</b>who is this?</button>';
+    $('whopicks').innerHTML=it.voices.map((v,i)=>'<button data-i="'+i+'"'+(it.choice===i?' class="picked"':'')+'><kbd>'+(i+1)+'</kbd> '+esc(v)+'</button>').join('')+'<button data-i="-1"'+(it.choice===-1?' class="picked"':'')+'><kbd>0</kbd> someone else / can\'t tell</button>';
+    $('whosteps').querySelectorAll('[data-part]').forEach(b=>b.onclick=()=>{queue=[];playPart(b.dataset.part)});
+    $('whopicks').querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>whoPick(+b.dataset.i));
+  }
   if(it.pick){
     $('picks').innerHTML=it.readings.map((r,i)=>'<button data-i="'+i+'"'+(it.choice===i?' class="picked"':'')+'><kbd>'+(i+1)+'</kbd> '+esc(r.before)+' '+(r.text?'<mark>'+esc(r.text)+'</mark>':'<span class="empty">(nothing there)</span>')+' '+esc(r.after)+'</button>').join('')
       +'<button data-i="-1"'+(it.choice===-1?' class="picked"':'')+'><kbd>0</kbd> None of these</button>';
@@ -289,12 +298,12 @@ function show(){
   $('t0').textContent='0.0 s';$('t1').textContent=w.length.toFixed(1)+' s';
   $('bR').classList.toggle('picked',it.answer==='r');$('bM').classList.toggle('picked',it.answer==='m');$('bW').classList.toggle('picked',it.answer==='w');$('bH').classList.toggle('picked',it.answer==='h');
   $('note').value=it.note||'';
-  $('status').textContent=!it.answer?'':it.who?'Picked '+WHO_NAMES[it.choice]+'. Pick again to change.':it.pick?'Picked '+(it.choice<0?'none of these':(it.choice+1))+'. Pick again to change.':'Answered: '+{r:'real speech',m:'said, doesn\'t matter',w:'speech, wrong words',h:'made up'}[it.answer]+'. Pick again to change.';
+  $('status').textContent=!it.answer?'':it.who?'Picked '+whoName(it,it.choice)+'. Pick again to change.':it.pick?'Picked '+(it.choice<0?'none of these':(it.choice+1))+'. Pick again to change.':'Answered: '+{r:'real speech',m:'said, doesn\'t matter',w:'speech, wrong words',h:'made up'}[it.answer]+'. Pick again to change.';
   play();
 }
 function play(){
   if(!started)return;
-  if(items[idx]&&items[idx].who){queue=['voice0','voice1','tight'];return next()}
+  if(items[idx]&&items[idx].who){queue=items[idx].people?['tight']:items[idx].voices.map((v,i)=>'voice'+i).concat(['tight']);return next()}
   playPart('window');
 }
 function playPart(part){
@@ -341,8 +350,7 @@ async function finish(){
 function go(i){idx=Math.max(0,i);show()}
 function begin(){if(started)return;started=true;$('start').hidden=true;show()}
 $('startbtn').onclick=begin;
-document.querySelectorAll('#whopanel [data-part]').forEach(b=>b.onclick=()=>{queue=[];playPart(b.dataset.part)});
-$('whopicks').querySelectorAll('button').forEach(b=>b.onclick=()=>whoPick(+b.dataset.i));
+document.querySelectorAll('#whopanel > [data-part]').forEach(b=>b.onclick=()=>{queue=[];playPart(b.dataset.part)});
 $('bR').onclick=()=>answer('r');$('bM').onclick=()=>answer('m');$('bW').onclick=()=>answer('w');$('bH').onclick=()=>answer('h');
 $('bS').onclick=()=>go(nextOpen()===idx?items.length:nextOpen());$('bB').onclick=()=>go(idx-1);$('bP').onclick=play;
 $('bFirst').onclick=()=>go(firstOpen()>=items.length?0:firstOpen());
@@ -353,7 +361,7 @@ document.addEventListener('keydown',e=>{
   if(e.target===$('note')||e.metaKey||e.ctrlKey||e.altKey)return;
   const k=e.key.toLowerCase();
   const it=items[idx];
-  if(it&&it.who&&/^[0-2]$/.test(k))whoPick(k==='0'?-1:+k-1);
+  if(it&&it.who&&/^[0-9]$/.test(k)&&+k<=it.voices.length)whoPick(k==='0'?-1:+k-1);
   else if(it&&it.pick&&/^[0-9]$/.test(k))pick(k==='0'?-1:+k-1);
   else if(it&&!it.pick&&!it.who&&(k==='r'||k==='m'||k==='w'||k==='h'))answer(k);else if(k==='s')go(nextOpen()===idx?items.length:nextOpen());
   else if(k===' '||k==='p'){e.preventDefault();play()}

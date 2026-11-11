@@ -314,7 +314,7 @@ def play_gap(file, item):
 TRUTH_TOLERANCE_MS = 500
 
 def clip_files():
-    return {clip['id']: store.clip_audio(clip) for clip in store.clips()}
+    return {clip['id']: store.clip_audio(clip) for clip in store.clips() + store.speaker_clips()}
 
 def truths_path():
     return store.root() / 'truths.jsonl'
@@ -348,22 +348,28 @@ def truths_import(args):
     if built.get('kind') == WHO_KIND:
         raise SystemExit('a who set says who spoke, not what was said: log its answers in docs/model-trials.json')
     answers = latest_answers(args.set)
-    known = {t['id'] for t in store.read_jsonl(truths_path())}
-    added = []
+    add_truths([{'id': hashlib.sha1(f"{args.set}|{item['key']}|{answer['at']}".encode()).hexdigest()[:16],
+                 'clip': item['clip'], 'startMs': item['gapStartMs'], 'endMs': item['gapEndMs'], **answer_fields(item, answer),
+                 'set': args.set, 'by': args.by, 'at': answer['at']}
+                for item in built['items'] if (answer := answers.get(item['key']))], f'from {args.set}')
     for item in built['items']:
-        answer = answers.get(item['key'])
-        if not answer:
-            continue
-        truth_id = hashlib.sha1(f"{args.set}|{item['key']}|{answer['at']}".encode()).hexdigest()[:16]
-        if truth_id in known:
-            continue
-        added.append({'id': truth_id, 'clip': item['clip'], 'startMs': item['gapStartMs'], 'endMs': item['gapEndMs'],
-                      'said': said_by_answer(item, answer), 'answer': answer['answer'], 'choice': answer.get('choice'),
-                      'note': answer.get('note', ''), 'before': item['before'], 'after': item['after'],
-                      'set': args.set, 'by': args.by, 'at': answer['at']})
+        if item.get('people') and (note := answers.get(item['key'], {}).get('note')):
+            print(f"note left out of {item['key']}: {note} (a person off the buttons goes in with people-add)")
+
+def answer_fields(item, answer):
+    """What an answer says: which person spoke, for a people item, or else what was said. A people answer's
+    note stays out: typed beside a row of names it is usually a name, and the vault sits in the public repo."""
+    if item.get('people'):
+        return {'said': None, 'person': None if answer['choice'] == review_server.NONE_OF_THESE else item['names'][answer['choice']], 'note': ''}
+    return {'said': said_by_answer(item, answer), 'answer': answer['answer'], 'choice': answer.get('choice'),
+            'before': item['before'], 'after': item['after'], 'note': answer.get('note', '')}
+
+def add_truths(truths, origin):
+    known = {t['id'] for t in store.read_jsonl(truths_path())}
+    added = [t for t in truths if t['id'] not in known]
     with open(truths_path(), 'a') as f:
         f.writelines(json.dumps(t) + '\n' for t in added)
-    print(f"{core.counted(len(added), 'truth')} added from {args.set}")
+    print(f"{core.counted(len(added), 'truth')} added {origin}")
 
 # ---- pick a reading ----
 # Two systems disagree on a span that changes the meaning; the user hears it and picks the reading that
@@ -507,6 +513,81 @@ def who_summary(name):
         lines.append(f"{side}: {core.counted(sided[side], 'stretch', 'stretches')}, {core.counted(words[side], 'word')}")
     return '\n'.join(lines)
 
+# ---- who spoke when ----
+# A meeting track labelled by person: each truth says which person (P1, P2…) spoke between two times,
+# with no names, so the vault in the public repo holds none. A people set plays stretches of a track
+# and asks which person by name (the names file stays on this Mac); speaker-score then scores any
+# diarizer's segments on that track against the truths.
+
+PEOPLE_KIND = 'people'
+PEOPLE_MIN_MS = 2500
+
+def speaker_clip(track):
+    """The speaker clip for an audio file, registered and linked into the audio dir on first use."""
+    clip_id = 's-' + store.audio_sha(track)
+    registered = store.speaker_clips()
+    found = next((c for c in registered if c['id'] == clip_id), None)
+    if found:
+        return found
+    found = {'id': clip_id, 'file': clip_id + pathlib.Path(track).suffix, 'source': str(track)}
+    link = store.sub('audio') / found['file']
+    if not link.exists():
+        link.symlink_to(track)
+    store.write_json(store.root() / 'speaker-clips.json', registered + [found])
+    return found
+
+def speaker_truths(clip_id):
+    return [t for t in truths_by_clip().get(clip_id, []) if t.get('person')]
+
+def read_segments(path):
+    loaded = store.read_json(path)
+    return loaded['segments'] if isinstance(loaded, dict) else loaded
+
+def people_set(args):
+    clip = speaker_clip(args.track)
+    shown = store.read_json(args.names)
+    names = sorted(shown, key=lambda name: int(name[1:]))
+    settled = speaker_truths(clip['id'])
+    max_ms = (MAX_PLAY_S - 2 * WHO_CONTEXT_S) * 1000
+    stretches = [s for s in read_segments(args.segments) if s['endMs'] - s['startMs'] >= PEOPLE_MIN_MS
+                 and not any(core.overlap_ms(s['startMs'], s['endMs'], t['startMs'], t['endMs']) for t in settled)]
+    chosen = random.Random(args.seed).sample(stretches, min(args.size, len(stretches)))
+    items = [{'clip': clip['id'], 'key': f"{clip['id']}|{s['startMs']}|{s['endMs']}", 'who': True, 'people': True,
+              'gapStartMs': s['startMs'], 'gapEndMs': min(s['endMs'], s['startMs'] + max_ms), 'names': names,
+              'labels': [shown[name] for name in names]}
+             for s in sorted(chosen, key=lambda s: s['startMs'])]
+    store.write_json(set_path(args.name), {'kind': PEOPLE_KIND, 'items': items})
+    print(f"{args.name}: {core.counted(len(items), 'stretch', 'stretches')} of {len(stretches)} unsettled, {core.counted(len(names), 'person', 'people')}")
+
+def people_summary(name):
+    built = store.read_json(set_path(name))
+    answered = latest_answers(name)
+    heard = collections.Counter(answered[i['key']]['choice'] for i in built['items'] if i['key'] in answered)
+    labels = built['items'][0]['labels'] if built['items'] else []
+    lines = [f"{sum(heard.values())} of {core.counted(len(built['items']), 'stretch', 'stretches')} answered"]
+    lines += [f"{labels[n]}: {heard[n]}" for n in range(len(labels)) if heard[n]]
+    if heard[review_server.NONE_OF_THESE]:
+        lines.append(f"several or can't tell: {heard[review_server.NONE_OF_THESE]}")
+    return '\n'.join(lines)
+
+def people_add(args):
+    """Truths heard outside a set, one per line of a jsonl file: {startMs, endMs, person, note}."""
+    clip = speaker_clip(args.track)
+    add_truths([{'id': hashlib.sha1(f"{clip['id']}|{heard['startMs']}|{heard['endMs']}|{heard['person']}".encode()).hexdigest()[:16],
+                 'clip': clip['id'], 'startMs': heard['startMs'], 'endMs': heard['endMs'], 'said': None, 'person': heard['person'],
+                 'note': heard.get('note', ''), 'set': None, 'by': args.by, 'at': int(time.time())}
+                for heard in store.read_jsonl(args.file)], f"to {clip['id']}")
+
+def speaker_score(args):
+    clip = speaker_clip(args.track)
+    truths = speaker_truths(clip['id'])
+    seconds = sum(t['endMs'] - t['startMs'] for t in truths) / 1000
+    print(f"{clip['id']}: {core.counted(len(truths), 'truth')}, {seconds:.0f} s, people {', '.join(sorted({t['person'] for t in truths}))}")
+    for path in args.segments:
+        result = core.speaker_agreement(truths, read_segments(path))
+        print(f"  {pathlib.Path(path).name}: {100 * result['right']:.0f}% of truth time right, "
+              f"found {len(result['found'])} of {len(result['people'])} ({', '.join(result['found'])})")
+
 def review_html(args, chosen, clips):
     import io, contextlib, argparse
     kind = (store.read_json(set_path(args.set)) or {}).get('kind')
@@ -514,6 +595,8 @@ def review_html(args, chosen, clips):
     def summary():
         if kind == WHO_KIND:
             return who_summary(args.set)
+        if kind == PEOPLE_KIND:
+            return people_summary(args.set)
         if picking:
             return pick_summary(args.set)
         out = io.StringIO()
@@ -530,7 +613,7 @@ def review_html(args, chosen, clips):
 def review_set(args):
     chosen = load_set(args)['items']
     answered = latest_answers(args.set)
-    clips = {c['id']: c for c in store.clips()}
+    clips = {c['id']: c for c in store.clips() + store.speaker_clips()}
     if args.html:
         return review_html(args, chosen, clips)
     if any(i.get('pick') or i.get('who') for i in chosen):
@@ -723,6 +806,14 @@ def main():
     ws.add_argument('--size', type=int, default=SET_SIZE); ws.add_argument('--seed', type=int, default=SET_SEED)
     ti = sub.add_parser('truths-import', help="turn a set's answers into truths (truths.jsonl), which every later score applies")
     ti.add_argument('set'); ti.add_argument('--by', required=True, help='who listened')
+    ps = sub.add_parser('people-set', help='draw stretches of a track to say by ear which person spoke, by name')
+    ps.add_argument('name'); ps.add_argument('--track', required=True); ps.add_argument('--segments', required=True, help='a diarizer\'s segments on the track, to draw stretches from')
+    ps.add_argument('--names', required=True, help='json {"P1": "a name", ...}: shown on the page only; truths keep P1, P2…')
+    ps.add_argument('--size', type=int, default=SET_SIZE); ps.add_argument('--seed', type=int, default=SET_SEED)
+    pa = sub.add_parser('people-add', help='truths heard outside a set: jsonl of {startMs, endMs, person, note}')
+    pa.add_argument('file'); pa.add_argument('--track', required=True); pa.add_argument('--by', required=True)
+    sc = sub.add_parser('speaker-score', help="score diarizers' segments on a track against its who-spoke-when truths")
+    sc.add_argument('segments', nargs='+'); sc.add_argument('--track', required=True)
     sub.add_parser('vault-save', help='encrypt truths and their audio snippets into Scripts/asr-eval/vault (needs ASR_EVAL_VAULT_KEY)')
     sub.add_parser('vault-load', help='decrypt the vault: missing truths into truths.jsonl, snippets into vault-snippets/')
     je = sub.add_parser('judge-export', help='write the disputed spans not yet judged for meaning to a jsonl file')
@@ -733,7 +824,7 @@ def main():
     rs.add_argument('--no-fillers', action='store_true')
     args = parser.parse_args()
     {'build': build, 'run': run, 'disagree': disagree, 'review': review, 'score': score, 'review-summary': review_summary,
-     'judge-export': judge_export, 'judge-import': judge_import, 'pick-set': pick_set, 'who-set': who_set, 'truths-import': truths_import,
+     'judge-export': judge_export, 'judge-import': judge_import, 'pick-set': pick_set, 'who-set': who_set, 'people-set': people_set, 'people-add': people_add, 'speaker-score': speaker_score, 'truths-import': truths_import,
      'vault-save': lambda _: vault.save(store.read_jsonl(truths_path()), clip_files()),
      'vault-load': lambda _: vault.load(truths_path(), store.root() / 'vault-snippets')}[args.cmd](args)
 

@@ -39,6 +39,11 @@ def read_jsonl(path):
 def clips():
     return read_json(root() / 'clips.json', [])
 
+def speaker_clips():
+    """Tracks labelled by person for the who-spoke-when eval: [{id, file, source}]. Apart from clips.json,
+    which every word score and AssemblyAI build reads, since these carry no reference transcript."""
+    return read_json(root() / 'speaker-clips.json', [])
+
 def audio_sha(path):
     digest = hashlib.sha256()
     with open(path, 'rb') as f:

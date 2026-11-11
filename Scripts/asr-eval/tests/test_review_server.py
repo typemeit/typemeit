@@ -30,13 +30,18 @@ class AnswerLine(unittest.TestCase):
         self.assertIsNone(review_server.answer_line(item, {'answer': 'r'}))
 
     def test_who_answer(self):
-        item = dict(ITEM, who=True)
+        item = dict(ITEM, who=True, samples=[{'startMs': 0, 'endMs': 1}, {'startMs': 2, 'endMs': 3}])
         self.assertEqual(review_server.answer_line(item, {'answer': 'who', 'choice': 0}, now=5),
                          {'key': 'k1', 'clip': 'm-1-mic', 'answer': 'who', 'at': 5, 'choice': 0})
         self.assertEqual(review_server.answer_line(item, {'answer': 'who', 'choice': -1}, now=5)['choice'], -1)
         self.assertIsNone(review_server.answer_line(item, {'answer': 'who', 'choice': 2}))
         self.assertIsNone(review_server.answer_line(item, {'answer': 'who', 'choice': True}))
         self.assertIsNone(review_server.answer_line(item, {'answer': 'r'}))
+
+    def test_people_answer_takes_any_of_its_names(self):
+        item = dict(ITEM, who=True, people=True, names=[f'P{n + 1}' for n in range(7)])
+        self.assertEqual(review_server.answer_line(item, {'answer': 'who', 'choice': 6}, now=5)['choice'], 6)
+        self.assertIsNone(review_server.answer_line(item, {'answer': 'who', 'choice': 7}))
 
     def test_rejects_other_answers(self):
         self.assertIsNone(review_server.answer_line(ITEM, {'answer': 's'}))
