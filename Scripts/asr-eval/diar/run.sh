@@ -45,6 +45,7 @@ def block(source, header):
 app = root / "TypeMeIt"
 word = block((app / "Transcriber.swift").read_text(), "struct Word: Sendable, Equatable, Codable {")
 is_user = block((app / "Meetings/SpeakerNaming.swift").read_text(), "static func isUser(")
+assign_is_user = block((app / "Meetings/SpeakerAssign.swift").read_text(), "static func isUser(_ name: String, userName: String)")
 milliseconds = block((app / "Output.swift").read_text(), "extension Duration {")
 (scratch / "Sources/diar/Stubs.swift").write_text(f"""struct SpeakerSegment: Codable, Equatable, Sendable {{
     let speaker: String
@@ -61,6 +62,9 @@ enum Transcriber {{
 }}
 enum SpeakerNaming {{
 {is_user}
+}}
+enum SpeakerAssign {{
+{assign_is_user}
 }}
 {milliseconds}
 enum Fixed {{

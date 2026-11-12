@@ -604,6 +604,11 @@ enum Fixed {
     /// AssemblyAI found 3 and 4 far-end speakers to our 5 and 5, the
     /// smallest were 8 s and 2 s; folding them gives 4 and 4.
     static let meetingMinimumSpeakerSeconds = 10
+    /// A roster name with less of the far end's speech than this under its
+    /// own tile is taken to be beside the user, and the mic is split for
+    /// them. On the 12 November call two people in the room unmuted their
+    /// own devices for 8 s and 3 s.
+    static let meetingRoomTalkerSeconds = 30
     /// A mic voice the far end has words over for this share of its time is
     /// the loudspeaker coming back. On the 29 September speakers call the remote
     /// voice's echo measured 0.63 and the two people at the laptop 0.01 and 0.05.
