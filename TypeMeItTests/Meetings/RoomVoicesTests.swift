@@ -2,26 +2,35 @@ import Testing
 @testable import TypeMeIt
 
 struct RoomVoicesTests {
-    @Test func aListedNameThatNeverLitIsSilent() {
+    @Test func aListedNameThatNeverTalkedOnItsTileIsSilent() {
         let names = MeetingNames(source: .speaking, roster: ["Edie O'Neill", "Hugh Ashby-Clarke", "Max Mitchell"], channel: nil, spans: [
             MeetingNames.Span(name: "Hugh Ashby-Clarke", startMs: 0, endMs: 5_000),
             MeetingNames.Span(name: "Max Mitchell", startMs: 5_000, endMs: 9_000),
         ], captions: nil)
-        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: true) == ["Edie O'Neill"])
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", talkers: ["Hugh Ashby-Clarke"]) == ["Edie O'Neill"])
+    }
+
+    @Test func aTileLitForAFewWordsStillCountsAsSilent() {
+        // Ana unmuted her own device for a moment, then talked into the user's laptop.
+        let names = MeetingNames(source: .speaking, roster: ["Ana", "Hugh Ashby-Clarke", "Max Mitchell"], channel: nil, spans: [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 4_000),
+            MeetingNames.Span(name: "Hugh Ashby-Clarke", startMs: 4_000, endMs: 60_000),
+        ], captions: nil)
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", talkers: ["Hugh Ashby-Clarke"]) == ["Ana"])
     }
 
     @Test func theUserIsNeverASilentName() {
         let names = MeetingNames(source: .roster, roster: ["Max Mitchell", "Ana"], channel: nil, spans: [], captions: nil)
-        #expect(RoomVoices.silentNames(names, userName: "max mitchell", farEndSpoke: true) == ["Ana"])
+        #expect(RoomVoices.silentNames(names, userName: "max mitchell", talkers: []) == ["Ana"])
     }
 
     @Test func withTheFarEndSilentEveryoneListedIsOnTheMic() {
-        // The tap heard nothing, so Ana's lit tile was the loudspeaker in the mic.
+        // The tap heard nothing, so nobody counts as a far-end talker and Ana's lit tile was the loudspeaker in the mic.
         let names = MeetingNames(source: .speaking, roster: ["Ana", "Max Mitchell"], channel: nil, spans: [
             MeetingNames.Span(name: "Ana", startMs: 0, endMs: 30_000),
         ], captions: nil)
-        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: false) == ["Ana"])
-        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", farEndSpoke: true).isEmpty)
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", talkers: []) == ["Ana"])
+        #expect(RoomVoices.silentNames(names, userName: "Max Mitchell", talkers: ["Ana"]).isEmpty)
     }
 
     @Test func withOthersLitTheUserIsTheVoiceLeastUnderTheirTiles() {

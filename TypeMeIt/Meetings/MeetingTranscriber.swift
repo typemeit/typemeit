@@ -130,7 +130,7 @@ enum MeetingTranscriber {
             meeting.names?.user = userTile
             let userName = userTile ?? NSFullUserName()
             let count = meeting.names.flatMap { SpeakerCount.of($0, talkers: talkers, userName: userName) }
-            let silent = meeting.names.map { RoomVoices.silentNames($0, userName: userName, farEndSpoke: farEndSpoke) } ?? []
+            let silent = meeting.names.map { RoomVoices.silentNames($0, userName: userName, talkers: talkers) } ?? []
             let previousSpeakers = meeting.speakers
             let speakersBegan = ContinuousClock.now
             let segments = await speakers(of: &meeting, in: folder, count: count)

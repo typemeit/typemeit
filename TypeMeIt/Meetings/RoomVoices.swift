@@ -25,13 +25,15 @@ enum RoomVoices {
         speaker.hasPrefix(idPrefix) && Int(speaker.dropFirst(idPrefix.count)) != nil
     }
 
-    /// Roster names whose speech is on the mic, the user left out: people
-    /// who joined but never lit a tile, their own device carrying no
-    /// speech; and, when the far end said nothing, everyone, since the
+    /// Roster names whose speech is on the mic, the user left out: everyone
+    /// listed who never talked on their own tile (`talkers`, from
+    /// `SpeakerCount.farEndTalkers`). That covers someone who joined muted
+    /// and never lit a tile, someone whose tile lit for a cough or a few
+    /// words on their own device and who then talked into the user's
+    /// laptop, and, when the far end said nothing, everyone, since the
     /// loudspeaker played them into the mic.
-    static func silentNames(_ names: MeetingNames, userName: String?, farEndSpoke: Bool) -> [String] {
-        let lit = farEndSpoke ? Set(names.spans.map(\.name)) : []
-        return names.roster.filter { !lit.contains($0) && !SpeakerNaming.isUser($0, userName: userName) }
+    static func silentNames(_ names: MeetingNames, userName: String?, talkers: [String]) -> [String] {
+        names.roster.filter { !talkers.contains($0) && !SpeakerNaming.isUser($0, userName: userName) }
     }
 
     /// The mic voices the far end spoke over for at least `echoShare` of
