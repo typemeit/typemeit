@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://typeme.it/og.png">
 <link rel="canonical" href="https://typeme.it/">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn 🌐, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn 🌐, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Ask Claude Code by name in a call or a dictation","Hooks: prompts Claude Code runs on each meeting once it ends","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
 </script>
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -258,6 +258,17 @@ a { color: inherit; }
 .prompt .cross { display: grid; place-items: center; width: 26px; height: 26px; background: color-mix(in srgb, var(--tmi-on-slab) 16%, transparent); }
 .prompt .cross svg { width: 12px; height: 12px; }
 
+/* The pill a question asked by name becomes, as AnswerPill draws it: the
+   question in its own row with the claude mark and the cross, and the
+   answer under a faint rule, starting under the question's first letter. */
+.pill { width: 420px; max-width: 100%; margin-top: 24px; background: var(--tmi-slab); color: var(--tmi-on-slab); box-shadow: var(--tmi-shadow-lift); }
+.pill .ask { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 10px 8px 14px; }
+.pill .mark { flex: none; width: 20px; text-align: center; font: 500 17px/1 var(--font-mono); }
+.pill .q { flex: 1; padding: 0 6px; font: 500 13px/1.4 var(--font-mono); letter-spacing: 0; }
+.pill .cross { flex: none; display: grid; place-items: center; width: 26px; height: 26px; background: color-mix(in srgb, var(--tmi-on-slab) 16%, transparent); }
+.pill .cross svg { width: 12px; height: 12px; }
+.pill .ans { border-top: 1px solid color-mix(in srgb, var(--tmi-on-slab) 16%, transparent); padding: 12px 14px 14px 52px; font: 400 14px/1.45 var(--font-ui); letter-spacing: -0.005em; }
+
 .tools { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 16px; }
 .tools code, .term .tool { font: 400 12px/1.5 var(--font-mono); color: var(--tmi-ink); border: 1px dashed var(--tmi-rule-control); padding: 1px 6px; }
 
@@ -348,7 +359,7 @@ a { color: inherit; }
     <p>You’re in control of your data. Meetings and dictations are some of the most sensitive data you own, so type me it keeps them on your Mac: no account, no cloud, and no third parties. You can read, export, share or delete it.</p>
     <p>Hold <kbd class="kbd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd>, speak, and it types wherever your cursor is. Apple Intelligence tidies the text on your Mac, and it learns your vocabulary from the corrections you make.</p>
     <p>It matches names to voices in any meeting, not just third-party meetings like Slack and Google Meet. Voices are biometric data under GDPR, so that matching runs on your machine and never leaves it.</p>
-    <p>Running NVIDIA’s Parakeet and Nemotron models on Apple silicon, with quality close to the paid cloud tools. A local MCP server lets Claude or any assistant you choose read your meetings and write summaries that know who said what, on your terms.</p>
+    <p>Running NVIDIA’s Parakeet and Nemotron models on Apple silicon, with quality close to the paid cloud tools. A local MCP server lets Claude or any assistant you choose read your meetings and write summaries that know who said what, on your terms. Say “Claude, …?” on a call and Claude Code answers from your own tools. Hooks run it on each meeting once it ends.</p>
   </section>
 
   <section class="band" id="dictation"><div class="band-grid">
@@ -389,14 +400,36 @@ a { color: inherit; }
         <p>on a call it tells the voices apart and takes their names from the slack or meet window. in a room, start a recording from the menu bar or a shortcut and it splits one microphone into voices. a voice it doesn't know opens with a clip playing: type a name, pick someone from past calls, or merge it with a voice you've named.</p>
         <p class="note">turn on learn voices and it suggests names from earlier meetings.</p>
       </div>
+    </div></div>
+    <div class="cell pics"><div class="stick">
+      <figure class="shot"><img src="shots/meeting.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="a meeting's page: summary, what two hooks did, transcript by speaker, talk share per person and the player"></figure>
+    </div></div>
+  </div></section>
+
+  <section class="band" id="claude"><div class="band-grid">
+    <div class="cell words"><div class="stick">
+      <div class="cap">
+        <h2 class="d3">claude</h2>
+        <p class="say">say “claude, …?” on a call or in a dictation.</p>
+        <p>claude code answers from the folder you pick, with its mcp servers and your account. the answer floats over your screen and stays with the meeting. in a dictation, the question is asked instead of typed.</p>
+        <div class="pill" role="img" aria-label="the pill type me it shows: the question how many visitors did the pricing page get last week, and claude's answer under it"><div class="ask"><span class="mark">∗</span><span class="q">How many visitors did the pricing page get last week?</span><span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 20L4 4m16 0L4 20"/></svg></span></div><div class="ans">About 2,400 over the last seven days, 310 a day on average, and 2,100 the week before. That is from the pricing page insight in PostHog.</div></div>
+      </div>
+      <div class="cap">
+        <h3>on camera</h3>
+        <p>pick type me it as the camera in your meeting app, and the answer shows in your video for everyone on the call.</p>
+      </div>
+      <div class="cap">
+        <h3>hooks</h3>
+        <p>prompts claude code runs once a meeting ends: open the tickets, post the recap, draft the follow-ups. run them from the pop-up when the meeting is saved, or from its page. they run at once, each with your mcp servers, and their replies sit at the top of the meeting’s page. pick any run up in the claude desktop app.</p>
+      </div>
       <div class="cap">
         <h3>mcp</h3>
-        <p>ask claude, codex or any ai app about your meetings. add type me it to any app that supports mcp, and it can list, read and search your transcripts.</p>
-        <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code></p>
+        <p>ask claude, codex or any ai app about your meetings and dictations. add type me it to any app that supports mcp, and it can list, read and search them, and add hooks.</p>
+        <p class="tools"><code>list_meetings</code><code>get_meeting</code><code>search_meetings</code><code>meeting_stats</code><code>list_dictations</code><code>search_dictations</code><code>add_hook</code></p>
       </div>
     </div></div>
     <div class="cell pics"><div class="stick">
-      <figure class="shot"><img src="shots/meeting.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="a meeting's page: summary, transcript by speaker, talk share per person and the player"></figure>
+      <figure class="shot"><img src="shots/hooks.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="the hooks tab: four hooks with their switches, the first open to edit its name and prompt"></figure>
       <div class="term" role="img" aria-label="claude code answering a question from the meetings mcp"><pre><span class="dim">&gt;</span> what did sam say he'd send on friday?
 
 <span class="tool">search_meetings</span> <span class="dim">friday · 1 match</span>
@@ -502,7 +535,7 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
 
   const blocks = [...document.querySelectorAll(".hero, .opening > h2, .opening > p, .band .cap, .end")].map((el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-      acceptNode: (t) => !t.data.trim() || t.parentElement.closest(".cta, .prompt, .tools, kbd") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      acceptNode: (t) => !t.data.trim() || t.parentElement.closest(".cta, .prompt, .pill, .tools, kbd") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });
     const texts = [];
     while (walker.nextNode()) texts.push(walker.currentNode);
