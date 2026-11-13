@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Capture the website's meeting page shot, web/shots/meeting.webp, from a
-made-up meeting in a throwaway store.
+"""Capture the website's meeting page and hooks tab shots, web/shots/meeting.webp
+and web/shots/hooks.webp, from a made-up meeting in a throwaway store.
 
     python3 Scripts/store/app/meeting.py
 
 Builds nothing: run the Debug build first (see CLAUDE.md), with no other dev
 instance running. Writes the meeting under Scripts/store/app/store/Meetings
-with a silent recording so the player shows, launches the dev app on that
-store with TYPEMEIT_SUPPORT_DIR, opens the meeting from the meetings tab and
-saves the window without its shadow at the size the page gives it. Keep the mouse and
-keyboard off while it runs. Deterministic: the same meeting every run.
+with a silent recording so the player shows, a question asked of Claude by
+name with its answer, and two hook runs; puts four hooks in the dev app's
+defaults for the capture and restores what was there after. Launches the dev
+app on that store with TYPEMEIT_SUPPORT_DIR, saves the hooks tab, then opens
+the meeting from the meetings tab and saves the window, both without their
+shadow at the size the page gives them. Keep the mouse and keyboard off while
+it runs. Deterministic: the same meeting every run.
 """
 import json
 import os
@@ -22,15 +25,20 @@ import wave
 
 from PIL import Image
 
-from capture import APP, HERE, ROOT, WINDOW_ID, clone_model, osascript, sidebar_buttons
+from capture import APP, DEFAULTS, HERE, ROOT, WINDOW_ID, clone_model, osascript, sidebar_buttons
 
 STORE = os.path.join(HERE, "store")
 OUT = os.path.join(ROOT, "web", "shots", "meeting.webp")
+HOOKS_OUT = os.path.join(ROOT, "web", "shots", "hooks.webp")
 SIZE = (2000, 1254)  # web/index.html's <img width> and height
-SIDEBAR = ["insights", "dictations", "meetings", "dictionary", "settings"]
+SIDEBAR = ["meetings", "hooks", "dictations", "insights", "dictionary", "settings"]
+# Hooks live in the dev app's preferences, DEFAULTS.
+HOOKS_KEY = "meetingHooks"
 # Where the newest meeting's row sits in the meetings tab, in points from the
 # window's corner, with the window at {0, 33}.
 FIRST_ROW = (600, 240)
+# Where the first hook's name sits on the hooks tab, the same way.
+FIRST_HOOK = (600, 190)
 
 ID = "5EED0000-0000-4000-8000-000000000001"
 STARTED = "2026-10-09T09:02:00Z"  # 10:02 in London
@@ -53,7 +61,39 @@ OPENING = [
     ("you", 68, "Good. What are we testing exactly, the monthly price or the lifetime one?"),
     ("sam", 76, "Both. Half the visitors see 2.99 a month, half see 19 once, and we compare after a week."),
     ("priya", 89, "Do we have enough traffic for a week to tell us anything?"),
-    ("sam", 96, "Probably not a precise answer, but enough to see if one of them falls over."),
+    ("you", 96, "Claude, how many visitors did the pricing page get last week?"),
+    ("sam", 108, "So about three hundred a day. Not a precise answer, but enough to see if one of them falls over."),
+]
+# The question above, asked of Claude by name during the call, and what came back.
+QUESTION = {
+    "atMs": 96_000, "text": "How many visitors did the pricing page get last week?", "outcome": "asked",
+    "answer": "About 2,400 over the last seven days, 310 a day on average, and 2,100 the week before. "
+              "That is from the pricing page insight in PostHog.",
+    "sessionID": "5eed0000-1111-4000-8000-000000000001",
+    "calls": [{"name": "posthog query pricing page pageviews, last 14 days", "result": "2,412 then 2,097"}],
+}
+# What the hooks tab holds for the capture, and the two that ran on this
+# meeting once it ended.
+HOOKS = [
+    ("tickets", "Open a Linear ticket for each action item, assigned to whoever took it on. "
+                "Skip anything already in the backlog, and link the meeting in the description."),
+    ("recap", "Post a five-line recap to the launch channel in Slack: decisions, owners and dates. No preamble."),
+    ("follow-ups", "Draft a follow-up email to anyone on the call from outside the company, in my voice, "
+                   "as a Gmail draft. Don't send it."),
+    ("pricing log", "If pricing came up, append the numbers and who proposed them to docs/pricing-log.md in the launch repo."),
+]
+HOOK_RUNS = [
+    ("tickets", "2026-10-09T09:36:40Z",
+     [("linear list_issues launch", "37 open"),
+      ("linear save_issue Move the launch to the 15th", "LAU-41"),
+      ("linear save_issue Revised pricing numbers by Friday", "LAU-42")],
+     "Opened two tickets: **LAU-41** move the launch to the 15th, for Priya, and **LAU-42** revised pricing "
+     "numbers by Friday, for Sam. The pricing test itself was already LAU-37, so I linked the meeting there."),
+    ("recap", "2026-10-09T09:36:52Z",
+     [("slack slack_send_message #launch", "sent")],
+     "Posted to #launch:\n\n- launch moves from the 8th to the 15th\n- Sam sends the revised numbers on Friday\n"
+     "- Priya tells the store team today\n- monthly vs lifetime price test runs for a week from Monday\n"
+     "- stop early if the monthly one converts at half the rate"),
 ]
 # The rest of the call, below the fold: lines drawn from these, so the
 # fingerprint has a whole meeting to show.
@@ -126,6 +166,12 @@ def seed():
                           "tookMs": 97_000, "asrMs": 69_000, "speakersMs": 18_000, "summaryMs": 4_000,
                           "done": {"mic": 4, "others": 4}},
         "paragraphs": paras, "summary": SUMMARY,
+        "questions": [QUESTION],
+        "hookRuns": [{"id": str(uuid.UUID(int=0x5EED0000_2222_4000_8000_000000000000 + i + 1)), "name": name,
+                      "prompt": dict(HOOKS)[name], "ranAt": ran_at, "output": output, "failed": False,
+                      "sessionID": str(uuid.UUID(int=0x5EED0000_3333_4000_8000_000000000000 + i + 1)),
+                      "calls": [{"name": call, "result": result} for call, result in calls]}
+                     for i, (name, ran_at, calls, output) in enumerate(HOOK_RUNS)],
     }
     with open(os.path.join(folder, "meeting.json"), "w") as f:
         json.dump(meeting, f, indent=2)
@@ -134,11 +180,40 @@ def seed():
             silent_track(folder, role)
 
 
+def stored_hooks():
+    """The dev app's hooks as `defaults` prints them, a hex data blob, or None."""
+    read = subprocess.run(["defaults", "read", DEFAULTS, HOOKS_KEY], capture_output=True, text=True)
+    return read.stdout.strip() if read.returncode == 0 else None
+
+
+def set_hooks(blob):
+    if blob is None:
+        subprocess.run(["defaults", "delete", DEFAULTS, HOOKS_KEY], capture_output=True)
+    else:
+        subprocess.run(["defaults", "write", DEFAULTS, HOOKS_KEY, "-data", blob.strip("<>").replace(" ", "")], check=True)
+
+
+def seeded_hooks_blob():
+    hooks = [{"id": str(uuid.UUID(int=0x5EED0000_4444_4000_8000_000000000000 + i + 1)), "name": name, "prompt": prompt, "on": True}
+             for i, (name, prompt) in enumerate(HOOKS)]
+    return json.dumps(hooks).encode().hex()
+
+
+def save_window(wid, path):
+    png = path + ".png"
+    subprocess.run(["screencapture", "-l", wid, "-o", "-x", png], check=True)
+    Image.open(png).resize(SIZE, Image.LANCZOS).save(path, "WEBP", quality=90)
+    os.remove(png)
+    print(path)
+
+
 def main():
     subprocess.run([sys.executable, os.path.join(HERE, "seed.py")], check=True)
     seed()
     clone_model()
     env = dict(os.environ, TYPEMEIT_SUPPORT_DIR=STORE)
+    hooks_before = stored_hooks()
+    set_hooks(seeded_hooks_blob())
     app = subprocess.Popen([APP], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(6)
@@ -147,22 +222,28 @@ def main():
         osascript(app.pid, 'set position of window "settings" to {0, 33}')
         osascript(app.pid, 'set size of window "settings" to {1512, 949}')
         wid = subprocess.run(["swift", "-e", WINDOW_ID, str(app.pid)], capture_output=True, text=True, check=True).stdout.split()[0]
-        osascript(app.pid, f'click button {sidebar_buttons(app.pid)[SIDEBAR.index("meetings")]} of group 1 of window "settings"')
+        pages = sidebar_buttons(app.pid)
+        osascript(app.pid, f'click button {pages[SIDEBAR.index("hooks")]} of group 1 of window "settings"')
+        time.sleep(1.5)
+        osascript(app.pid, "set frontmost to true")
+        # The first hook open, so its prompt shows in full.
+        subprocess.run(["cliclick", f"c:{FIRST_HOOK[0]},{FIRST_HOOK[1] + 33}", "m:1500,900"], check=True)
+        time.sleep(1)
+        osascript(app.pid, "set frontmost to true")
+        time.sleep(0.5)
+        save_window(wid, HOOKS_OUT)
+        osascript(app.pid, f'click button {pages[SIDEBAR.index("meetings")]} of group 1 of window "settings"')
         time.sleep(1.5)
         osascript(app.pid, "set frontmost to true")
         subprocess.run(["cliclick", f"c:{FIRST_ROW[0]},{FIRST_ROW[1] + 33}", "m:1500,900"], check=True)
         time.sleep(2)
         osascript(app.pid, "set frontmost to true")
         time.sleep(0.5)
-        png = os.path.join(HERE, "meeting.png")
-        subprocess.run(["screencapture", "-l", wid, "-o", "-x", png], check=True)
-        shot = Image.open(png)
-        shot.resize(SIZE, Image.LANCZOS).save(OUT, "WEBP", quality=90)
-        os.remove(png)
-        print(OUT)
+        save_window(wid, OUT)
     finally:
         app.terminate()
         app.wait()
+        set_hooks(hooks_before)
 
 
 if __name__ == "__main__":
