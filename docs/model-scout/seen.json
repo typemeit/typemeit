@@ -1494,6 +1494,62 @@
       "date": "2026-11-11",
       "role": "speech enhancement",
       "why": "target-speaker voice isolation in sherpa-onnx v2.0.1; not a role we ship"
+    },
+    {
+      "id": "FluidVoice-Labs/fluid-speech-pro",
+      "date": "2026-11-14",
+      "role": "speech recognition",
+      "pick": true
+    },
+    {
+      "id": "salesforce-sovereign-intelligence/SOV-Transcribe-1",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "yoob/yoob-asr-pro-v1 (eval reference)",
+      "date": "2026-11-14",
+      "role": "eval reference"
+    },
+    {
+      "id": "sahilmahendrakar/Earlybird-29M",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "oruk/orukqwen-asr-1.7b",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "oruk/orukqwen-asr-1.7b-v2",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Fish Audio Transcribe 1 Pro (eval reference)",
+      "date": "2026-11-14",
+      "role": "eval reference"
+    },
+    {
+      "id": "swaynehales/granite-speech-5.0-470m-turboctc-coreml",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "xix3r/voxix GGUF ports",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "kramerthomas/edda-v0.2-coreml",
+      "date": "2026-11-14",
+      "role": "speech recognition"
+    },
+    {
+      "id": "arXiv 2611.16371 (structured speaker conditioning)",
+      "date": "2026-11-14",
+      "role": "meetings speech and diarization"
     }
   ]
 }
