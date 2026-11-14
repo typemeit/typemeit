@@ -30,7 +30,7 @@ enum WakePhrase {
     private static let greetings: Set<String> = ["hey", "ok", "okay"]
     private static let asks: Set<String> = ["can", "could", "would", "will"]
     /// How a question can open when the speech model dropped its question
-    /// mark: "what was the score TMI", "TMI, who won".
+    /// mark: "what was the score, TMI", "TMI, who won".
     private static let questionWords: Set<String> = ["what", "who", "when", "where", "why", "how", "which",
                                                      "is", "are", "was", "were", "do", "does", "did", "have", "has"]
 
@@ -61,10 +61,13 @@ enum WakePhrase {
         return capitalised(request.joined(separator: " ").trimmingCharacters(in: requestEdges) + "?")
     }
 
-    /// The name last: "what was the score, TMI?".
+    /// The name last, set off by a comma or a sentence end: "what was the
+    /// score, TMI?". Without one the name is part of the question ("do you
+    /// pipe it through Claude?").
     private static func trailing(_ tokens: [String], _ words: [String], _ sentence: String) -> String? {
         guard let name = names.first(where: { Array(words.suffix($0.count)) == $0 }) else { return nil }
         let before = tokens.dropLast(name.count)
+        guard let setOff = before.last, setOff.hasSuffix(",") || endsSentence(setOff) else { return nil }
         // Only the sentence the name closes: an earlier one opening with a
         // question word says nothing about it.
         let start = before.dropLast().lastIndex(where: endsSentence).map { $0 + 1 } ?? 0

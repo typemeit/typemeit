@@ -97,9 +97,14 @@ struct QuestionSpotterTests {
     }
 
     @Test func theNameLastIsARequest() {
-        #expect(WakePhrase.request(in: "what was the final score tmi") == "What was the final score?")
+        #expect(WakePhrase.request(in: "what was the final score, tmi") == "What was the final score?")
         #expect(WakePhrase.request(in: "Can you check the alerts, Claude?") == "Can you check the alerts?")
         #expect(WakePhrase.request(in: "That was TMI.") == nil)
+    }
+
+    @Test func theNameLastWithoutACommaIsPartOfTheQuestion() {
+        #expect(WakePhrase.request(in: "Or do you pipe it through Claude?") == nil)
+        #expect(WakePhrase.request(in: "what was the final score tmi") == nil)
     }
 
     @Test func claudeByNameIsARequest() {
@@ -128,7 +133,7 @@ struct QuestionSpotterTests {
     @Test func theNameLastOnlyAsksInItsOwnSentence() {
         #expect(WakePhrase.request(in: "Why is it slow? This should have gone to Claude.") == nil)
         #expect(WakePhrase.request(in: "It looks wrong. What was the score, TMI.") == "What was the score?")
-        #expect(WakePhrase.request(in: "what was the score T. M. I.") == "What was the score?")
+        #expect(WakePhrase.request(in: "what was the score, T. M. I.") == "What was the score?")
     }
 
     @Test func anAbbreviationDoesNotEndTheSentence() {
