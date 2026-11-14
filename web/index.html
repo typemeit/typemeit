@@ -322,9 +322,6 @@ a { color: inherit; }
 }
 
 @media (max-width: 760px) {
-  /* A screenshot pans inside its own box rather than shrinking past reading. */
-  .shot { overflow-x: auto; border: 1px solid var(--tmi-ink-a20); }
-  .shot img { width: 880px; max-width: none; border-radius: 0; box-shadow: none; }
   .foot a { display: inline-block; padding: 12px 0; }
 }
 @media (max-width: 480px) {
@@ -409,14 +406,10 @@ a { color: inherit; }
   <section class="band" id="claude"><div class="band-grid">
     <div class="cell words"><div class="stick">
       <div class="cap">
-        <h2 class="d3">claude</h2>
+        <h2 class="d3">bring your own llm</h2>
         <p class="say">say “claude, …?” on a call or in a dictation.</p>
         <p>claude code answers from the folder you pick, with its mcp servers and your account. the answer floats over your screen and stays with the meeting. in a dictation, the question is asked instead of typed.</p>
         <div class="pill" role="img" aria-label="the pill type me it shows: the question how many visitors did the pricing page get last week, and claude's answer under it"><div class="ask"><span class="mark">∗</span><span class="q">How many visitors did the pricing page get last week?</span><span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 20L4 4m16 0L4 20"/></svg></span></div><div class="ans">About 2,400 over the last seven days, 310 a day on average, and 2,100 the week before. That is from the pricing page insight in PostHog.</div></div>
-      </div>
-      <div class="cap">
-        <h3>on camera</h3>
-        <p>pick type me it as the camera in your meeting app, and the answer shows in your video for everyone on the call.</p>
       </div>
       <div class="cap">
         <h3>hooks</h3>
@@ -429,7 +422,7 @@ a { color: inherit; }
       </div>
     </div></div>
     <div class="cell pics"><div class="stick">
-      <figure class="shot"><img src="shots/hooks.webp" width="2000" height="1254" loading="lazy" decoding="async" alt="the hooks tab: four hooks with their switches, the first open to edit its name and prompt"></figure>
+      <figure class="shot"><img src="shots/hooks.webp" width="1700" height="700" loading="lazy" decoding="async" alt="a meeting's page: the recap hook's slack post and the four hooks with which ran"></figure>
       <div class="term" role="img" aria-label="claude code answering a question from the meetings mcp"><pre><span class="dim">&gt;</span> what did sam say he'd send on friday?
 
 <span class="tool">search_meetings</span> <span class="dim">friday · 1 match</span>

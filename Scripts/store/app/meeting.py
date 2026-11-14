@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Capture the website's meeting page and hooks tab shots, web/shots/meeting.webp
-and web/shots/hooks.webp, from a made-up meeting in a throwaway store.
+"""Capture the website's meeting page shot, web/shots/meeting.webp, from a
+made-up meeting in a throwaway store, and crop its hook run and hooks list
+into web/shots/hooks.webp.
 
     python3 Scripts/store/app/meeting.py
 
@@ -9,9 +10,9 @@ instance running. Writes the meeting under Scripts/store/app/store/Meetings
 with a silent recording so the player shows, a question asked of Claude by
 name with its answer, and two hook runs; puts four hooks in the dev app's
 defaults for the capture and restores what was there after. Launches the dev
-app on that store with TYPEMEIT_SUPPORT_DIR, saves the hooks tab, then opens
-the meeting from the meetings tab and saves the window, both without their
-shadow at the size the page gives them. Keep the mouse and keyboard off while
+app on that store with TYPEMEIT_SUPPORT_DIR, opens the meeting from the
+meetings tab and saves the window without its shadow at the size the page
+gives it. Keep the mouse and keyboard off while
 it runs. Deterministic: the same meeting every run.
 """
 import json
@@ -37,8 +38,9 @@ HOOKS_KEY = "meetingHooks"
 # Where the newest meeting's row sits in the meetings tab, in points from the
 # window's corner, with the window at {0, 33}.
 FIRST_ROW = (600, 240)
-# Where the first hook's name sits on the hooks tab, the same way.
-FIRST_HOOK = (600, 190)
+# The hook run card and the hooks list in the saved meeting shot, in its
+# pixels: left, top, right, bottom.
+HOOKS_CROP = (300, 330, 2000, 1030)
 
 ID = "5EED0000-0000-4000-8000-000000000001"
 STARTED = "2026-10-09T09:02:00Z"  # 10:02 in London
@@ -223,15 +225,6 @@ def main():
         osascript(app.pid, 'set size of window "settings" to {1512, 949}')
         wid = subprocess.run(["swift", "-e", WINDOW_ID, str(app.pid)], capture_output=True, text=True, check=True).stdout.split()[0]
         pages = sidebar_buttons(app.pid)
-        osascript(app.pid, f'click button {pages[SIDEBAR.index("hooks")]} of group 1 of window "settings"')
-        time.sleep(1.5)
-        osascript(app.pid, "set frontmost to true")
-        # The first hook open, so its prompt shows in full.
-        subprocess.run(["cliclick", f"c:{FIRST_HOOK[0]},{FIRST_HOOK[1] + 33}", "m:1500,900"], check=True)
-        time.sleep(1)
-        osascript(app.pid, "set frontmost to true")
-        time.sleep(0.5)
-        save_window(wid, HOOKS_OUT)
         osascript(app.pid, f'click button {pages[SIDEBAR.index("meetings")]} of group 1 of window "settings"')
         time.sleep(1.5)
         osascript(app.pid, "set frontmost to true")
@@ -240,6 +233,8 @@ def main():
         osascript(app.pid, "set frontmost to true")
         time.sleep(0.5)
         save_window(wid, OUT)
+        Image.open(OUT).crop(HOOKS_CROP).save(HOOKS_OUT, "WEBP", quality=90)
+        print(HOOKS_OUT)
     finally:
         app.terminate()
         app.wait()
