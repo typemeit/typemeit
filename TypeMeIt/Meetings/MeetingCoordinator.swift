@@ -677,7 +677,7 @@ final class MeetingCoordinator {
         meeting.transcription.state = .pending
         meeting.transcription.error = nil
         meeting.transcription.done = [:]
-        meeting.paragraphs = []
+        meeting.forgettingParagraphs()
         meeting.summary = nil
         // A generated or roster title is made again from the new words; a typed one stays.
         if meeting.titleSource == .generated || meeting.titleSource == .roster {

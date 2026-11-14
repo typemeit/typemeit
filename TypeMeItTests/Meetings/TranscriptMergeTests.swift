@@ -200,4 +200,63 @@ struct TranscriptMergeTests {
         let paragraphs = TranscriptMerge.paragraphs(tracks: [them], segments: segments, dictations: [], gap: .seconds(20))
         #expect(paragraphs == [Meeting.Paragraph(speaker: "s1", startMs: 100, endMs: 10_300, text: "hi there")])
     }
+
+    @Test func aReplyOverTheEndOfAQuestionLeavesTheQuestionWhole() {
+        let them = TrackWords(role: "them", words: [
+            .at("Do", 0, 300), .at("we", 400, 700), .at("need", 800, 1100), .at("it", 1200, 1500),
+            .at("so", 1600, 1900), .at("for", 2100, 2400), .at("the", 2500, 2800), .at("whole", 2900, 3200), .at("team", 3300, 3600), .at("now?", 3700, 3900),
+        ])
+        let you = TrackWords(role: "you", words: run("a", fromMs: 2000, toMs: 9000))
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs == [
+            Meeting.Paragraph(speaker: "them", startMs: 0, endMs: 3900, text: "Do we need it so for the whole team now?"),
+            Meeting.Paragraph(speaker: "you", startMs: 2000, endMs: 9100, text: run("a", fromMs: 2000, toMs: 9000).map(\.text).joined(separator: " ")),
+        ])
+    }
+
+    @Test func someoneWhoSpeaksUpMidSentenceCutsItWhereTheySpoke() {
+        // The sentence runs on 3 s past the interruption: too far to wait for its end.
+        let them = TrackWords(role: "them", words: run("b", fromMs: 0, toMs: 5000) + [.at("done.", 5000, 5300)])
+        let you = TrackWords(role: "you", words: run("a", fromMs: 2100, toMs: 4400))
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["them", "you", "them"])
+        #expect(paragraphs.map(\.startMs) == [0, 2100, 2400])
+    }
+
+    @Test func aShortSentenceEndingATurnUnderTheReplyIsAnAside() {
+        let them = TrackWords(role: "them", words: [
+            .at("Do", 0, 300), .at("we", 400, 700), .at("need", 800, 1100), .at("it", 1200, 1500),
+            .at("for", 2100, 2400), .at("cost?", 2500, 2900), .at("Okay,", 3500, 3800), .at("cool.", 3900, 4200),
+        ])
+        let you = TrackWords(role: "you", words: [
+            .at("No.", 2000, 2300), .at("Definitely", 2400, 2900), .at("not", 3000, 3300), .at("cost.", 3400, 3700),
+            .at("It", 3800, 4100), .at("has", 4200, 4500), .at("a", 4600, 4900), .at("limit.", 5000, 5300),
+        ])
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [you, them], segments: nil, dictations: [], gap: .seconds(2))
+        #expect(paragraphs == [
+            Meeting.Paragraph(speaker: "them", startMs: 0, endMs: 2900, text: "Do we need it for cost?"),
+            Meeting.Paragraph(speaker: "you", startMs: 2000, endMs: 3700, text: "No. Definitely not cost."),
+            Meeting.Paragraph(speaker: "them", startMs: 3500, endMs: 4200, text: "Okay, cool.", aside: true),
+            Meeting.Paragraph(speaker: "you", startMs: 3800, endMs: 5300, text: "It has a limit."),
+        ])
+    }
+
+    @Test func aWordTheDiarizerHopsToAnotherVoiceMidSentenceStaysWithTheSentence() {
+        let them = TrackWords(role: "them", words: [
+            .at("And", 0, 300), .at("also", 400, 700), .at("consistency,", 800, 1300), .at("particularly", 1400, 1900),
+            .at("as", 2000, 2200), .at("we", 2300, 2500), .at("talk.", 2600, 3000),
+        ])
+        let segments = [segment("s1", 0, 1350), segment("s2", 1350, 1950), segment("s1", 1950, 3000)]
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [them], segments: segments, dictations: [], gap: .seconds(2))
+        #expect(paragraphs == [Meeting.Paragraph(speaker: "s1", startMs: 0, endMs: 3000, text: "And also consistency, particularly as we talk.")])
+    }
+
+    @Test func aReplyThatReadsAsASentenceKeepsItsVoice() {
+        let them = TrackWords(role: "them", words: [
+            .at("And", 0, 300), .at("also", 400, 700), .at("Yeah.", 1400, 1900), .at("as", 2000, 2200), .at("we", 2300, 2500), .at("talk.", 2600, 3000),
+        ])
+        let segments = [segment("s1", 0, 1350), segment("s2", 1350, 1950), segment("s1", 1950, 3000)]
+        let paragraphs = TranscriptMerge.paragraphs(tracks: [them], segments: segments, dictations: [], gap: .seconds(2))
+        #expect(paragraphs.map(\.speaker) == ["s1", "s2", "s1"])
+    }
 }

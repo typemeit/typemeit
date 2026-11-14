@@ -175,7 +175,7 @@ enum MeetingTranscriber {
             // Added after the far end is named, which counts on the far-end
             // speakers being the only ones that are not the user.
             if let room {
-                meeting.speakers += roomSpeakers(room.others, silent: silent, after: meeting.speakers.filter { !$0.isYou }.count, previous: previousSpeakers)
+                meeting.speakers += roomSpeakers(room.others, segments: room.segments, silent: silent, after: meeting.speakers.filter { !$0.isYou }.count, previous: previousSpeakers)
             }
             for i in meeting.speakers.indices {
                 let id = meeting.speakers[i].id
@@ -272,8 +272,11 @@ enum MeetingTranscriber {
         // A speakers call with echo on the mic side never feeds the mic into embeddings (8.3); the far end is diarized alone.
         let segments: [SpeakerSegment]
         do {
-            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: count, spans: farEndSpans(meeting.names))
-            segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+            let spans = farEndSpans(meeting.names)
+            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: count, spans: spans)
+            // The user's own tile names nobody on the far end.
+            let tiles = SpeakerMerge.tiles(of: run.segments, spans: spans).filter { !SpeakerAssign.isUser($0.value, in: meeting) }
+            segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000, tiles: tiles)
         } catch {
             Log.meetings.error("Diarization failed; keeping \(defaultName(for: role)): \(error.localizedDescription)")
             DebugLog.write("Meeting diarization failed: \(error.localizedDescription)")
@@ -293,13 +296,15 @@ enum MeetingTranscriber {
             return nil
         }
         let ids = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, "s\($0 + 1)") })
+        let renamed = segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
+        let carried = SpeakerNaming.carried(previous.filter { !$0.isYou }, segments: renamed)
         for (i, original) in order.enumerated() {
             let id = ids[original]!
-            let before = previous.first { $0.id == id }
+            let before = carried[id]
             meeting.speakers.append(Meeting.Speaker(id: id, name: before?.name ?? Meeting.Speaker.numberedName(i + 1), isYou: false, talkMs: 0, nameSource: before?.nameSource))
         }
         DebugLog.write("Meeting speakers: \(counted(order.count, "speaker")) on the \(role.rawValue) track\(count.map { ", told \($0)" } ?? "")")
-        return segments.map { SpeakerSegment(speaker: ids[$0.speaker]!, startMs: $0.startMs, endMs: $0.endMs) }
+        return renamed
     }
 
     /// The window's speaking spans moved onto the far-end track's clock.
@@ -332,12 +337,14 @@ enum MeetingTranscriber {
         }
     }
 
-    /// The speakers for the people beside the user. A name the user gave an
-    /// id before stays; one person beside the user and one silent name
-    /// takes it; otherwise they are numbered on from the far end's `after`.
-    private static func roomSpeakers(_ ids: [String], silent: [String], after: Int, previous: [Meeting.Speaker]) -> [Meeting.Speaker] {
-        ids.enumerated().map { i, id in
-            if let renamed = previous.first(where: { $0.id == id && $0.nameSource == .user }) {
+    /// The speakers for the people beside the user. A name the user gave
+    /// stays with the voice that talked where that person did
+    /// (`SpeakerNaming.carried`); one person beside the user and one silent
+    /// name takes it; otherwise they are numbered on from the far end's `after`.
+    private static func roomSpeakers(_ ids: [String], segments: [SpeakerSegment], silent: [String], after: Int, previous: [Meeting.Speaker]) -> [Meeting.Speaker] {
+        let carried = SpeakerNaming.carried(previous.filter { RoomVoices.isVoice($0.id) }, segments: segments.filter { ids.contains($0.speaker) })
+        return ids.enumerated().map { i, id in
+            if let renamed = carried[id], renamed.nameSource == .user {
                 return Meeting.Speaker(id: id, name: renamed.name, isYou: false, talkMs: 0, nameSource: .user)
             }
             if ids.count == 1, silent.count == 1 {

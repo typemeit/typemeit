@@ -11,10 +11,23 @@ enum SpeakerMerge {
     /// those at or over it. One without an embedding, too short for the
     /// embedding model to hear, goes to the speaker whose turns it sits
     /// next to most. With nobody at or over `minimumMs`, nobody moves.
-    static func absorbingShort(_ segments: [SpeakerSegment], embeddings: [String: [Float]], minimumMs: Int) -> [SpeakerSegment] {
+    ///
+    /// `tiles` (from `tiles(of:spans:)`) keeps a short speaker heard through
+    /// a tile no longer speaker was: the window showed someone else talking,
+    /// who said little. Of several short speakers under that tile, the one
+    /// with most talk stays and the rest fold as before.
+    static func absorbingShort(_ segments: [SpeakerSegment], embeddings: [String: [Float]], minimumMs: Int, tiles: [String: String] = [:]) -> [SpeakerSegment] {
         let talk = talkMs(segments)
-        let kept = Set(talk.filter { $0.value >= minimumMs }.keys)
-        guard !kept.isEmpty else { return segments }
+        let long = Set(talk.filter { $0.value >= minimumMs }.keys)
+        guard !long.isEmpty else { return segments }
+        let longTiles = Set(long.compactMap { tiles[$0] })
+        var ownTile: [String: String] = [:]
+        for speaker in talk.keys where !long.contains(speaker) {
+            guard let tile = tiles[speaker], !longTiles.contains(tile) else { continue }
+            if let current = ownTile[tile], (talk[current]!, current) >= (talk[speaker]!, speaker) { continue }
+            ownTile[tile] = speaker
+        }
+        let kept = long.union(ownTile.values)
         var into: [String: String] = [:]
         for speaker in talk.keys where !kept.contains(speaker) {
             into[speaker] = nearest(to: speaker, among: kept, segments: segments, embeddings: embeddings, talk: talk)

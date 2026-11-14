@@ -26,11 +26,13 @@ enum TranscriptMerge {
             let words = isMic ? track.words.filter { word in !dictations.contains { contains($0, midpoint(of: word)) } } : track.words
             if let trackSegments = isMic ? micSegments : segments {
                 var previousSpeaker = track.role
+                var speakers: [String] = []
                 for word in words {
                     let speaker = speaker(for: word, segments: trackSegments, fallback: previousSpeaker)
-                    assigned.append((word, speaker))
+                    speakers.append(speaker)
                     previousSpeaker = speaker
                 }
+                assigned.append(contentsOf: zip(words, unflickered(speakers, words: words)).map { ($0, $1) })
             } else {
                 assigned.append(contentsOf: words.map { ($0, track.role) })
             }
@@ -50,19 +52,46 @@ enum TranscriptMerge {
         let turns = order.flatMap { speaker in
             self.turns(of: bySpeaker[speaker]!.sorted { $0.start < $1.start }, gap: gap).map { (speaker: speaker, words: $0) }
         }.filter { !$0.words.allSatisfy(isFiller) }
-        // A short turn inside another speaker's ("yeah" under a sentence) is
-        // an aside: that turn is cut where it starts, however short the
-        // halves, so the aside sits where it was said and not after the turn.
-        var paragraphs: [Meeting.Paragraph] = []
-        for turn in turns {
+        // A turn is cut where another speaker's starts, moved on to the end
+        // of the sentence it falls in when that is near, so a reply that
+        // starts over the last words of a question leaves the question whole. A short turn inside
+        // another speaker's ("yeah" under a sentence) is an aside, and so is
+        // the short sentence a turn ends on once another speaker has started
+        // ("Okay, cool." under the answer): the host turn is cut where the
+        // aside starts, however short the halves, so it sits where it was said.
+        var cuts = [[Duration]](repeating: [], count: turns.count)
+        var always = [[Duration]](repeating: [], count: turns.count)
+        var asideFrom = [Duration?](repeating: nil, count: turns.count)
+        for (i, turn) in turns.enumerated() {
             let others = turns.indices.filter { turns[$0].speaker != turn.speaker }
-            let saidInside = others.contains { isAside(turn.words, within: turns[$0].words) }
-            let cuts = others.map { turns[$0].words[0].start }
-            let asideCuts = others.filter { isAside(turns[$0].words, within: turn.words) }.map { turns[$0].words[0].start }
-            for words in split(turn.words, at: cuts, always: asideCuts) {
+            if let host = others.first(where: { isAside(turn.words, within: turns[$0].words) }) {
+                asideFrom[i] = turn.words[0].start
+                always[host].append(turn.words[0].start)
+            }
+            for other in others {
+                let cut = turns[other].words[0].start
+                guard let sentence = sentenceStart(atOrAfter: cut, in: turn.words) else {
+                    cuts[i].append(cut)
+                    continue
+                }
+                guard sentence < turn.words.count else { continue }
+                let tail = Array(turn.words[sentence...])
+                if asideFrom[i] == nil, isAside(tail, within: turns[other].words) {
+                    asideFrom[i] = tail[0].start
+                    always[i].append(tail[0].start)
+                    always[other].append(tail[0].start)
+                } else {
+                    cuts[i].append(turn.words[sentence].start)
+                }
+            }
+        }
+        var paragraphs: [Meeting.Paragraph] = []
+        for (i, turn) in turns.enumerated() {
+            for words in split(turn.words, at: cuts[i], always: always[i]) {
+                let aside = asideFrom[i].map { words[0].start >= $0 } ?? false
                 paragraphs.append(Meeting.Paragraph(
                     speaker: turn.speaker, startMs: words[0].start.milliseconds, endMs: words[words.count - 1].end.milliseconds,
-                    text: words.map(\.text).joined(separator: " "), aside: saidInside ? true : nil))
+                    text: words.map(\.text).joined(separator: " "), aside: aside ? true : nil))
             }
         }
         // A pause alone never starts a paragraph: one speaker's paragraphs
@@ -79,6 +108,35 @@ enum TranscriptMerge {
             }
         }
         return joined
+    }
+
+    /// `speakers`, one per word of a diarized track, with each flicker given
+    /// back: a run of words under another speaker in the middle of someone's
+    /// sentence, shorter than `minimumSplitMs`, that does not read as a
+    /// sentence of its own, with the same speaker's words either side and
+    /// the word before it not ending a sentence. The diarizer hops to the
+    /// last voice heard for a word or two ("particularly" given to someone
+    /// whose tile lit a moment earlier, heard by ear on 14 November); a reply
+    /// that does read as a sentence ("Yeah.") stays as it was.
+    private static func unflickered(_ speakers: [String], words: [Transcriber.Word]) -> [String] {
+        var result = speakers
+        var start = 0
+        while start < speakers.count {
+            var end = start
+            while end + 1 < speakers.count, speakers[end + 1] == speakers[start] { end += 1 }
+            if start > 0, end + 1 < speakers.count, speakers[start - 1] == speakers[end + 1],
+               words[end].end - words[start].start < .milliseconds(minimumSplitMs),
+               !endsSentence(words[start - 1]), !isSentence(Array(words[start...end])) {
+                for i in start...end { result[i] = speakers[start - 1] }
+            }
+            start = end + 1
+        }
+        return result
+    }
+
+    /// Starts with a capital and ends in ".", "?" or "!".
+    private static func isSentence(_ words: [Transcriber.Word]) -> Bool {
+        words[0].text.first?.isUppercase == true && endsSentence(words[words.count - 1])
     }
 
     /// One speaker's words as turns, split where a word starts more than
@@ -117,6 +175,26 @@ enum TranscriptMerge {
         return pieces
     }
 
+    /// The index of the first word of `words` that starts at or after `cut`
+    /// and begins a sentence: the word before it ends in ".", "?" or "!".
+    /// `words.count` when the sentence `cut` falls in is the turn's last.
+    /// Nil when that sentence runs on more than `minimumSplitMs` past `cut`,
+    /// or never ends, as on words the model left unpunctuated: the cut then
+    /// stays where it was. Someone who speaks up in the middle of a sentence
+    /// interrupted it, and their words go where they said them; heard by ear
+    /// on 14 November (listen review `layout-1114`), moving them to the
+    /// sentence's end was heard as wrong at four of 40 places, among them a
+    /// "yeah" and a "we were".
+    private static func sentenceStart(atOrAfter cut: Duration, in words: [Transcriber.Word]) -> Int? {
+        guard let first = words.firstIndex(where: { $0.start >= cut }), first > 0 else { return nil }
+        let reach = cut + .milliseconds(minimumSplitMs)
+        return (first...words.count).prefix { words[$0 - 1].end <= reach }.first { endsSentence(words[$0 - 1]) }
+    }
+
+    private static func endsSentence(_ word: Transcriber.Word) -> Bool {
+        word.text.last.map(".?!".contains) == true
+    }
+
     /// `turn` is shorter than `minimumSplitMs`, reads as a sentence of its
     /// own, and `host`, another speaker's turn, has words before it starts,
     /// from then on, and past its end. A sentence starts with a capital and
@@ -127,7 +205,7 @@ enum TranscriptMerge {
         let start = turn[0].start
         let end = turn[turn.count - 1].end
         return end - start < .milliseconds(minimumSplitMs)
-            && turn[0].text.first?.isUppercase == true && turn[turn.count - 1].text.last.map(".?!".contains) == true
+            && isSentence(turn)
             && host[0].start < start && host[host.count - 1].end > end
             && host.contains { $0.start >= start }
     }

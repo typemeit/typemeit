@@ -191,6 +191,11 @@ enum SpeakerNaming {
     /// accepted only when the overlap clears `minOverlapMs` and is at least
     /// `margin` times that speaker's next-best name overlap (computed once,
     /// over every name, not just what remains unassigned).
+    ///
+    /// A speaker under `minOverlapMs` still takes the name of its tile
+    /// (`SpeakerMerge.tiles`) when no other speaker was heard through that
+    /// tile, the name is still free and the margin holds: someone who said
+    /// little, with nobody else under their tile to confuse them with.
     private static func alignSpeaking(
         speakers: [Meeting.Speaker],
         segments: [SpeakerSegment],
@@ -238,6 +243,16 @@ enum SpeakerNaming {
             chosen[triple.speaker] = triple.name
         }
 
+        let candidateIds = Set(candidates.map(\.id))
+        let tiles = SpeakerMerge.tiles(of: segments.filter { candidateIds.contains($0.speaker) }, spans: spans)
+        let speakersByTile = Dictionary(grouping: tiles.keys, by: { tiles[$0]! })
+        for (name, heardThrough) in speakersByTile where heardThrough.count == 1 && !assignedNames.contains(name) {
+            let speaker = heardThrough[0]
+            guard chosen[speaker] == nil else { continue }
+            guard Double(overlapMs[speaker]![name]!) >= margin * Double(nextBest[speaker]!) else { continue }
+            chosen[speaker] = name
+        }
+
         return speakers.map { speaker in
             guard let name = chosen[speaker.id] else { return speaker }
             var updated = speaker
@@ -245,6 +260,30 @@ enum SpeakerNaming {
             updated.nameSource = .speaking
             return updated
         }
+    }
+
+    /// The earlier speaker each new speaker id keeps its name from, after
+    /// the meeting is diarized again. A speaker the user named and who
+    /// kept where they talked (`heard`) goes to the new id whose segments
+    /// overlap that most, the most-heard first; it never passes by id, since
+    /// a voice found or lost earlier in the call renumbers everyone after
+    /// it. Every other earlier speaker passes to the same id as before.
+    static func carried(_ previous: [Meeting.Speaker], segments: [SpeakerSegment]) -> [String: Meeting.Speaker] {
+        var carried: [String: Meeting.Speaker] = [:]
+        let located = previous.filter { $0.nameSource == .user && $0.heard != nil }
+        let mostHeard = located.sorted { ($0.heard!.map { $0.endMs - $0.startMs }.reduce(0, +), $1.id) > ($1.heard!.map { $0.endMs - $0.startMs }.reduce(0, +), $0.id) }
+        for speaker in mostHeard {
+            let spans = speaker.heard!.map { MeetingNames.Span(name: speaker.name, startMs: $0.startMs, endMs: $0.endMs) }
+            let free = Set(segments.map(\.speaker)).subtracting(carried.keys)
+            let best = free.map { id in (id, overlap(segments: segments.filter { $0.speaker == id }, spans: spans)) }
+                .max { ($0.1, $1.0) < ($1.1, $0.0) }
+            if let (id, heard) = best, heard > 0 { carried[id] = speaker }
+        }
+        for speaker in previous where !located.contains(speaker) && carried[speaker.id] == nil
+            && Set(segments.map(\.speaker)).contains(speaker.id) {
+            carried[speaker.id] = speaker
+        }
+        return carried
     }
 
     static func overlap(segments: [SpeakerSegment], spans: [MeetingNames.Span]) -> Int {

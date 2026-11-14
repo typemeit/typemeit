@@ -159,6 +159,26 @@ struct EchoFoldTests {
         #expect(result.mic == words(micHeard, startMs: 20_000))
     }
 
+    /// A minute of call with the echo read at 60 ms, and over 19.8 to 21 s the
+    /// mic flat at `level`, so its level does not follow the far end's there.
+    private func foldFlat(_ heard: [String], level: Float) -> EchoFold.Result {
+        let othersEnvelope = EchoSignal.farEnd(seconds: 60)
+        var micEnvelope = EchoSignal.mic(hearing: othersEnvelope, gain: 0.3) { _ in 60 }
+        for k in 1980 ..< 2100 { micEnvelope[k] = level }
+        return EchoFold.fold(mic: words(heard, startMs: 20_000), others: words(farEndSaid, startMs: 20_000),
+                             micEnvelope: micEnvelope, othersEnvelope: othersEnvelope, envelopeHz: 100)
+    }
+
+    @Test func aFewWordsOfQuietEchoGoEvenWhenTheirLevelDoesNotFollowTheFarEnd() {
+        let result = foldFlat(["a", "slides"], level: 0.3 * 0.06)
+        #expect(result.mic.isEmpty)
+    }
+
+    @Test func aFewWordsTheUserSaysOverTheFarEndStay() {
+        let result = foldFlat(["yep", "please"], level: 0.2)
+        #expect(result.mic == words(["yep", "please"], startMs: 20_000))
+    }
+
     @Test func soundsLikeTakesPrefixesAndCloseSpellings() {
         #expect(EchoFold.soundsLike("gonna", "going"))
         #expect(EchoFold.soundsLike("9", "9am"))

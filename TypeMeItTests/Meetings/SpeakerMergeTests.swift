@@ -76,4 +76,27 @@ struct SpeakerMergeTests {
         let embeddings: [String: [Float]] = ["A": [1, 0], "B": [0, 1]]
         #expect(SpeakerMerge.absorbingShort(segments, embeddings: embeddings, minimumMs: 10_000) == segments)
     }
+
+    @Test func aShortSpeakerUnderATileOfTheirOwnStays() {
+        let segments = [segment("A", 0, 60_000), segment("B", 60_000, 69_000), segment("C", 69_000, 120_000)]
+        let embeddings: [String: [Float]] = ["A": [1, 0], "B": [0.9, 0.1], "C": [0, 1]]
+        let tiles = ["A": "Ana", "B": "Ben", "C": "Cy"]
+        #expect(SpeakerMerge.absorbingShort(segments, embeddings: embeddings, minimumMs: 10_000, tiles: tiles) == segments)
+    }
+
+    @Test func aShortSpeakerUnderALongerSpeakersTileFolds() {
+        let segments = [segment("A", 0, 60_000), segment("B", 60_000, 64_000), segment("C", 64_000, 120_000)]
+        let embeddings: [String: [Float]] = ["A": [1, 0], "B": [0.1, 1], "C": [0, 1]]
+        let tiles = ["A": "Ana", "B": "Ana", "C": "Cy"]
+        #expect(SpeakerMerge.absorbingShort(segments, embeddings: embeddings, minimumMs: 10_000, tiles: tiles)
+            == [segment("A", 0, 60_000), segment("C", 60_000, 64_000), segment("C", 64_000, 120_000)])
+    }
+
+    @Test func ofTwoShortSpeakersUnderOneNewTileTheLongerStays() {
+        let segments = [segment("A", 0, 60_000), segment("B", 60_000, 68_000), segment("D", 68_000, 71_000)]
+        let embeddings: [String: [Float]] = ["A": [1, 0], "B": [0, 1], "D": [0.1, 1]]
+        let tiles = ["A": "Ana", "B": "Ben", "D": "Ben"]
+        #expect(SpeakerMerge.absorbingShort(segments, embeddings: embeddings, minimumMs: 10_000, tiles: tiles)
+            == [segment("A", 0, 60_000), segment("B", 60_000, 68_000), segment("B", 68_000, 71_000)])
+    }
 }

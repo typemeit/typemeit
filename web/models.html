@@ -35,7 +35,7 @@
  "name": "type me it model trials",
  "description": "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores.",
  "url": "https://typeme.it/models",
- "dateModified": "2026-11-06",
+ "dateModified": "2026-11-14",
  "creator": {
   "@type": "Organization",
   "name": "type me it",
@@ -391,6 +391,18 @@
    "dateCreated": "2026-11-06",
    "description": "Phonon refiner 1.7B passed 299/353 on every dictation vs Apple's 353/353; behind the gate 351/353",
    "url": "https://huggingface.co/Infatoshi/phonon-refiner-1.7b"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Short voices, sentence-end turns and quiet echo, listen review",
+   "dateCreated": "2026-11-14",
+   "description": "on 5 calls: paragraphs 1,661 to 1,332, lowercase starts 875 to 529; quiet echo cut at 3x takes 479 words AssemblyAI confirms as echo and 4 misheard words of the user's; ear picked the new layout 8 times, the old 5, neither 27 of 40"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Offline linear echo canceller before EchoFold",
+   "dateCreated": "2026-11-14",
+   "description": "on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940"
   }
  ]
 }
@@ -401,7 +413,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">50 trials · updated 6 november 2026</p>
+  <p class="meta">52 trials · updated 14 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -842,6 +854,17 @@
 <section id="speakers" data-group="speakers">
 <h2>speakers</h2>
 <div>
+<article class="trial" id="short-voices-sentence-end-turns-and-quiet-echo-listen-review" data-group="speakers" data-status="shipped">
+  <time datetime="2026-11-14">14 november 2026</time>
+  <h3>Short voices, sentence-end turns and quiet echo, listen review</h3>
+  <span class="status status-shipped">shipped</span>
+  <p class="summary">on 5 calls: paragraphs 1,661 to 1,332, lowercase starts 875 to 529; quiet echo cut at 3x takes 479 words AssemblyAI confirms as echo and 4 misheard words of the user&#x27;s; ear picked the new layout 8 times, the old 5, neither 27 of 40</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Rules after the diarizer: a short voice under a tile no long voice has is kept and named by that tile (<code>SpeakerMerge.absorbingShort</code>, <code>SpeakerNaming.alignSpeaking</code>); turns cut at the next sentence start within 2 s, a trailing short sentence made an aside, diarizer flickers under 2 s given back (<code>TranscriptMerge</code>); user-given names follow their voice on re-transcribe (<code>SpeakerNaming.carried</code>); mic islands of 6 words or fewer under 3x the predicted echo level dropped as echo (<code>EchoFold</code>)</p>
+    <dl><dt>against</dt><dd>Every voice under 10 s folded into the nearest; turns cut at the word another voice starts on; echo dropped only when the mic was quieter than the echo predicted</dd><dt>measured</dt><dd>5 calls replayed on both builds from the same audio; paragraph, lowercase-start and You-word counts; 40 changed places heard in listen review <code>layout-1114</code> (old, new or neither); the quiet-echo drops read against AssemblyAI Universal-3.5 Pro transcripts of each call's mic and far-end tracks</dd><dt>result</dt><dd>Paragraphs 253/429/460/388/131 to 224/329/316/345/118; lowercase starts 107/271/303/137/57 to 68/171/155/92/43; You words 742/2546/1288/1490/1323 to 720/2428/983/1459/1307. The ear: new 8, old 5, neither 27; the 5 old picks came from snapping across long sentences, so the snap was cut to 2 s. Of the neither picks, 18 of 22 echo places were quiet echo (gain 0.04 to 0.14, 0.7 to 4.6x the predicted level; the user's own voice runs near 700x). Against AssemblyAI (a mic island is echo when AssemblyAI's mic words there match its far-end words): at 5x the rule takes 647 echo words, 49 of 56 phantom words heard by ear and 15 of the user's, two whole sentences among them; at 4x 596, 43 and 9; at 3x 479, 33 and 4, all four words Parakeet misheard. 0 of 2 user words heard by ear are dropped at any cut. 4 places are people beside the user labelled You, and 2 are Meet lighting the wrong tile: out of reach here. A voice of 14.7 s lit under one tile, folded into a 10 s+ voice before, keeps its own lines and that tile's name</dd><dt>verdict</dt><dd>shipped with the quiet-echo cut at 3x, the cut already used for the user's voice</dd></dl>
+  </details>
+</article>
 <article class="trial" id="fluidaudio-0-17-6-speaker-embeddings" data-group="speakers" data-status="shipped">
   <time datetime="2026-10-22">22 october 2026</time>
   <h3><a href="https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.6">FluidAudio 0.17.6 speaker embeddings</a></h3>
@@ -978,6 +1001,17 @@
 <section id="echo-cancellation" data-group="echo-cancellation">
 <h2>echo cancellation</h2>
 <div>
+<article class="trial" id="offline-linear-echo-canceller-before-echofold" data-group="echo-cancellation" data-status="rejected">
+  <time datetime="2026-11-14">14 november 2026</time>
+  <h3>Offline linear echo canceller before EchoFold</h3>
+  <span class="status status-rejected">rejected</span>
+  <p class="summary">on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Partitioned-block frequency-domain NLMS (numpy; 320 ms and 640 ms tails, step 0.3), the far-end track as reference, adapting only while the far end talks and frozen when the mic is 8x the predicted echo</p>
+    <dl><dt>against</dt><dd>Raw mic into EchoFold with the 3x, 6-word quiet-echo rule</dd><dt>measured</dt><dd>Mic transcribed with the app's speech path, then EchoFold and the quiet-echo rule; phantom words left in the places heard by ear (<code>layout-1114</code>); kept mic words AssemblyAI puts on the far end but not on the user's mic voice; share of AssemblyAI user-only words still present</dd><dt>result</dt><dd>Raw: phantom 20, far-end words kept 553, user words 95.0%, real words heard by ear 2/2. Cancelled 320 ms: 57, 940, 95.0%, 2/2. Cancelled 640 ms: 57, 1,105, 94.3%. Before any rules the canceller removes 6% of far-end words (20,592 to 19,357). A residual suppressor on one call made it worse again (phantom 27 vs 3, far-end words 267 vs 33). The filter removes little echo per word and blurs what is left, so EchoFold's word match and level test catch less. A neural stage (DTLN-aec) was not tested</dd><dt>verdict</dt><dd>rejected; the raw mic stays</dd></dl>
+  </details>
+</article>
 <article class="trial" id="localvqe" data-group="echo-cancellation" data-status="rejected">
   <time datetime="2026-10-11">11 october 2026</time>
   <h3><a href="https://huggingface.co/LocalAI-io/LocalVQE">LocalVQE</a></h3>
