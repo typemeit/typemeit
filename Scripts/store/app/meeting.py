@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture the website's meeting page shot, web/shots/meeting.webp, from a
-made-up meeting in a throwaway store, and crop its hook run and hooks list
-into web/shots/hooks.webp.
+made-up meeting in a throwaway store with no hooks run, and crop the same
+page with two hook runs into web/shots/hooks.webp.
 
     python3 Scripts/store/app/meeting.py
 
@@ -12,7 +12,7 @@ name with its answer, and two hook runs; puts four hooks in the dev app's
 defaults for the capture and restores what was there after. Launches the dev
 app on that store with TYPEMEIT_SUPPORT_DIR, opens the meeting from the
 meetings tab and saves the window without its shadow at the size the page
-gives it. Keep the mouse and keyboard off while
+gives it; once with the hook runs for the crop, then again without them. Keep the mouse and keyboard off while
 it runs. Deterministic: the same meeting every run.
 """
 import json
@@ -147,7 +147,7 @@ def silent_track(folder, role):
     os.remove(raw)
 
 
-def seed():
+def seed(hook_runs):
     folder = os.path.join(STORE, "Meetings", FOLDER)
     os.makedirs(folder, exist_ok=True)
     paras = paragraphs()
@@ -173,7 +173,7 @@ def seed():
                       "prompt": dict(HOOKS)[name], "ranAt": ran_at, "output": output, "failed": False,
                       "sessionID": str(uuid.UUID(int=0x5EED0000_3333_4000_8000_000000000000 + i + 1)),
                       "calls": [{"name": call, "result": result} for call, result in calls]}
-                     for i, (name, ran_at, calls, output) in enumerate(HOOK_RUNS)],
+                     for i, (name, ran_at, calls, output) in enumerate(HOOK_RUNS if hook_runs else [])],
     }
     with open(os.path.join(folder, "meeting.json"), "w") as f:
         json.dump(meeting, f, indent=2)
@@ -209,13 +209,9 @@ def save_window(wid, path):
     print(path)
 
 
-def main():
-    subprocess.run([sys.executable, os.path.join(HERE, "seed.py")], check=True)
-    seed()
-    clone_model()
+def capture(path):
+    """Opens the meeting in the dev app on STORE and saves its window to path."""
     env = dict(os.environ, TYPEMEIT_SUPPORT_DIR=STORE)
-    hooks_before = stored_hooks()
-    set_hooks(seeded_hooks_blob())
     app = subprocess.Popen([APP], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(6)
@@ -232,14 +228,26 @@ def main():
         time.sleep(2)
         osascript(app.pid, "set frontmost to true")
         time.sleep(0.5)
-        save_window(wid, OUT)
-        Image.open(OUT).crop(HOOKS_CROP).save(HOOKS_OUT, "WEBP", quality=90)
-        print(HOOKS_OUT)
+        save_window(wid, path)
     finally:
         app.terminate()
         app.wait()
-        set_hooks(hooks_before)
 
+
+def main():
+    subprocess.run([sys.executable, os.path.join(HERE, "seed.py")], check=True)
+    clone_model()
+    hooks_before = stored_hooks()
+    set_hooks(seeded_hooks_blob())
+    try:
+        seed(hook_runs=True)
+        capture(HOOKS_OUT)
+        Image.open(HOOKS_OUT).crop(HOOKS_CROP).save(HOOKS_OUT, "WEBP", quality=90)
+        print(HOOKS_OUT)
+        seed(hook_runs=False)
+        capture(OUT)
+    finally:
+        set_hooks(hooks_before)
 
 if __name__ == "__main__":
     main()
