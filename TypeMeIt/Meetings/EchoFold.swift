@@ -46,16 +46,18 @@ enum EchoFold {
     static let userLouder = 3.0
     /// A short island whose level does not follow the far end's still goes
     /// when the far end is speaking over it and the mic is under
-    /// `quietEchoLevel` times the echo the far end predicts. On calls through
+    /// `userLouder` times the echo the far end predicts. On calls through
     /// laptop speakers the echo is quiet (gain 0.04 to 0.14) and comes out of
     /// speech-to-text as other words, and over a few words its level
     /// correlates only 0.46 to 0.68 with the far end's. On five calls from
     /// 27 October to 13 November, heard by ear on 14 November (listen review
     /// `layout-1114`), such islands sat 0.7 to 4.6 times the predicted echo
-    /// and the user's own words a median 715 times; this took 49 of 56
-    /// phantom words the user said they never spoke and none of theirs.
+    /// and the user's own words a median 715 times. Read against AssemblyAI's
+    /// mic and far-end transcripts, a cut at 3 took 479 words that both
+    /// tracks have, 33 of 56 phantom words heard by ear, and 4 words of the
+    /// user's, all misheard; a cut at 5 took 49 of the 56 but also two of
+    /// the user's sentences.
     static let quietEchoMaxWords = 6
-    static let quietEchoLevel = 5.0
 
     /// Without a read lag, as on a call with too little echo to read: an
     /// island of up to three words goes when the mic's level follows the far
@@ -156,7 +158,7 @@ enum EchoFold {
            correlation >= trackedCorrelation {
             return overEcho.map { $0 < userLouder } ?? true
         }
-        return island.count <= quietEchoMaxWords && overEcho.map { $0 < quietEchoLevel } ?? false
+        return island.count <= quietEchoMaxWords && overEcho.map { $0 < userLouder } ?? false
     }
 
     /// The median of the mic's level over what the echo alone would give it
