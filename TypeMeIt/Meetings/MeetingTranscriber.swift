@@ -175,7 +175,7 @@ enum MeetingTranscriber {
             // Added after the far end is named, which counts on the far-end
             // speakers being the only ones that are not the user.
             if let room {
-                meeting.speakers += roomSpeakers(room.others, silent: silent, after: meeting.speakers.filter { !$0.isYou }.count, previous: previousSpeakers)
+                meeting.speakers += roomSpeakers(room.others, segments: room.segments, silent: silent, after: meeting.speakers.filter { !$0.isYou }.count, previous: previousSpeakers)
             }
             for i in meeting.speakers.indices {
                 let id = meeting.speakers[i].id
@@ -337,12 +337,14 @@ enum MeetingTranscriber {
         }
     }
 
-    /// The speakers for the people beside the user. A name the user gave an
-    /// id before stays; one person beside the user and one silent name
-    /// takes it; otherwise they are numbered on from the far end's `after`.
-    private static func roomSpeakers(_ ids: [String], silent: [String], after: Int, previous: [Meeting.Speaker]) -> [Meeting.Speaker] {
-        ids.enumerated().map { i, id in
-            if let renamed = previous.first(where: { $0.id == id && $0.nameSource == .user }) {
+    /// The speakers for the people beside the user. A name the user gave
+    /// stays with the voice that talked where that person did
+    /// (`SpeakerNaming.carried`); one person beside the user and one silent
+    /// name takes it; otherwise they are numbered on from the far end's `after`.
+    private static func roomSpeakers(_ ids: [String], segments: [SpeakerSegment], silent: [String], after: Int, previous: [Meeting.Speaker]) -> [Meeting.Speaker] {
+        let carried = SpeakerNaming.carried(previous.filter { RoomVoices.isVoice($0.id) }, segments: segments.filter { ids.contains($0.speaker) })
+        return ids.enumerated().map { i, id in
+            if let renamed = carried[id], renamed.nameSource == .user {
                 return Meeting.Speaker(id: id, name: renamed.name, isYou: false, talkMs: 0, nameSource: .user)
             }
             if ids.count == 1, silent.count == 1 {
