@@ -44,6 +44,18 @@ enum EchoFold {
     /// The mic's level over the echo the far end predicts, above which the
     /// island has the user's voice in it.
     static let userLouder = 3.0
+    /// A short island whose level does not follow the far end's still goes
+    /// when the far end is speaking over it and the mic is under
+    /// `quietEchoLevel` times the echo the far end predicts. On calls through
+    /// laptop speakers the echo is quiet (gain 0.04 to 0.14) and comes out of
+    /// speech-to-text as other words, and over a few words its level
+    /// correlates only 0.46 to 0.68 with the far end's. On five calls from
+    /// 27 October to 13 November, heard by ear on 14 November (listen review
+    /// `layout-1114`), such islands sat 0.7 to 4.6 times the predicted echo
+    /// and the user's own words a median 715 times; this took 49 of 56
+    /// phantom words the user said they never spoke and none of theirs.
+    static let quietEchoMaxWords = 6
+    static let quietEchoLevel = 5.0
 
     /// Without a read lag, as on a call with too little echo to read: an
     /// island of up to three words goes when the mic's level follows the far
@@ -137,21 +149,25 @@ enum EchoFold {
                 others.contains { abs($0.start.milliseconds - word.start.milliseconds) <= soundsLikeWindowMs && soundsLike($0.text, word.text) }
             }
         }
-        guard let correlation = envelopes.correlation(from: start - islandPadMs, to: end + islandPadMs, centreMs: lagMs, maxLagMs: trackedSearchMs),
-              correlation >= trackedCorrelation,
-              others.contains(where: { $0.start.milliseconds + lagMs - farEndOverlapMs < end && start < $0.end.milliseconds + lagMs + farEndOverlapMs })
+        guard others.contains(where: { $0.start.milliseconds + lagMs - farEndOverlapMs < end && start < $0.end.milliseconds + lagMs + farEndOverlapMs })
         else { return false }
-        return !userIsLouder(from: start, to: end, lagMs: lagMs, gain: lag.gain(at: start), envelopes: envelopes)
+        let overEcho = levelOverEcho(from: start, to: end, lagMs: lagMs, gain: lag.gain(at: start), envelopes: envelopes)
+        if let correlation = envelopes.correlation(from: start - islandPadMs, to: end + islandPadMs, centreMs: lagMs, maxLagMs: trackedSearchMs),
+           correlation >= trackedCorrelation {
+            return overEcho.map { $0 < userLouder } ?? true
+        }
+        return island.count <= quietEchoMaxWords && overEcho.map { $0 < quietEchoLevel } ?? false
     }
 
-    /// Whether the mic is `userLouder` times what the echo alone would give
-    /// it over `from..<to` ms, the far end's level at `lagMs` before times the gain.
-    private static func userIsLouder(from: Int, to: Int, lagMs: Int, gain: Double?, envelopes: Envelopes) -> Bool {
-        guard let gain, gain > 0 else { return false }
+    /// The median of the mic's level over what the echo alone would give it
+    /// over `from..<to` ms, the far end's level at `lagMs` before times the
+    /// gain. Nil without a gain or with the window off either envelope.
+    private static func levelOverEcho(from: Int, to: Int, lagMs: Int, gain: Double?, envelopes: Envelopes) -> Double? {
+        guard let gain, gain > 0 else { return nil }
         let a = envelopes.frame(from), b = max(a + 1, envelopes.frame(to)), shift = envelopes.frame(lagMs)
-        guard a - shift >= 0, b - shift <= envelopes.others.count, b <= envelopes.mic.count else { return false }
+        guard a - shift >= 0, b - shift <= envelopes.others.count, b <= envelopes.mic.count else { return nil }
         let ratios = (a..<b).map { Double(envelopes.mic[$0]) / (gain * Double(envelopes.others[$0 - shift]) + .leastNonzeroMagnitude) }
-        return EchoLag.median(ratios) >= userLouder
+        return EchoLag.median(ratios)
     }
 
     /// The same word, one a prefix of the other ("9", "9am"), or within

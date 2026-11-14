@@ -35,7 +35,7 @@
  "name": "type me it model trials",
  "description": "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores.",
  "url": "https://typeme.it/models",
- "dateModified": "2026-11-06",
+ "dateModified": "2026-11-14",
  "creator": {
   "@type": "Organization",
   "name": "type me it",
@@ -391,6 +391,12 @@
    "dateCreated": "2026-11-06",
    "description": "Phonon refiner 1.7B passed 299/353 on every dictation vs Apple's 353/353; behind the gate 351/353",
    "url": "https://huggingface.co/Infatoshi/phonon-refiner-1.7b"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Short voices, sentence-end turns and quiet echo, listen review",
+   "dateCreated": "2026-11-14",
+   "description": "on 5 calls: paragraphs 1,661 to 1,285, lowercase starts 874 to 492, phantom You words 49 of 56 gone; ear picked the new layout 8 times, the old 5, neither 27 of 40"
   }
  ]
 }
@@ -401,7 +407,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">50 trials · updated 6 november 2026</p>
+  <p class="meta">51 trials · updated 14 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -842,6 +848,17 @@
 <section id="speakers" data-group="speakers">
 <h2>speakers</h2>
 <div>
+<article class="trial" id="short-voices-sentence-end-turns-and-quiet-echo-listen-review" data-group="speakers" data-status="shipped">
+  <time datetime="2026-11-14">14 november 2026</time>
+  <h3>Short voices, sentence-end turns and quiet echo, listen review</h3>
+  <span class="status status-shipped">shipped</span>
+  <p class="summary">on 5 calls: paragraphs 1,661 to 1,285, lowercase starts 874 to 492, phantom You words 49 of 56 gone; ear picked the new layout 8 times, the old 5, neither 27 of 40</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Rules after the diarizer: a short voice under a tile no long voice has is kept and named by that tile (<code>SpeakerMerge.absorbingShort</code>, <code>SpeakerNaming.alignSpeaking</code>); turns cut at the next sentence start within 2 s, a trailing short sentence made an aside, diarizer flickers under 2 s given back (<code>TranscriptMerge</code>); user-given names follow their voice on re-transcribe (<code>SpeakerNaming.carried</code>); mic islands of 6 words or fewer under 5x the predicted echo level dropped as echo (<code>EchoFold</code>)</p>
+    <dl><dt>against</dt><dd>Every voice under 10 s folded into the nearest; turns cut at the word another voice starts on; echo dropped only when the mic was quieter than the echo predicted</dd><dt>measured</dt><dd>5 calls replayed on both builds from the same audio; paragraph, lowercase-start and You-word counts; 40 changed places heard in listen review <code>layout-1114</code> (old, new or neither)</dd><dt>result</dt><dd>Paragraphs 253/429/460/388/131 to 218/319/297/337/114; lowercase starts 107/271/302/137/57 to 63/163/140/87/39; You words 742/2546/1288/1490/1323 to 709/2419/949/1444/1303. The ear: new 8, old 5, neither 27; the 5 old picks came from snapping across long sentences, so the snap was cut to 2 s. Of the neither picks, 18 of 22 echo places were quiet echo (gain 0.04 to 0.14, 0.7 to 4.6x the predicted level; the user's own voice runs near 700x); the 5x rule drops 49 of 56 phantom words and 0 of 2 user words, plus 664 other mic words (6%), of which about 3 in a sample of 25 might be the user. 4 places are people beside the user labelled You, and 2 are Meet lighting the wrong tile: out of reach here. A voice of 14.7 s lit under one tile, folded into a 10 s+ voice before, keeps its own lines and that tile's name</dd><dt>verdict</dt><dd>shipped; the 664 extra echo drops are not yet heard</dd></dl>
+  </details>
+</article>
 <article class="trial" id="fluidaudio-0-17-6-speaker-embeddings" data-group="speakers" data-status="shipped">
   <time datetime="2026-10-22">22 october 2026</time>
   <h3><a href="https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.6">FluidAudio 0.17.6 speaker embeddings</a></h3>

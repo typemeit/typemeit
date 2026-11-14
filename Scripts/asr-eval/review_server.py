@@ -66,8 +66,10 @@ def part_window(item, part, context_s, max_play_s):
     return window['begin'], window['length']
 
 def default_readings(item):
+    if item.get('readings'):
+        return item['readings']
     middle = ' '.join(item['words'])
-    return item.get('readings') or [
+    return [
         {'system': 'AssemblyAI', 'before': item['before'], 'text': '', 'after': item['after']},
         {'system': 'Parakeet', 'before': item['before'], 'text': '', 'after': item['after']},
         {'system': 'Ultra', 'before': item['before'], 'text': middle, 'after': item['after']}]

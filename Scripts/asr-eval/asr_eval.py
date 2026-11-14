@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ASR and diarization eval against an AssemblyAI reference with hand-checked disagreements.
 See README.md. usage: asr_eval.py build|run|disagree|review|score ..."""
-import argparse, collections, hashlib, importlib, json, os, pathlib, random, subprocess, sys, tempfile, time
+import argparse, collections, difflib, hashlib, importlib, json, os, pathlib, random, subprocess, sys, tempfile, time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import assemblyai, core, review_server, store, vault
@@ -347,6 +347,8 @@ def truths_import(args):
         raise SystemExit(f'no set named {args.set}')
     if built.get('kind') == WHO_KIND:
         raise SystemExit('a who set says who spoke, not what was said: log its answers in docs/model-trials.json')
+    if built.get('kind') == TURNS_KIND:
+        raise SystemExit('a turns set says how words were laid out, not what was said: log its answers in docs/model-trials.json')
     answers = latest_answers(args.set)
     add_truths([{'id': hashlib.sha1(f"{args.set}|{item['key']}|{answer['at']}".encode()).hexdigest()[:16],
                  'clip': item['clip'], 'startMs': item['gapStartMs'], 'endMs': item['gapEndMs'], **answer_fields(item, answer),
@@ -588,15 +590,124 @@ def speaker_score(args):
         print(f"  {pathlib.Path(path).name}: {100 * result['right']:.0f}% of truth time right, "
               f"found {len(result['found'])} of {len(result['people'])} ({', '.join(result['found'])})")
 
+# ---- paragraph layout ----
+# Two transcripts of the same call that hold the same words but break them into paragraphs differently
+# (a change to TranscriptMerge, say): a turns set plays each place they differ, both tracks mixed, and
+# asks which layout matches what was heard. Its answers say how the words were laid out, not what was
+# said, so they are not truths.
+
+TURNS_KIND = 'turns'
+# Where the layouts part, how much is played before and after: within MAX_PLAY_S with PICK_CONTEXT_S each side.
+TURNS_BEFORE_MS = 2000
+TURNS_AFTER_MS = 4000
+
+def call_mix(meeting_id):
+    """Both tracks of a call mixed to one file, registered as a speaker clip on first use."""
+    folder = next(f.parent for f in (store.data_dir() / 'Meetings').glob('*/meeting.json') if (store.read_json(f) or {}).get('id') == meeting_id)
+    mix = store.sub('mixes') / f'{meeting_id}.m4a'
+    if not mix.exists():
+        tracks = [str(folder / t['file']) for t in store.read_json(folder / 'meeting.json')['tracks']]
+        inputs = [arg for track in tracks for arg in ('-i', track)]
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', f'amix=inputs={len(tracks)}:normalize=0',
+                        '-ac', '1', '-c:a', 'aac', '-b:a', '64k', str(mix)], check=True)
+    return speaker_clip(mix)
+
+def layout_text(meeting, start_ms, end_ms):
+    """The paragraphs heard between two times as one line: "Name: words | [Name: aside]", each paragraph
+    cut to the stretch by its words spread evenly over its time."""
+    names = {s['id']: s['name'] for s in meeting['speakers']}
+    parts = []
+    for p in meeting['paragraphs']:
+        if p['endMs'] <= start_ms or p['startMs'] >= end_ms:
+            continue
+        words = p['text'].split()
+        per = max(1, p['endMs'] - p['startMs']) / max(1, len(words))
+        kept = [w for n, w in enumerate(words) if start_ms <= p['startMs'] + (n + 0.5) * per < end_ms] or words[:1]
+        text = ('… ' if kept[0] != words[0] else '') + ' '.join(kept) + (' …' if kept[-1] != words[-1] else '')
+        name = names.get(p['speaker'], p['speaker'])
+        parts.append(f'[{name}: {text}]' if p.get('aside') else f'{name}: {text}')
+    return ' | '.join(parts)
+
+def paragraph_starts(meeting):
+    return {p['startMs'] for p in meeting['paragraphs']}
+
+def renamed(old_words, new_words):
+    """Whether a word went to one speaker in the old layout and another in the new. A word only one side
+    holds here is one that moved into a neighbouring place, with its speaker kept."""
+    gone, came = old_words - new_words, new_words - old_words
+    return any(word == moved and name != to for name, word in gone for to, moved in came)
+
+def words_by_speaker(meeting, first, last):
+    """Each speaker's words in paragraphs first..<last, counted."""
+    names = {s['id']: s['name'] for s in meeting['speakers']}
+    return collections.Counter((names.get(p['speaker']), word) for p in meeting['paragraphs'][first:last] for word in p['text'].split())
+
+def layout_rows(meeting):
+    names = {s['id']: s['name'] for s in meeting['speakers']}
+    return [(names.get(p['speaker']), bool(p.get('aside')), p['text']) for p in meeting['paragraphs']]
+
+def turns_set(args):
+    old_root, new_root = pathlib.Path(args.old), pathlib.Path(args.new)
+    rng = random.Random(args.seed)
+    pools = {}
+    for new_file in sorted(new_root.glob('*/meeting.json')):
+        new = store.read_json(new_file)
+        old = store.read_json(old_root / new_file.parent.name / 'meeting.json')
+        if not old:
+            continue
+        clip = call_mix(new['id'])
+        # A call whose speakers hold the same words in both layouts had none renamed.
+        voices_moved = words_by_speaker(old, 0, len(old['paragraphs'])) != words_by_speaker(new, 0, len(new['paragraphs']))
+        items = []
+        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, layout_rows(old), layout_rows(new), autojunk=False).get_opcodes():
+            if tag == 'equal':
+                continue
+            span = [p['startMs'] for p in old['paragraphs'][i1:i2]] + [p['startMs'] for p in new['paragraphs'][j1:j2]]
+            parted = sorted(set(span) - (paragraph_starts(old) & paragraph_starts(new))) or sorted(span)
+            focus = parted[0]
+            begin, end = focus - TURNS_BEFORE_MS, focus + TURNS_AFTER_MS
+            window = (begin - PICK_CONTEXT_S * 1000, end + PICK_CONTEXT_S * 1000)
+            texts = {'old': layout_text(old, *window), 'new': layout_text(new, *window)}
+            if texts['old'] == texts['new']:
+                continue
+            items.append({'clip': clip['id'], 'key': f"{clip['id']}|{focus}", 'pick': True, 'turns': True,
+                          'gapStartMs': max(0, begin), 'gapEndMs': end, 'texts': texts,
+                          'speakers': voices_moved and renamed(words_by_speaker(old, i1, i2), words_by_speaker(new, j1, j2))})
+        pools[new_file.parent.name] = items
+    per_call = max(1, args.size // max(1, len(pools)))
+    chosen = []
+    for call, items in pools.items():
+        voiced = [i for i in items if i['speakers']]
+        rest = [i for i in items if not i['speakers']]
+        for item in voiced + rng.sample(rest, min(max(0, per_call - len(voiced)), len(rest))):
+            order = ['old', 'new']
+            rng.shuffle(order)
+            item['systems'] = order
+            item['readings'] = [{'system': chr(ord('A') + n), 'before': '', 'text': item['texts'][name], 'after': ''} for n, name in enumerate(order)]
+            chosen.append(item)
+    rng.shuffle(chosen)
+    population = {call: len(items) for call, items in pools.items()}
+    store.write_json(set_path(args.name), {'kind': TURNS_KIND, 'population': population, 'items': chosen})
+    print(f"{args.name}: {core.counted(len(chosen), 'place')} drawn of {sum(population.values())} where the layouts differ, {core.counted(len(pools), 'call')}")
+
+def turns_summary(name):
+    built = store.read_json(set_path(name))
+    answered = latest_answers(name)
+    picked = collections.Counter('neither' if a['choice'] == review_server.NONE_OF_THESE else i['systems'][a['choice']]
+                                 for i in built['items'] if (a := answered.get(i['key'])) and a.get('answer') == review_server.PICK)
+    return f"{sum(picked.values())} of {core.counted(len(built['items']), 'place')} answered: new {picked['new']}, old {picked['old']}, neither {picked['neither']}"
+
 def review_html(args, chosen, clips):
     import io, contextlib, argparse
     kind = (store.read_json(set_path(args.set)) or {}).get('kind')
-    picking = kind == PICK_KIND
+    picking = kind in (PICK_KIND, TURNS_KIND)
     def summary():
         if kind == WHO_KIND:
             return who_summary(args.set)
         if kind == PEOPLE_KIND:
             return people_summary(args.set)
+        if kind == TURNS_KIND:
+            return turns_summary(args.set)
         if picking:
             return pick_summary(args.set)
         out = io.StringIO()
@@ -810,6 +921,10 @@ def main():
     ps.add_argument('name'); ps.add_argument('--track', required=True); ps.add_argument('--segments', required=True, help='a diarizer\'s segments on the track, to draw stretches from')
     ps.add_argument('--names', required=True, help='json {"P1": "a name", ...}: shown on the page only; truths keep P1, P2…')
     ps.add_argument('--size', type=int, default=SET_SIZE); ps.add_argument('--seed', type=int, default=SET_SEED)
+    ts = sub.add_parser('turns-set', help='draw places two transcripts of the same calls lay the words out differently, to pick by ear')
+    ts.add_argument('name'); ts.add_argument('--old', required=True, help='a folder of meeting folders (meeting.json each)')
+    ts.add_argument('--new', required=True, help='the same meetings laid out the other way')
+    ts.add_argument('--size', type=int, default=SET_SIZE); ts.add_argument('--seed', type=int, default=SET_SEED)
     pa = sub.add_parser('people-add', help='truths heard outside a set: jsonl of {startMs, endMs, person, note}')
     pa.add_argument('file'); pa.add_argument('--track', required=True); pa.add_argument('--by', required=True)
     sc = sub.add_parser('speaker-score', help="score diarizers' segments on a track against its who-spoke-when truths")
@@ -824,7 +939,7 @@ def main():
     rs.add_argument('--no-fillers', action='store_true')
     args = parser.parse_args()
     {'build': build, 'run': run, 'disagree': disagree, 'review': review, 'score': score, 'review-summary': review_summary,
-     'judge-export': judge_export, 'judge-import': judge_import, 'pick-set': pick_set, 'who-set': who_set, 'people-set': people_set, 'people-add': people_add, 'speaker-score': speaker_score, 'truths-import': truths_import,
+     'judge-export': judge_export, 'judge-import': judge_import, 'pick-set': pick_set, 'who-set': who_set, 'people-set': people_set, 'turns-set': turns_set, 'people-add': people_add, 'speaker-score': speaker_score, 'truths-import': truths_import,
      'vault-save': lambda _: vault.save(store.read_jsonl(truths_path()), clip_files()),
      'vault-load': lambda _: vault.load(truths_path(), store.root() / 'vault-snippets')}[args.cmd](args)
 

@@ -99,6 +99,20 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         /// How this speaker got its name (docs/meetings.md 8.6). Nil for a
         /// speaker still labelled by number.
         var nameSource: MeetingNames.Source? = nil
+        /// Where a speaker the user named talked, kept from the transcript
+        /// while the meeting is transcribed again, so the name goes to the
+        /// voice heard there rather than to whoever gets this id next.
+        var heard: [Span]? = nil
+    }
+
+    /// The transcript dropped for another pass, each speaker the user named
+    /// keeping where they talked in it (`Speaker.heard`).
+    mutating func forgettingParagraphs() {
+        for i in speakers.indices where speakers[i].nameSource == .user && !speakers[i].isYou {
+            let id = speakers[i].id
+            speakers[i].heard = paragraphs.filter { $0.speaker == id }.map { Span(startMs: $0.startMs, endMs: $0.endMs) }
+        }
+        paragraphs = []
     }
 
     struct Transcription: Codable, Equatable, Sendable {

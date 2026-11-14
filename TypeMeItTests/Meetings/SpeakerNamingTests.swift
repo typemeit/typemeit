@@ -198,6 +198,56 @@ struct SpeakerNamingTests {
         ])
     }
 
+    @Test func aShortVoiceAloneUnderItsTileTakesTheName() {
+        let speakers = [
+            Self.you,
+            numbered(1, talkMs: 60_000),
+            numbered(2, talkMs: 8_000),
+            numbered(3, talkMs: 30_000),
+        ]
+        // s2 says 8 s, under the 20 s minimum, all while Cy's tile is lit.
+        // s3 is lit as Dee for 10 s and as Ana for 10 s: no tile of its own.
+        let segments = [
+            segment("s1", 0, 60_000),
+            segment("s2", 60_000, 68_000),
+            segment("s3", 70_000, 100_000),
+        ]
+        let names = MeetingNames(source: .speaking, roster: [], channel: nil, spans: [
+            MeetingNames.Span(name: "Ana", startMs: 0, endMs: 60_000),
+            MeetingNames.Span(name: "Cy", startMs: 60_000, endMs: 68_000),
+            MeetingNames.Span(name: "Dee", startMs: 70_000, endMs: 80_000),
+            MeetingNames.Span(name: "Ana", startMs: 80_000, endMs: 90_000),
+        ], captions: nil)
+
+        let result = align(speakers: speakers, segments: segments, names: names)
+
+        #expect(result.speakers == [
+            Self.you,
+            Meeting.Speaker(id: "s1", name: "Ana", isYou: false, talkMs: 60_000, nameSource: .speaking),
+            Meeting.Speaker(id: "s2", name: "Cy", isYou: false, talkMs: 8_000, nameSource: .speaking),
+            numbered(3, talkMs: 30_000),
+        ])
+    }
+
+    @Test func twoShortVoicesUnderOneTileStayNumbers() {
+        let speakers = [
+            Self.you,
+            numbered(1, talkMs: 5_000),
+            numbered(2, talkMs: 5_000),
+        ]
+        let segments = [
+            segment("s1", 0, 5_000),
+            segment("s2", 10_000, 15_000),
+        ]
+        let names = MeetingNames(source: .speaking, roster: [], channel: nil, spans: [
+            MeetingNames.Span(name: "Cy", startMs: 0, endMs: 15_000),
+        ], captions: nil)
+
+        let result = align(speakers: speakers, segments: segments, names: names)
+
+        #expect(result.speakers == speakers)
+    }
+
     @Test func theOneToOneRosterCase() {
         let speakers = [
             Self.you,
@@ -275,5 +325,36 @@ struct SpeakerNamingTests {
     @Test func noOtherNameIsNoTitle() {
         let names = MeetingNames(source: .roster, roster: ["Max Mitchell"], channel: nil, spans: [], captions: nil)
         #expect(names.title(excluding: "Max Mitchell") == nil)
+    }
+
+    @Test func aNameTheUserGaveFollowsTheVoiceWhenANewVoiceTakesItsNumber() {
+        // Ana was s1, Ben s2 (named by the user); a voice found early in the call now holds s2.
+        let previous = [
+            Meeting.Speaker(id: "s1", name: "Ana", isYou: false, talkMs: 0, nameSource: .speaking),
+            Meeting.Speaker(id: "s2", name: "Ben", isYou: false, talkMs: 0, nameSource: .user, heard: [Meeting.Span(startMs: 60_000, endMs: 70_000)]),
+        ]
+        let segments = [SpeakerSegment(speaker: "s1", startMs: 0, endMs: 30_000), SpeakerSegment(speaker: "s2", startMs: 30_000, endMs: 40_000),
+                        SpeakerSegment(speaker: "s3", startMs: 60_000, endMs: 70_000)]
+        let carried = SpeakerNaming.carried(previous, segments: segments)
+        #expect(carried.mapValues(\.name) == ["s1": "Ana", "s3": "Ben"])
+    }
+
+    @Test func aNameTheUserGaveWithNoVoiceLeftWhereTheyTalkedIsDropped() {
+        let previous = [Meeting.Speaker(id: "s1", name: "Ben", isYou: false, talkMs: 0, nameSource: .user, heard: [Meeting.Span(startMs: 60_000, endMs: 70_000)])]
+        let segments = [SpeakerSegment(speaker: "s1", startMs: 0, endMs: 30_000)]
+        #expect(SpeakerNaming.carried(previous, segments: segments).isEmpty)
+    }
+
+    @Test func forgettingTheTranscriptKeepsWhereNamedSpeakersTalked() {
+        var meeting = MeetingFixtures.meeting(speakers: [
+            Meeting.Speaker(id: "s1", name: "Ana", isYou: false, talkMs: 0, nameSource: .user),
+            Meeting.Speaker(id: "s2", name: "Speaker 2", isYou: false, talkMs: 0),
+        ], paragraphs: [
+            Meeting.Paragraph(speaker: "s1", startMs: 0, endMs: 1000, text: "Hi."),
+            Meeting.Paragraph(speaker: "s2", startMs: 1000, endMs: 2000, text: "Hello."),
+        ])
+        meeting.forgettingParagraphs()
+        #expect(meeting.paragraphs.isEmpty)
+        #expect(meeting.speakers.map(\.heard) == [[Meeting.Span(startMs: 0, endMs: 1000)], nil])
     }
 }

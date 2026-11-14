@@ -867,6 +867,23 @@
       "held": "—",
       "verdict": "rejected",
       "link": "—"
+    },
+    {
+      "name": "Short voices, sentence-end turns and quiet echo, listen review",
+      "url": null,
+      "group": "speakers",
+      "status": "shipped",
+      "summary": "on 5 calls: paragraphs 1,661 to 1,285, lowercase starts 874 to 492, phantom You words 49 of 56 gone; ear picked the new layout 8 times, the old 5, neither 27 of 40",
+      "date": "2026-11-14",
+      "role": "Meetings",
+      "model": "Rules after the diarizer: a short voice under a tile no long voice has is kept and named by that tile (`SpeakerMerge.absorbingShort`, `SpeakerNaming.alignSpeaking`); turns cut at the next sentence start within 2 s, a trailing short sentence made an aside, diarizer flickers under 2 s given back (`TranscriptMerge`); user-given names follow their voice on re-transcribe (`SpeakerNaming.carried`); mic islands of 6 words or fewer under 5x the predicted echo level dropped as echo (`EchoFold`)",
+      "against": "Every voice under 10 s folded into the nearest; turns cut at the word another voice starts on; echo dropped only when the mic was quieter than the echo predicted",
+      "hypothesis": "—",
+      "metric": "5 calls replayed on both builds from the same audio; paragraph, lowercase-start and You-word counts; 40 changed places heard in listen review `layout-1114` (old, new or neither)",
+      "result": "Paragraphs 253/429/460/388/131 to 218/319/297/337/114; lowercase starts 107/271/302/137/57 to 63/163/140/87/39; You words 742/2546/1288/1490/1323 to 709/2419/949/1444/1303. The ear: new 8, old 5, neither 27; the 5 old picks came from snapping across long sentences, so the snap was cut to 2 s. Of the neither picks, 18 of 22 echo places were quiet echo (gain 0.04 to 0.14, 0.7 to 4.6x the predicted level; the user's own voice runs near 700x); the 5x rule drops 49 of 56 phantom words and 0 of 2 user words, plus 664 other mic words (6%), of which about 3 in a sample of 25 might be the user. 4 places are people beside the user labelled You, and 2 are Meet lighting the wrong tile: out of reach here. A voice of 14.7 s lit under one tile, folded into a 10 s+ voice before, keeps its own lines and that tile's name",
+      "held": "—",
+      "verdict": "shipped; the 664 extra echo drops are not yet heard",
+      "link": "`Scripts/asr-eval` `turns-set` and `review --set layout-1114`; person truths in `Scripts/asr-eval/vault/truths.tmv`"
     }
   ]
 }

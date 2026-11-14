@@ -133,7 +133,7 @@ enum MeetingProbes {
             return
         }
         meeting.transcription.done = [:]
-        meeting.paragraphs = []
+        meeting.forgettingParagraphs()
         meeting.summary = nil
         // Each save follows a chunk, when the track's words file holds every
         // word so far; kept under another name, since the pass deletes the
