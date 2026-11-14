@@ -219,6 +219,7 @@ final class MeetingCoordinator {
         Pipeline.shared.shortcuts.onReturn = { [weak self] in self?.askDictatedOnReturn() ?? false }
         model.onOpenAsk = { [weak self] in self?.openAsk() }
         model.onContinueInClaude = { [weak self] sessionID in
+            self?.dismissToast()
             ClaudeDesktop.open(prompt: ClaudeDesktop.prompt(resuming: sessionID, meeting: self?.openTarget?.meeting))
         }
         model.onShowClaudeCheck = { [weak self] in
