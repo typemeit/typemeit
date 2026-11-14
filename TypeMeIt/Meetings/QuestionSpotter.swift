@@ -51,7 +51,13 @@ enum WakePhrase {
         let asksYou = asks.contains(words[at]) && words[at + 1] == "you"
         if asksYou || sentence.hasSuffix("?") { return capitalised(tokens[at...].joined(separator: " ")) }
         let request = tokens[at...]
-        guard questionWords.contains(words[at]), !request.dropLast().contains(where: endsSentence) else { return nil }
+        guard questionWords.contains(words[at]) else { return nil }
+        // "Claude, what time does it close? On a Saturday": a question mark
+        // closes the first sentence and an afterthought follows it.
+        if let end = request.dropLast().firstIndex(where: endsSentence) {
+            guard request[end].hasSuffix("?") else { return nil }
+            return capitalised(request.joined(separator: " "))
+        }
         return capitalised(request.joined(separator: " ").trimmingCharacters(in: requestEdges) + "?")
     }
 

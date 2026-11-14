@@ -120,6 +120,11 @@ struct QuestionSpotterTests {
         #expect(WakePhrase.request(in: "Claude is fine. We should ship it.") == nil)
     }
 
+    @Test func aQuestionByNameKeepsItsAfterthought() {
+        #expect(WakePhrase.request(in: "Claude, when does the shop shut? On a Sunday") == "When does the shop shut? On a Sunday")
+        #expect(WakePhrase.request(in: "TMI, is it ready? It was slow. Check the logs") == "Is it ready? It was slow. Check the logs")
+    }
+
     @Test func theNameLastOnlyAsksInItsOwnSentence() {
         #expect(WakePhrase.request(in: "Why is it slow? This should have gone to Claude.") == nil)
         #expect(WakePhrase.request(in: "It looks wrong. What was the score, TMI.") == "What was the score?")
