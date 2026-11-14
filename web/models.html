@@ -397,6 +397,12 @@
    "name": "Short voices, sentence-end turns and quiet echo, listen review",
    "dateCreated": "2026-11-14",
    "description": "on 5 calls: paragraphs 1,661 to 1,332, lowercase starts 875 to 529; quiet echo cut at 3x takes 479 words AssemblyAI confirms as echo and 4 misheard words of the user's; ear picked the new layout 8 times, the old 5, neither 27 of 40"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Offline linear echo canceller before EchoFold",
+   "dateCreated": "2026-11-14",
+   "description": "on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940"
   }
  ]
 }
@@ -407,7 +413,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">51 trials · updated 14 november 2026</p>
+  <p class="meta">52 trials · updated 14 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -995,6 +1001,17 @@
 <section id="echo-cancellation" data-group="echo-cancellation">
 <h2>echo cancellation</h2>
 <div>
+<article class="trial" id="offline-linear-echo-canceller-before-echofold" data-group="echo-cancellation" data-status="rejected">
+  <time datetime="2026-11-14">14 november 2026</time>
+  <h3>Offline linear echo canceller before EchoFold</h3>
+  <span class="status status-rejected">rejected</span>
+  <p class="summary">on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Partitioned-block frequency-domain NLMS (numpy; 320 ms and 640 ms tails, step 0.3), the far-end track as reference, adapting only while the far end talks and frozen when the mic is 8x the predicted echo</p>
+    <dl><dt>against</dt><dd>Raw mic into EchoFold with the 3x, 6-word quiet-echo rule</dd><dt>measured</dt><dd>Mic transcribed with the app's speech path, then EchoFold and the quiet-echo rule; phantom words left in the places heard by ear (<code>layout-1114</code>); kept mic words AssemblyAI puts on the far end but not on the user's mic voice; share of AssemblyAI user-only words still present</dd><dt>result</dt><dd>Raw: phantom 20, far-end words kept 553, user words 95.0%, real words heard by ear 2/2. Cancelled 320 ms: 57, 940, 95.0%, 2/2. Cancelled 640 ms: 57, 1,105, 94.3%. Before any rules the canceller removes 6% of far-end words (20,592 to 19,357). A residual suppressor on one call made it worse again (phantom 27 vs 3, far-end words 267 vs 33). The filter removes little echo per word and blurs what is left, so EchoFold's word match and level test catch less. A neural stage (DTLN-aec) was not tested</dd><dt>verdict</dt><dd>rejected; the raw mic stays</dd></dl>
+  </details>
+</article>
 <article class="trial" id="localvqe" data-group="echo-cancellation" data-status="rejected">
   <time datetime="2026-10-11">11 october 2026</time>
   <h3><a href="https://huggingface.co/LocalAI-io/LocalVQE">LocalVQE</a></h3>

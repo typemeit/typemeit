@@ -884,6 +884,23 @@
       "held": "—",
       "verdict": "shipped with the quiet-echo cut at 3x, the cut already used for the user's voice",
       "link": "`Scripts/asr-eval` `turns-set` and `review --set layout-1114`; person truths in `Scripts/asr-eval/vault/truths.tmv`; AssemblyAI transcripts of the 10 tracks cached in `asr-reference/aai`"
+    },
+    {
+      "name": "Offline linear echo canceller before EchoFold",
+      "url": null,
+      "group": "echo cancellation",
+      "status": "rejected",
+      "summary": "on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940",
+      "date": "2026-11-14",
+      "role": "Meetings",
+      "model": "Partitioned-block frequency-domain NLMS (numpy; 320 ms and 640 ms tails, step 0.3), the far-end track as reference, adapting only while the far end talks and frozen when the mic is 8x the predicted echo",
+      "against": "Raw mic into EchoFold with the 3x, 6-word quiet-echo rule",
+      "hypothesis": "—",
+      "metric": "Mic transcribed with the app's speech path, then EchoFold and the quiet-echo rule; phantom words left in the places heard by ear (`layout-1114`); kept mic words AssemblyAI puts on the far end but not on the user's mic voice; share of AssemblyAI user-only words still present",
+      "result": "Raw: phantom 20, far-end words kept 553, user words 95.0%, real words heard by ear 2/2. Cancelled 320 ms: 57, 940, 95.0%, 2/2. Cancelled 640 ms: 57, 1,105, 94.3%. Before any rules the canceller removes 6% of far-end words (20,592 to 19,357). A residual suppressor on one call made it worse again (phantom 27 vs 3, far-end words 267 vs 33). The filter removes little echo per word and blurs what is left, so EchoFold's word match and level test catch less. A neural stage (DTLN-aec) was not tested",
+      "held": "—",
+      "verdict": "rejected; the raw mic stays",
+      "link": "rig kept locally (fdaf.py, score.py), not in the repo"
     }
   ]
 }
