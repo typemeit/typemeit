@@ -36,6 +36,8 @@ enum EchoFold {
     /// behind, and after a jump in the lag the echo of the 25 September
     /// lunch call sat at 60 ms ahead for 45 minutes.
     static let islandGapMs = 700
+    /// How closely the island's level must follow the far end's at the read
+    /// lag. Not measured.
     static let trackedCorrelation = 0.7
     /// Either side of the read lag, searched for the island's own.
     static let trackedSearchMs = 30
@@ -71,6 +73,8 @@ enum EchoFold {
     /// of the island taken in with it.
     static let islandMaxLagMs = 100
     static let islandPadMs = 200
+    /// How far apart a mic word and a far-end word may start and still be
+    /// compared by sound. Not measured.
     static let soundsLikeWindowMs = 600
     /// Edits allowed as a share of the longer word: "gonna" sounds like
     /// "going", "how" does not sound like "Hugh".

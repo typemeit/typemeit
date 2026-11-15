@@ -10,8 +10,10 @@ import Foundation
 /// user can paste it into a bug report while the problem is happening.
 @MainActor
 enum AudioCheck {
+    /// How long the mic test and the capture test each record.
     static let micTestSeconds = 2
     static let captureTestSeconds = 2
+    /// The capture test's own tone: 1 kHz at -26 dBFS.
     nonisolated static let toneHz: Double = 1000
     nonisolated static let toneLevel: Float = 0.05
     /// Bluetooth plays music at 44.1 or 48 kHz; a headset in its call

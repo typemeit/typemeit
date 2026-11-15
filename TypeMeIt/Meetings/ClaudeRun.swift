@@ -43,6 +43,7 @@ final class ClaudeRun: @unchecked Sendable {
 
     /// Claude Code's own default, whatever the plan makes it; no `--model`.
     static let defaultModel = "default"
+    /// Longest an answer to a meeting question may take. Not measured.
     static let answerTimeoutSeconds = 180.0
     /// A hook can do more than look something up, such as writing tickets.
     static let hookTimeoutSeconds = 600.0

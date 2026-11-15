@@ -12,6 +12,7 @@ enum CameraIDs {
     static let sourceStreamID = UUID(uuidString: "619A0D7A-84DC-4B1B-B66D-CAEF83D1700A")!
     static let sinkStreamID = UUID(uuidString: "C196D96D-E905-4FF9-A390-F4CFC489D61D")!
 
+    /// The camera's one format: 720p at 30 fps.
     static let width: Int32 = 1280
     static let height: Int32 = 720
     static let framesPerSecond: Int32 = 30

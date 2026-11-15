@@ -14,6 +14,7 @@ import Observation
 @Observable
 final class WindowCapture {
     static let shared = WindowCapture()
+    /// How long one capture watches the window.
     nonisolated static let seconds = 180
     /// Time for the app to build its accessibility tree once asked to.
     nonisolated static let settleSeconds = 2

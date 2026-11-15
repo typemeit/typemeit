@@ -16,6 +16,7 @@ enum QuestionCheck {
     }
 
     static let model = "haiku"
+    /// Longest the check of one question may take. Not measured.
     static let timeoutSeconds = 30.0
     /// The most of each kind of past answer the instructions carry.
     static let examplesPerAnswer = 15

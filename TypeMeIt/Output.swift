@@ -179,6 +179,7 @@ enum Output {
         /// Reads after `ReadBackTiming.settle`, for fields that update their
         /// accessibility text lazily.
         static let reads = 4
+        /// The wait between those reads.
         static let retry: Duration = .milliseconds(300)
         /// Shorter previous clipboard text is too likely to be in the field
         /// already for its presence to mean anything.

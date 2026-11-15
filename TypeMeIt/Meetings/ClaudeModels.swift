@@ -12,6 +12,7 @@ enum ClaudeModels {
         let supportsAutoMode: Bool?
     }
 
+    /// How long the CLI is given to list its models. Not measured.
     static let timeoutSeconds = 20.0
     private static let request = #"{"request_id":"models","type":"control_request","request":{"subtype":"initialize"}}"#
 

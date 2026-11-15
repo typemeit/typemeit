@@ -55,6 +55,7 @@ final class ClaudeCheck {
     @ObservationIgnored var onUnaskedFailure: (@MainActor () -> Void)?
 
     private static let passKey = "claudeCheckPassed"
+    /// How often `watch` checks again, to notice Claude Code updating itself.
     private static let hourly: Duration = .seconds(3600)
     /// `claude install` downloads the version first.
     private static let installTimeoutSeconds = 300.0

@@ -70,6 +70,8 @@ final class MeetingRecorder: @unchecked Sendable, MeetingCaptureSink {
     /// and locks; held by this process, so every exit path releases it.
     private var sleepAssertion: IOPMAssertionID?
     private static let sleepReason = "type me it is recording a meeting"
+    /// How often free space is checked while recording; the recording stops
+    /// below `Fixed.meetingMinimumFreeBytes`.
     private static let diskCheckInterval: Duration = .seconds(60)
 
     /// `preRoll` is the live capture and the audio held since the call

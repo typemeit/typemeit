@@ -80,6 +80,8 @@ enum CustomWordMatcher {
     /// "TypeMe yet", "type me at").
     static let builtInWords = ["type me it"]
 
+    /// Most heard words one term is matched against: "type me it" heard as
+    /// "type me at" is three.
     static let maxRun = 4
     /// A word the speech model scored at or above this is left as heard,
     /// unless it spells the term exactly. Over 7,000 words of the user's own
@@ -101,6 +103,8 @@ enum CustomWordMatcher {
         if let confidence, confidence < 0.75 { return base - 0.1 + longRun }
         return base + longRun
     }
+    /// How much each word past the first raises the sound-match bar in
+    /// `minSoundSimilarity`. Not measured.
     static let runWordPenalty = 0.05
     /// Words that never stand for a term on their own: "or" is not "VR".
     static let stopWords: Set<String> = ["a", "an", "the", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for", "with", "as", "is", "are", "was", "were", "be", "been", "it", "its", "this", "that", "these", "those", "i", "you", "he", "she", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "our", "their", "so", "if", "not", "no", "yes", "do", "does", "did", "have", "has", "had", "can", "will", "would", "should", "could", "just", "then", "than", "there", "here", "what", "which", "who", "how", "when", "where", "why", "up", "out", "about", "into", "over", "also", "very", "all", "any", "some", "one", "two"]
