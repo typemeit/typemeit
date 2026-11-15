@@ -1550,6 +1550,37 @@
       "id": "arXiv 2611.16371 (structured speaker conditioning)",
       "date": "2026-11-14",
       "role": "meetings speech and diarization"
+    },
+    {
+      "id": "AirCaps A5S Async v1 (a5s-async-v1)",
+      "date": "2026-11-15",
+      "role": "eval reference",
+      "pick": true
+    },
+    {
+      "id": "coder543/fluid-speech-pro-glade",
+      "date": "2026-11-15",
+      "role": "speech recognition"
+    },
+    {
+      "id": "MacEpic/fluid-speech-pro-coreml",
+      "date": "2026-11-15",
+      "role": "speech recognition"
+    },
+    {
+      "id": "AirCaps Diarization-v1",
+      "date": "2026-11-15",
+      "role": "diarization"
+    },
+    {
+      "id": "AirCaps A5S Small V2 Streaming",
+      "date": "2026-11-15",
+      "role": "speech recognition"
+    },
+    {
+      "id": "KoljaB/RealtimeVAD",
+      "date": "2026-11-15",
+      "role": "voice activity detection"
     }
   ]
 }
