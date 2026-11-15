@@ -901,6 +901,23 @@
       "held": "—",
       "verdict": "rejected; the raw mic stays",
       "link": "rig kept locally (fdaf.py, score.py), not in the repo"
+    },
+    {
+      "name": "Fluid Speech Pro",
+      "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-pro-coreml",
+      "group": "speech recognition",
+      "status": "rejected",
+      "summary": "dictation tied at 4.08% vs 4.22%; meetings 12.98% vs Ultra's 12.65%, p95 dictation 211 vs 105 ms",
+      "date": "2026-11-14",
+      "role": "Speech recognition",
+      "model": "Fluid Speech Pro (FluidVoice, published 2026-11-13: Parakeet TDT 0.6B v3 fine-tune with one extra encoder block, 25 languages detected by the model with no setting to fix one; int8 encoder, fp16 decoder and joint, 652 MB Core ML; CC-BY-4.0), through `fluidasr local` (FluidAudio 0.18.2 `loadLocal`, `.v3`)",
+      "against": "FluidAudio Parakeet Ultra (`fluid-ultra`, same 62 clips)",
+      "hypothesis": "—",
+      "metric": "WER vs AssemblyAI Universal-3.5 Pro, unprompted (`ASSEMBLYAI_PROMPT=''`), 50 dictations and 12 meeting tracks, no new spans hand-checked, fillers dropped; S/D/I; p50/p95; peak memory",
+      "result": "Dictation 4.08% vs 4.22% (28 vs 29 errors). Meetings 12.98% vs 12.65% (+0.33): 302 deletions vs 230, 902 insertions vs 980, 999 substitutions vs 937. Dictation p50/p95 60/211 ms vs 51/105 ms; meetings 210× vs 240× realtime; peak 621 vs 643 MiB on dictations, 289 vs 300 MiB on meetings. Ultra's timings are from its earlier run, not re-timed in this session",
+      "held": "no: meetings 0.33 points worse, dictation a tie",
+      "verdict": "rejected",
+      "link": "`Scripts/asr-eval/systems/fluid_speech_pro.py`"
     }
   ]
 }

@@ -403,6 +403,13 @@
    "name": "Offline linear echo canceller before EchoFold",
    "dateCreated": "2026-11-14",
    "description": "on 5 calls, phantom words in the heard echo places 20 with the raw mic vs 57 after the canceller; far-end words kept on the mic 553 vs 940"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Fluid Speech Pro",
+   "dateCreated": "2026-11-14",
+   "description": "dictation tied at 4.08% vs 4.22%; meetings 12.98% vs Ultra's 12.65%, p95 dictation 211 vs 105 ms",
+   "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-pro-coreml"
   }
  ]
 }
@@ -413,7 +420,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">52 trials · updated 14 november 2026</p>
+  <p class="meta">53 trials · updated 14 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -426,6 +433,17 @@
 <section id="speech-recognition" data-group="speech-recognition">
 <h2>speech recognition</h2>
 <div>
+<article class="trial" id="fluid-speech-pro" data-group="speech-recognition" data-status="rejected">
+  <time datetime="2026-11-14">14 november 2026</time>
+  <h3><a href="https://huggingface.co/FluidVoice-Labs/fluid-speech-pro-coreml">Fluid Speech Pro</a></h3>
+  <span class="status status-rejected">rejected</span>
+  <p class="summary">dictation tied at 4.08% vs 4.22%; meetings 12.98% vs Ultra&#x27;s 12.65%, p95 dictation 211 vs 105 ms</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">Fluid Speech Pro (FluidVoice, published 2026-11-13: Parakeet TDT 0.6B v3 fine-tune with one extra encoder block, 25 languages detected by the model with no setting to fix one; int8 encoder, fp16 decoder and joint, 652 MB Core ML; CC-BY-4.0), through <code>fluidasr local</code> (FluidAudio 0.18.2 <code>loadLocal</code>, <code>.v3</code>)</p>
+    <dl><dt>against</dt><dd>FluidAudio Parakeet Ultra (<code>fluid-ultra</code>, same 62 clips)</dd><dt>measured</dt><dd>WER vs AssemblyAI Universal-3.5 Pro, unprompted (<code>ASSEMBLYAI_PROMPT=''</code>), 50 dictations and 12 meeting tracks, no new spans hand-checked, fillers dropped; S/D/I; p50/p95; peak memory</dd><dt>result</dt><dd>Dictation 4.08% vs 4.22% (28 vs 29 errors). Meetings 12.98% vs 12.65% (+0.33): 302 deletions vs 230, 902 insertions vs 980, 999 substitutions vs 937. Dictation p50/p95 60/211 ms vs 51/105 ms; meetings 210× vs 240× realtime; peak 621 vs 643 MiB on dictations, 289 vs 300 MiB on meetings. Ultra's timings are from its earlier run, not re-timed in this session</dd><dt>held</dt><dd>no: meetings 0.33 points worse, dictation a tie</dd><dt>verdict</dt><dd>rejected</dd></dl>
+  </details>
+</article>
 <article class="trial" id="fluidaudio-0-18-2" data-group="speech-recognition" data-status="shipped">
   <time datetime="2026-11-05">5 november 2026</time>
   <h3><a href="https://github.com/FluidInference/FluidAudio/releases/tag/v0.18.2">FluidAudio 0.18.2</a></h3>

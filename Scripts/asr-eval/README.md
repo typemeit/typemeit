@@ -19,6 +19,7 @@ make asr-eval ARGS="run bark-plus --like fluid-ultra"  # Bark 3.0 Plus through i
 make asr-eval ARGS="run fluid-orukeet"  # needs ORUKEET_DIR=<extracted orukeet-r3-coreml-greedy/>; compiles its packages on first run
 make asr-eval ARGS="run cohere"          # Cohere Transcribe 2B, MLX int8; first run builds a venv and downloads ~2 GB
 make asr-eval ARGS="run fluid-speech-mini"  # FluidVoice's Fluid Speech Mini, Core ML through fluidasr local; first run downloads 243 MB
+make asr-eval ARGS="run fluid-speech-pro --like fluid-ultra"  # FluidVoice's Fluid Speech Pro, Core ML through fluidasr local; first run downloads 652 MB
 make asr-eval ARGS="run granite-nar"     # Granite Speech 4.1 2B NAR, transcribe.cpp Q8_0 on Metal; first run builds transcribe.cpp and downloads 2.5 GB
 make asr-eval ARGS="run nemotron"        # diarizer; needs a CLI, see below
 make asr-eval ARGS="run nemotron_app"    # diarizer: the turns plus the app's per-speaker embeddings and short-speaker merge; FLUIDAUDIO_VERSION=x.y.z builds against another tag
