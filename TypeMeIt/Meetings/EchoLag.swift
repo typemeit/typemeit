@@ -21,6 +21,8 @@ struct EchoLag: Equatable {
 
     let readings: [Reading]
 
+    /// Each reading of the lag and gain covers this much of the call, and a
+    /// new one starts this often. Not measured.
     static let windowSeconds = 20
     static let stepSeconds = 5
     /// The lags searched, mic ahead to mic behind.

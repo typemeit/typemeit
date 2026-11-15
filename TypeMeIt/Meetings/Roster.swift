@@ -218,6 +218,8 @@ final class Roster: @unchecked Sendable {
         return (nodes, elements, code, path)
     }
 
+    /// A walk of the meeting window stops after this many elements or this
+    /// many levels down, so a huge page cannot stall the poll. Not measured.
     private static let nodeLimit = 20_000
     private static let depthLimit = 80
     /// Pipit (MIT) reads huddle tiles from 24 levels down; the rest of the

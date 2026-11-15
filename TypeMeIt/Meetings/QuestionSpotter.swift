@@ -119,6 +119,7 @@ struct SentenceSplitter {
 /// a third of the time on meetings it had not seen, so the app offers the
 /// question and the user decides whether to ask.
 enum QuestionRule {
+    /// A shorter question ("you there?") is never offered. Not measured.
     static let minimumWords = 3
 
     private static var phrases: Regex<AnyRegexOutput> {
@@ -144,6 +145,8 @@ enum QuestionRule {
 /// Drops a question that repeats one offered a moment ago: the same question
 /// asked twice, or the far end's question heard again through the mic.
 struct QuestionDeduper {
+    /// How long an offered question is remembered, and the share of the
+    /// shorter question's words two must share to be the same. Not measured.
     static let window: TimeInterval = 60
     static let sameShare = 0.6
 

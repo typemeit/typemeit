@@ -45,6 +45,10 @@ enum EchoBleedDetector {
     /// capture chains having different gain and frequency response, which
     /// they always do.
     static let frameSeconds = 0.010
+    /// The window the two envelopes are correlated over, the lag searched
+    /// either way, the correlation that marks a window as bleeding, and the
+    /// share of windows that marks the call: meeting-transcriber's values,
+    /// unchanged.
     static let windowSeconds = 10.0
     static let maxLagSeconds = 0.2
     static let correlationThreshold = 0.7

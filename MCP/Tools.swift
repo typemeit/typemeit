@@ -23,6 +23,7 @@ enum MCPTools {
     /// that type is not part of this target.
     static let meetingMCPBudgetBytes = 24_576
 
+    /// Rows a list or search returns when Claude asks for no limit.
     static let defaultListLimit = 40
     static let defaultSearchLimit = 20
 

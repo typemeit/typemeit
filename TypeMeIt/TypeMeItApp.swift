@@ -14,6 +14,7 @@ struct TypeMeItApp: App {
     /// is room, at the far left of the other icons; a small distance puts it
     /// at the right end. Once the user moves it, the key is theirs.
     private static let statusItemPositionKey = "NSStatusItem Preferred Position Item-0"
+    /// The distance from the right edge written to that key on first launch.
     private static let rightmostStatusItemPosition = 1
 
     init() {

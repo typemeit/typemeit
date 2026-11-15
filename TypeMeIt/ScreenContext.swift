@@ -13,6 +13,8 @@ enum ScreenContext {
     /// How many terms the prompt is allowed to carry. The on-device model's
     /// window is small and long lists dilute the transcript.
     static let maxTerms = 40
+    /// Text the screen reader is less sure of than this is left out.
+    /// Not measured.
     static let minimumConfidence: Float = 0.5
 
     /// Recognised text lines from the frontmost on-screen window of `pid`.

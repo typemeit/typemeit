@@ -429,12 +429,16 @@ enum Fixed {
     static let contactURL = URL(string: "mailto:\(contactEmail)")!
     /// The GitHub release page for a version, linked from the about row.
     static func releaseURL(_ version: String) -> String { "https://github.com/typemeit/typemeit/releases/tag/v\(version)" }
+    /// Fn let go sooner than this after a dictation started is a tap, and the
+    /// recording is dropped. Not measured.
     static let holdThresholdMs = 300
     /// How often a held hotkey's modifiers are checked for release.
     static let holdPollMs = 20.0
     /// The microphone stays open this long after a dictation is stopped, so
     /// a last word said as Fn goes up is not cut off.
     static let recordingTail: Duration = .milliseconds(300)
+    /// Wait between putting the text on the clipboard and pressing Cmd+V.
+    /// Not measured.
     static let pasteDelayBeforeMs = 60
     /// Restore this long after the target read the clipboard. Chromium's
     /// browser process reads, then the renderer reads the pasteboard's copy.
@@ -450,13 +454,18 @@ enum Fixed {
     static let pasteLandedWaitMs = 1000
     /// Restore this long after a Cmd+V that could not be posted.
     static let pasteNotPostedMs = 500
+    /// How often the paste checks whether the clipboard has been read.
     static let pasteTickMs = 20
     /// A dictation that waited longer than this for the speech model's turn is logged.
     static let slowTranscriberWait: Duration = .milliseconds(500)
+    /// How long the copy prompt stays up. Not measured.
     static let copyPromptTimeout: Duration = .seconds(8)
+    /// A shorter dictation is dropped as an accidental press. Not measured.
     static let minimumRecordingSeconds = 0.3
     /// A screen read serves every dictation into the same window this long.
     static let screenReadReuse: Duration = .seconds(60)
+    /// A dictation whose peak never reaches this (-40 dBFS) is dropped as
+    /// silence. Not measured.
     static let silencePeak: Float = 0.01
     /// An unmute that does not take is tried this many times, this far
     /// apart: long enough to outlast a Bluetooth headset leaving its
@@ -528,6 +537,9 @@ enum Fixed {
     /// where the median word is 80 ms and the mic's longest was 560 ms. A
     /// stretched word would carry its paragraph over the other speaker.
     static let meetingLongestWordMs = 1000
+    /// Each chunk starts this far before the last one ended, so a word cut at
+    /// the seam is heard whole once; `ChunkStitch` drops the repeat.
+    /// Not measured.
     static let meetingChunkOverlapSeconds = 2
     /// The seam is placed at the quietest point within this of the nominal cut.
     static let meetingChunkSearchSeconds = 5

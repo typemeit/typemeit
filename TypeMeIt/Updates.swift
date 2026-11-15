@@ -56,6 +56,7 @@ final class Updates: NSObject, SPUUpdaterDelegate {
     /// Ends a check that never comes back, so the row does not sit on
     /// "checking" when the feed is down.
     @ObservationIgnored private var checkTimeout: Task<Void, Never>?
+    /// How long an update check is given before it is ended.
     static let checkTimeoutSeconds: Double = 10
 
     private override init() {
