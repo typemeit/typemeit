@@ -40,7 +40,11 @@ struct HooksPage: View {
                 .frame(height: 52)
                 .overlay(alignment: .bottom) { SquareRule() }
             }
-            if let draft = Binding($draft) { draftRow(draft) }
+            if let shown = draft {
+                // Not Binding($draft), which force-unwraps: save and cancel clear the
+                // draft while its fields still read it, and that read traps.
+                draftRow(Binding(get: { draft ?? shown }, set: { if draft != nil { draft = $0 } }))
+            }
             if settings.meetingHooks.isEmpty, draft == nil {
                 Text("no hooks yet")
                     .font(Square.mono(12))
