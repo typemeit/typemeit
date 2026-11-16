@@ -9,7 +9,11 @@ import Observation
 final class ClaudeLive {
     static let shared = ClaudeLive()
 
-    struct Run {
+    /// Its own observable, so a line streamed into one run redraws only
+    /// the views showing that run; `runs` changes only when a run starts.
+    @MainActor
+    @Observable
+    final class Run {
         let prompt: String
         let started = Date()
         var lines: [SquareClaudeLine] = []
@@ -17,6 +21,8 @@ final class ClaudeLive {
         var sessionID: String?
         var seconds: Int?
         var failed = false
+
+        init(prompt: String) { self.prompt = prompt }
     }
 
     private(set) var runs: [UUID: Run] = [:]
@@ -36,7 +42,7 @@ final class ClaudeLive {
     }
 
     func apply(_ event: ClaudeStream.Event, to id: UUID) {
-        guard var run = runs[id] else { return }
+        guard let run = runs[id] else { return }
         switch event {
         case .started(let model, let sessionID):
             run.model = model
@@ -49,7 +55,6 @@ final class ClaudeLive {
             run.seconds = seconds
             run.failed = failed
         }
-        runs[id] = run
     }
 
     /// The tools `id`'s run called, to keep with its answer; nil for none.

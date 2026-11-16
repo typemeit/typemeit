@@ -18,26 +18,30 @@ struct ClaudeRunOutput: View {
     var kept: Kept?
     /// The meeting the run was on, which continuing in Claude names.
     var meeting: UUID?
+    /// Puts the answer first, with the prompt folded away beside the tool calls.
+    var foldsPrompt = false
     @State private var live = ClaudeLive.shared
 
     var body: some View {
         if let run = live.runs[id] {
             let running = live.running.contains(id)
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let seconds = run.seconds ?? Int(context.date.timeIntervalSince(run.started))
-                let failed = run.failed || (!running && kept?.failed == true)
-                SquareClaudeThread(lines: [.prompt(run.prompt)] + run.lines + (failed && !run.lines.contains(where: Self.isText) ? kept.map { [.error($0.answer)] } ?? [] : []),
-                                   status: running ? .running : failed ? .failed : .done,
-                                   footer: ([running ? nil : ranLabel, running || !failed ? nil : "failed", "\(seconds) s", run.model].compactMap { $0 }).joined(separator: " · "),
-                                   sessionID: run.sessionID,
-                                   openInClaude: openInClaude(run.sessionID),
-                                   stop: { live.cancel(id) })
-            }
+            let failed = run.failed || (!running && kept?.failed == true)
+            // While it runs the thread counts the seconds itself, so only its footer redraws each second.
+            let seconds = running ? nil : run.seconds ?? Int(Date().timeIntervalSince(run.started))
+            SquareClaudeThread(lines: [.prompt(run.prompt)] + run.lines + (failed && !run.lines.contains(where: Self.isText) ? kept.map { [.error($0.answer)] } ?? [] : []),
+                               status: running ? .running : failed ? .failed : .done,
+                               footer: ([running ? nil : ranLabel, running || !failed ? nil : "failed", seconds.map { "\($0) s" }, run.model].compactMap { $0 }).joined(separator: " · "),
+                               runningSince: running ? run.started : nil,
+                               foldsPrompt: foldsPrompt,
+                               sessionID: run.sessionID,
+                               openInClaude: openInClaude(run.sessionID),
+                               stop: { live.cancel(id) })
         } else if let kept {
             SquareClaudeThread(lines: [.prompt(kept.prompt)] + (kept.calls ?? []).map { .call($0.name, result: $0.result) }
                                    + [kept.failed ? .error(kept.answer) : .text(kept.answer)],
                                status: kept.failed ? .failed : .done,
                                footer: [ranLabel, kept.failed ? "failed" : nil].compactMap { $0 }.joined(separator: " · "),
+                               foldsPrompt: foldsPrompt,
                                sessionID: kept.sessionID,
                                openInClaude: openInClaude(kept.sessionID))
         }
