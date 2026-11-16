@@ -1581,6 +1581,76 @@
       "id": "KoljaB/RealtimeVAD",
       "date": "2026-11-15",
       "role": "voice activity detection"
+    },
+    {
+      "id": "Kyudan/eDIAR (arXiv 2611.18529)",
+      "date": "2026-11-16",
+      "role": "Diarization"
+    },
+    {
+      "id": "charcot-ai/marimba",
+      "date": "2026-11-16",
+      "role": "Turn-taking / VAD classifier"
+    },
+    {
+      "id": "ggml-org/higgs-audio-v3-stt-GGUF",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "prithivMLmods/higgs-audio-v3-stt-GGUF",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "ggml-org/VibeVoice-ASR-GGUF",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "antoinedebroye/parakeet-ultra-0.6b-onnx",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "nahcmon/fluid-speech-pro-swiftlet-4bit",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "FluidVoice-Labs/fluid-speech-pro-gguf",
+      "date": "2026-11-16",
+      "role": "Speech recognition"
+    },
+    {
+      "id": "leohuang2013/pyannote-audio_overlapped-speech-detection_cpp",
+      "date": "2026-11-16",
+      "role": "Diarization"
+    },
+    {
+      "id": "Murf AI Finch-1 (eval reference)",
+      "date": "2026-11-16",
+      "role": "Eval reference"
+    },
+    {
+      "id": "Cartesia Ink-2 (eval reference)",
+      "date": "2026-11-16",
+      "role": "Eval reference"
+    },
+    {
+      "id": "Amazon Transcribe Streaming (eval reference)",
+      "date": "2026-11-16",
+      "role": "Eval reference"
+    },
+    {
+      "id": "Fish Audio Transcribe Stream 1 (eval reference)",
+      "date": "2026-11-16",
+      "role": "Eval reference"
+    },
+    {
+      "id": "Gradium Speech-to-Text Streaming (eval reference)",
+      "date": "2026-11-16",
+      "role": "Eval reference"
     }
   ]
 }
