@@ -293,11 +293,7 @@ struct MeetingPage: View {
                        picked: Binding(get: { picked }, set: { hookTab = lines[$0].name })) {
                 hookTabEnd(lines[picked])
             } content: { index in
-                ViewThatFits(in: .vertical) {
-                    hookOutput(lines[index]).padding(14)
-                    ScrollView { hookOutput(lines[index]).padding(14) }
-                }
-                .frame(maxHeight: MeetingPage.hookOutputHeight)
+                HookPanelScroll(maxHeight: MeetingPage.hookOutputHeight) { hookOutput(lines[index]).padding(14) }
             }
             .padding(.top, 26)
         }
@@ -320,9 +316,28 @@ struct MeetingPage: View {
     private func hookOutput(_ line: HookLine) -> some View {
         ClaudeRunOutput(id: line.id, kept: line.run.map {
             .init(prompt: $0.prompt, answer: $0.output, failed: $0.failed, sessionID: $0.sessionID, calls: $0.calls, ranAt: $0.ranAt)
-        }, meeting: meeting.id)
+        }, meeting: meeting.id, foldsPrompt: true)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A hook's output at its own height up to `maxHeight`, scrolling past
+    /// it. One copy of the output, measured, where `ViewThatFits` built and
+    /// measured two; the height is its own state so a change to it redraws
+    /// this panel and not the page.
+    private struct HookPanelScroll<Content: View>: View {
+        let maxHeight: CGFloat
+        @ViewBuilder var content: () -> Content
+        @State private var height: CGFloat = 0
+
+        var body: some View {
+            ScrollView {
+                content().onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            }
+            // A panel that fits passes the wheel on to the page.
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(height, maxHeight))
+        }
     }
 
     /// A hook's latest run on the meeting, its run going on now, or a hook
