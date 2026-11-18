@@ -245,6 +245,11 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// Speakers the user merged into others, as they were, so a merge can
     /// be split again. Nil when nothing is merged.
     var mergedSpeakers: [Speaker]? = nil
+    /// Speakers the user removed, a voice in the background, and the
+    /// paragraphs that were theirs, so a removal can be undone. Nil when
+    /// nothing is removed.
+    var removedSpeakers: [Speaker]? = nil
+    var removedParagraphs: [Paragraph]? = nil
     /// The questions offered to Claude Code during the meeting. Nil when none.
     var questions: [Question]? = nil
     /// The hooks run on the meeting since it ended. Nil when none.
