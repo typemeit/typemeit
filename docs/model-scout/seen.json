@@ -1651,6 +1651,49 @@
       "id": "Gradium Speech-to-Text Streaming (eval reference)",
       "date": "2026-11-16",
       "role": "Eval reference"
+    },
+    {
+      "id": "AssemblyAI-STT-3.7 (assemblyai-stt-3-7) (eval reference)",
+      "date": "2026-11-18",
+      "role": "eval reference",
+      "pick": true
+    },
+    {
+      "id": "Lucasgitguy-co/LvW-Dictate-1.5B",
+      "date": "2026-11-18",
+      "role": "clean-up",
+      "pick": true
+    },
+    {
+      "id": "Lucasgitguy-co/Fleet-Clean-0.36B",
+      "date": "2026-11-18",
+      "role": "clean-up",
+      "pick": true
+    },
+    {
+      "id": "ishiki-labs/ishiki-asr-0.5",
+      "date": "2026-11-18",
+      "role": "speech recognition"
+    },
+    {
+      "id": "CobuildX-AI/cbx-healthcare-speech-to-text-0.6B",
+      "date": "2026-11-18",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Lucasgitguy-co/Fleet-2",
+      "date": "2026-11-18",
+      "role": "speech recognition"
+    },
+    {
+      "id": "arXiv 2611.19160 (lost speakers in Nemotron-3 diarization)",
+      "date": "2026-11-18",
+      "role": "diarization"
+    },
+    {
+      "id": "rebreda/starbright-en",
+      "date": "2026-11-18",
+      "role": "speech recognition"
     }
   ]
 }
