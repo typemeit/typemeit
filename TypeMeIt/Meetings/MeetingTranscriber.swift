@@ -147,8 +147,10 @@ enum MeetingTranscriber {
             if Task.isCancelled { throw Failure.cancelled }
             meeting.transcription.speakersMs = (ContinuousClock.now - speakersBegan).milliseconds
             let spans = meeting.dictations.map { Meeting.Span(startMs: $0.startMs, endMs: $0.endMs) }
-            // New paragraphs carry no merges, so nothing is left to split.
+            // New paragraphs carry no merges or removals, so nothing is left to undo.
             meeting.mergedSpeakers = nil
+            meeting.removedSpeakers = nil
+            meeting.removedParagraphs = nil
             meeting.paragraphs = TranscriptMerge.paragraphs(
                 tracks: trackWords, segments: segments, micSegments: room?.segments, dictations: spans, gap: .seconds(Fixed.meetingParagraphGapSeconds))
             // A word the segments did not reach keeps its track's label; that

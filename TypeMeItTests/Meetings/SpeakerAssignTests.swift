@@ -114,17 +114,18 @@ struct SpeakerAssignTests {
     @Test func emptyTheFieldNumbersTheCallsNamesThenPastPeopleAndTheUser() {
         let past = [SpeakerAssign.Person(name: "Edie O'Neill", calls: 6), SpeakerAssign.Person(name: "Cora Jensen", calls: 2)]
         let options = SpeakerAssign.options(for: "r2", in: call(), query: "", past: past)
-        #expect(options.map(\.label) == ["Ada Rowe", "Alma Lund", "Nils Shaw", "Edie O'Neill", "Cora Jensen", "that's me"])
-        #expect(options.map(\.key) == [1, 2, 3, nil, nil, nil])
+        #expect(options.map(\.label) == ["Ada Rowe", "Alma Lund", "Nils Shaw", "Edie O'Neill", "Cora Jensen", "that's me", "remove"])
+        #expect(options.map(\.key) == [1, 2, 3, nil, nil, nil, nil])
         #expect(options[3].detail == "6 calls")
         #expect(options[5].detail == "merge into You")
+        #expect(options[6].detail == "0 lines")
     }
 
     @Test func theVoiceMatchComesFirstAndTheCallsNamesKeepTheirKeys() {
         let options = SpeakerAssign.options(for: "r2", in: call(), query: "", past: [], voice: "Nils Shaw")
-        #expect(options.map(\.label) == ["Nils Shaw", "Ada Rowe", "Alma Lund", "that's me"])
-        #expect(options.map(\.group) == [.voice, .call, .call, .other])
-        #expect(options.map(\.key) == [nil, 1, 2, nil])
+        #expect(options.map(\.label) == ["Nils Shaw", "Ada Rowe", "Alma Lund", "that's me", "remove"])
+        #expect(options.map(\.group) == [.voice, .call, .call, .other, .other])
+        #expect(options.map(\.key) == [nil, 1, 2, nil, nil])
         #expect(SpeakerAssign.options(for: "r2", in: call(), query: "al", past: [], voice: "Nils Shaw").map(\.label) == ["Alma Lund", "use “al”"])
     }
 
@@ -145,7 +146,7 @@ struct SpeakerAssignTests {
 
     @Test func aSpeakersOwnNameIsNotOffered() {
         let named = SpeakerAssign.apply(.name("Nils Shaw"), to: "r3", in: call())
-        #expect(SpeakerAssign.options(for: "r3", in: named, query: "", past: []).map(\.label) == ["Ada Rowe", "Alma Lund", "that's me"])
+        #expect(SpeakerAssign.options(for: "r3", in: named, query: "", past: []).map(\.label) == ["Ada Rowe", "Alma Lund", "that's me", "remove"])
     }
 
     @Test func typingOffersWhatWasTypedLast() {
@@ -209,6 +210,33 @@ struct SpeakerAssignTests {
         let back = SpeakerAssign.split("r2", in: c)
         #expect(back.paragraphs.map(\.speaker) == ["r3", "r2", "r3"])
         #expect(SpeakerAssign.mergedInto("r3", in: back).map(\.id) == ["r1"])
+    }
+
+    @Test func aBackgroundVoiceIsRemovedAndRestoredInPlace() {
+        let start = call(paragraphs: [paragraph("r1", 0, 1_000, "a"), paragraph("r2", 1_000, 2_000, "b"), paragraph("r1", 2_000, 3_000, "c"), paragraph("r2", 3_000, 4_000, "d")])
+        let options = SpeakerAssign.options(for: "r2", in: start, query: "rem", past: [])
+        #expect(options.map(\.label) == ["remove", "use “rem”"])
+        #expect(options.first == SpeakerAssign.Option(choice: .remove, label: "remove", group: .other, detail: "2 lines"))
+        #expect(SpeakerAssign.options(for: "r2", in: start, query: "remove", past: []).map(\.choice) == [.remove])
+        let removed = SpeakerAssign.apply(.remove, to: "r2", in: start)
+        #expect(removed.speakers.map(\.id) == ["you", "r1", "r3"])
+        #expect(removed.paragraphs.map(\.text) == ["a", "c"])
+        #expect(removed.removedSpeakers?.map(\.id) == ["r2"])
+        let restored = SpeakerAssign.apply(.restore, to: "r2", in: removed)
+        #expect(restored.speakers.map(\.id) == ["you", "r1", "r3", "r2"])
+        #expect(restored.paragraphs == start.paragraphs)
+        #expect(restored.removedSpeakers == nil)
+        #expect(restored.removedParagraphs == nil)
+    }
+
+    @Test func youAreNotOfferedForRemoval() {
+        #expect(SpeakerAssign.options(for: "you", in: call(), query: "remove", past: []).map(\.choice) == [.name("remove")])
+    }
+
+    @Test func removingTheLastUnknownVoiceNamesTheOneLeft() {
+        let m = call(roster: ["Max Mitchell", "Ada Rowe"], speakers: [speaker("you", "You", you: true), speaker("r1", "Speaker 2"), speaker("r2", "Speaker 3")])
+        let removed = SpeakerAssign.apply(.remove, to: "r2", in: m)
+        #expect(removed.speakers.map(\.name) == ["You", "Ada Rowe"])
     }
 
     @Test func thatsMeMergesIntoYou() {

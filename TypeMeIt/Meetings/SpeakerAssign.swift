@@ -170,6 +170,10 @@ enum SpeakerAssign {
         case me
         /// Takes a speaker merged into this one back out.
         case split(String)
+        /// Takes the speaker and its paragraphs out of the transcript.
+        case remove
+        /// Puts a removed speaker back.
+        case restore
     }
 
     struct Option: Equatable, Sendable {
@@ -185,7 +189,7 @@ enum SpeakerAssign {
     /// What the name field offers for `id`: the name its voice matches
     /// (`VoiceNames`, 8.7), the call's names not yet given, people from past
     /// meetings, the speakers already named (to merge), the user, what was
-    /// typed, and the speakers merged into it (to split).
+    /// removing it, what was typed, and the speakers merged into it (to split).
     static func options(for id: String, in meeting: Meeting, query: String, past: [Person], voice: String? = nil) -> [Option] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         let matches = { (name: String) in
@@ -213,6 +217,9 @@ enum SpeakerAssign {
         if you?.id != id, q.isEmpty || "that's me".hasPrefix(q) || q == "me" {
             out.append(Option(choice: .me, label: "that's me", group: .other, detail: you == nil ? "" : "merge into You"))
         }
+        if meeting.speakers.contains(where: { $0.id == id && !$0.isYou }), q.isEmpty || removeLabel.hasPrefix(q) {
+            out.append(Option(choice: .remove, label: removeLabel, group: .other, detail: counted(meeting.paragraphs.filter { $0.speaker == id }.count, "line")))
+        }
         if !q.isEmpty, !"that's me".hasPrefix(q), q != "me", !out.contains(where: { $0.label.lowercased() == q }) {
             let typed = query.trimmingCharacters(in: .whitespaces)
             out.append(Option(choice: .name(typed), label: "use “\(typed)”", group: .other))
@@ -225,6 +232,8 @@ enum SpeakerAssign {
         return out
     }
 
+    static let removeLabel = "remove"
+
     // MARK: Choosing
 
     /// The meeting with `id` given `choice`. A name another speaker already
@@ -233,10 +242,15 @@ enum SpeakerAssign {
     /// that speaker takes it.
     static func apply(_ choice: Choice, to id: String, in meeting: Meeting) -> Meeting {
         var m = meeting
+        if choice == .restore { return restore(id, in: m) }
         guard let i = m.speakers.firstIndex(where: { $0.id == id }) else { return m }
         switch choice {
         case .split(let merged):
             return split(merged, in: m)
+        case .restore:
+            return m
+        case .remove:
+            m = remove(id, in: m)
         case .me:
             if let you = m.speakers.first(where: { $0.isYou && $0.id != id }) {
                 m = merge(id, into: you.id, in: m)
@@ -303,6 +317,35 @@ enum SpeakerAssign {
             m.paragraphs[k].mergedFrom = nil
         }
         m.speakers.append(kept)
+        return m
+    }
+
+    /// `id` and its paragraphs set aside, out of the transcript, so `restore`
+    /// can put them back.
+    static func remove(_ id: String, in meeting: Meeting) -> Meeting {
+        var m = meeting
+        guard let speaker = m.speakers.first(where: { $0.id == id }) else { return m }
+        m.speakers.removeAll { $0.id == id }
+        m.removedSpeakers = (m.removedSpeakers ?? []) + [speaker]
+        m.removedParagraphs = (m.removedParagraphs ?? []) + m.paragraphs.filter { $0.speaker == id }
+        m.paragraphs.removeAll { $0.speaker == id }
+        return m
+    }
+
+    /// A removed speaker back in the list, each of its paragraphs before the
+    /// first that starts after it, the others left in their order.
+    static func restore(_ id: String, in meeting: Meeting) -> Meeting {
+        var m = meeting
+        guard let speaker = m.removedSpeakers?.first(where: { $0.id == id }) else { return m }
+        m.removedSpeakers?.removeAll { $0.id == id }
+        if m.removedSpeakers?.isEmpty == true { m.removedSpeakers = nil }
+        let back = m.removedParagraphs?.filter { $0.speaker == id } ?? []
+        m.removedParagraphs?.removeAll { $0.speaker == id }
+        if m.removedParagraphs?.isEmpty == true { m.removedParagraphs = nil }
+        for paragraph in back {
+            m.paragraphs.insert(paragraph, at: m.paragraphs.firstIndex { $0.startMs > paragraph.startMs } ?? m.paragraphs.endIndex)
+        }
+        m.speakers.append(speaker)
         return m
     }
 }

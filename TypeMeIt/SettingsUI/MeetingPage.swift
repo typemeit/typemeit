@@ -521,7 +521,25 @@ struct MeetingPage: View {
                 }
                 .onChange(of: name) { old, new in typed(old, new) }
             }
-            SquareSubhead(text: "where", first: meeting.speakers.isEmpty)
+            if let removed = meeting.removedSpeakers {
+                SquareSubhead(text: "removed", first: meeting.speakers.isEmpty)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(removed) { speaker in
+                        Button { _ = store.assign(.restore, to: speaker.id, in: meeting.id) } label: {
+                            Text(speaker.name)
+                                .font(Square.mono(12))
+                                .strikethrough()
+                                .foregroundStyle(DesignTokens.Colors.ink3)
+                                .lineLimit(1)
+                                .frame(minHeight: MeetingPage.nameHeight)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("restore")
+                    }
+                }
+            }
+            SquareSubhead(text: "where", first: meeting.speakers.isEmpty && meeting.removedSpeakers == nil)
             Text(whereLine)
                 .font(Square.mono(12))
                 .foregroundStyle(DesignTokens.Colors.ink)
