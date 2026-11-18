@@ -74,30 +74,51 @@ enum RoomVoices {
         }
     }
 
-    /// The user is the voice that is not echo: the one least under
-    /// `othersLit`, the tiles of other people lit while the far end was
-    /// silent, when there are any; else the loudest. Every other voice that
-    /// is not echo becomes `r1`, `r2`…. Nil when fewer than two voices are
-    /// left, so the mic stays `you` as before.
+    /// Which mic voices the user's learned voice says are theirs: a voice
+    /// whose likeliest person is `user` is theirs, a voice whose likeliest
+    /// person is anyone else is not. `posteriors` holds each voice with
+    /// enough clips to judge, as `VoiceNames.Model.posterior` gives it.
+    /// Empty unless some voice is the user at `sure` or more, so a call
+    /// where the user's voice is not recognised is left to `split`'s other rules.
     ///
-    /// The lit tiles come first because a loudspeaker beside the mic can be
-    /// louder than the user: on the 6 November Meet with the far-end track
-    /// silent, the loudest voice was under the other person's tile 93% of
-    /// its time.
-    static func split(_ segments: [SpeakerSegment], echo: Set<String>, loudness: [String: Float], othersLit: [MeetingNames.Span] = []) -> Split? {
+    /// On 117 kept calls, each judged by a model trained on the others, the
+    /// mic voice labelled You was the user at 0.8 or more on 111. On the
+    /// five below 0.5 it was the user mixed with someone beside them: 15 of
+    /// 44 clips were the user's on one, 6 of 56 on another.
+    static func heardAsUser(_ posteriors: [String: [String: Float]], user: String, sure: Float) -> [String: Bool] {
+        guard posteriors.values.contains(where: { ($0[user] ?? 0) >= sure }) else { return [:] }
+        return posteriors.mapValues { posterior in posterior.max { $0.value < $1.value }?.key == user }
+    }
+
+    /// The user is the voice that is not echo: every voice `heardAsUser`
+    /// says is theirs, and any voice it did not judge, when it judged any;
+    /// else the one least under `othersLit`, the tiles of other people lit
+    /// while the far end was silent, when there are any; else the loudest.
+    /// Every other voice that is not echo becomes `r1`, `r2`…. Nil when no
+    /// voice is left beside the user, so the mic stays `you` as before.
+    ///
+    /// The lit tiles come before loudness because a loudspeaker beside the
+    /// mic can be louder than the user: on the 6 November Meet with the
+    /// far-end track silent, the loudest voice was under the other person's
+    /// tile 93% of its time.
+    static func split(_ segments: [SpeakerSegment], echo: Set<String>, loudness: [String: Float], othersLit: [MeetingNames.Span] = [],
+                      heardAsUser: [String: Bool] = [:]) -> Split? {
         var order: [String] = []
         for segment in segments.sorted(by: { $0.startMs < $1.startMs }) where !echo.contains(segment.speaker) && !order.contains(segment.speaker) {
             order.append(segment.speaker)
         }
         guard order.count >= 2 else { return nil }
-        let user: String
-        if othersLit.isEmpty {
-            user = order.max { (loudness[$0] ?? 0) < (loudness[$1] ?? 0) }!
+        let user: Set<String>
+        if !heardAsUser.isEmpty {
+            user = Set(order.filter { heardAsUser[$0] != false })
+        } else if othersLit.isEmpty {
+            user = [order.max { (loudness[$0] ?? 0) < (loudness[$1] ?? 0) }!]
         } else {
             let litShare = share(segments, under: othersLit)
-            user = order.min { (litShare[$0] ?? 0) < (litShare[$1] ?? 0) }!
+            user = [order.min { (litShare[$0] ?? 0) < (litShare[$1] ?? 0) }!]
         }
-        let others = order.filter { $0 != user }
+        let others = order.filter { !user.contains($0) }
+        guard !others.isEmpty else { return nil }
         let ids = Dictionary(uniqueKeysWithValues: others.enumerated().map { ($1, "\(idPrefix)\($0 + 1)") })
         return Split(
             segments: segments.map { SpeakerSegment(speaker: ids[$0.speaker] ?? Meeting.Speaker.you, startMs: $0.startMs, endMs: $0.endMs) },
