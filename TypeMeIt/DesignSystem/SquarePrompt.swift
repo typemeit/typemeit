@@ -198,9 +198,9 @@ struct SquarePromptSpecimen: View {
             SquareAskPillSpecimen(question: "what did we agree about moving the launch date if the pricing page isn't signed off by the end of next week?")
             SquareAskPillSpecimen(question: "who owns the rollout?", queues: true)
             group("meetings")
-            SquarePrompt(mark: .icon("akar-people-group"), message: Text("record this meeting?"), dismiss: "not now") {
-                Button("record") {}.buttonStyle(SquareButtonStyle(kind: .primary))
-            }
+            SquareMeetingPromptSpecimen(calls: [])
+            SquareMeetingPromptSpecimen(calls: ["meet.google.com/abc-defg-hij"])
+            SquareMeetingPromptSpecimen(calls: ["meet.google.com/abc-defg-hij", "Design review", "meet.google.com/xyz-wxyz-xyz"])
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("recording again · slack"), dismiss: "dismiss") {
                 Button("stop") {}.buttonStyle(SquareButtonStyle(kind: .primary))
             }
@@ -275,6 +275,34 @@ private struct SquareUndoPromptSpecimen: View {
                 }
                 .buttonStyle(SquareButtonStyle(kind: .primary))
             }
+        }
+    }
+}
+
+/// Record this meeting, by its address when one call is open and from a
+/// list when several are: a pick or record shows it recording, then goes back.
+private struct SquareMeetingPromptSpecimen: View {
+    let calls: [String]
+    @State private var recording: String?
+
+    var body: some View {
+        if let recording {
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text("recording · \(recording)"), dismiss: "dismiss", onDismiss: { self.recording = nil }) {}
+        } else if calls.count > 1 {
+            SquareChoicePrompt(icon: "akar-people-group", question: "which meeting?", choices: calls, verb: "record",
+                               dismiss: "not now", onDismiss: {}, onPick: { show(calls[$0]) })
+        } else {
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text(calls.first ?? "record this meeting?"), dismiss: "not now") {
+                Button("record") { show(calls.first ?? "meeting") }.buttonStyle(SquareButtonStyle(kind: .primary))
+            }
+        }
+    }
+
+    private func show(_ call: String) {
+        recording = call
+        Task {
+            try? await Task.sleep(for: specimenPause)
+            recording = nil
         }
     }
 }

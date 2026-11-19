@@ -26,10 +26,10 @@ struct SquareHookTray: View {
     @State private var find = ""
 
     static let width: CGFloat = 420
-    private static let rowHeight: CGFloat = 30
+    static let rowHeight: CGFloat = 30
     private static let visibleRows = 7
     /// The line number's column, so "all" lines up with the names.
-    fileprivate static let numberWidth: CGFloat = 16
+    static let numberWidth: CGFloat = 16
 
     private let fg = DesignTokens.Colors.onSlab
     private let bg = DesignTokens.Colors.slab
