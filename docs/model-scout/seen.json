@@ -1694,6 +1694,41 @@
       "id": "rebreda/starbright-en",
       "date": "2026-11-18",
       "role": "speech recognition"
+    },
+    {
+      "id": "Reson8/Rumble-2-Flash",
+      "date": "2026-11-19",
+      "role": "speech recognition"
+    },
+    {
+      "id": "opusclip/steno-v1-preview (eval reference)",
+      "date": "2026-11-19",
+      "role": "eval reference"
+    },
+    {
+      "id": "SpeedAudio261119/SpeedASR-v1-65M",
+      "date": "2026-11-19",
+      "role": "speech recognition"
+    },
+    {
+      "id": "microsoft/Aion-1.0-Instruct-2.3B",
+      "date": "2026-11-19",
+      "role": "clean-up"
+    },
+    {
+      "id": "Manifestro/kezek",
+      "date": "2026-11-19",
+      "role": "diarization"
+    },
+    {
+      "id": "Oulasong/ThunderTalk-ASR-0.6B",
+      "date": "2026-11-19",
+      "role": "speech recognition"
+    },
+    {
+      "id": "frankyoujian/EdgeASR",
+      "date": "2026-11-19",
+      "role": "speech recognition"
     }
   ]
 }
