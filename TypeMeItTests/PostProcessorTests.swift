@@ -26,6 +26,22 @@ final class PostProcessorTests: XCTestCase {
         XCTAssertTrue(PostProcessor.lostOpening(transcript: "she said ship it", output: "Ship it."))
     }
 
+    func testScreenTermGuardRejectsAListPastedInPlaceOfWords() {
+        let terms = ["Zentryx", "Kavuu", "PR-1234", "stg_api", "walkthr", "typemeit"]
+        XCTAssertEqual(PostProcessor.addedScreenTerm(
+            transcript: "check the uh sort of login page of zen tricks",
+            output: "Check the Zentryx of Kavuu PR-1234 stg_api walkthr typemeit",
+            screenTerms: terms), "Kavuu")
+    }
+
+    func testScreenTermGuardAllowsATermThatWasSaid() {
+        let terms = ["Zentryx", "kubectl", "typemeit"]
+        XCTAssertNil(PostProcessor.addedScreenTerm(transcript: "restart the centrics cluster", output: "Restart the Zentryx cluster.", screenTerms: terms))
+        XCTAssertNil(PostProcessor.addedScreenTerm(transcript: "don't mention type me it", output: "Don't mention typemeit.", screenTerms: terms))
+        XCTAssertNil(PostProcessor.addedScreenTerm(transcript: "is the Zentryx cluster up", output: "Is the Zentryx cluster up?", screenTerms: terms))
+        XCTAssertNil(PostProcessor.addedScreenTerm(transcript: "it was cold", output: "It was cold.", screenTerms: terms))
+    }
+
     func testGateLeavesPunctuatedAndUnpunctuatedTextToCode() {
         XCTAssertNil(PostProcessor.reasonForModel("It was cold out there.", hints: [], screenTerms: []))
         XCTAssertNil(PostProcessor.reasonForModel("it was cold out there and we left", hints: [], screenTerms: []))
