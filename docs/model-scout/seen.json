@@ -1729,6 +1729,86 @@
       "id": "frankyoujian/EdgeASR",
       "date": "2026-11-19",
       "role": "speech recognition"
+    },
+    {
+      "id": "FluidAudio 0.18.4",
+      "date": "2026-11-20",
+      "role": "speech recognition and diarization runtime"
+    },
+    {
+      "id": "tanzilidrisi/Foreword-29M",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "tarantila/parakeet-ultra-coreai",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "AshBuk/dabri-models",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "struan-assembly/yapp-parakeet-tdt-0.6b-v3",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "spashii/SraVaani-1.0-CoreML",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Kentucky-Open-Science/Rumble-2-Flash-Astral",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "kaptionai/Rumble-2-Flash ports",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "cstr/fluid-speech-pro-GGUF",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "sayzly GGUF ports",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "esigoing/orbit-align-v2",
+      "date": "2026-11-20",
+      "role": "forced alignment"
+    },
+    {
+      "id": "aaimn/aai-asr-nano-v1",
+      "date": "2026-11-20",
+      "role": "speech recognition"
+    },
+    {
+      "id": "Meta Muse Voice Transcribe (eval reference)",
+      "date": "2026-11-20",
+      "role": "eval reference"
+    },
+    {
+      "id": "Google Gemini 3.5 Transcribe (eval reference)",
+      "date": "2026-11-20",
+      "role": "eval reference"
+    },
+    {
+      "id": "AssemblyAI-STT-3.7-Realtime-Agent (eval reference)",
+      "date": "2026-11-20",
+      "role": "eval reference"
+    },
+    {
+      "id": "ElevenLabs Scribe $0.20/h pricing (eval reference)",
+      "date": "2026-11-20",
+      "role": "eval reference"
     }
   ]
 }
