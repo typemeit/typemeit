@@ -33,12 +33,17 @@ key.
 
 ## Not in place
 
-- Nothing on sale. Every `v*` tag since v1.1.1 uploaded its store build, and
-  the listing step then failed: through v1.4.0 on the API key's role (fixed
-  with the secrets of 24 October 2026), and v1.11.0 on 6 November 2026
-  because App Store Connect refuses ⌥ in the promotional text. The listing
-  spells the key "option" since then. Submission of 1.11.0 (build
-  202611062343) goes through `submit-store` below.
+- Nothing on sale yet. 1.11.0 (build 202611062343) has been Waiting for
+  Review since 8 November 2026, submitted by hand in App Store Connect.
+  Every `v*` tag since v1.1.1 had uploaded its store build and then failed
+  at the listing step: through v1.4.0 on the API key's role (fixed with the
+  secrets of 24 October 2026), v1.11.0 on 6 November because App Store
+  Connect refuses ⌥ in the promotional text (the listing spells the key
+  "option" since then), and the `submit-store` re-runs of 8 November
+  because the September review submission was still open with unresolved
+  issues. `fastlane mac submit` cannot replace an open submission; the way
+  through is App Store Connect › App Review › the open submission › Edit
+  on the rejected item › Update Review › Resubmit to App Review.
 
 ## Releasing
 
@@ -97,7 +102,15 @@ Also different in a store build:
 
 ## App Review
 
-Build 1.0.0 (202609231830) was rejected on 27 September 2026 under:
+Submission 8e7c8a5c (opened 23 September 2026) was rejected twice. On 23
+September, build 1.0.0 (202609201109), under:
+
+- 4.2.3(ii): the model download did not say its size or ask first. The
+  onboarding row now shows the size and a download button.
+- 2.1(a): the download's progress bar froze halfway on the reviewer's Mac.
+  The bar now shows received of total and a reconnecting state.
+
+On 27 September, build 1.0.0 (202609231830), under:
 
 - 5.1.1(iv): the screen before the microphone prompt had a "grant" button.
   The press that brings up a permission prompt must read "continue" or
