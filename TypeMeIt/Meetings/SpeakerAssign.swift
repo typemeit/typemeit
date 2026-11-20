@@ -244,7 +244,7 @@ enum SpeakerAssign {
     }
 
     static let removeLabel = "remove"
-    static let backgroundLabel = "background"
+    static let backgroundLabel = "unknown"
 
     // MARK: Choosing
 
