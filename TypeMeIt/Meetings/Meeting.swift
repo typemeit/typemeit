@@ -103,6 +103,21 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         /// while the meeting is transcribed again, so the name goes to the
         /// voice heard there rather than to whoever gets this id next.
         var heard: [Span]? = nil
+        /// True for a voice the user set as background: its lines stay on
+        /// the meeting's page, dimmed, and leave everything read from the
+        /// transcript (`withoutBackground`). Nil for everyone else.
+        var background: Bool? = nil
+    }
+
+    /// The meeting without its background voices and their paragraphs: what
+    /// the transcript file, the summary, hooks, a share and the MCP read.
+    var withoutBackground: Meeting {
+        let background = Set(speakers.filter { $0.background == true }.map(\.id))
+        guard !background.isEmpty else { return self }
+        var m = self
+        m.speakers.removeAll { background.contains($0.id) }
+        m.paragraphs.removeAll { background.contains($0.speaker) }
+        return m
     }
 
     /// The transcript dropped for another pass, each speaker the user named
@@ -300,7 +315,7 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
 
     /// The transcript as plain text, one paragraph per speaker turn.
     var transcriptText: String {
-        paragraphs.map { "\(speakerName($0.speaker)): \($0.text)" }.joined(separator: "\n\n")
+        withoutBackground.paragraphs.map { "\(speakerName($0.speaker)): \($0.text)" }.joined(separator: "\n\n")
     }
 
     func speakerName(_ id: String) -> String {

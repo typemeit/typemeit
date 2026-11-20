@@ -328,7 +328,7 @@ enum MCPTools {
                   let data = try? Data(contentsOf: meetingURL),
                   let meeting = Meeting.decode(data)
             else { continue }
-            results.append(FolderMeeting(folder: entry, meeting: meeting))
+            results.append(FolderMeeting(folder: entry, meeting: meeting.withoutBackground))
         }
         return results.sorted { $0.meeting.started > $1.meeting.started }
     }
