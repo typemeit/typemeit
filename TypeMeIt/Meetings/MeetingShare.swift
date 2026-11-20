@@ -26,7 +26,7 @@ enum MeetingShare {
     /// The file's text. The user's own speaker is named `sender` unless the
     /// user renamed it: in anyone else's copy, "You" is the wrong person.
     static func markdown(_ meeting: Meeting, sender: String) -> String {
-        var shared = meeting
+        var shared = meeting.withoutBackground
         for i in shared.speakers.indices where shared.speakers[i].isYou && shared.speakers[i].nameSource != .user {
             shared.speakers[i].name = sender
         }
