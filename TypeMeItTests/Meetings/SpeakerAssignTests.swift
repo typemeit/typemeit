@@ -114,7 +114,7 @@ struct SpeakerAssignTests {
     @Test func emptyTheFieldNumbersTheCallsNamesThenPastPeopleAndTheUser() {
         let past = [SpeakerAssign.Person(name: "Edie O'Neill", calls: 6), SpeakerAssign.Person(name: "Cora Jensen", calls: 2)]
         let options = SpeakerAssign.options(for: "r2", in: call(), query: "", past: past)
-        #expect(options.map(\.label) == ["Ada Rowe", "Alma Lund", "Nils Shaw", "Edie O'Neill", "Cora Jensen", "that's me", "background", "remove"])
+        #expect(options.map(\.label) == ["Ada Rowe", "Alma Lund", "Nils Shaw", "Edie O'Neill", "Cora Jensen", "that's me", "unknown", "remove"])
         #expect(options.map(\.key) == [1, 2, 3, nil, nil, nil, nil, nil])
         #expect(options[3].detail == "6 calls")
         #expect(options[5].detail == "merge into You")
@@ -123,7 +123,7 @@ struct SpeakerAssignTests {
 
     @Test func theVoiceMatchComesFirstAndTheCallsNamesKeepTheirKeys() {
         let options = SpeakerAssign.options(for: "r2", in: call(), query: "", past: [], voice: "Nils Shaw")
-        #expect(options.map(\.label) == ["Nils Shaw", "Ada Rowe", "Alma Lund", "that's me", "background", "remove"])
+        #expect(options.map(\.label) == ["Nils Shaw", "Ada Rowe", "Alma Lund", "that's me", "unknown", "remove"])
         #expect(options.map(\.group) == [.voice, .call, .call, .other, .other, .other])
         #expect(options.map(\.key) == [nil, 1, 2, nil, nil, nil])
         #expect(SpeakerAssign.options(for: "r2", in: call(), query: "al", past: [], voice: "Nils Shaw").map(\.label) == ["Alma Lund", "use “al”"])
@@ -146,7 +146,7 @@ struct SpeakerAssignTests {
 
     @Test func aSpeakersOwnNameIsNotOffered() {
         let named = SpeakerAssign.apply(.name("Nils Shaw"), to: "r3", in: call())
-        #expect(SpeakerAssign.options(for: "r3", in: named, query: "", past: []).map(\.label) == ["Ada Rowe", "Alma Lund", "that's me", "background", "remove"])
+        #expect(SpeakerAssign.options(for: "r3", in: named, query: "", past: []).map(\.label) == ["Ada Rowe", "Alma Lund", "that's me", "unknown", "remove"])
     }
 
     @Test func typingOffersWhatWasTypedLast() {
@@ -231,8 +231,8 @@ struct SpeakerAssignTests {
 
     @Test func aBackgroundVoiceKeepsItsLinesOutOfTheTranscript() {
         let start = call(paragraphs: [paragraph("r1", 0, 1_000, "a"), paragraph("r2", 1_000, 2_000, "b"), paragraph("r1", 2_000, 3_000, "c")])
-        let options = SpeakerAssign.options(for: "r2", in: start, query: "back", past: [])
-        #expect(options.first == SpeakerAssign.Option(choice: .background, label: "background", group: .other, detail: "1 line"))
+        let options = SpeakerAssign.options(for: "r2", in: start, query: "unk", past: [])
+        #expect(options.first == SpeakerAssign.Option(choice: .background, label: "unknown", group: .other, detail: "1 line"))
         let set = SpeakerAssign.apply(.background, to: "r2", in: start)
         #expect(set.paragraphs == start.paragraphs)
         #expect(set.speakers.filter { $0.background == true }.map(\.id) == ["r2"])

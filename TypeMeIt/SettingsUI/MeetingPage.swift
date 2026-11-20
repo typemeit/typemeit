@@ -522,8 +522,8 @@ struct MeetingPage: View {
                 .onChange(of: name) { old, new in typed(old, new) }
             }
             if !backgroundVoices.isEmpty {
-                SquareSubhead(text: "background", first: people.isEmpty)
-                setAside(backgroundVoices, struck: false, choice: .foreground, help: "not background")
+                SquareSubhead(text: SpeakerAssign.backgroundLabel, first: people.isEmpty)
+                setAside(backgroundVoices, struck: false, choice: .foreground, help: "not unknown")
             }
             if let removed = meeting.removedSpeakers {
                 SquareSubhead(text: "removed", first: meeting.speakers.isEmpty)
