@@ -511,33 +511,23 @@ struct MeetingPage: View {
 
     private var rail: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !meeting.speakers.isEmpty {
+            if !people.isEmpty {
                 let fingerprint = meeting.fingerprint
                 SquareSubhead(text: "people", first: true)
                 VStack(spacing: 8) {
-                    ForEach(meeting.speakers) { speaker in
+                    ForEach(people) { speaker in
                         person(speaker, colour: fingerprint?.tone(ofSpeaker: speaker.id).map(SquareFingerprint.colour) ?? DesignTokens.Colors.ink)
                     }
                 }
                 .onChange(of: name) { old, new in typed(old, new) }
             }
+            if !backgroundVoices.isEmpty {
+                SquareSubhead(text: SpeakerAssign.backgroundLabel, first: people.isEmpty)
+                setAside(backgroundVoices, struck: false, choice: .foreground, help: "not unknown")
+            }
             if let removed = meeting.removedSpeakers {
                 SquareSubhead(text: "removed", first: meeting.speakers.isEmpty)
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(removed) { speaker in
-                        Button { _ = store.assign(.restore, to: speaker.id, in: meeting.id) } label: {
-                            Text(speaker.name)
-                                .font(Square.mono(12))
-                                .strikethrough()
-                                .foregroundStyle(DesignTokens.Colors.ink3)
-                                .lineLimit(1)
-                                .frame(minHeight: MeetingPage.nameHeight)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("restore")
-                    }
-                }
+                setAside(removed, struck: true, choice: .restore, help: "restore")
             }
             SquareSubhead(text: "where", first: meeting.speakers.isEmpty && meeting.removedSpeakers == nil)
             Text(whereLine)
@@ -572,12 +562,35 @@ struct MeetingPage: View {
 
     private static let nameHeight: CGFloat = 20
 
+    /// The speakers in the people list: everyone but the background voices.
+    private var people: [Meeting.Speaker] { meeting.speakers.filter { $0.background != true } }
+    private var backgroundVoices: [Meeting.Speaker] { meeting.speakers.filter { $0.background == true } }
+
+    /// Names set aside from the people list, each a button that puts it back.
+    private func setAside(_ speakers: [Meeting.Speaker], struck: Bool, choice: SpeakerAssign.Choice, help: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(speakers) { speaker in
+                Button { _ = store.assign(choice, to: speaker.id, in: meeting.id) } label: {
+                    Text(speaker.name)
+                        .font(Square.mono(12))
+                        .strikethrough(struck)
+                        .foregroundStyle(DesignTokens.Colors.ink3)
+                        .lineLimit(1)
+                        .frame(minHeight: MeetingPage.nameHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(help)
+            }
+        }
+    }
+
     /// A speaker, how much of the talking they did in their fingerprint
     /// colour, and its name. An unknown speaker's name, or any name while the
     /// page is edited, is a field; a click opens it, plays the speaker, and
     /// lists names to give it.
     private func person(_ speaker: Meeting.Speaker, colour: Color) -> some View {
-        let total = max(1, meeting.speakers.reduce(0) { $0 + $1.talkMs })
+        let total = max(1, people.reduce(0) { $0 + $1.talkMs })
         let share = Double(speaker.talkMs) / Double(total)
         let unknown = SpeakerAssign.isUnknown(speaker)
         return VStack(alignment: .leading, spacing: 4) {
@@ -905,7 +918,8 @@ private struct MeetingTranscript: View {
             Text(text)
                 .font(Square.sans(14))
                 .lineSpacing(5)
-                .foregroundStyle(current.map(row.contains) == true ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
+                .foregroundStyle(isBackground(paragraph.speaker) ? DesignTokens.Colors.ink3
+                                 : current.map(row.contains) == true ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -957,11 +971,15 @@ private struct MeetingTranscript: View {
         let unknown = meeting.speakers.first { $0.id == id }.map(SpeakerAssign.isUnknown) ?? false
         return Text(SpeakerAssign.firstName(of: id, in: meeting))
             .font(Square.mono(12, weight: .medium))
-            .foregroundStyle(open ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink)
+            .foregroundStyle(open ? DesignTokens.Colors.onSlab : isBackground(id) ? DesignTokens.Colors.ink3 : DesignTokens.Colors.ink)
             .lineLimit(1)
             .padding(.horizontal, 4)
             .background(open ? DesignTokens.Colors.slab : unknown ? DesignTokens.Colors.inkA08 : .clear)
             .padding(.horizontal, -4)
+    }
+
+    private func isBackground(_ id: String) -> Bool {
+        meeting.speakers.first { $0.id == id }?.background == true
     }
 
     private func marked(_ text: String, paragraph: Int) -> AttributedString {

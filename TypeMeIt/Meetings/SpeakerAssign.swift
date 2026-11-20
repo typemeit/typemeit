@@ -32,8 +32,9 @@ enum SpeakerAssign {
         !speaker.isYou && speaker.id != Meeting.Speaker.room && (speaker.nameSource == nil || Meeting.Speaker.isPlaceholder(speaker.name))
     }
 
+    /// The unknown speakers left to name: a background voice needs no name.
     static func unknown(in meeting: Meeting) -> [Meeting.Speaker] {
-        meeting.speakers.filter(isUnknown)
+        meeting.speakers.filter { isUnknown($0) && $0.background != true }
     }
 
     /// The speaker's first name: "Ana". "Ana R." when another speaker is
@@ -59,7 +60,7 @@ enum SpeakerAssign {
         for step in 1...order.count {
             let i = ((start + (backwards ? -step : step)) % order.count + order.count) % order.count
             let speaker = meeting.speakers[i]
-            if speaker.id != id, isUnknown(speaker) { return speaker.id }
+            if speaker.id != id, isUnknown(speaker), speaker.background != true { return speaker.id }
         }
         return nil
     }
@@ -174,6 +175,10 @@ enum SpeakerAssign {
         case remove
         /// Puts a removed speaker back.
         case restore
+        /// Keeps the speaker's lines, dimmed, out of what reads the transcript.
+        case background
+        /// Puts a background voice back among the people.
+        case foreground
     }
 
     struct Option: Equatable, Sendable {
@@ -188,8 +193,8 @@ enum SpeakerAssign {
 
     /// What the name field offers for `id`: the name its voice matches
     /// (`VoiceNames`, 8.7), the call's names not yet given, people from past
-    /// meetings, the speakers already named (to merge), the user, what was
-    /// removing it, what was typed, and the speakers merged into it (to split).
+    /// meetings, the speakers already named (to merge), the user, setting it
+    /// as background, removing it, what was typed, and the speakers merged into it (to split).
     static func options(for id: String, in meeting: Meeting, query: String, past: [Person], voice: String? = nil) -> [Option] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         let matches = { (name: String) in
@@ -210,15 +215,21 @@ enum SpeakerAssign {
         for person in past.filter({ !used.contains($0.name.lowercased()) && matches($0.name) }).prefix(q.isEmpty ? pastShown : pastMatched) {
             out.append(Option(choice: .name(person.name), label: person.name, group: .past, detail: counted(person.calls, "call")))
         }
-        for speaker in meeting.speakers where speaker.id != id && !speaker.isYou && !isUnknown(speaker) && matches(speaker.name) {
+        for speaker in meeting.speakers where speaker.id != id && !speaker.isYou && speaker.background != true && !isUnknown(speaker) && matches(speaker.name) {
             out.append(Option(choice: .name(speaker.name), label: speaker.name, group: .same, detail: "merge"))
         }
         let you = meeting.speakers.first(where: \.isYou)
         if you?.id != id, q.isEmpty || "that's me".hasPrefix(q) || q == "me" {
             out.append(Option(choice: .me, label: "that's me", group: .other, detail: you == nil ? "" : "merge into You"))
         }
-        if meeting.speakers.contains(where: { $0.id == id && !$0.isYou }), q.isEmpty || removeLabel.hasPrefix(q) {
-            out.append(Option(choice: .remove, label: removeLabel, group: .other, detail: counted(meeting.paragraphs.filter { $0.speaker == id }.count, "line")))
+        if meeting.speakers.contains(where: { $0.id == id && !$0.isYou }) {
+            let lines = counted(meeting.paragraphs.filter { $0.speaker == id }.count, "line")
+            if q.isEmpty || backgroundLabel.hasPrefix(q) {
+                out.append(Option(choice: .background, label: backgroundLabel, group: .other, detail: lines))
+            }
+            if q.isEmpty || removeLabel.hasPrefix(q) {
+                out.append(Option(choice: .remove, label: removeLabel, group: .other, detail: lines))
+            }
         }
         if !q.isEmpty, !"that's me".hasPrefix(q), q != "me", !out.contains(where: { $0.label.lowercased() == q }) {
             let typed = query.trimmingCharacters(in: .whitespaces)
@@ -233,6 +244,7 @@ enum SpeakerAssign {
     }
 
     static let removeLabel = "remove"
+    static let backgroundLabel = "unknown"
 
     // MARK: Choosing
 
@@ -251,6 +263,10 @@ enum SpeakerAssign {
             return m
         case .remove:
             m = remove(id, in: m)
+        case .background:
+            m.speakers[i].background = true
+        case .foreground:
+            m.speakers[i].background = nil
         case .me:
             if let you = m.speakers.first(where: { $0.isYou && $0.id != id }) {
                 m = merge(id, into: you.id, in: m)
@@ -272,7 +288,7 @@ enum SpeakerAssign {
         }
         let used = Set(m.speakers.map { $0.name.lowercased() })
         let left = callNames(m).filter { !used.contains($0.lowercased()) }
-        let open = m.speakers.indices.filter { isUnknown(m.speakers[$0]) }
+        let open = m.speakers.indices.filter { isUnknown(m.speakers[$0]) && m.speakers[$0].background != true }
         if left.count == 1, open.count == 1 {
             m.speakers[open[0]].name = left[0]
             m.speakers[open[0]].nameSource = .roster

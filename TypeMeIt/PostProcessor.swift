@@ -182,6 +182,10 @@ actor PostProcessor {
                     Log.postProcess.notice("Rejected post-processing output for dropping the opening words")
                     return nil
                 }
+                if let term = PostProcessor.addedScreenTerm(transcript: transcript, output: out, screenTerms: screenTerms) {
+                    Log.postProcess.notice("Rejected post-processing output for adding the screen term \(term, privacy: .private)")
+                    return nil
+                }
                 out = out.replacingOccurrences(of: "\u{200B}", with: "")
                 if !styles.contains(.fillerWords) { out = PostProcessor.restoreKeptWords(transcript: transcript, output: out) }
                 out = ModelText.fuseTerms(out, terms: screenTerms + keep + hints.map(\.term))
@@ -227,6 +231,27 @@ actor PostProcessor {
         guard outWords.contains(where: { o in firsts.contains { f in o.first == f.first && ModelText.levenshtein(o, f) <= 2 } }) else { return true }
         guard heard.count > 1 else { return false }
         return !out.prefix(4).contains { o in o == heard[1] || ModelText.levenshtein(o, heard[1]) <= 1 }
+    }
+
+    // MARK: Screen term guard
+
+    /// A screen term in the output that the transcript neither says nor
+    /// sounds like. The model sometimes writes the screen list into the text
+    /// in place of words it was unsure of (two words came back as sixteen
+    /// screen terms in alphabetical order), so any term it brings in has to
+    /// replace a run that sounds like it.
+    static func addedScreenTerm(transcript: String, output: String, screenTerms: [String]) -> String? {
+        func keys(_ s: String) -> [String] { s.split(whereSeparator: \.isWhitespace).map { CustomWordMatcher.letters(String($0)) }.filter { !$0.isEmpty } }
+        let heard = keys(transcript)
+        let written = Set(keys(output))
+        // Runs of one to three words written together, so "type me it" says typemeit.
+        let heardSet = Set(heard.indices.flatMap { start in (1...3).filter { start + $0 <= heard.count }.map { heard[start..<(start + $0)].joined() } })
+        for term in screenTerms {
+            let letters = CustomWordMatcher.letters(term)
+            guard !letters.isEmpty, written.contains(letters), !heardSet.contains(letters) else { continue }
+            if soundsLikeScreenTerm(heard, [term], unknownWords: heardSet) == nil { return term }
+        }
+        return nil
     }
 
     // MARK: Response cap

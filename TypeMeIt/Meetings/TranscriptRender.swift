@@ -36,6 +36,7 @@ enum TranscriptRender {
     /// The front matter plus one `**speaker** · timestamp` / text block per
     /// paragraph, blank-line separated, ending in one newline.
     static func markdown(_ meeting: Meeting) -> String {
+        let meeting = meeting.withoutBackground
         var frontMatter = [
             "---",
             "title: \(quoted(meeting.title))",

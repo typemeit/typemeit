@@ -29,8 +29,8 @@ enum MeetingInsights {
             meetingsThisMonth: thisMonth.count,
             totalMs: lengths.reduce(0, +),
             thisMonthMs: thisMonth.map(\.durationMs).reduce(0, +),
-            yourTalkMs: calls.flatMap(\.speakers).filter(\.isYou).map(\.talkMs).reduce(0, +),
-            callTalkMs: calls.flatMap(\.speakers).map(\.talkMs).reduce(0, +),
+            yourTalkMs: calls.flatMap(\.withoutBackground.speakers).filter(\.isYou).map(\.talkMs).reduce(0, +),
+            callTalkMs: calls.flatMap(\.withoutBackground.speakers).map(\.talkMs).reduce(0, +),
             medianMs: lengths.isEmpty ? nil : lengths[(lengths.count - 1) / 2],
             longestMs: lengths.last,
             topApp: byApp.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key)
