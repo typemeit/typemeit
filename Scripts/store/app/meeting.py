@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Capture the website's meeting page shot, web/shots/meeting.webp, from a
-made-up meeting in a throwaway store with no hooks run, and crop the same
-page with two hook runs into web/shots/hooks.webp.
+"""Capture the website's shots of the dev app: the meeting page,
+web/shots/meeting.webp, from a made-up meeting in a throwaway store with no
+hooks run; the same page with two hook runs, cropped into web/shots/hooks.webp;
+and the insights page over that store, web/shots/insights.webp.
 
     python3 Scripts/store/app/meeting.py
 
@@ -10,13 +11,14 @@ instance running. Writes the meeting under Scripts/store/app/store/Meetings
 with a silent recording so the player shows, a question asked of Claude by
 name with its answer, and two hook runs; puts four hooks in the dev app's
 defaults for the capture and restores what was there after. Launches the dev
-app on that store with TYPEMEIT_SUPPORT_DIR, opens the meeting from the
-meetings tab and saves the window without its shadow at the size the page
-gives it; once with the hook runs for the crop, then again without them. Keep the mouse and keyboard off while
-it runs. Deterministic: the same meeting every run.
+app on that store with TYPEMEIT_SUPPORT_DIR and -openMeeting, and saves the
+window without its shadow at the size the page gives it; once with the hook
+runs for the crop, then again without them; then with -openPage insights.
+Keep the mouse and keyboard off while it runs. Deterministic: the same meeting every run.
 """
 import json
 import os
+import plistlib
 import random
 import subprocess
 import sys
@@ -24,23 +26,24 @@ import time
 import uuid
 import wave
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
-from capture import APP, DEFAULTS, HERE, ROOT, WINDOW_ID, clone_model, osascript, sidebar_buttons
+from capture import APP, DEFAULTS, HERE, ROOT, WINDOW_ID, clone_model, osascript
 
 STORE = os.path.join(HERE, "store")
 OUT = os.path.join(ROOT, "web", "shots", "meeting.webp")
 HOOKS_OUT = os.path.join(ROOT, "web", "shots", "hooks.webp")
+INSIGHTS_OUT = os.path.join(ROOT, "web", "shots", "insights.webp")
 SIZE = (2000, 1254)  # web/index.html's <img width> and height
-SIDEBAR = ["meetings", "hooks", "dictations", "dictionary", "insights", "settings"]
 # Hooks live in the dev app's preferences, DEFAULTS.
 HOOKS_KEY = "meetingHooks"
-# Where the newest meeting's row sits in the meetings tab, in points from the
-# window's corner, with the window at {0, 33}.
-FIRST_ROW = (600, 240)
 # The hook run card and the hooks list in the saved meeting shot, in its
 # pixels: left, top, right, bottom.
-HOOKS_CROP = (300, 330, 2000, 1030)
+HOOKS_CROP = (300, 296, 2000, 996)
+# The summary's last line ends level with the top of the hooks run button,
+# so the crop's strip over the article, in its own pixels, is painted over
+# with the page's background.
+SUMMARY_TAIL = (0, 0, 1240, 10)
 
 ID = "5EED0000-0000-4000-8000-000000000001"
 STARTED = "2026-10-09T09:02:00Z"  # 10:02 in London
@@ -183,16 +186,18 @@ def seed(hook_runs):
 
 
 def stored_hooks():
-    """The dev app's hooks as `defaults` prints them, a hex data blob, or None."""
-    read = subprocess.run(["defaults", "read", DEFAULTS, HOOKS_KEY], capture_output=True, text=True)
-    return read.stdout.strip() if read.returncode == 0 else None
+    """The dev app's hooks as hex, or None. Read through `defaults export`:
+    `defaults read` shortens long data to `{length=…,bytes=0x…}`."""
+    exported = subprocess.run(["defaults", "export", DEFAULTS, "-"], capture_output=True, check=True).stdout
+    hooks = plistlib.loads(exported).get(HOOKS_KEY)
+    return hooks.hex() if hooks is not None else None
 
 
 def set_hooks(blob):
     if blob is None:
         subprocess.run(["defaults", "delete", DEFAULTS, HOOKS_KEY], capture_output=True)
     else:
-        subprocess.run(["defaults", "write", DEFAULTS, HOOKS_KEY, "-data", blob.strip("<>").replace(" ", "")], check=True)
+        subprocess.run(["defaults", "write", DEFAULTS, HOOKS_KEY, "-data", blob], check=True)
 
 
 def seeded_hooks_blob():
@@ -209,22 +214,18 @@ def save_window(wid, path):
     print(path)
 
 
-def capture(path):
-    """Opens the meeting in the dev app on STORE and saves its window to path."""
+def capture(path, opening):
+    """Launches the dev app on STORE with `opening`, its launch flags for the
+    page to show, and saves its window to path."""
     env = dict(os.environ, TYPEMEIT_SUPPORT_DIR=STORE)
-    app = subprocess.Popen([APP], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    app = subprocess.Popen([APP, *opening], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(6)
-        subprocess.run(["open", APP.split("/Contents/MacOS/")[0]], check=True)
-        time.sleep(2)
         osascript(app.pid, 'set position of window "settings" to {0, 33}')
         osascript(app.pid, 'set size of window "settings" to {1512, 949}')
         wid = subprocess.run(["swift", "-e", WINDOW_ID, str(app.pid)], capture_output=True, text=True, check=True).stdout.split()[0]
-        pages = sidebar_buttons(app.pid)
-        osascript(app.pid, f'click button {pages[SIDEBAR.index("meetings")]} of group 1 of window "settings"')
-        time.sleep(1.5)
-        osascript(app.pid, "set frontmost to true")
-        subprocess.run(["cliclick", f"c:{FIRST_ROW[0]},{FIRST_ROW[1] + 33}", "m:1500,900"], check=True)
+        # The pointer off the rows, so none shows its hover.
+        subprocess.run(["cliclick", "m:1500,900"], check=True)
         time.sleep(2)
         osascript(app.pid, "set frontmost to true")
         time.sleep(0.5)
@@ -241,11 +242,14 @@ def main():
     set_hooks(seeded_hooks_blob())
     try:
         seed(hook_runs=True)
-        capture(HOOKS_OUT)
-        Image.open(HOOKS_OUT).crop(HOOKS_CROP).save(HOOKS_OUT, "WEBP", quality=90)
+        capture(HOOKS_OUT, ["-openMeeting", ID])
+        hooks = Image.open(HOOKS_OUT).crop(HOOKS_CROP)
+        ImageDraw.Draw(hooks).rectangle(SUMMARY_TAIL, fill=hooks.getpixel((SUMMARY_TAIL[2], SUMMARY_TAIL[3] + 1)))
+        hooks.save(HOOKS_OUT, "WEBP", quality=90)
         print(HOOKS_OUT)
         seed(hook_runs=False)
-        capture(OUT)
+        capture(OUT, ["-openMeeting", ID])
+        capture(INSIGHTS_OUT, ["-openPage", "insights"])
     finally:
         set_hooks(hooks_before)
 

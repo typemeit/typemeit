@@ -529,6 +529,7 @@ struct MeetingPage: View {
                 SquareSubhead(text: "removed", first: meeting.speakers.isEmpty)
                 setAside(removed, struck: true, choice: .restore, help: "restore")
             }
+            if showsHooks { railHooks }
             SquareSubhead(text: "where", first: meeting.speakers.isEmpty && meeting.removedSpeakers == nil)
             Text(whereLine)
                 .font(Square.mono(12))
@@ -553,7 +554,6 @@ struct MeetingPage: View {
             }
             SquareSubhead(text: "processing")
             RailFacts(facts: processing)
-            if showsHooks { railHooks }
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 22)
