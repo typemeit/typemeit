@@ -24,8 +24,9 @@ final class OverlayModel {
         case updateFailed(version: String)
         /// The microphone would not start when a dictation began.
         case micFailed
-        /// A call is confirmed: record it? Stays until answered.
-        case meetingPrompt(app: ProcessOwner.Owner)
+        /// A call is confirmed: record it? Stays until answered. `calls` are
+        /// the Meet calls open in the app; two or more ask which one.
+        case meetingPrompt(app: ProcessOwner.Owner, calls: [RosterRules.Meet.Call])
         /// The tap delivered nothing for `Fixed.meetingSilentSeconds`.
         case meetingSystemAudioOff
         /// With `hooks`, it offers to run the meeting's hooks.
@@ -139,7 +140,7 @@ final class OverlayModel {
     var onOpenDictionary: (@MainActor () -> Void)?
     var onOpenAccessibility: (@MainActor () -> Void)?
     // Meetings, wired by the coordinator.
-    var onRecordMeeting: (@MainActor () -> Void)?
+    var onRecordMeeting: (@MainActor (RosterRules.Meet.Call?) -> Void)?
     var onDeclineMeeting: (@MainActor () -> Void)?
     var onStopMeeting: (@MainActor () -> Void)?
     var onShowMeeting: (@MainActor (UUID?) -> Void)?

@@ -158,4 +158,29 @@ struct RosterRulesTests {
         #expect(RosterRules.Meet.name(inTitle: "Meet – efg-hijk-lmn") == nil)
         #expect(RosterRules.Meet.name(inTitle: "Meet") == nil)
     }
+
+    @Test func callsComeFromVisibleTabsAndTabsBehindThem() {
+        let calls = RosterRules.Meet.calls(
+            areas: [("https://meet.google.com/meet/abc-defg-hij?authuser=0", "Meet – Design review")],
+            tabTitles: ["Meet – Design review", "Google Meet", "Meet – xyz-wxyz-xyz", "Inbox", "Meet – Weekly sync"])
+        #expect(calls == [
+            .init(code: "abc-defg-hij", name: "Design review"),
+            .init(code: "xyz-wxyz-xyz", name: nil),
+            .init(code: nil, name: "Weekly sync"),
+        ])
+        #expect(calls.map(\.label) == ["meet.google.com/abc-defg-hij", "meet.google.com/xyz-wxyz-xyz", "Weekly sync"])
+    }
+
+    @Test func meetsHomePageIsNotACall() {
+        #expect(RosterRules.Meet.calls(areas: [("https://meet.google.com/landing", "Google Meet")], tabTitles: ["Google Meet"]).isEmpty)
+    }
+
+    @Test func aPickedCallReadsOnlyItsOwnTab() {
+        let byCode = RosterRules.Meet.Call(code: "abc-defg-hij", name: "Design review")
+        #expect(byCode.isShown(address: "https://meet.google.com/meet/abc-defg-hij", title: "Meet – Design review"))
+        #expect(!byCode.isShown(address: "https://meet.google.com/meet/xyz-wxyz-xyz", title: "Meet – Design review"))
+        let byName = RosterRules.Meet.Call(code: nil, name: "Weekly sync")
+        #expect(byName.isShown(address: "https://meet.google.com/meet/xyz-wxyz-xyz", title: "Meet – Weekly sync"))
+        #expect(!byName.isShown(address: "https://meet.google.com/meet/abc-defg-hij", title: "Meet – Design review"))
+    }
 }

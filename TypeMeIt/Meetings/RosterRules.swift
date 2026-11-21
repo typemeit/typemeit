@@ -155,6 +155,43 @@ enum RosterRules {
                 capitalised.contains(word) || nameParticles.contains(word.lowercased())
             }
         }
+
+        /// One Meet call open in the browser: its code when the tab's
+        /// address or title shows it, its name when the title has one.
+        struct Call: Hashable, Sendable {
+            var code: String?
+            var name: String?
+
+            /// What the prompt shows for it: the call's address, or its name
+            /// when only a background tab's title was read.
+            var label: String { code.map { "meet.google.com/\($0)" } ?? name ?? "" }
+
+            /// Whether a Meet page, by its address and title, is this call.
+            func isShown(address: String, title: String?) -> Bool {
+                if let code { return Meet.code(in: address) == code }
+                return title.flatMap(Meet.name(inTitle:)) == name
+            }
+        }
+
+        /// The calls open across a browser's windows. A window's visible tab
+        /// is its web area, with an address (`areas`); a tab behind it is
+        /// only its title in the tab strip (`tabTitles`), which names the call
+        /// or shows its code. A tab already read from its area is skipped, and
+        /// a tab that is not a call (Meet's home page, "Google Meet") too.
+        static func calls(areas: [(address: String, title: String?)], tabTitles: [String]) -> [Call] {
+            var calls: [Call] = []
+            func add(_ call: Call) {
+                guard call.code != nil || call.name != nil else { return }
+                let known = calls.contains { ($0.code != nil && $0.code == call.code) || ($0.name != nil && $0.name == call.name) }
+                if !known { calls.append(call) }
+            }
+            for area in areas {
+                guard let code = code(in: area.address) else { continue }
+                add(Call(code: code, name: area.title.flatMap(name(inTitle:))))
+            }
+            for title in tabTitles { add(Call(code: code(inTitle: title), name: name(inTitle: title))) }
+            return calls
+        }
     }
 
     static func meet(_ nodes: [AXNode]) -> RosterReading {
