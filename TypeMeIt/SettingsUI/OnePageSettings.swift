@@ -692,7 +692,7 @@ struct OnePageSettings: View {
     }
 
     private func claudeModelLabel(_ value: String) -> String {
-        claudeModels?.first { $0.value == value }?.displayName.lowercased() ?? value
+        claudeModels?.first { $0.value == value }?.label ?? value
     }
 
     private var claudeModelCaption: String {

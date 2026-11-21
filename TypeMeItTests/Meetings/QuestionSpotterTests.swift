@@ -77,8 +77,8 @@ struct QuestionSpotterTests {
     @Test func theModelsComeFromTheInitializeResponse() {
         let line = Data(#"{"type":"control_response","response":{"subtype":"success","request_id":"models","response":{"models":[{"value":"default","displayName":"Default (recommended)","description":"Opus with 1M context","supportsAutoMode":true},{"value":"haiku","displayName":"Haiku","description":"Fastest"}]}}}"#.utf8)
         #expect(ClaudeModels.models(in: line) == [
-            ClaudeModels.Model(value: "default", displayName: "Default (recommended)", description: "Opus with 1M context", supportsAutoMode: true),
-            ClaudeModels.Model(value: "haiku", displayName: "Haiku", description: "Fastest", supportsAutoMode: nil),
+            ClaudeModels.Model(value: "default", displayName: "Default (recommended)", description: "Opus with 1M context", supportsAutoMode: true, resolvedModel: nil),
+            ClaudeModels.Model(value: "haiku", displayName: "Haiku", description: "Fastest", supportsAutoMode: nil, resolvedModel: nil),
         ])
     }
 
