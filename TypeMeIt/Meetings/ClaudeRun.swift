@@ -203,6 +203,30 @@ final class ClaudeRun: @unchecked Sendable {
                   extraEnvironment: ["MAX_THINKING_TOKENS": "0"])
     }
 
+    private static let wordCheckInstructions = """
+        You review dictations a speech recogniser typed for one user. Find the words it most \
+        likely misheard: a word or short phrase that sounds like what was said but makes no \
+        sense where it stands, most often a name, product, acronym or technical term. Leave \
+        grammar, style, punctuation and word choice alone, and leave anything that could be \
+        right. A few sure suggestions beat many unsure ones; none is a fine answer. Copy \
+        `heard` exactly as it appears in the dictation, only the misheard words and none \
+        around them; `meant` replaces it, so "get hub actions" meaning GitHub Actions is \
+        `heard` "get hub", `meant` "GitHub". Set `term` when \
+        `meant` is a name, product, acronym or technical term worth adding to the dictionary. \
+        Give `why` in one short sentence.
+        """
+
+    /// `model` with no tools, MCP servers, settings or Claude Code system
+    /// prompt, answering `schema` about the dictations on stdin.
+    static func wordCheck(input: String, schema: String, model: String, timeoutSeconds: Double) -> ClaudeRun? {
+        ClaudeRun(arguments: ["-p", "Find the misheard words in these dictations.",
+                              "--output-format", "stream-json", "--verbose", "--json-schema", schema,
+                              "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence",
+                              "--disable-slash-commands", "--system-prompt", wordCheckInstructions]
+                      + (model == defaultModel ? [] : ["--model", model]),
+                  input: input, folder: FileManager.default.temporaryDirectory, timeoutSeconds: timeoutSeconds)
+    }
+
     /// `transcript` is the meeting's whole Markdown transcript.
     static func hook(prompt: String, transcript: String, folder: URL, model: String, allowedTools: [String], permissionMode: String, userSystemPrompt: String) -> ClaudeRun? {
         ClaudeRun(arguments: arguments(prompt: prompt, instructions: hookInstructions, model: model, allowedTools: allowedTools,
