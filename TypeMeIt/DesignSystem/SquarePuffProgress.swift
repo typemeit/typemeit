@@ -26,6 +26,74 @@ struct SquarePuffProgress: View {
     }
 }
 
+/// The puff in the meeting colours, for work that runs in the background:
+/// with a fraction it fills clockwise from twelve o'clock like
+/// `SquarePuffProgress`, each stretch of the outline in the next of the
+/// seven hues; without one, a comet of those hues circles it, its tail
+/// fading. Unlit cells show faintly.
+struct SquarePuffLoader: View {
+    var fraction: Double?
+    var side: CGFloat = 112
+
+    /// One trip round the puff.
+    static let period = 1.6
+    /// The comet's length, as a share of the puff.
+    static let tail = 0.35
+
+    var body: some View {
+        TimelineView(.animation(paused: fraction != nil)) { timeline in
+            Canvas { context, size in
+                let cells = PuffPixels.cells
+                let cell = min(size.width, size.height) / CGFloat(PuffPixels.size)
+                let gap = cell >= 3 ? 1 : cell * 0.2
+                let lit = fraction.map(PuffPixels.litCount)
+                let head = (timeline.date.timeIntervalSinceReferenceDate / SquarePuffLoader.period).truncatingRemainder(dividingBy: 1)
+                    * Double(cells.count)
+                let tail = SquarePuffLoader.tail * Double(cells.count)
+                for (index, c) in cells.enumerated() {
+                    let rect = CGRect(x: CGFloat(c.column) * cell, y: CGFloat(c.row) * cell, width: cell - gap, height: cell - gap)
+                    let hue = Color(nsColor: CloudColor.hues[index * CloudColor.hues.count / cells.count].color)
+                    let colour: Color
+                    if let lit {
+                        colour = index < lit ? hue : DesignTokens.Colors.inkA12
+                    } else {
+                        let behind = (head - Double(index) + Double(cells.count)).truncatingRemainder(dividingBy: Double(cells.count))
+                        colour = behind < tail ? hue.opacity(1 - behind / tail) : DesignTokens.Colors.inkA12
+                    }
+                    context.fill(Path(rect), with: .color(DesignTokens.Colors.inkA12))
+                    context.fill(Path(rect), with: .color(colour))
+                }
+            }
+        }
+        .frame(width: side, height: side)
+        .accessibilityElement()
+        .accessibilityLabel("working")
+        .accessibilityValue(fraction.map { "\(Int((min(max($0, 0), 1) * 100).rounded())) percent" } ?? "")
+    }
+}
+
+#if DEBUG
+/// The loader filling as a run of work goes by, then circling while the
+/// last step has no fraction to show; click to start it again.
+struct SquarePuffLoaderSpecimen: View {
+    @State private var started = Date()
+
+    var body: some View {
+        SquareSpecimen {
+            SquareSpecimenLine(name: "loader") {
+                TimelineView(.animation) { timeline in
+                    let elapsed = timeline.date.timeIntervalSince(started)
+                    SquarePuffLoader(fraction: elapsed < 4 ? elapsed / 4 : nil)
+                }
+                .onTapGesture { started = Date() }
+            }
+        }
+    }
+}
+
+#Preview("puff loader") { SquarePuffLoaderSpecimen() }
+#endif
+
 /// The menu bar puff (Support/Icon/puff.svg) on a 28 × 28 grid. The SVG's
 /// eleven arcs are kept here as circles, worked out from its arc commands:
 /// a cell belongs to the puff when its centre is within 0.7 cells of one.

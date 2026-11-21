@@ -193,6 +193,7 @@ enum MeetingTranscriber {
             // the audio setting off (8.7).
             if await MainActor.run(body: { Settings.shared.meetingLearnVoices }) {
                 await VoiceLibrary.shared.learn(meeting, folder: folder)
+                await VoiceLibrary.shared.refreshMap()
             }
             if Task.isCancelled { throw Failure.cancelled }
             if !meeting.paragraphs.isEmpty {

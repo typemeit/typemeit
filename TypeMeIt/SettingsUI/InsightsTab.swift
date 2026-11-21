@@ -16,6 +16,9 @@ struct InsightsTab: View {
     /// The figures, kept across redraws that change neither the filter nor
     /// the data: a hover on the calendar, a resize.
     @State private var cache = FiguresCache()
+    /// 0 for the figures, 1 for voices.
+    @State private var section = 0
+    @State private var voicesUpdating = false
 
     /// The meetings the when filter leaves.
     private var shownMeetings: [Meeting] {
@@ -50,6 +53,9 @@ struct InsightsTab: View {
         }
         VStack(spacing: 0) {
             toolbar
+            if section == 1 {
+                VoiceInsights(updating: $voicesUpdating)
+            } else {
             // Scrolls only when the window is too short for the page.
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -89,13 +95,24 @@ struct InsightsTab: View {
                 .padding([.horizontal, .bottom], 20)
             }
             .scrollBounceBehavior(.basedOnSize)
+            }
         }
     }
 
+    /// The figures and voices tabs, where this build has meetings, and the
+    /// when filter, which only the figures use.
     private var toolbar: some View {
         let time = WhenFilter(when, from: from, to: to)
-        return SquareFilter(label: time.label, active: time.narrows, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
-            SquareWhenPicker(when: $when, from: $from, to: $to)
+        return HStack(spacing: 16) {
+            if Sandbox.hasMeetings {
+                SquareTabStrip(tabs: [SquareTab(name: "overview"), SquareTab(name: "voices", state: voicesUpdating ? .running : .idle)],
+                               picked: $section)
+            }
+            if section == 0 {
+                SquareFilter(label: time.label, active: time.narrows, clear: { when = .any; from = ""; to = "" }, open: $whenOpen) {
+                    SquareWhenPicker(when: $when, from: $from, to: $to)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 16)

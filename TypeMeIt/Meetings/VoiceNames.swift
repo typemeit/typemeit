@@ -35,9 +35,9 @@ enum VoiceNames {
     /// A meeting's voices under the speakers they belong to now: a speaker
     /// merged into another (`SpeakerAssign.merge`) lends its clips to the one
     /// holding its paragraphs. Clips of a speaker no longer in the meeting go.
-    static func regrouped(_ voices: [String: [[Float]]], in meeting: Meeting) -> [String: [[Float]]] {
+    static func regrouped<Element>(_ voices: [String: [Element]], in meeting: Meeting) -> [String: [Element]] {
         let present = Set(meeting.speakers.map(\.id))
-        var out: [String: [[Float]]] = [:]
+        var out: [String: [Element]] = [:]
         for id in voices.keys.sorted() {
             let holder = present.contains(id) ? id : meeting.paragraphs.first { $0.mergedFrom == id }?.speaker
             if let holder { out[holder, default: []] += voices[id]! }

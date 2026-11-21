@@ -19,6 +19,10 @@ actor VoiceLibrary {
         var embedding: String?
         /// Each speaker's clip embeddings, `dimensions` Float32s apiece, end to end.
         var speakers: [String: Data]
+        /// Each speaker's clips in the same order, as start and end ms in
+        /// turn, so a voice can be played back; absent in files learned
+        /// before the voices map.
+        var times: [String: [Int]]?
     }
 
     /// Clips read and embedded at a time: about 10 MB of audio, where a
@@ -39,6 +43,8 @@ actor VoiceLibrary {
     private var forgotten: Set<UUID> = []
     /// Every file read so far, by meeting; `learn` and `forget` keep it current.
     private var voices: [UUID: [String: [[Float]]]] = [:]
+    /// Each read file's clip times, where it has them.
+    private var times: [UUID: [String: [Range<Int>]]] = [:]
     private var readAll = false
     /// The last model trained, with what it was trained on.
     private var cached: (key: String, model: VoiceNames.Model)?
@@ -47,10 +53,21 @@ actor VoiceLibrary {
     /// takes the next call while one waits on training: without this, each
     /// call that came in before the first finished started a training of its own.
     private var training: (key: String, task: Task<VoiceNames.Model?, Never>)?
+    /// The voices map, with the `trainingSet` key it was made from: what
+    /// `mapURL` holds.
+    private struct MapFile: Codable {
+        var key: String
+        var map: VoiceMap?
+    }
+    private var mapped: MapFile?
+    /// The map being made, with what it is made from.
+    private var mapping: (key: String, task: Task<VoiceMap?, Never>)?
 
     private init() {}
 
     private static func url(for id: UUID) -> URL { directory.appendingPathComponent("\(id.uuidString).json") }
+    /// Not a meeting id, so `learnedIDs` passes over it.
+    private static let mapURL = directory.appendingPathComponent("map.json")
 
     // MARK: Learning
 
@@ -65,18 +82,24 @@ actor VoiceLibrary {
                                          crosstalkShare: Fixed.meetingVoiceCrosstalkShare, echoPadMs: Fixed.meetingVoiceEchoPadMs)
             let tracks = Dictionary(meeting.tracks.map { ($0.role, folder.appendingPathComponent($0.file)) }, uniquingKeysWith: { first, _ in first })
             var bySpeaker: [String: [[Float]]] = [:]
+            var timesBySpeaker: [String: [Range<Int>]] = [:]
             for start in stride(from: 0, to: clips.count, by: VoiceLibrary.clipsPerBatch) {
                 try Task.checkCancellation()
                 let batch = Array(clips[start..<min(start + VoiceLibrary.clipsPerBatch, clips.count)])
                 let audio = try await VoiceLibrary.read(batch, tracks: tracks)
                 let embedded = try await Diarizer.shared.voices(of: audio)
-                for (clip, vector) in zip(batch, embedded) where !vector.isEmpty { bySpeaker[clip.speaker, default: []].append(vector) }
+                for (clip, vector) in zip(batch, embedded) where !vector.isEmpty {
+                    bySpeaker[clip.speaker, default: []].append(vector)
+                    timesBySpeaker[clip.speaker, default: []].append(clip.range)
+                }
             }
             guard generation == self.generation, !forgotten.contains(meeting.id), let dimensions = bySpeaker.values.first?.first?.count else { return }
-            let file = VoiceFile(dimensions: dimensions, embedding: VoiceLibrary.embedding, speakers: bySpeaker.mapValues { VoiceLibrary.data($0) })
+            let file = VoiceFile(dimensions: dimensions, embedding: VoiceLibrary.embedding, speakers: bySpeaker.mapValues { VoiceLibrary.data($0) },
+                                 times: timesBySpeaker.mapValues { $0.flatMap { [$0.lowerBound, $0.upperBound] } })
             try FileManager.default.createDirectory(at: VoiceLibrary.directory, withIntermediateDirectories: true)
             try JSONEncoder().encode(file).write(to: VoiceLibrary.url(for: meeting.id), options: .atomic)
             voices[meeting.id] = bySpeaker
+            times[meeting.id] = timesBySpeaker
             // A relearned meeting keeps its clip counts, which is all `cached`'s key sees.
             cached = nil
             DebugLog.write("Meeting voices learned: \(counted(clips.count, "clip")) of \(counted(bySpeaker.count, "speaker")) in \(ContinuousClock.now - started)")
@@ -90,16 +113,29 @@ actor VoiceLibrary {
     /// on, and at launch. Voices embedded another way with no audio left to
     /// relearn from are deleted.
     func learnMissing(_ meetings: [(meeting: Meeting, folder: URL)]) async {
+        var learnedAny = false
         for (meeting, folder) in meetings where meeting.isDone {
             let url = VoiceLibrary.url(for: meeting.id)
             if FileManager.default.fileExists(atPath: url.path) {
                 guard VoiceLibrary.file(at: url) == nil else { continue }
                 if meeting.audioFiles.isEmpty { forget([meeting.id]); continue }
                 voices[meeting.id] = nil
+                times[meeting.id] = nil
             }
             guard !meeting.audioFiles.isEmpty else { continue }
             await learn(meeting, folder: folder)
+            learnedAny = true
         }
+        if learnedAny { refreshMap() }
+    }
+
+    /// The meetings whose voices were learned before clips kept their
+    /// times and whose audio is still here to relearn them from. The voices
+    /// page relearns these when it opens, so only people who look at it
+    /// pay for the work.
+    func untimed(_ meetings: [(meeting: Meeting, folder: URL)]) -> [(meeting: Meeting, folder: URL)] {
+        loadAll()
+        return meetings.filter { voices[$0.meeting.id] != nil && times[$0.meeting.id] == nil && !$0.meeting.audioFiles.isEmpty }
     }
 
     func forget(_ ids: Set<UUID>) {
@@ -107,6 +143,7 @@ actor VoiceLibrary {
         for id in ids {
             try? FileManager.default.removeItem(at: VoiceLibrary.url(for: id))
             voices[id] = nil
+            times[id] = nil
         }
     }
 
@@ -114,8 +151,12 @@ actor VoiceLibrary {
         generation += 1
         try? FileManager.default.removeItem(at: VoiceLibrary.directory)
         voices = [:]
+        times = [:]
         readAll = false
         cached = nil
+        mapped = nil
+        mapping?.task.cancel()
+        mapping = nil
     }
 
     // MARK: Suggesting
@@ -169,6 +210,75 @@ actor VoiceLibrary {
             .mapValues { Dictionary(uniqueKeysWithValues: zip(trained.names, trained.posterior($0))) }
     }
 
+    /// Every named voice in `meetings` laid out for the voices page. Made
+    /// once for a set of names and clips and kept in `mapURL`, so opening
+    /// the page reads a file; only a new name or clip makes it again. Nil
+    /// with fewer than two people learned.
+    func map(among meetings: [Meeting]) async -> VoiceMap? {
+        loadAll()
+        let (examples, key) = mapExamples(among: meetings)
+        if let saved = savedMap(), saved.key == key { return saved.map }
+        let task: Task<VoiceMap?, Never>
+        if let mapping, mapping.key == key {
+            task = mapping.task
+        } else {
+            mapping?.task.cancel()
+            task = Task.detached(priority: .utility) { VoiceMap.make(examples) }
+            mapping = (key, task)
+        }
+        let map = await task.value
+        guard mapping?.key == key else { return map }
+        mapping = nil
+        let saved = MapFile(key: key, map: map)
+        mapped = saved
+        try? FileManager.default.createDirectory(at: VoiceLibrary.directory, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(saved).write(to: VoiceLibrary.mapURL, options: .atomic)
+        return map
+    }
+
+    /// The last map made, whatever names and clips it was made from: shown
+    /// while a newer one is made.
+    func lastMap() -> VoiceMap? { savedMap()?.map }
+
+    /// Makes the map for the meetings as they are now, in the background,
+    /// so the voices page has it when it opens.
+    func refreshMap() {
+        Task(priority: .background) {
+            let meetings = await MainActor.run { MeetingStore.shared.meetings }
+            _ = await map(among: meetings)
+        }
+    }
+
+    private func savedMap() -> MapFile? {
+        if mapped == nil, let data = try? Data(contentsOf: VoiceLibrary.mapURL) {
+            mapped = try? JSONDecoder().decode(MapFile.self, from: data)
+        }
+        return mapped
+    }
+
+    /// `trainingSet`'s clips with where each came from, for the map. Its key
+    /// also changes when a meeting gains clip times.
+    private func mapExamples(among meetings: [Meeting]) -> (examples: [VoiceMap.Example], key: String) {
+        var examples: [VoiceMap.Example] = []
+        var timed = 0
+        for other in meetings {
+            guard let file = voices[other.id] else { continue }
+            let clips = VoiceNames.regrouped(file, in: other)
+            let clipTimes = times[other.id].map { VoiceNames.regrouped($0, in: other) }
+            if clipTimes != nil { timed += 1 }
+            for speaker in other.speakers {
+                guard let name = VoiceNames.label(of: speaker), let vectors = clips[speaker.id] else { continue }
+                let ranges = clipTimes?[speaker.id]
+                for (i, vector) in vectors.enumerated() {
+                    let range = ranges.flatMap { $0.indices.contains(i) ? $0[i] : nil }
+                    examples.append(VoiceMap.Example(name: name, vector: vector,
+                                                     source: VoiceMap.Source(meeting: other.id, speaker: speaker.id, startMs: range?.lowerBound, endMs: range?.upperBound)))
+                }
+            }
+        }
+        return (examples, trainingSet(among: meetings).key + "\ntimed \(timed)")
+    }
+
     /// Every learned clip of every named speaker in `meetings`, with a key
     /// that changes whenever a name or a clip count does.
     private func trainingSet(among meetings: [Meeting]) -> (examples: [(name: String, vector: [Float])], key: String) {
@@ -200,6 +310,7 @@ actor VoiceLibrary {
         for id in VoiceLibrary.learnedIDs() where voices[id] == nil {
             guard let file = VoiceLibrary.file(at: VoiceLibrary.url(for: id)) else { continue }
             voices[id] = file.speakers.mapValues { VoiceLibrary.vectors($0, dimensions: file.dimensions) }
+            times[id] = file.times?.mapValues { flat in stride(from: 0, to: flat.count - 1, by: 2).map { flat[$0]..<flat[$0 + 1] } }
         }
     }
 
