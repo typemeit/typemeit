@@ -1,8 +1,4 @@
-/* The models page, on top of legal.css. Model names and notes keep their
-   case in the HTML, which is what search engines read; the page shows them
-   lowercase like the rest of the site. */
-.models main { text-transform: lowercase; }
-.models code { text-transform: none; }
+/* The models page, on top of legal.css. */
 
 .note { color: var(--ink-3); max-width: 68ch; margin-top: 12px; }
 
@@ -22,7 +18,7 @@
 
 .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 32px 0 0; }
 .filters button {
-  font: 400 0.75rem/1.35 var(--font-display); text-transform: lowercase;
+  font: 400 0.75rem/1.35 var(--font-display);
   color: var(--ink-2); background: none; cursor: pointer;
   border: 1px dashed var(--rule); border-radius: 5px; padding: 4px 10px;
   transition: color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out);
