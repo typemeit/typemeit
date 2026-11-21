@@ -1809,6 +1809,72 @@
       "id": "ElevenLabs Scribe $0.20/h pricing (eval reference)",
       "date": "2026-11-20",
       "role": "eval reference"
+    },
+    {
+      "id": "oruk/oruk-fourier-2b",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "Qwen3-ASR-1.7B merge with Musci-ASR (AMI-Cleaned 6.73, 7-split mean 4.95); same architecture as Qwen3-ASR rejected 2026-10-12, and about 4 GB in bf16, over the file budget"
+    },
+    {
+      "id": "BuilderHelm/Cadence-Sae-EN",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "Parakeet TDT v3 fine-tune in Core ML (CC-BY-4.0); ties v3 on its own Speech Bench (7.54% vs 7.56%), AMI gain comes from AMI training; same architecture as Orukeet, rejected"
+    },
+    {
+      "id": "Scrya/parakeet-tdt-0.6b-v3-nsc5",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "Singapore English fine-tune of Parakeet TDT v3, numbers only on IMDA NSC; same architecture as Orukeet, rejected. Includes its nemo-speech-cpp q8_0/f16 ports"
+    },
+    {
+      "id": "thinkingmachines/Inkling-2-Mini",
+      "date": "2026-11-21",
+      "role": "clean-up",
+      "why": "26.4B MoE (3.4B active), about 20 GB, needs a 32 GB Mac; no clean-up score. Includes the GGUF and MLX ports"
+    },
+    {
+      "id": "ishiki-labs/weight-space-programming-for-audio-models",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "research Space (LibriSpeech clean 0.83%); no released ASR weights"
+    },
+    {
+      "id": "Krisp Voice Isolation",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "noise and second-voice isolation SDK on an enterprise licence; no model role in the app"
+    },
+    {
+      "id": "Banafo/Kroko-ASR-XL-EN-Offline (fast-gpu-asr)",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "new leaderboard row for a model already seen"
+    },
+    {
+      "id": "vocetlabs/orukqwen-asr-1.7b-gguf",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "GGUF port of orukqwen-asr-1.7b (seen 2026-11-14); Qwen3-ASR rejected"
+    },
+    {
+      "id": "stevyhacker/Qwen3-ASR-LokalBot-GGUF",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "GGUF ports of Qwen3-ASR 0.6B and 1.7B; Qwen3-ASR rejected"
+    },
+    {
+      "id": "mradermacher/higgs-audio-v3-stt-v2-GGUF",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "GGUF ports of Higgs Audio v3 STT v2 (seen), no new numbers"
+    },
+    {
+      "id": "Katsugachi/omi-med-stt-v1-onnx",
+      "date": "2026-11-21",
+      "role": "speech recognition",
+      "why": "ONNX port of Omi Med STT v1, a medical model behind Parakeet on Voice Arena (3.09% vs 3.01%)"
     }
   ]
 }
