@@ -177,8 +177,22 @@ llama.cpp, transcribe.cpp, sherpa-onnx, mlx-audio, Apple Foundation Models.
    End with a **Near misses** list (one line each, the filter that failed)
    and a **Source status** list of any fetch that failed.
 8. Append every pick and near miss to `seen.json` as
-   `{"id": "<hf id or name>", "date": "YYYY-MM-DD", "role": "<role>"}`.
-   Picks also get `"pick": true`.
+   `{"id": "<hf id or name>", "date": "YYYY-MM-DD", "role": "<role>", "checks": {...}, "verdict": "<one line>"}`.
+   Picks also get `"pick": true`. `checks` holds one entry per step-4 filter
+   and step-5 ranking rule, each `{"pass": true | false | null, "why": "<fact with its number or source>"}`,
+   with `null` when the scout could not tell. Every key is filled in, not only the
+   one that failed, so a later scout can see which facts would bring the model back:
+   - `onDevice`: runs on Apple Silicon (Core ML, MLX, GGUF, ONNX)
+   - `english`
+   - `licence`: allows a commercial app; name CC-BY-SA here
+   - `fits`: fits in 24 GB beside the app, and inside the file and memory budgets in "Judging a candidate"
+   - `number`: a published number against what we ship or its proxy, with both numbers
+   - `notRejected`: not a same-architecture variant of a rejected model in `model-trials.md`
+   - `heldOut`: the benchmark's data is not in its training set
+
+   An eval reference candidate uses `api` (self-serve, a 1-hour file in one
+   request, speaker labels, word timestamps) and `number` in place of the
+   on-device keys. `verdict` names the deciding check.
 9. Commit on a branch `model-scout-YYYY-MM-DD`, then open and merge the PR
    (see PRs). The title is "Model scout YYYY-MM-DD". The body is the top pick
    in one sentence.
