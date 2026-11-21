@@ -179,7 +179,9 @@ a { color: inherit; }
   height: 22px; min-width: 22px; padding: 0 8px; margin-inline: 2px;
   border: 1px solid var(--tmi-ink-a20); border-radius: var(--radius-sm);
   background: var(--tmi-paper-raised); color: var(--tmi-ink);
-  font: 400 12px/1 var(--font-ui); letter-spacing: 0; vertical-align: middle;
+  font: 400 12px/1 var(--font-ui); letter-spacing: 0;
+  /* middle centres on the x-height; lift it to centre on the cap height */
+  vertical-align: middle; position: relative; top: -0.12em;
   transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out), transform var(--duration-1) var(--ease-out);
 }
 .kbd svg { width: 12px; height: 12px; flex: none; }

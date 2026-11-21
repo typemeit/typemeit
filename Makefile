@@ -12,7 +12,8 @@
 #   make meeting-eval       score meeting summaries and titles on Apple Intelligence
 #   make asr-eval ARGS=...  score speech models and diarizers against AssemblyAI (Scripts/asr-eval/README.md)
 #   make asr-eval-test      unit tests for the asr-eval scoring
-#   make model-trials       build docs/model-trials.md and typeme.it/models from docs/model-trials.json
+#   make site-shots         build the dev app and retake the website's app shots (web/shots)
+#   make model-trials      build docs/model-trials.md and typeme.it/models from docs/model-trials.json
 #   make diarizer-model     fetch both speaker models' files and tar them
 #   make diarizer-model-sums    print the DiarizerModelStore.swift constants for the tar
 #   make diarizer-model-verify  check the tar against what DiarizerModelStore.swift pins
@@ -54,7 +55,7 @@ DIARIZER_PINNED_SHA := $(shell sed -n 's/.*let sha256 = "\([0-9a-f]*\)".*/\1/p' 
 DIARIZER_PINNED_BYTES := $(shell sed -n 's/.*let expectedBytes: Int64 = \([0-9_]*\).*/\1/p' $(DIARIZER_STORE) | tr -d _)
 
 .DEFAULT_GOAL := help
-.PHONY: help fresh-install fresh-install-restore asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval asr-eval asr-eval-test model-trials bench \
+.PHONY: help site-shots fresh-install fresh-install-restore asr-model asr-model-sums asr-model-verify asr-model-publish asr-model-verify-url eval meeting-eval asr-eval asr-eval-test model-trials bench \
 	diarizer-model diarizer-model-sums diarizer-model-verify diarizer-model-publish diarizer-model-verify-url
 
 help:
@@ -66,6 +67,17 @@ help:
 # app's grants too.
 fresh-install:
 	Scripts/fresh-install.sh
+
+# The meeting, hooks and insights shots on typeme.it, from a seeded store
+# (Scripts/store/app/meeting.py). Refuses while a dev instance runs: it may be
+# recording, and the capture launches its own. Keep the mouse and keyboard off
+# while it runs.
+site-shots:
+	@! pgrep -fil "type me it dev.app/Contents/MacOS" || { echo "quit the running dev app first"; exit 1; }
+	DEVELOPMENT_TEAM=Z28DW76Y3W xcodegen generate
+	xcodebuild -project TypeMeIt.xcodeproj -scheme TypeMeIt -configuration Debug -derivedDataPath /tmp/typemeit-dd build \
+		'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$$(inherited) Diarizer' -quiet
+	python3 Scripts/store/app/meeting.py
 
 fresh-install-restore:
 	Scripts/fresh-install.sh restore

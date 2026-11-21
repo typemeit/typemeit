@@ -288,9 +288,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Settings.shared.onboardingComplete, OnboardingView.permissionsGranted {
             startRunning()
             if ModelStore.needsUpgrade(onboardingComplete: true, currentInstalled: modelInstalled) { showUpgrade() }
+            openLaunchPage()
         } else {
             showOnboarding()
         }
+    }
+
+    /// `-openPage insights` or `-openMeeting <id>` on the command line opens
+    /// that page or meeting at launch, for screenshots (Scripts/store/app).
+    /// Read from the arguments only, never from saved preferences.
+    private func openLaunchPage() {
+        let arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        if let id = (arguments["openMeeting"] as? String).flatMap(UUID.init(uuidString:)) {
+            AppState.shared.settingsTab = .meetings
+            AppState.shared.revealMeeting = id
+        } else if let page = (arguments["openPage"] as? String).flatMap(SettingsTab.init(rawValue:)) {
+            AppState.shared.settingsTab = page
+        } else {
+            return
+        }
+        Task { @MainActor in NotificationCenter.default.post(name: MenuBarLabel.openSettings, object: nil) }
     }
 
     /// The app is in the Dock and the app switcher only while one of its
