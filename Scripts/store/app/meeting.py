@@ -32,7 +32,7 @@ STORE = os.path.join(HERE, "store")
 OUT = os.path.join(ROOT, "web", "shots", "meeting.webp")
 HOOKS_OUT = os.path.join(ROOT, "web", "shots", "hooks.webp")
 SIZE = (2000, 1254)  # web/index.html's <img width> and height
-SIDEBAR = ["meetings", "hooks", "dictations", "insights", "dictionary", "settings"]
+SIDEBAR = ["meetings", "hooks", "dictations", "dictionary", "insights", "settings"]
 # Hooks live in the dev app's preferences, DEFAULTS.
 HOOKS_KEY = "meetingHooks"
 # Where the newest meeting's row sits in the meetings tab, in points from the
