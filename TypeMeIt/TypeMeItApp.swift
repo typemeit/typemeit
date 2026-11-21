@@ -65,6 +65,9 @@ final class AppState {
     var settingsTab: SettingsTab?
     /// The tab the settings window is showing, nil while it is closed.
     var visibleTab: SettingsTab?
+    /// The meetings page is open and the app is in front, so the user can
+    /// see it; open behind another app's window, they can't.
+    var meetingsInFront: Bool { visibleTab == .meetings && NSApp.isActive }
     /// A meeting the meetings tab should scroll to and expand when next shown.
     var revealMeeting: UUID?
     /// A dictation the dictations tab should open when next shown.

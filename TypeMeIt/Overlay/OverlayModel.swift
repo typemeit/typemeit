@@ -58,10 +58,13 @@ final class OverlayModel {
             }
         }
 
-        /// Stays up until a button answers it, never on a timer.
+        /// Stays up until a button answers it, never on a timer. A saved
+        /// meeting offering its hooks arrives minutes after the call, when
+        /// the user may not be looking.
         var isStanding: Bool {
             switch self {
             case .updateReady, .meetingPrompt, .meetingDiskFull, .meetingQuestion, .meetingAsking, .meetingAnswer: true
+            case .meetingSaved(_, let hooks): hooks
             default: false
             }
         }
