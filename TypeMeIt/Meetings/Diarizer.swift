@@ -150,6 +150,25 @@ actor Diarizer {
         return try await Diarizer.embedded(clips, with: loaded)
     }
 
+    /// Each speaker's voice embedded as `VoiceLibrary` learns one: their
+    /// turns cut into clips by `VoiceNames.windows`, each embedded by
+    /// `voices(of:)`. For telling whose voice each speaker on a track is.
+    func voices(of segments: [SpeakerSegment], in url: URL) async throws -> [String: [[Float]]] {
+        let loaded = try await ensureLoaded()
+        let longestMs = Diarizer.inputLength(loaded.models.fbankModel, "audio") / Meeting.framesPerMs
+        let file = try AVAudioFile(forReading: url)
+        var bySpeaker: [String: [[Float]]] = [:]
+        for segment in segments {
+            for range in VoiceNames.windows(segment.startMs..<segment.endMs, longestMs: longestMs, shortestMs: Fixed.meetingVoiceShortestMs) {
+                let clip = try MeetingTranscriber.read(file, range: range)
+                if let voice = try await Diarizer.embedded([clip], with: loaded).first, !voice.isEmpty {
+                    bySpeaker[segment.speaker, default: []].append(voice)
+                }
+            }
+        }
+        return bySpeaker
+    }
+
     /// `voice(of:models:)` for each clip, off the actor.
     private nonisolated static func embedded(_ clips: [[Float]], with loaded: Loaded) async throws -> [[Float]] {
         try clips.map { clip in

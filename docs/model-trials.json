@@ -918,6 +918,40 @@
       "held": "no: meetings 0.33 points worse, dictation a tie",
       "verdict": "rejected",
       "link": "`Scripts/asr-eval/systems/fluid_speech_pro.py`"
+    },
+    {
+      "name": "Diarizer segmentation step 0.1",
+      "url": null,
+      "group": "speakers",
+      "status": "rejected",
+      "summary": "on 5 calls, identical at 0.1 and 0.2: Nemotron makes the turns and never reads the setting",
+      "date": "2026-11-15",
+      "role": "Meetings",
+      "model": "FluidAudio offline pipeline `segmentationStepRatio` 0.1 (its docs' pick for far-field meetings with rapid exchanges)",
+      "against": "The default 0.2 on the same build",
+      "hypothesis": "—",
+      "metric": "Five calls replayed from the same audio; far-end words under the wrong speaker against AssemblyAI's labels; the user's mic words AssemblyAI gives to another voice",
+      "result": "Far end 0.9% wrong (196/21,842) at both; every paragraph and speaker the same on all five calls, mic included. The step ratio only sets the pyannote segmentation used by the embedder (told one speaker) and the S3 probe; the turns come from Nemotron",
+      "held": "—",
+      "verdict": "rejected; 0.2 stays",
+      "link": "rig kept locally (step-trial.sh, who.py, roomyou.py), not in the repo"
+    },
+    {
+      "name": "Learned voice picks the user on the mic",
+      "url": null,
+      "group": "speakers",
+      "status": "shipped",
+      "summary": "on 8 calls, one mixed You split into the user and two people beside them; no solo call split",
+      "date": "2026-11-15",
+      "role": "Meetings",
+      "model": "The learned-voice model (class-balanced softmax over WeSpeaker clips) trained on every other meeting, scoring each mic voice; a voice is the user's when the user is its likeliest person, once one voice is the user at 0.8",
+      "against": "The mic split only when a listed name never lit a tile, the user taken as the voice least under others' lit tiles, else the loudest",
+      "hypothesis": "—",
+      "metric": "Eight calls replayed with the check off and on; share of each mic voice's clips the same model hears as the user",
+      "result": "One call changed: You went from 148 s mixed to 101 s, 4 of 4 clips the user's (0.93), with two people beside the user split out as learned colleagues (0.88, 0.87). Three solo calls stayed one voice (the user at 0.95 to 0.99); two already-split calls kept the old pick. On one call no voice reached 0.8, so the old rule ran; on another, what is left in You is far-end echo, which this does not touch. Far-end attribution unchanged at 0.9% wrong",
+      "held": "—",
+      "verdict": "shipped",
+      "link": "`RoomVoices.heardAsUser`"
     }
   ]
 }

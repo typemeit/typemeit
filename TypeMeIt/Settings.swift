@@ -576,9 +576,11 @@ enum Fixed {
         "com.apple.CoreSpeech", "com.apple.assistantd", "com.apple.universalaccessd",
         "com.apple.accessibility.heard", "com.apple.systemsoundserverd",
     ]
-    /// FluidAudio's segmentation step ratio: its default 0.2; its docs say
-    /// 0.1 measures best on far-field meetings with rapid exchanges. S3
-    /// (docs/meetings.md 6) picks between them; until it runs, the default.
+    /// FluidAudio's segmentation step ratio, its default. It sets the
+    /// pyannote segmentation that `Diarizer`'s embedder and the S3 probe
+    /// use; the turns come from Nemotron, which does not read it. 0.1, which
+    /// FluidAudio's docs suggest for meetings, left five replayed calls
+    /// unchanged to the word (15 November).
     static let meetingDiarizerStepRatio = 0.2
     /// S3, from humla (MIT) and measured here: see `Diarizer.configuration`.
     static let meetingDiarizerMinOnSeconds = 1.0

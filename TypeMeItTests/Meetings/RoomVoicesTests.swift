@@ -63,6 +63,31 @@ struct RoomVoicesTests {
             others: ["r1"]))
     }
 
+    @Test func aVoiceIsTheUsersWhenTheUserIsItsLikeliestPerson() {
+        let posteriors: [String: [String: Float]] = ["A": ["You": 0.9, "Ana": 0.1], "B": ["You": 0.3, "Ana": 0.7], "C": ["You": 0.6, "Ana": 0.4]]
+        #expect(RoomVoices.heardAsUser(posteriors, user: "You", sure: 0.8) == ["A": true, "B": false, "C": true])
+    }
+
+    @Test func noVoiceSureToBeTheUserJudgesNothing() {
+        let posteriors: [String: [String: Float]] = ["A": ["You": 0.7, "Ana": 0.3], "B": ["You": 0.1, "Ana": 0.9]]
+        #expect(RoomVoices.heardAsUser(posteriors, user: "You", sure: 0.8).isEmpty)
+    }
+
+    @Test func voicesHeardAsTheUserAreTheUserWhicheverIsLoudest() {
+        // B is louder, but its voice is Ana's; A and C are both the user, split in two by the diarizer, and D was too short to judge.
+        let segments = [segment("A", 0, 10_000), segment("B", 10_000, 20_000), segment("C", 20_000, 30_000), segment("D", 30_000, 32_000)]
+        let split = RoomVoices.split(segments, echo: [], loudness: ["A": 0.1, "B": 0.5, "C": 0.1, "D": 0.1],
+                                     heardAsUser: ["A": true, "B": false, "C": true])
+        #expect(split == RoomVoices.Split(
+            segments: [segment("you", 0, 10_000), segment("r1", 10_000, 20_000), segment("you", 20_000, 30_000), segment("you", 30_000, 32_000)],
+            others: ["r1"]))
+    }
+
+    @Test func everyVoiceHeardAsTheUserLeavesTheMicAlone() {
+        let segments = [segment("A", 0, 10_000), segment("B", 10_000, 20_000)]
+        #expect(RoomVoices.split(segments, echo: [], loudness: ["A": 0.1, "B": 0.5], heardAsUser: ["A": true, "B": true]) == nil)
+    }
+
     @Test func oneVoiceBesidesEchoLeavesTheMicAlone() {
         let segments = [segment("A", 0, 10_000), segment("B", 10_000, 20_000)]
         #expect(RoomVoices.split(segments, echo: ["B"], loudness: ["A": 0.1, "B": 0.2]) == nil)
