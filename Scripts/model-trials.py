@@ -29,10 +29,10 @@ PUBLIC_FIELDS = ["name", "group", "status", "summary"]
 GROUPS = ["speech recognition", "clean-up", "speakers", "punctuation", "meeting questions", "echo cancellation"]
 STATUSES = ["shipped", "kept", "rejected", "open"]
 # What the opened row shows, under these labels.
-DETAIL_ROWS = [("against", "against"), ("hypothesis", "expected"), ("metric", "measured"),
-               ("result", "result"), ("held", "held"), ("verdict", "verdict")]
+DETAIL_ROWS = [("against", "Against"), ("hypothesis", "Expected"), ("metric", "Measured"),
+               ("result", "Result"), ("held", "Held"), ("verdict", "Verdict")]
 
-TITLE = "models · type me it"
+TITLE = "Models · type me it"
 DESCRIPTION = "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores."
 
 
@@ -91,7 +91,13 @@ def slug(text):
 
 def human_date(iso):
     day = date.fromisoformat(iso)
-    return f"{day.day} {day.strftime('%B').lower()} {day.year}"
+    return f"{day.day} {day.strftime('%B')} {day.year}"
+
+
+def sentence(text):
+    """Group, status and summary text starts with a capital on the page; the
+    JSON and the data attributes keep them lowercase."""
+    return text[:1].upper() + text[1:]
 
 
 def trial_html(trial, anchor):
@@ -99,16 +105,16 @@ def trial_html(trial, anchor):
     if trial["url"]:
         name = f'<a href="{html.escape(trial["url"])}">{name}</a>'
     details = "".join(
-        f"<dt>{label}</dt><dd>{inline(trial[field])}</dd>"
+        f"<dt>{label}</dt><dd>{inline(trial[field] if field == 'against' else sentence(trial[field]))}</dd>"
         for field, label in DETAIL_ROWS if trial[field] != "—"
     )
     return f"""<article class="trial" id="{anchor}" data-group="{slug(trial['group'])}" data-status="{trial['status']}">
   <time datetime="{trial['date']}">{human_date(trial['date'])}</time>
   <h3>{name}</h3>
-  <span class="status status-{trial['status']}">{trial['status']}</span>
-  <p class="summary">{html.escape(trial['summary'])}</p>
+  <span class="status status-{trial['status']}">{sentence(trial['status'])}</span>
+  <p class="summary">{html.escape(sentence(trial['summary']))}</p>
   <details>
-    <summary>notes</summary>
+    <summary>Notes</summary>
     <p class="model">{inline(trial['model'])}</p>
     <dl>{details}</dl>
   </details>
@@ -131,18 +137,18 @@ def page(data):
             if anchors[anchor] > 1:
                 anchor = f"{anchor}-{anchors[anchor]}"
             rows.append(trial_html(trial, anchor))
-        sections.append(f'<section id="{slug(group)}" data-group="{slug(group)}">\n<h2>{group}</h2>\n<div>\n'
+        sections.append(f'<section id="{slug(group)}" data-group="{slug(group)}">\n<h2>{sentence(group)}</h2>\n<div>\n'
                         + "\n".join(rows) + "\n</div>\n</section>")
 
     in_use = "".join(
-        f'<li><span class="label">{html.escape(m["group"])}</span>'
+        f'<li><span class="label">{html.escape(sentence(m["group"]))}</span>'
         f'<span class="in-use-name">{html.escape(m["name"])}</span>'
         f'<span class="in-use-score">{html.escape(m["score"])}</span></li>'
         for m in data["inUse"]
     )
-    filters = "".join(f'<button type="button" data-filter="{slug(g)}">{g}</button>'
+    filters = "".join(f'<button type="button" data-filter="{slug(g)}">{sentence(g)}</button>'
                       for g in GROUPS if any(t["group"] == g for t in trials))
-    filters += "".join(f'<button type="button" data-filter="{s}">{s}</button>'
+    filters += "".join(f'<button type="button" data-filter="{s}">{sentence(s)}</button>'
                        for s in STATUSES if any(t["status"] == s for t in trials))
 
     structured = json.dumps({
@@ -197,21 +203,21 @@ def page(data):
 <main>
 <header>
   <a class="home" href="/">← type me it</a>
-  <h1>models</h1>
-  <p class="meta">{len(trials)} trials · updated {human_date(newest)}</p>
+  <h1>Models</h1>
+  <p class="meta">{len(trials)} trials · Updated {human_date(newest)}</p>
 </header>
 
-<p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
-<p class="note">these notes are written by ai from evals we run ad hoc on a {html.escape(data['machine'])}. we would love it if you have any models you suggest we test (<a href="mailto:hello@typeme.it">hello@typeme.it</a>) - the point of type me it is to make onboarding as minimal as possible, so we want to use the best local model for each category instead of giving you even more decision fatigue.</p>
+<p class="lead">Every model we've tried against the one type me it runs, tested on our own dictations and meetings. Accuracy comes first, then speed, then memory and CPU, then download size - a new model has to match on accuracy before the rest count.</p>
+<p class="note">These notes are written by AI from evals we run ad hoc on a {html.escape(data['machine'])}. We would love it if you have any models you suggest we test (<a href="mailto:hello@typeme.it">hello@typeme.it</a>) - the point of type me it is to make onboarding as minimal as possible, so we want to use the best local model for each category instead of giving you even more decision fatigue.</p>
 
-<ul class="in-use" aria-label="in the app now">{in_use}</ul>
+<ul class="in-use" aria-label="In the app now">{in_use}</ul>
 
-<nav class="filters" aria-label="filter trials" hidden><button type="button" data-filter="" aria-pressed="true">all</button>{filters}</nav>
+<nav class="filters" aria-label="Filter trials" hidden><button type="button" data-filter="" aria-pressed="true">All</button>{filters}</nav>
 
 {chr(10).join(sections)}
 
 <footer>
-  <a href="/privacy">privacy</a>
+  <a href="/privacy">Privacy</a>
   <span aria-hidden="true">·</span>
   <a href="/">type me it</a>
 </footer>
