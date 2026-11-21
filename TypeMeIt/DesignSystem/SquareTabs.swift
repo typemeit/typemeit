@@ -41,7 +41,7 @@ struct SquareTabs<Trailing: View, Content: View>: View {
 
 /// The tab names and the slab under the picked one. Its own view, so each
 /// frame of the slab's jump redraws the strip and not the panel under it.
-private struct SquareTabStrip: View {
+struct SquareTabStrip: View {
     let tabs: [SquareTab]
     @Binding var picked: Int
 

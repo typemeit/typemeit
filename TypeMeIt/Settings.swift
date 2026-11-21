@@ -657,4 +657,14 @@ enum Fixed {
     static let meetingVoiceTrainingSteps = 300
     static let meetingVoiceTrainingRate: Float = 4
     static let meetingVoiceTrainingMomentum: Float = 0.9
+    /// The voices map on the insights page (`VoiceMap`): at most this many
+    /// clips a person, which keeps t-SNE's n² steps to seconds.
+    static let voiceMapClipsPerPerson = 60
+    /// How many nearest clips the map's separation figure looks at.
+    static let voiceMapNeighbours = 10
+    /// scikit-learn's t-SNE defaults.
+    static let voiceMapPerplexity: Float = 30
+    static let voiceMapExaggeration: Float = 12
+    static let voiceMapExaggeratedSteps = 250
+    static let voiceMapSteps = 750
 }

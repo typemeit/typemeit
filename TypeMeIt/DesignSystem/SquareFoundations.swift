@@ -171,6 +171,7 @@ struct SquareGallery: View {
             ("layouts", "grid page split", AnyView(SquareLayoutsSpecimen())),
             ("list head", "table header column", AnyView(SquareListHeadSpecimen())),
             ("status", "state progress badge", AnyView(SquareStatusSpecimen())),
+            ("puff loader", "loading progress spinner cloud colour", AnyView(SquarePuffLoaderSpecimen())),
             ("sidebar", "navigation nav", AnyView(SquareSidebarSpecimen())),
             ("page header", "title toolbar", AnyView(SquarePageHeaderSpecimen())),
             ("prompt", "input ask composer", AnyView(SquarePromptSpecimen())),
