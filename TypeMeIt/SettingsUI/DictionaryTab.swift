@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The custom words: learning from corrections, each word with what else it
 /// has been heard as, the field that adds one, and what a new word would have
-/// changed in the last dictations.
+/// changed in the last dictations, and Claude's check for misheard words.
 struct DictionaryTab: View {
     @State private var settings = Settings.shared
     @State private var store = Store.shared
@@ -50,6 +50,7 @@ struct DictionaryTab: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .top) { SquareRule() }
                 verifyPanel
+                if WordCheck.isOn { WordSuggestions() }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 16)

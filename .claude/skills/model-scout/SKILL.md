@@ -27,6 +27,7 @@ model to update it.
 | Opening "Can" check | Apple Foundation Models | `TypeMeIt/OpeningCan.swift` | `make eval` cases |
 | Diarization | Nemotron 3 Diarization, CoreML offline, weights `ga-2026-09-23` | `TypeMeIt/Meetings/Diarizer.swift`, `DiarizerModelStore.swift` | `make asr-eval ARGS=score`: wrong-speaker word rate vs AssemblyAI labels. The Nemotron baseline adapter is still a stub |
 | Ask Claude: finding the question | Claude Haiku via Claude Code (`--model haiku`, no tools or MCP) | `TypeMeIt/Meetings/ClaudeRun.swift` `latestQuestion` | None |
+| Word check: misheard words in past dictations | The Claude Code model picked in settings (`askClaudeModel`, Claude Code's default unless set), no tools or MCP, `--json-schema` output | `TypeMeIt/Meetings/ClaudeRun.swift` `wordCheck`, `TypeMeIt/Learning/WordCheck.swift` | None |
 | Speaker segmentation and embeddings | pyannote community-1 + WeSpeaker 256-d + VBx, via FluidAudio 0.18.2 | `project.yml`, `Diarizer.swift` | None. `docs/voice-names-research/` scripts are ad hoc |
 
 The evals use one paid model, tracked the same way:
