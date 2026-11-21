@@ -127,18 +127,7 @@ actor VoiceLibrary {
         loadAll()
         guard !unnamed.isEmpty, let file = voices[meeting.id] else { return [:] }
         let heard = VoiceNames.regrouped(file, in: meeting)
-        var examples: [(name: String, vector: [Float])] = []
-        var trainedOn: [String] = []
-        for other in meetings {
-            guard let file = voices[other.id] else { continue }
-            let clips = VoiceNames.regrouped(file, in: other)
-            for speaker in other.speakers {
-                guard let name = VoiceNames.label(of: speaker), let vectors = clips[speaker.id] else { continue }
-                examples += vectors.map { (name, $0) }
-                trainedOn.append("\(other.id) \(speaker.id) \(name) \(vectors.count)")
-            }
-        }
-        let key = trainedOn.sorted().joined(separator: "\n")
+        let (examples, key) = trainingSet(among: meetings)
         let model: VoiceNames.Model
         if let cached, cached.key == key {
             model = cached.model
@@ -163,6 +152,38 @@ actor VoiceLibrary {
         }
         return VoiceNames.suggestions(for: heard.filter { unnamed.contains($0.key) }, taken: Set(meeting.speakers.compactMap(VoiceNames.label(of:))),
                                       model: model, minimum: Fixed.meetingVoiceSuggestPosterior, minimumClips: Fixed.meetingVoiceMinimumClips)
+    }
+
+    /// How likely each person named in `meetings` is to be each of `heard`'s
+    /// voices, for those with at least `Fixed.meetingVoiceMinimumClips`
+    /// clips. Nil when fewer than two people have been learned. Trained
+    /// apart from `suggestions`, so neither cancels the other's training.
+    func posteriors(of heard: [String: [[Float]]], among meetings: [Meeting]) async -> [String: [String: Float]]? {
+        loadAll()
+        let examples = trainingSet(among: meetings).examples
+        let trained = await Task.detached {
+            VoiceNames.Model.train(examples, steps: Fixed.meetingVoiceTrainingSteps, rate: Fixed.meetingVoiceTrainingRate, momentum: Fixed.meetingVoiceTrainingMomentum)
+        }.value
+        guard let trained else { return nil }
+        return heard.filter { $0.value.count >= Fixed.meetingVoiceMinimumClips }
+            .mapValues { Dictionary(uniqueKeysWithValues: zip(trained.names, trained.posterior($0))) }
+    }
+
+    /// Every learned clip of every named speaker in `meetings`, with a key
+    /// that changes whenever a name or a clip count does.
+    private func trainingSet(among meetings: [Meeting]) -> (examples: [(name: String, vector: [Float])], key: String) {
+        var examples: [(name: String, vector: [Float])] = []
+        var trainedOn: [String] = []
+        for other in meetings {
+            guard let file = voices[other.id] else { continue }
+            let clips = VoiceNames.regrouped(file, in: other)
+            for speaker in other.speakers {
+                guard let name = VoiceNames.label(of: speaker), let vectors = clips[speaker.id] else { continue }
+                examples += vectors.map { (name, $0) }
+                trainedOn.append("\(other.id) \(speaker.id) \(name) \(vectors.count)")
+            }
+        }
+        return (examples, trainedOn.sorted().joined(separator: "\n"))
     }
 
     // MARK: Files

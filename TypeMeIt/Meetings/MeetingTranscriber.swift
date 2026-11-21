@@ -315,21 +315,41 @@ enum MeetingTranscriber {
     }
 
     /// The mic track of a call split between the user and the people beside
-    /// them (`RoomVoices`), when the roster lists someone who never lit a
-    /// tile. Without such a name the mic is not diarized: the user alone
-    /// would risk being split in two, with nobody to name the second half.
-    /// The diarizer is capped at the user, the silent names and, on an
+    /// them (`RoomVoices`). With voices learned, the mic is diarized on
+    /// every call and each voice is checked against the user's learned voice
+    /// (`RoomVoices.heardAsUser`), trained on every other meeting. When that
+    /// does not recognise the user, the mic is split only when the roster
+    /// lists someone who never lit a tile: the user alone would otherwise
+    /// risk being split in two, with nobody to name the second half. That
+    /// split is capped at the user, the silent names and, on an
     /// echo-affected call, the far end's voices coming back.
     private static func roomVoices(of meeting: Meeting, in folder: URL, silent: [String], othersLit: [MeetingNames.Span], farEnd: [Transcriber.Word], farEndVoices: Int, micEnvelope: [Float]?) async -> RoomVoices.Split? {
-        guard meeting.kind == .call, !silent.isEmpty, let micEnvelope, DiarizerModelStore.isInstalled,
+        let (learned, otherMeetings) = await MainActor.run { (Settings.shared.meetingLearnVoices, MeetingStore.shared.meetings.filter { $0.id != meeting.id }) }
+        guard meeting.kind == .call, !silent.isEmpty || learned, let micEnvelope, DiarizerModelStore.isInstalled,
               let track = meeting.tracks.first(where: { $0.role == .mic }) else { return nil }
-        let cap = 1 + silent.count + (meeting.echo == .affected ? farEndVoices : 0)
+        let url = folder.appendingPathComponent(track.file)
         do {
-            let run = try await Diarizer.shared.run(url: folder.appendingPathComponent(track.file), count: .atMost(cap))
-            let segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+            let run = try await Diarizer.shared.run(url: url)
+            let loudness = { (segments: [SpeakerSegment]) in RoomVoices.loudness(segments, envelope: micEnvelope, envelopeHz: rmsEnvelopeHz) }
+            if learned {
+                let segments = SpeakerMerge.absorbingShort(run.segments, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
+                let echo = RoomVoices.echoVoices(segments, farEnd: farEnd, echoShare: Fixed.meetingEchoVoiceShare)
+                let micVoicePrints = try await Diarizer.shared.voices(of: segments.filter { !echo.contains($0.speaker) }, in: url)
+                let posteriors = await VoiceLibrary.shared.posteriors(of: micVoicePrints, among: otherMeetings) ?? [:]
+                let userVoices = RoomVoices.heardAsUser(posteriors, user: VoiceNames.youName, sure: Fixed.meetingVoiceSuggestPosterior)
+                if !userVoices.isEmpty {
+                    let split = RoomVoices.split(segments, echo: echo, loudness: loudness(segments), heardAsUser: userVoices)
+                    DebugLog.write("Meeting room voices: \(counted(Set(segments.map(\.speaker)).count, "voice")) on the mic, \(echo.count) echo, \(userVoices.values.filter { $0 }.count) heard as the user, \(counted(split?.others.count ?? 0, "person")) beside the user")
+                    return split
+                }
+                DebugLog.write("Meeting room voices: the user's voice was not recognised on the mic")
+            }
+            guard !silent.isEmpty else { return nil }
+            let cap = 1 + silent.count + (meeting.echo == .affected ? farEndVoices : 0)
+            let capped = SpeakerMerge.capped(run.segments, embeddings: run.embeddings, maximum: cap)
+            let segments = SpeakerMerge.absorbingShort(capped, embeddings: run.embeddings, minimumMs: Fixed.meetingMinimumSpeakerSeconds * 1000)
             let echo = RoomVoices.echoVoices(segments, farEnd: farEnd, echoShare: Fixed.meetingEchoVoiceShare)
-            let split = RoomVoices.split(segments, echo: echo, loudness: RoomVoices.loudness(segments, envelope: micEnvelope, envelopeHz: rmsEnvelopeHz),
-                                         othersLit: othersLit)
+            let split = RoomVoices.split(segments, echo: echo, loudness: loudness(segments), othersLit: othersLit)
             DebugLog.write("Meeting room voices: \(counted(Set(segments.map(\.speaker)).count, "voice")) on the mic, \(echo.count) echo, \(counted(split?.others.count ?? 0, "person")) beside the user")
             return split
         } catch {

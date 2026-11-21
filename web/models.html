@@ -35,7 +35,7 @@
  "name": "type me it model trials",
  "description": "Speech, clean-up and speaker models type me it has tested against the ones it runs, with the scores.",
  "url": "https://typeme.it/models",
- "dateModified": "2026-11-14",
+ "dateModified": "2026-11-15",
  "creator": {
   "@type": "Organization",
   "name": "type me it",
@@ -410,6 +410,18 @@
    "dateCreated": "2026-11-14",
    "description": "dictation tied at 4.08% vs 4.22%; meetings 12.98% vs Ultra's 12.65%, p95 dictation 211 vs 105 ms",
    "url": "https://huggingface.co/FluidVoice-Labs/fluid-speech-pro-coreml"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Diarizer segmentation step 0.1",
+   "dateCreated": "2026-11-15",
+   "description": "on 5 calls, identical at 0.1 and 0.2: Nemotron makes the turns and never reads the setting"
+  },
+  {
+   "@type": "CreativeWork",
+   "name": "Learned voice picks the user on the mic",
+   "dateCreated": "2026-11-15",
+   "description": "on 8 calls, one mixed You split into the user and two people beside them; no solo call split"
   }
  ]
 }
@@ -420,7 +432,7 @@
 <header>
   <a class="home" href="/">← type me it</a>
   <h1>models</h1>
-  <p class="meta">53 trials · updated 14 november 2026</p>
+  <p class="meta">55 trials · updated 15 november 2026</p>
 </header>
 
 <p class="lead">every model we've tried against the one type me it runs, tested on our own dictations and meetings. accuracy comes first, then speed, then memory and cpu, then download size - a new model has to match on accuracy before the rest count.</p>
@@ -872,6 +884,28 @@
 <section id="speakers" data-group="speakers">
 <h2>speakers</h2>
 <div>
+<article class="trial" id="diarizer-segmentation-step-0-1" data-group="speakers" data-status="rejected">
+  <time datetime="2026-11-15">15 november 2026</time>
+  <h3>Diarizer segmentation step 0.1</h3>
+  <span class="status status-rejected">rejected</span>
+  <p class="summary">on 5 calls, identical at 0.1 and 0.2: Nemotron makes the turns and never reads the setting</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">FluidAudio offline pipeline <code>segmentationStepRatio</code> 0.1 (its docs' pick for far-field meetings with rapid exchanges)</p>
+    <dl><dt>against</dt><dd>The default 0.2 on the same build</dd><dt>measured</dt><dd>Five calls replayed from the same audio; far-end words under the wrong speaker against AssemblyAI's labels; the user's mic words AssemblyAI gives to another voice</dd><dt>result</dt><dd>Far end 0.9% wrong (196/21,842) at both; every paragraph and speaker the same on all five calls, mic included. The step ratio only sets the pyannote segmentation used by the embedder (told one speaker) and the S3 probe; the turns come from Nemotron</dd><dt>verdict</dt><dd>rejected; 0.2 stays</dd></dl>
+  </details>
+</article>
+<article class="trial" id="learned-voice-picks-the-user-on-the-mic" data-group="speakers" data-status="shipped">
+  <time datetime="2026-11-15">15 november 2026</time>
+  <h3>Learned voice picks the user on the mic</h3>
+  <span class="status status-shipped">shipped</span>
+  <p class="summary">on 8 calls, one mixed You split into the user and two people beside them; no solo call split</p>
+  <details>
+    <summary>notes</summary>
+    <p class="model">The learned-voice model (class-balanced softmax over WeSpeaker clips) trained on every other meeting, scoring each mic voice; a voice is the user's when the user is its likeliest person, once one voice is the user at 0.8</p>
+    <dl><dt>against</dt><dd>The mic split only when a listed name never lit a tile, the user taken as the voice least under others' lit tiles, else the loudest</dd><dt>measured</dt><dd>Eight calls replayed with the check off and on; share of each mic voice's clips the same model hears as the user</dd><dt>result</dt><dd>One call changed: You went from 148 s mixed to 101 s, 4 of 4 clips the user's (0.93), with two people beside the user split out as learned colleagues (0.88, 0.87). Three solo calls stayed one voice (the user at 0.95 to 0.99); two already-split calls kept the old pick. On one call no voice reached 0.8, so the old rule ran; on another, what is left in You is far-end echo, which this does not touch. Far-end attribution unchanged at 0.9% wrong</dd><dt>verdict</dt><dd>shipped</dd></dl>
+  </details>
+</article>
 <article class="trial" id="short-voices-sentence-end-turns-and-quiet-echo-listen-review" data-group="speakers" data-status="shipped">
   <time datetime="2026-11-14">14 november 2026</time>
   <h3>Short voices, sentence-end turns and quiet echo, listen review</h3>
