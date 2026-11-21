@@ -41,3 +41,13 @@ struct ToastCountdownTests {
         #expect(steps == 2)
     }
 }
+
+struct MeetingSavedStandingTests {
+    @Test func aSavedMeetingOfferingHooksStaysUntilDismissed() {
+        #expect(OverlayModel.State.meetingSaved(id: UUID(), hooks: true).isStanding)
+    }
+
+    @Test func aSavedMeetingWithoutHooksTimesOut() {
+        #expect(!OverlayModel.State.meetingSaved(id: UUID(), hooks: false).isStanding)
+    }
+}

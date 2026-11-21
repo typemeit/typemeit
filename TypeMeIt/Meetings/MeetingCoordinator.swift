@@ -864,9 +864,9 @@ final class MeetingCoordinator {
             // The tick may have published it between the run's last save and here.
             if store.meeting(meeting.id)?.published == true {
                 store.renameFolderIfNeeded(meeting.id)
-                if AppState.shared.visibleTab != .meetings { toast(saved) }
+                if !AppState.shared.meetingsInFront { toast(saved) }
             } else if store.publish(meeting.id) {
-                if AppState.shared.visibleTab != .meetings { toast(saved) }
+                if !AppState.shared.meetingsInFront { toast(saved) }
             } else {
                 toast(.meetingFolderUnavailable)
             }
@@ -933,7 +933,7 @@ final class MeetingCoordinator {
             // Cancelled from the page, which shows how far they got; the
             // meetings page shows the results itself. A prompt or answer
             // standing in the pill is left alone too.
-            guard !cancelled, AppState.shared.visibleTab != .meetings, !self.overlay.model.state.isStanding else { return }
+            guard !cancelled, !AppState.shared.meetingsInFront, !self.overlay.model.state.isStanding else { return }
             self.toast(.meetingHooksDone(id: id, ran: hooks.count, failed: failures))
         }
     }
