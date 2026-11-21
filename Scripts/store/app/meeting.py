@@ -26,7 +26,7 @@ import time
 import uuid
 import wave
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from capture import APP, DEFAULTS, HERE, ROOT, WINDOW_ID, clone_model, osascript
 
@@ -37,13 +37,9 @@ INSIGHTS_OUT = os.path.join(ROOT, "web", "shots", "insights.webp")
 SIZE = (2000, 1254)  # web/index.html's <img width> and height
 # Hooks live in the dev app's preferences, DEFAULTS.
 HOOKS_KEY = "meetingHooks"
-# The hook run card and the hooks list in the saved meeting shot, in its
+# The title, the hook run card, and people and hooks in the saved meeting shot, in its
 # pixels: left, top, right, bottom.
-HOOKS_CROP = (300, 296, 2000, 996)
-# The summary's last line ends level with the top of the hooks run button,
-# so the crop's strip over the article, in its own pixels, is painted over
-# with the page's background.
-SUMMARY_TAIL = (0, 0, 1240, 10)
+HOOKS_CROP = (300, 120, 2000, 990)
 
 ID = "5EED0000-0000-4000-8000-000000000001"
 STARTED = "2026-10-09T09:02:00Z"  # 10:02 in London
@@ -243,9 +239,7 @@ def main():
     try:
         seed(hook_runs=True)
         capture(HOOKS_OUT, ["-openMeeting", ID])
-        hooks = Image.open(HOOKS_OUT).crop(HOOKS_CROP)
-        ImageDraw.Draw(hooks).rectangle(SUMMARY_TAIL, fill=hooks.getpixel((SUMMARY_TAIL[2], SUMMARY_TAIL[3] + 1)))
-        hooks.save(HOOKS_OUT, "WEBP", quality=90)
+        Image.open(HOOKS_OUT).crop(HOOKS_CROP).save(HOOKS_OUT, "WEBP", quality=90)
         print(HOOKS_OUT)
         seed(hook_runs=False)
         capture(OUT, ["-openMeeting", ID])
