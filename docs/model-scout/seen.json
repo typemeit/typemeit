@@ -1698,37 +1698,234 @@
     {
       "id": "Reson8/Rumble-2-Flash",
       "date": "2026-11-19",
-      "role": "speech recognition"
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "mlx-audio's qwen3_asr model loads the bf16 weights; a 6-bit MLX build exists (ungurenko/Parrot-ASR-0.5B-MLX-6bit)"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among 45 languages; leaderboard English track"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.51B parameters, model.safetensors 1.02 GB bf16, inside the 1.5 GB file budget"
+        },
+        "number": {
+          "pass": true,
+          "why": "Open ASR Leaderboard 18-11-2026: average 6.60; 7 public sets 6.08 vs Parakeet TDT v2 6.43; AMI-Cleaned 9.24 vs 9.09; private conversational 13.14 vs 13.70"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture (Qwen3ASRForConditionalGeneration); Qwen3-ASR-0.6B rejected 2026-10-12. Reson8 does not say whether it is a fine-tune or trained from scratch"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "training data not disclosed"
+        }
+      },
+      "verdict": "near miss: notRejected (Qwen3-ASR architecture)"
     },
     {
       "id": "opusclip/steno-v1-preview (eval reference)",
       "date": "2026-11-19",
-      "role": "eval reference"
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": null,
+          "why": "OpusClip's transcription API lists word timestamps and diarization, but no page names Steno, a model id or a price; 1-hour limit not stated"
+        },
+        "number": {
+          "pass": true,
+          "why": "Open ASR Leaderboard 18-11-2026: AMI-Cleaned 6.55 vs Universal-3.5 Pro 10.63; private conversational 12.61 vs 12.62; whether maintainer-run not checked"
+        }
+      },
+      "verdict": "near miss: api (no public model id or price for Steno)"
     },
     {
       "id": "SpeedAudio261119/SpeedASR-v1-65M",
       "date": "2026-11-19",
-      "role": "speech recognition"
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX exports of encoder, decoder and joiner (Zipformer transducer, sherpa-onnx family); parity with PyTorch not checked by the author"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "65.6M parameters, 263 MB checkpoint"
+        },
+        "number": {
+          "pass": false,
+          "why": "self-run on an RTX 3090 Ti, not official: 7 public sets 6.90 vs Parakeet TDT v2 6.43; AMI-Cleaned 9.59 vs 9.09. Worse than the proxy"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "no Zipformer in model-trials.md"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "training data not stated"
+        }
+      },
+      "verdict": "near miss: number (worse than Parakeet TDT v2 on the shared sets)"
     },
     {
       "id": "microsoft/Aion-1.0-Instruct-2.3B",
       "date": "2026-11-19",
-      "role": "clean-up"
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "card lists PyTorch, ONNX and GGUF; quantized builds to follow"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among 8 languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "MIT"
+        },
+        "fits": {
+          "pass": null,
+          "why": "2.3B parameters unquantized; size of a quantized build unknown against the 1.5 GB clean-up budget"
+        },
+        "number": {
+          "pass": false,
+          "why": "no dictation clean-up or text-normalisation score"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not a variant of a rejected clean-up model"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark to check"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
     },
     {
       "id": "Manifestro/kezek",
       "date": "2026-11-19",
-      "role": "diarization"
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "PyTorch on GitHub; no Core ML, MLX, GGUF or ONNX build found"
+        },
+        "english": {
+          "pass": true,
+          "why": "conversational English (Open Yap, CallHome)"
+        },
+        "licence": {
+          "pass": null,
+          "why": "open-sourced on GitHub; licence not read"
+        },
+        "fits": {
+          "pass": true,
+          "why": "41M parameters"
+        },
+        "number": {
+          "pass": false,
+          "why": "two-speaker separation scored against pyannote + DialogueSidon on channel assignment (0.93 vs 0.79) and leakage; no DER against Nemotron or pyannote"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Conv-TasNet-style separation, not in model-trials.md"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "CallHome not seen in training, per the post (0.86 channel assignment)"
+        }
+      },
+      "verdict": "near miss: number (no DER; separates two speakers only)"
     },
     {
       "id": "Oulasong/ThunderTalk-ASR-0.6B",
       "date": "2026-11-19",
-      "role": "speech recognition"
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, 8-bit decoder and fp16 encoder, 1.2 GB"
+        },
+        "english": {
+          "pass": false,
+          "why": "Chinese, English and mixed; short English 17.2% token error on its own set"
+        },
+        "licence": {
+          "pass": false,
+          "why": "ThunderTalk licence: non-commercial outside the ThunderTalk app"
+        },
+        "fits": {
+          "pass": true,
+          "why": "1.2 GB"
+        },
+        "number": {
+          "pass": false,
+          "why": "only its own 44-recording set, against Qwen3-ASR-0.6B"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "fine-tune of Qwen3-ASR-0.6B, rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "test clips come from splits of corpora like its training data"
+        }
+      },
+      "verdict": "near miss: licence (non-commercial)"
     },
     {
       "id": "frankyoujian/EdgeASR",
       "date": "2026-11-19",
-      "role": "speech recognition"
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "k2/icefall PyTorch checkpoint; no on-device build in the repo"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": false,
+          "why": "weights CC-BY-NC-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "offline Zipformer transducer, small"
+        },
+        "number": {
+          "pass": null,
+          "why": "no Open ASR Leaderboard numbers on the card"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "no Zipformer in model-trials.md"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not stated"
+        }
+      },
+      "verdict": "near miss: licence (CC-BY-NC)"
     },
     {
       "id": "FluidAudio 0.18.4",
