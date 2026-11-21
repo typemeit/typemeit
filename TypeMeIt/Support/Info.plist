@@ -45,8 +45,6 @@
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>type me it records the other side of a call when you ask it to record a meeting.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>type me it shows your camera through the type me it camera, with Claude's answers when you ask.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>type me it keeps your meetings in the folder you chose.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

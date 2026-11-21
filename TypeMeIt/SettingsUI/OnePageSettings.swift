@@ -1,4 +1,3 @@
-import AVFoundation
 import FoundationModels
 import SwiftUI
 
@@ -70,11 +69,6 @@ struct OnePageSettings: View {
     @State private var updates = Updates.shared
     /// Read from the CLI when the ask claude rows first show; nil until then.
     @State private var claudeModels: [ClaudeModels.Model]?
-    @State private var camera = CameraFeed.shared
-    @State private var cameraInstaller = CameraInstaller.shared
-    @State private var cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
-    @State private var settingUpCamera = false
-    @State private var removingCamera = false
     @State private var claudeCheck = ClaudeCheck.shared
     @State private var checkDetailsOpen = false
     @State private var devices = AudioCapture.inputDevices()
@@ -119,7 +113,6 @@ struct OnePageSettings: View {
         .onReceive(poll) { _ in
             availability = PostProcessor.availability
             screenGranted = CGPreflightScreenCaptureAccess()
-            cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
             let pickedUID = settings.microphoneUID
             if settings.connectedMicrophoneUID() != pickedUID { devices = AudioCapture.inputDevices() }
         }
@@ -146,22 +139,10 @@ struct OnePageSettings: View {
 
     private var assistant: some View {
         SquareRows {
-            SquareSubhead(text: "mcp", first: true,
-                          blurb: "lets assistants on this mac, like claude code or claude desktop, read your meetings and dictations locally and add hooks.")
-            SquareSettingsRow(label: "server", help: "lets assistants read your meetings and dictations locally · a cloud assistant sends what it reads to its servers · try asking claude code \u{201C}what was my last meeting about?\u{201D}",
-                              caption: MCPSetup.translocated ? "move to applications first" : nil) {
-                toggle("mcp server", $settings.mcpEnabled).disabled(MCPSetup.translocated)
-            } below: {
-                if settings.mcpEnabled, !MCPSetup.translocated {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if ClaudeRun.isAvailable { MCPAddToClaudeCode() }
-                        MCPToolList()
-                    }
-                }
-            }
-            SquareSubhead(text: "everywhere",
+            SquareSubhead(text: "everywhere", first: true,
                           blurb: "claude code answers questions you ask in a call or a dictation, and runs your hooks on a meeting once it ends, using your account and mcp servers. each one sends the call's transcript to anthropic.")
             if ClaudeRun.isAvailable {
+                claudeCheckRow
                 SquareSettingsRow(label: "ask", help: OnePageSettings.askHelp) {
                     toggle("ask", checkedOn(get: { settings.askClaude }, set: { settings.askClaude = $0 }))
                 }
@@ -174,6 +155,19 @@ struct OnePageSettings: View {
                     }
                 }
             }
+            SquareSubhead(text: "mcp",
+                          blurb: "lets assistants on this mac, like claude code or claude desktop, read your meetings and dictations locally and add hooks.")
+            SquareSettingsRow(label: "server", help: "lets assistants read your meetings and dictations locally · a cloud assistant sends what it reads to its servers · try asking claude code \u{201C}what was my last meeting about?\u{201D}",
+                              caption: MCPSetup.translocated ? "move to applications first" : nil) {
+                toggle("mcp server", $settings.mcpEnabled).disabled(MCPSetup.translocated)
+            } below: {
+                if settings.mcpEnabled, !MCPSetup.translocated {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if ClaudeRun.isAvailable { MCPAddToClaudeCode() }
+                        MCPToolList()
+                    }
+                }
+            }
             if ClaudeRun.isAvailable {
                 SquareSubhead(text: "meetings")
                 meetingAskRows
@@ -181,7 +175,7 @@ struct OnePageSettings: View {
         }
     }
 
-    private static let askHelp = "ask from the menu bar, or say \"claude, …?\" or \"tmi, …?\" in a call or a dictation · the answer is kept with the meeting"
+    private static let askHelp = "say \"claude, …?\" or \"tmi, …?\" during a meeting · ask from the menu bar"
 
     /// How Claude Code answers, wherever it is asked.
     @ViewBuilder private var claudeRows: some View {
@@ -201,6 +195,10 @@ struct OnePageSettings: View {
         } below: {
             SquarePromptEditor(text: $settings.askClaudeSystemPrompt)
         }
+    }
+
+    /// Whether Claude Code runs the way ask and hooks need.
+    private var claudeCheckRow: some View {
         SquareSettingsRow(label: "claude code", help: "checks claude code runs the way ask and hooks need · runs when you turn either on, change these settings or claude code updates · if it fails, what you turned on goes back off · use installs the last version that worked, and claude code updates itself again unless DISABLE_AUTOUPDATER is 1 under env in ~/.claude/settings.json",
                           caption: ClaudeCheck.caption(claudeCheck.status, lastPassed: claudeCheck.lastPassed)) {
             if let rollback = claudeCheck.rollback {
@@ -268,38 +266,8 @@ struct OnePageSettings: View {
         })
     }
 
-    /// While ask is on, the camera; and the way to the hooks, which only need Claude Code.
+    /// The way to the hooks, which only need Claude Code.
     @ViewBuilder private var meetingAskRows: some View {
-        if settings.askClaude {
-            SquareSettingsRow(label: "on camera", help: "shows the cloud and claude's answer in your video while a meeting records · pick type me it as the camera in your meeting app",
-                              caption: onCameraCaption) {
-                HStack(spacing: 10) {
-                    if settings.askClaudeOnCamera, !cameraReady {
-                        Button("finish") { settingUpCamera = true }.buttonStyle(SquareButtonStyle())
-                    }
-                    toggle("on camera", $settings.askClaudeOnCamera)
-                }
-            }
-            .onChange(of: settings.askClaudeOnCamera) { _, on in if on, !cameraReady { settingUpCamera = true } }
-            .sheet(isPresented: $settingUpCamera) { CameraSetupView { settingUpCamera = false } }
-            if camera.installed {
-                SquareSettingsRow(label: "camera", help: "the camera type me it shows") {
-                    SquareMenu(selection: $settings.meetingCamera, options: cameraOptions, label: cameraLabel)
-                }
-                .onChange(of: settings.meetingCamera) { camera.cameraChanged() }
-                if CameraInstaller.canAdd {
-                    SquareSettingsRow(label: "remove camera", help: "meeting apps stop listing type me it") {
-                        Button("remove") { removingCamera = true }
-                            .buttonStyle(SquareButtonStyle())
-                            .squareConfirmDelete(isPresented: $removingCamera, title: "remove the type me it camera?",
-                                                 detail: "add it again from on camera", confirm: "remove") {
-                                settings.askClaudeOnCamera = false
-                                cameraInstaller.remove()
-                            }
-                    }
-                }
-            }
-        }
         SquareSettingsRow(label: "hooks", help: "prompts claude runs on a finished meeting",
                           caption: settings.meetingHooks.isEmpty ? nil : "\(counted(settings.meetingHooks.count, "hook")) · \(settings.meetingHooks.filter(\.on).count) on") {
             Button("open") { AppState.shared.settingsTab = .hooks }
@@ -702,41 +670,6 @@ struct OnePageSettings: View {
         }
         if !offeredModels.contains(model) { return "doesn't run in auto mode" }
         return model.description.lowercased()
-    }
-
-    /// The Mac's default, then each camera; the saved one stays listed while it is unplugged.
-    private var cameraOptions: [String] {
-        let listed = camera.cameras.map(\.uniqueID)
-        let saved = [settings.meetingCamera].filter { !$0.isEmpty && !listed.contains($0) }
-        return [""] + saved + listed
-    }
-
-    private func cameraLabel(_ value: String) -> String {
-        if value.isEmpty { return "default" }
-        return camera.cameras.first { $0.uniqueID == value }?.localizedName.lowercased() ?? "unplugged camera"
-    }
-
-    /// Added, allowed and given the real camera; picking it in a meeting app is up to the user.
-    private var cameraReady: Bool { camera.installed && cameraAccess == .authorized }
-
-    /// What is left of setting up on camera, or that a meeting shows it.
-    private var onCameraCaption: String? {
-        guard settings.askClaudeOnCamera else { return nil }
-        if !camera.installed {
-            if !CameraInstaller.canAdd { return "dev build: add it with scripts/install-camera.sh" }
-            if !CameraInstaller.inApplications { return "move to applications first" }
-            switch cameraInstaller.status {
-            case .adding: return "adding…"
-            case .needsApproval: return "needs approval in system settings"
-            case .failed(let reason): return reason
-            default: return "not added"
-            }
-        }
-        switch cameraAccess {
-        case .authorized: return camera.watched ? "showing in a meeting" : "pick type me it in your meeting app"
-        case .notDetermined: return "needs camera access"
-        default: return "camera access is off"
-        }
     }
 
     private var claudeFolderPath: String {

@@ -162,12 +162,6 @@ final class Settings {
     /// them, in its `--allowedTools` syntax. Empty leaves every action to the
     /// classifier.
     var askClaudeTools: [String] { didSet { Stored.askClaudeTools.save(askClaudeTools, defaults) } }
-    /// The cloud and Claude's answers show on the type me it camera while a
-    /// meeting records. Off, it shows the plain camera.
-    var askClaudeOnCamera: Bool { didSet { Stored.askClaudeOnCamera.save(askClaudeOnCamera, defaults) } }
-    /// The camera `CameraFeed` shows through the type me it camera: a
-    /// capture device's unique id, or empty for the Mac's default camera.
-    var meetingCamera: String { didSet { Stored.meetingCamera.save(meetingCamera, defaults) } }
     /// Starts and stops a room recording. Nil means no shortcut.
     var recordRoomShortcut: KeyCombo? {
         didSet { Stored.recordRoomShortcut.save(recordRoomShortcut, defaults) }
@@ -226,8 +220,6 @@ final class Settings {
         askClaudeFolder = Stored.askClaudeFolder.load(d)
         askClaudeTools = Stored.askClaudeTools.load(d)
         askClaudeModel = Stored.askClaudeModel.load(d)
-        askClaudeOnCamera = Stored.askClaudeOnCamera.load(d)
-        meetingCamera = Stored.meetingCamera.load(d)
         recordRoomShortcut = Stored.recordRoomShortcut.load(d)
         debugLogs = Stored.debugLogs.load(d)
         DebugLog.enabled = debugLogs
@@ -319,7 +311,7 @@ extension Settings {
         static let meetingLearnVoices = StoredSetting.bool("meetingLearnVoices", default: false)
         static let meetingAskBeforeTranscribing = StoredSetting.bool("meetingAskBeforeTranscribing", default: false)
         static let meetingLimit = StoredSetting.int("meetingLimit", default: 0)
-        static let askClaude = StoredSetting.bool("askClaude", default: Updates.isDevBuild)
+        static let askClaude = StoredSetting.bool("askClaude", default: true)
         static let askClaudeSystemPrompt = StoredSetting.string(MCPDefaults.systemPromptKey, default: "")
         static let meetingHooks = StoredSetting<[MeetingHook]>(
             load: { MeetingHook.stored(in: $0) }, save: { MeetingHook.store($0, in: $1) })
@@ -327,8 +319,6 @@ extension Settings {
         static let askClaudeFolder = StoredSetting.string("askClaudeFolder", default: FileManager.default.homeDirectoryForCurrentUser.path)
         static let askClaudeTools = StoredSetting.strings("askClaudeTools")
         static let askClaudeModel = StoredSetting.string("askClaudeModel", default: ClaudeRun.defaultModel)
-        static let askClaudeOnCamera = StoredSetting.bool("askClaudeOnCamera", default: false)
-        static let meetingCamera = StoredSetting.string("meetingCamera", default: "")
         static let recordRoomShortcut = StoredSetting<KeyCombo?>.optionalJSON("recordRoomShortcut")
         static let debugLogs = StoredSetting.bool("debugLogs", default: false)
     }

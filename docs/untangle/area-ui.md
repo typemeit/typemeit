@@ -1,17 +1,16 @@
-# UI: DesignSystem, SettingsUI, Overlay, Onboarding, Camera, gallery
+# UI: DesignSystem, SettingsUI, Overlay, Onboarding, gallery
 
 Each fix sits above the problems it solves.
 
 - **Design data lives in the design system, and the design system imports no feature.** `PuffView` with `Puff.metal`, the menu-bar mark, `ClaudeReplyMarkdown`, and `CloudColor`/`CloudPosition`/`CloudChoice` move in, with one `tint(choice, backdrop:, scheme:)`. `SquareClaudeLine` moves out to the stream parser. Parts take plain values, not feature types.
   - `SquareChrome.swift:30` uses `MenuBarIconRenderer.mark`, and `:119,242` use `PuffView`. `SquareFingerprint.swift:14,19,112` uses `Meetings/MeetingFingerprint`. `ClaudeMarkdown.swift:16` uses `Meetings/ClaudeReplyMarkdown`.
   - `SquarePalette.swift:6` defines `CloudChoice`, which `Settings.swift:93` uses, so app state depends on the design system.
-  - The cloud tint is mapped four ways: `SquarePalette.swift:42-64` (greys 0.34/0.85), `CloudView.swift:104-113` (reads `Settings.shared`), `CameraFeed.swift:123` (pure black/white) and `Settings.cloudChoice`.
+  - The cloud tint is mapped three ways: `SquarePalette.swift:42-64` (greys 0.34/0.85), `CloudView.swift:104-113` (reads `Settings.shared`) and `Settings.cloudChoice`.
   - `SquareTabs.swift:55`: the parser (`ClaudeStream.swift:12`, `ClaudeLive.swift:15`) produces a design-system type. `SquareTabs.swift:147` builds `claude --resume`, as `TranscriptRender.swift:85` does.
   - Feature copy inside parts: `SquareChips.swift:59` (dictionary words), `SquarePalette.swift:101,110` (screen recording), `SquareRows.swift:250` (meeting band).
   - `project.yml:349-370` hand-lists every app file the gallery target pulls in.
   - `SquareKeys.swift:45`: the static `listeningChanged` hook is set by `Pipeline.swift:40`. Pass it through the environment.
   - `SquareFoundations.swift:133,187` stores its own appearance enum under Settings' `"appearance"` key, with different values.
-  - Camera token copies: `CameraProvider.swift:198,203` and `CameraAnswerCard.swift:18`. `CameraCompositor.swift:80,239` borrows `ScreenSampler` luminance from Overlay.
 
 - **Pill states are data.** One pure mapping from state to content (mark, message, actions) feeds PillView, the gallery specimen and the meetings first-run. AnswerPill is a SquarePrompt variant. `dismiss(then:)` replaces the `closeNow` ritual. A per-case table replaces three parallel switches.
   - `SquarePrompt.swift:169-229` re-types every pill message from `PillView.swift:56-251`. `MeetingsTab.swift:637` is a third copy of the record prompt.
@@ -27,15 +26,13 @@ Each fix sits above the problems it solves.
   - `OverlayPanel.swift:97,200,209` reads and writes `Settings.shared` directly.
 
 - **Settings applies its own side effects** (shared with the dictation-core fix). `KeepLimit` becomes a model type.
-  - `OnePageSettings.swift:218,291,417-427,486-510,731,735`: appearance, launch at login, updates, learn voices, keep limits, the camera and the Claude Code check only take effect because this view calls a hook. Changes from the MCP or elsewhere never apply them.
+  - `OnePageSettings.swift:218,291,417-427,486-510,731,735`: appearance, launch at login, updates, learn voices, keep limits and the Claude Code check only take effect because this view calls a hook. Changes from the MCP or elsewhere never apply them.
   - `OnePageSettings.swift:718-723` keeps the microphone name in step with the UID.
   - `OnePageSettings.swift:23-56`: the KeepLimit sentinels (0, −1) are reinterpreted at `Pipeline.swift:258`, `MeetingStore.swift:183` and `OnePageSettings.swift:454`.
 
 - **A `SquareWizard` part and one permission-request helper.**
-  - `CameraSetupView.swift:14-58,164-185` copies the onboarding wizard (`OnboardingView.swift:19-81,314-338`): the header, dots, 1 s poll, `advanceWhenSettled`, first-unsatisfied step and the debug override.
   - `OnboardingView.swift:287-338` decides whether a step is satisfied in three places.
   - `OnboardingView.swift:221,275` sleeps 1.5 s and checks `isActive` to guess "no prompt". The block is written twice, and the AX options twice (`:125,270`).
-  - Camera readiness is turned into copy twice: `CameraSetupView.swift:132-150` and `OnePageSettings.swift:781-801`. `CameraSetupView.swift:73` and `CameraHost.swift:57` copy the instruction.
   - Apple Intelligence availability is polled and mapped three times: `OnePageSettings.swift:95,701`, `DictionaryTab.swift:16`, `OnboardingView.swift:38,164,293`, with different wording.
   - `OnePageSettings.swift:677-691` requests screen recording twice.
 
@@ -86,13 +83,6 @@ Each fix sits above the problems it solves.
   - `DesignSystemGallery/LiveClaude.swift:39-99` copies the hook instructions, the CLI path, the meetings path and a line splitter, and a launch failure leaves it "running" forever.
   - Reduce motion is read once into `@State` (`CloudView.swift:13`, `PuffView.swift:59`).
 
-- **Camera.**
-  - `CameraIDs.swift:9` copies `project.yml:278`.
-  - "The second stream" is a convention shared by `CameraProvider.swift:77` and `CameraSink.swift:31`.
-  - `CameraProvider.swift:154` retries with a 10 ms `asyncAfter`.
-  - `CameraInstaller.swift:101` treats "after reboot" as added.
-  - `CameraSink.swift:21` and `CameraFeed.swift:159`: the "our camera" test is written twice.
-  - `CameraFeed.swift:21,78` polls the singletons every 500 ms. `:104,113` gate on a debug flag. `:123` and `CameraAnswerCard.swift:25` share the magic number 100.
 
 - **Copy rules (CLAUDE.md).**
   - `help:` carries state or a fix: `OnboardingView.swift:131,157,161,212` and `UpgradeView.swift:71`.
@@ -101,4 +91,4 @@ Each fix sits above the problems it solves.
   - `CloudView.swift:44`: capitalised tooltips.
   - `OnePageSettings.swift:346`: hard-coded "space".
 
-- Comments: about 15 only restate the code (for example `SquareRows.swift:94`, `OverlayPanel.swift:77`, `CameraFeed.swift:15`). Stray or misplaced docs: `SquareChips.swift:99`, `SquarePrompt.swift:101`, `InsightsTab.swift:12`, `MeetingPage.swift:4,258,588`.
+- Comments: about 15 only restate the code (for example `SquareRows.swift:94`, `OverlayPanel.swift:77`). Stray or misplaced docs: `SquareChips.swift:99`, `SquarePrompt.swift:101`, `InsightsTab.swift:12`, `MeetingPage.swift:4,258,588`.
