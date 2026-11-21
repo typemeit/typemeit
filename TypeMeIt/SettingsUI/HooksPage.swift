@@ -21,7 +21,10 @@ struct HooksPage: View {
         VStack(alignment: .leading, spacing: 0) {
             SquarePageHeader(title: "hooks", count: counted(settings.meetingHooks.count, "hook"), status: status,
                              linkTitle: "ai settings", onLink: showAssistant)
-            HStack {
+            HStack(spacing: 12) {
+                Text("a hook is a prompt claude code runs on each finished meeting · turn decisions into tickets, draft a follow-up email, write session notes in your own format or count how often each person said \"circle back\"")
+                    .font(Square.mono(12))
+                    .foregroundStyle(DesignTokens.Colors.ink2)
                 Spacer()
                 Button("new hook", action: add)
                     .buttonStyle(SquareButtonStyle(kind: .primary))
