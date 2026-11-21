@@ -347,7 +347,7 @@ struct OnboardingView: View {
 }
 
 /// One square per step: ink for the steps reached, ink-a08 for the rest.
-struct StepDots: View {
+private struct StepDots: View {
     var current: Int
     var count: Int
 

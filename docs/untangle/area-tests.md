@@ -16,7 +16,6 @@ The rule: a test should fail on a regression, and only then. This pass comes las
   - `QuietSpeechTests.swift:38,44` restate the gain formula.
   - `MeetingFingerprintTests.swift:69-71`.
   - `ProcessOwnerTests.swift:75-78`.
-  - `CameraCompositorTests.swift:16-17` (borderline).
   - `test_core.py:92`.
   - `SettingsTests.swift:112-158` pins every default. Keep the key-name and format tests (`:173,193`).
 
@@ -37,7 +36,6 @@ The rule: a test should fail on a regression, and only then. This pass comes las
   - Asserts that follow a full-equality assert: `HistoryEntryTests.swift:26-27`, `ProcessOwnerTests.swift:39` and `TrackWriterTests.swift:39`.
 
 - **Fix flakes and skips.**
-  - `CameraCompositorTests.swift:41` really sleeps. Inject the fade clock.
   - `PinnedDownloadTests.swift:79-83` polls, and `:15-16` shares static state.
   - `DayLineTests.swift:50-55` uses `Date.now` and `Calendar.current`.
   - `ScreenContextTests.swift:74-83` and `LearningTests.swift:172,190` depend on the machine's dictionary. That goes away once there is one known-word oracle.

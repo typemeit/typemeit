@@ -7,7 +7,7 @@ The area files list every problem with `path:line`, each under the fix that solv
 - [area-meetings-capture.md](area-meetings-capture.md): recording, capture, transcription, speakers
 - [area-meetings-data.md](area-meetings-data.md): the meeting model, text forms, Claude, MCP, Insights
 - [area-dictation-core.md](area-dictation-core.md): top-level `TypeMeIt/*.swift`, `Learning/`
-- [area-ui.md](area-ui.md): DesignSystem, SettingsUI, Overlay, Onboarding, Camera
+- [area-ui.md](area-ui.md): DesignSystem, SettingsUI, Overlay, Onboarding
 - [area-tests.md](area-tests.md): the test suite
 
 About 450 problems in all.
@@ -52,7 +52,7 @@ Today each layer reaches down into the ones below it: Settings imports Updates, 
 
 1. **Settings stores values, and nothing else.**
    - `Fixed` splits into per-feature tuning, so about 75 meeting constants go to Meetings.
-   - Every side effect moves into one `SettingsEffects` observer: appearance, launch at login, updater, prune, debug log, microphone name, camera, the Claude check.
+   - Every side effect moves into one `SettingsEffects` observer: appearance, launch at login, updater, prune, debug log, microphone name, the Claude check.
    - `CloudChoice`, `KeepLimit` and the microphone lookup move to their owners.
    - Solves about 40 problems in dictation-core and UI, the effects that run only while the settings page is open, and the change-of-a-setting-from-the-MCP case.
 

@@ -64,7 +64,7 @@ Each fix sits above the problems it solves.
 - **`BuildInfo` and `LaunchArgs` in one place, and System Settings links out of `SecureInput`.**
   - `isDevBuild` is written at `Updates.swift:41,357` and `MenuBarIcon.swift:13`. `Updates.swift:350-355` copies the whole `State` enum for the store build.
   - `AudioCheck.swift:44` duplicates `DebugLog.swift:45` `writeHeader`.
-  - Launch keys are scattered: `TypeMeItApp.swift:443,450`, `Sandbox.swift:13`, `MeetingCoordinator.swift:1207`, `OnboardingView.swift:331`, `CameraSetupView.swift:166` and `SquareFoundations.swift:184`. `TypeMeItApp.swift:445,452` waits with launch sleeps.
+  - Launch keys are scattered: `TypeMeItApp.swift:443,450`, `Sandbox.swift:13`, `MeetingCoordinator.swift:1207`, `OnboardingView.swift:331` and `SquareFoundations.swift:184`. `TypeMeItApp.swift:445,452` waits with launch sleeps.
   - `SecureInput.swift:66-73` holds every deep link, for callers that have nothing to do with Secure Input.
   - `Store.swift:33`, `RecordingArchive.swift:9` and `ModelStore.swift:31` define paths outside `SupportPaths`.
   - `ModelStore.swift:14,20` repeats the hash. `:75,83` both set the version. `:54` has a parameter always passed `true`.
