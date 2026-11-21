@@ -51,6 +51,10 @@ final class Roster: @unchecked Sendable {
 
     let target: Target
     private let pid: pid_t
+    /// The Meet call picked from several open at once; nil reads every Meet
+    /// tab shown. Nil when only one was open, so a next call joined in the
+    /// same tab is still read and ends this meeting (`RosterAccumulator.add`).
+    private let call: RosterRules.Meet.Call?
     private let now: @Sendable () -> Int?
     private let queue = DispatchQueue(label: "it.typeme.typemeit.meeting-roster", qos: .utility)
     private let lock = NSLock()
@@ -75,12 +79,31 @@ final class Roster: @unchecked Sendable {
     }
 
     /// `now` gives meeting time in ms, nil until the recording's clock starts.
-    init?(owner: ProcessOwner.Owner, now: @escaping @Sendable () -> Int?) {
-        guard let target = Target.of(owner),
-              let app = NSRunningApplication.runningApplications(withBundleIdentifier: owner.bundleID).first(where: { $0.activationPolicy == .regular }) else { return nil }
+    init?(owner: ProcessOwner.Owner, call: RosterRules.Meet.Call? = nil, now: @escaping @Sendable () -> Int?) {
+        guard let target = Target.of(owner), let pid = Roster.pid(of: owner) else { return nil }
         self.target = target
-        self.pid = app.processIdentifier
+        self.pid = pid
+        self.call = call
         self.now = now
+    }
+
+    private static func pid(of owner: ProcessOwner.Owner) -> pid_t? {
+        NSRunningApplication.runningApplications(withBundleIdentifier: owner.bundleID).first { $0.activationPolicy == .regular }?.processIdentifier
+    }
+
+    /// The Meet calls open in the owner's windows, for the prompt to ask
+    /// which one to record. Empty for an app that is not a Meet browser.
+    static func meetCalls(owner: ProcessOwner.Owner) -> [RosterRules.Meet.Call] {
+        guard Target.of(owner) == .meet, let pid = pid(of: owner) else { return [] }
+        var areas: [(address: String, title: String?)] = [], tabTitles: [String] = []
+        for window in children(AXUIElementCreateApplication(pid), kAXWindowsAttribute) {
+            for area in webAreas(under: window) {
+                guard let address = url(of: area), address.host == "meet.google.com" else { continue }
+                areas.append((address.absoluteString, string(area, kAXTitleAttribute)))
+            }
+            tabTitles += tabButtons(under: window).compactMap { string($0, kAXTitleAttribute) }
+        }
+        return RosterRules.Meet.calls(areas: areas, tabTitles: tabTitles)
     }
 
     func start() {
@@ -107,7 +130,7 @@ final class Roster: @unchecked Sendable {
             // call ends: the next poll walks it again.
             if nodes.isEmpty { tiles = [] }
         } else {
-            let window = Roster.meetingNodes(pid: pid, target: target)
+            let window = Roster.meetingNodes(pid: pid, target: target, call: call)
             var whole = RosterRules.read(window.nodes, target: target)
             whole.call = target == .meet ? window.meetCode : whole.channel
             if target == .meet {
@@ -198,7 +221,7 @@ final class Roster: @unchecked Sendable {
     /// the main window as well as its own, walked no deeper than its tiles.
     /// Each node's element beside it, and the Meet code and path from the
     /// tab's address, for Meet.
-    static func meetingNodes(pid: pid_t, target: Target) -> (nodes: [AXNode], elements: [AXUIElement], meetCode: String?, meetPath: String?) {
+    static func meetingNodes(pid: pid_t, target: Target, call: RosterRules.Meet.Call? = nil) -> (nodes: [AXNode], elements: [AXUIElement], meetCode: String?, meetPath: String?) {
         let app = AXUIElementCreateApplication(pid)
         var nodes: [AXNode] = [], elements: [AXUIElement] = []
         var code: String?, path: String?
@@ -208,7 +231,8 @@ final class Roster: @unchecked Sendable {
                 walk(window, depth: 0, maxDepth: slackDepthLimit, into: &nodes, elements: &elements)
             case .meet:
                 for area in webAreas(under: window) {
-                    guard let address = url(of: area), address.host == "meet.google.com" else { continue }
+                    guard let address = url(of: area), address.host == "meet.google.com",
+                          call?.isShown(address: address.absoluteString, title: string(area, kAXTitleAttribute)) ?? true else { continue }
                     code = code ?? RosterRules.Meet.code(in: address.absoluteString)
                     path = path ?? address.path
                     walk(area, depth: 0, maxDepth: depthLimit, into: &nodes, elements: &elements)
@@ -258,6 +282,18 @@ final class Roster: @unchecked Sendable {
         if string(element, kAXRoleAttribute) == "AXWebArea" { return [element] }
         return children(element, kAXChildrenAttribute).flatMap { webAreas(under: $0, depth: depth + 1) }
     }
+
+    /// The browser's tabs in a window's tab strip, which sits above the
+    /// web area: 9 levels down in Chrome on 18 November 2026.
+    private static func tabButtons(under element: AXUIElement, depth: Int = 0) -> [AXUIElement] {
+        guard depth < tabStripDepthLimit else { return [] }
+        let role = string(element, kAXRoleAttribute)
+        if role == "AXWebArea" { return [] }
+        if role == kAXRadioButtonRole, string(element, kAXSubroleAttribute) == "AXTabButton" { return [element] }
+        return children(element, kAXChildrenAttribute).flatMap { tabButtons(under: $0, depth: depth + 1) }
+    }
+
+    private static let tabStripDepthLimit = 16
 
     private static func url(of element: AXUIElement) -> URL? {
         var value: CFTypeRef?

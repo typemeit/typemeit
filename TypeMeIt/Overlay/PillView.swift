@@ -81,10 +81,14 @@ struct PillView: View {
         case .micFailed:
             SquarePrompt(mark: .icon("akar-microphone"), message: Text("mic didn't start"), failed: true,
                          dismiss: "dismiss", onDismiss: { model.closeNow = true; model.onKeep?() }, minWidth: width) {}
-        case .meetingPrompt:
-            SquarePrompt(mark: .icon("akar-people-group"), message: Text("record this meeting?"),
+        case .meetingPrompt(_, let calls) where calls.count > 1:
+            SquareChoicePrompt(icon: "akar-people-group", question: "which meeting?", choices: calls.map(\.label), verb: "record",
+                               dismiss: "not now", onDismiss: { model.closeNow = true; model.onDeclineMeeting?() },
+                               onPick: { model.onRecordMeeting?(calls[$0]) })
+        case .meetingPrompt(_, let calls):
+            SquarePrompt(mark: .icon("akar-people-group"), message: Text(calls.first?.label ?? "record this meeting?"),
                          dismiss: "not now", onDismiss: { model.closeNow = true; model.onDeclineMeeting?() }, minWidth: width) {
-                Button("record") { model.onRecordMeeting?() }.buttonStyle(SquareButtonStyle(kind: .primary))
+                Button("record") { model.onRecordMeeting?(nil) }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         case .meetingResumed(let app):
             SquarePrompt(mark: .icon("akar-people-group"), message: Text("recording again · \(app.name.lowercased())"),

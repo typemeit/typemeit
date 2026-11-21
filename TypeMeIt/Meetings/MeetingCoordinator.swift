@@ -79,6 +79,8 @@ final class MeetingCoordinator {
     @ObservationIgnored private var recorder: MeetingRecorder?
     /// Reads names off the meeting's window while a call records (8.6).
     @ObservationIgnored private var roster: Roster?
+    /// The Meet call picked in the prompt, read by `startRecording` while the record event is handled.
+    @ObservationIgnored private var pickedCall: RosterRules.Meet.Call?
     /// The capture running since the current candidate formed, and what it
     /// has held so far (D20). Nothing of it reaches a file before `record`.
     @ObservationIgnored private var preRoll: (held: PreRoll, capture: MeetingCapture)?
@@ -192,7 +194,7 @@ final class MeetingCoordinator {
 
     private func wirePill() {
         let model = overlay.model
-        model.onRecordMeeting = { [weak self] in self?.recordFromPrompt() }
+        model.onRecordMeeting = { [weak self] call in self?.recordFromPrompt(call) }
         model.onDeclineMeeting = { [weak self] in self?.decline() }
         model.onStopMeeting = { [weak self] in self?.dismissToast(); self?.stopMeeting() }
         model.onShowMeeting = { [weak self] id in self?.dismissToast(); self?.showTab(id) }
@@ -317,7 +319,9 @@ final class MeetingCoordinator {
             discardPreRoll()
         case .showPrompt(let owner):
             guard settings.meetingAsk else { return }
-            overlay.showMeeting(.meetingPrompt(app: owner))
+            let calls = Sandbox.readsOtherApps ? Roster.meetCalls(owner: owner) : []
+            DebugLog.write("Meeting prompt: \(counted(calls.count, "meet call")) open")
+            overlay.showMeeting(.meetingPrompt(app: owner, calls: calls))
         case .hidePrompt:
             if case .meetingPrompt = overlay.model.state { overlay.hideMeeting(overlay.model.state) }
             if case .meetingPrompt? = overlay.model.pendingMeeting { overlay.model.pendingMeeting = nil }
@@ -402,7 +406,7 @@ final class MeetingCoordinator {
             // other apps; a sandboxed one cannot (docs/meetings.md 8.6).
             if let owner, Sandbox.readsOtherApps {
                 // Meeting time from the recording's own clock, so names line up with words.
-                roster = Roster(owner: owner) { [weak recorder] in
+                roster = Roster(owner: owner, call: pickedCall) { [weak recorder] in
                     guard let first = recorder?.firstHostTime, first > 0 else { return nil }
                     return Int(MeetingCapture.seconds(fromHostTime: first, to: mach_absolute_time()) * 1000)
                 }
@@ -530,10 +534,12 @@ final class MeetingCoordinator {
 
     // MARK: The user
 
-    /// The pill's record button.
-    func recordFromPrompt() {
+    /// The pill's record button, or the call picked from its list of several.
+    func recordFromPrompt(_ call: RosterRules.Meet.Call? = nil) {
         guard let owner = prompting else { return }
+        pickedCall = call
         send(.record(owner))
+        pickedCall = nil
     }
 
     /// The menu's Record This Meeting: the owner detected at click time.

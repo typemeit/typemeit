@@ -1230,7 +1230,7 @@ Pill states (`OverlayModel.State`, all `.pill`):
 
 | State | Left | Label | Right | Lifetime |
 | --- | --- | --- | --- | --- |
-| `.meetingPrompt(app: Owner)` | app icon (`NSWorkspace.shared.icon(forFile:)`, or the generic app icon) | `record this meeting?` | `record` (primary), cross (help `Not now`) | until answered or `hidePrompt` |
+| `.meetingPrompt(app: Owner, calls: [Call])` | app icon (`NSWorkspace.shared.icon(forFile:)`, or the generic app icon) | the Meet call's address (`meet.google.com/abc-defg-hij`), or `record this meeting?` when no Meet call is read; with two or more calls, `which meeting?` over one line per call, a click recording that call and reading names from its tab only (`Roster.meetCalls`) | `record` (primary), cross (help `Not now`) | until answered or `hidePrompt` |
 | `.meetingSystemAudioOff` | `akar-microphone` | `system audio is off` | `system settings` (primary), cross | toast timer |
 | `.meetingSaved(id: UUID)` | `akar-people-group` | `meeting saved` | `show` (primary), cross | toast timer |
 | `.meetingFailed(id: UUID)` | `akar-people-group` | `meeting not transcribed` | `show`, cross | toast timer |
@@ -2452,7 +2452,8 @@ Not in this plan, written down so they are not re-derived:
 | Info.plist `NSAppleEventsUsageDescription` | `type me it reads who is in a meet call from the page. it never changes the page.` |
 | Info.plist `NSAudioCaptureUsageDescription` | `type me it records the other side of a call when you ask it to record a meeting.` |
 | Info.plist folder keys (Documents, Desktop, Downloads, removable and network volumes) | `type me it keeps your meetings in the folder you chose.` |
-| Pill prompt | `record this meeting?` · `record` · cross help `Not now` |
+| Pill prompt | `record this meeting?` or the call's address · `record` · cross help `Not now` |
+| Pill prompt, several Meet calls | `which meeting?` · one line per call · `record` on the hovered line |
 | Pill, never asking | `won't ask for slack again` · `undo` |
 | Pill, grant missing | `system audio is off` · `system settings` |
 | Pill, saved | `meeting saved` · `show` |
