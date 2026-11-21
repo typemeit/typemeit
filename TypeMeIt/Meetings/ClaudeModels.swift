@@ -10,6 +10,25 @@ enum ClaudeModels {
         let displayName: String
         let description: String
         let supportsAutoMode: Bool?
+        let resolvedModel: String?
+
+        /// The menu's name: family and version from the resolved id, so two
+        /// Fables read "fable 5.2" and "fable 5.1" (claude-fable-5-2[1m] → fable 5.2;
+        /// a date suffix and the context tag drop out). The default entry stays
+        /// "default", since the CLI's own name only adds "(recommended)".
+        var label: String {
+            if value == "default" { return value }
+            guard let id = resolvedModel?.split(separator: "[").first else { return displayName.lowercased() }
+            let parts = id.split(separator: "-").filter { $0 != "claude" }
+            let numeric = { (part: Substring) in part.allSatisfy(\.isNumber) }
+            let words = parts.filter { !numeric($0) }
+            let version = parts.filter { numeric($0) && !isDate($0) }
+            guard !words.isEmpty, !version.isEmpty else { return displayName.lowercased() }
+            return words.joined(separator: " ") + " " + version.joined(separator: ".")
+        }
+
+        /// A snapshot date such as 20251001 at the end of claude-haiku-4-5-20251001.
+        private func isDate(_ part: Substring) -> Bool { part.count == "yyyyMMdd".count }
     }
 
     /// How long the CLI is given to list its models. Not measured.
