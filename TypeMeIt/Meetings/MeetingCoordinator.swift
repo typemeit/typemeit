@@ -306,9 +306,22 @@ final class MeetingCoordinator {
         send(.tick(.now))
         if let live = recording {
             let minutes = Int(Date().timeIntervalSince(live.started)) / 60
-            if minutes != recordingMinutes { recordingMinutes = minutes }
+            if minutes != recordingMinutes {
+                recordingMinutes = minutes
+                keepNamesSoFar()
+            }
         }
         if store.meetings.contains(where: { $0.isDone && !$0.published }) { store.republishPending() }
+    }
+
+    /// Writes what the call's window has shown so far into the staged
+    /// meeting. A relaunch or crash mid-recording recovers the meeting from
+    /// that file and the tracks alone, so without this it loses the call's
+    /// name, code and roster.
+    private func keepNamesSoFar() {
+        guard let names = roster?.peek(), let id = inProgress?.meeting.id, var live = store.meeting(id), live.names != names else { return }
+        live.names = names
+        store.save(live)
     }
 
     private func apply(_ effect: MeetingMachine.Effect) {
@@ -331,6 +344,7 @@ final class MeetingCoordinator {
             startRecording(owner)
         case .pauseRecording:
             recorder?.pause()
+            keepNamesSoFar()
         case .resumeRecording:
             recorder?.resume()
         case .stopRecording:
@@ -648,8 +662,8 @@ final class MeetingCoordinator {
             finished.dictations = result.dictations
             finished.bothSilentMs = result.bothSilentMs
             finished.firstHostTime = result.firstHostTime
-            finished.names = names
         }
+        finished.names = names
         try? MeetingFolder.write(finished, to: MeetingFolder.staged(meeting.id))
         DebugLog.write("Meeting saved for quit: \(finished.durationMs) ms")
     }
