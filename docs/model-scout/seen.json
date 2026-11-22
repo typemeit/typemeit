@@ -2072,6 +2072,258 @@
       "date": "2026-11-21",
       "role": "speech recognition",
       "why": "ONNX port of Omi Med STT v1, a medical model behind Parakeet on Voice Arena (3.09% vs 3.01%)"
+    },
+    {
+      "id": "ishiki-labs/ishiki-asr-1.0",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "transformers checkpoint with trust_remote_code, run on an H100; no Core ML, MLX, GGUF or ONNX build"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "13.31B parameters, one 24.79 GiB bf16 safetensors file; over the 1.5 GB file budget and 24 GB of memory"
+        },
+        "number": {
+          "pass": true,
+          "why": "card: Open ASR Leaderboard 8 short-form sets 4.39% average WER; not a leaderboard row"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "new weight-space-programmed multi-stream architecture, not a rejected one"
+        },
+        "heldOut": {
+          "pass": false,
+          "why": "card lists hf-audio/esb-datasets-test-only-sorted and hf-audio/open-asr-leaderboard among its datasets"
+        }
+      },
+      "verdict": "near miss: fits (13.31B, 24.79 GiB); its numbers use the leaderboard test sets"
+    },
+    {
+      "id": "Olicorne/parakeet-tdt-0.6b-v3-ultra-UltiMed-v2-onnx",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": false,
+          "why": "French only"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "Parakeet 0.6B"
+        },
+        "number": {
+          "pass": null,
+          "why": "release in progress; numbers are French medical only"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 architecture, Parakeet Ultra ships it"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no English benchmark"
+        }
+      },
+      "verdict": "near miss: english (French medical fine-tune of Parakeet Ultra)"
+    },
+    {
+      "id": "Maximilian228/Geode-STT packs",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "sherpa-onnx int8 ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "the parakeet-v3 pack includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0 for the Parakeet pack"
+        },
+        "fits": {
+          "pass": true,
+          "why": "Parakeet 0.6B int8"
+        },
+        "number": {
+          "pass": false,
+          "why": "only 30-utterance FLEURS WER per language (en 5.4%), no comparison against Parakeet TDT v2 or Ultra"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 architecture, Parakeet Ultra ships it"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "FLEURS, 30 utterances"
+        }
+      },
+      "verdict": "near miss: number (int8 repacks of Parakeet v3, Whisper and others for an Android app)"
+    },
+    {
+      "id": "nik12114d/remark-parakeet-tdt-0.6b-v3-mlx",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among 25 languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "755 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers; 8-bit encoder export of mlx-community Parakeet TDT v3"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 architecture, Parakeet Ultra ships it"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (an unmodified MLX export of Parakeet TDT v3)"
+    },
+    {
+      "id": "Scrya/parakeet-tdt-0.6b-v3-nsc5 nemo-speech-cpp ports",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF q8_0 and f16"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0, as the source"
+        },
+        "fits": {
+          "pass": true,
+          "why": "Parakeet 0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers beyond the source model (seen 2026-11-21)"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 architecture, Parakeet Ultra ships it"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (ports of Scrya/parakeet-tdt-0.6b-v3-nsc5, seen 2026-11-21)"
+    },
+    {
+      "id": "nicolamanzini/Rumble-2-Flash-transcribe-cpp-GGUF",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF for transcribe.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0, as the source"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.51B"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers beyond the source model"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Rumble-2-Flash is a Qwen3-ASR architecture (seen 2026-11-19); Qwen3-ASR rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (GGUF port of Rumble-2-Flash, Qwen3-ASR architecture)"
+    },
+    {
+      "id": "PraxySante/Nemo-EN-delib-T5Gemma2",
+      "date": "2026-11-22",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "card is gated or private"
+        },
+        "english": {
+          "pass": true,
+          "why": "English per its id"
+        },
+        "licence": {
+          "pass": null,
+          "why": "card not readable"
+        },
+        "fits": {
+          "pass": null,
+          "why": "card not readable"
+        },
+        "number": {
+          "pass": false,
+          "why": "no published number readable"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "architecture unknown"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (card not readable)"
     }
   ]
 }
