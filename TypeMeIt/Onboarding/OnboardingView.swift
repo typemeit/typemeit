@@ -347,17 +347,51 @@ struct OnboardingView: View {
 }
 
 /// One square per step: ink for the steps reached, ink-a08 for the rest.
+/// A square per step, inked up to the current one. Moving on dithers the
+/// next square in over the square parts' steps; going back dithers it out.
 private struct StepDots: View {
     var current: Int
     var count: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Each square's ink, 0...16, while one changes; nil once they have landed.
+    @State private var moving: [Int]?
+    @State private var run: Task<Void, Never>?
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<count, id: \.self) { i in
-                Rectangle()
-                    .fill(i <= current ? DesignTokens.Colors.ink : DesignTokens.Colors.inkA08)
+                SquareDither(level: level(i), color: DesignTokens.Colors.ink)
+                    .background(DesignTokens.Colors.inkA08)
                     .frame(width: 8, height: 8)
             }
+        }
+        .onChange(of: current) { was, now in step(from: was, to: now) }
+        .onDisappear { run?.cancel() }
+    }
+
+    private func level(_ i: Int) -> Int {
+        if let moving, moving.indices.contains(i) { return moving[i] }
+        return i <= current ? 16 : 0
+    }
+
+    private func step(from was: Int, to now: Int) {
+        run?.cancel()
+        run = nil
+        guard !reduceMotion else {
+            moving = nil
+            return
+        }
+        let start = moving ?? (0..<count).map { $0 <= was ? 16 : 0 }
+        let end = (0..<count).map { $0 <= now ? 16 : 0 }
+        run = Task {
+            var step = 0
+            guard await SquarePixel.run({
+                step += 1
+                moving = zip(start, end).map { SquarePixel.level(from: $0, to: $1, step: step) }
+                return step < SquarePixel.steps
+            }) else { return }
+            moving = nil
+            run = nil
         }
     }
 }

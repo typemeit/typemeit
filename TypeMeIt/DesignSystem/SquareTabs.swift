@@ -48,17 +48,8 @@ struct SquareTabStrip: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Each tab's frame in the strip.
     @State private var frames: [Int: CGRect] = [:]
-    /// Where the slab is drawn; nil until the tabs are laid out.
-    @State private var slab: CGRect?
-    /// The tab the slab left, while its ghost fades.
-    @State private var ghost: CGRect?
-    /// How many of each 4 × 4 block of the ghost's cells are inked, 0...16.
-    @State private var ghostLevel = 0
+    @State private var motion = SquareSlabMotion()
     @State private var jump: Task<Void, Never>?
-
-    private static var jumpSteps: Int { 4 }
-    private static var ghostStart: Int { 10 }
-    private static var frameTime: Duration { .milliseconds(35) }
 
     var body: some View {
         // Tabs past the panel's width scroll sideways, the picked one kept in view.
@@ -98,94 +89,32 @@ struct SquareTabStrip: View {
                     .contentShape(Rectangle())
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(squareTabsStrip)) } action: { frame in
                         frames[index] = frame
-                        if index == picked && jump == nil { slab = frame }
+                        if index == picked && jump == nil { motion.slab = frame }
                     }
                 }
                 .buttonStyle(.plain)
                 .id(index)
             }
         }
-        .background(alignment: .topLeading) {
-            ZStack(alignment: .topLeading) {
-                if let ghost, ghostLevel > 0 {
-                    SquareDither(level: ghostLevel, color: DesignTokens.Colors.slab)
-                        .frame(width: ghost.width, height: ghost.height)
-                        .offset(x: ghost.minX, y: ghost.minY)
-                }
-                if let slab {
-                    Rectangle()
-                        .fill(DesignTokens.Colors.slab)
-                        .frame(width: slab.width, height: slab.height)
-                        .offset(x: slab.minX, y: slab.minY)
-                }
-            }
-        }
+        .background(alignment: .topLeading) { SquareSlabLayer(motion: motion) }
         .coordinateSpace(.named(squareTabsStrip))
     }
 
     /// The slab covers the middle of this tab, so its label is drawn on the
     /// slab. Before layout, that is the picked tab.
     private func isUnderSlab(_ index: Int) -> Bool {
-        guard let slab, let frame = frames[index] else { return index == picked }
-        return slab.minX <= frame.midX && frame.midX <= slab.maxX
+        motion.covers(frames[index]) ?? (index == picked)
     }
 
     private func jumpSlab(to index: Int) {
         jump?.cancel()
         jump = nil
-        guard let target = frames[index] else { return }
-        guard let from = slab, from != target, !reduceMotion else {
-            slab = target
-            ghost = nil
-            return
-        }
-        ghost = from
-        ghostLevel = SquareTabStrip.ghostStart
-        jump = Task { @MainActor in
-            var step = 0
-            while step < SquareTabStrip.jumpSteps || ghostLevel > 0 {
-                try? await Task.sleep(for: SquareTabStrip.frameTime)
-                if Task.isCancelled { return }
-                if step < SquareTabStrip.jumpSteps {
-                    step += 1
-                    let k = CGFloat(step) / CGFloat(SquareTabStrip.jumpSteps)
-                    slab = CGRect(x: (from.minX + (target.minX - from.minX) * k).rounded(),
-                                  y: target.minY,
-                                  width: (from.width + (target.width - from.width) * k).rounded(),
-                                  height: target.height)
-                }
-                ghostLevel = max(0, ghostLevel - 2)
-            }
-            // The layout may have moved while it jumped.
-            slab = frames[index] ?? target
-            ghost = nil
+        guard let target = frames[index], motion.start(to: target, reduceMotion: reduceMotion) else { return }
+        jump = Task {
+            guard await SquarePixel.run({ motion.advance() }) else { return }
+            motion.settle(at: frames[index])
             jump = nil
         }
-    }
-}
-
-/// The order a 4 × 4 block's cells fill in, for `SquareDither`.
-private let squareBayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
-
-/// A 2 pt ordered dither: `level` of every 16 cells in a 4 × 4 Bayer block
-/// are filled, so 8 is a checker and 16 is solid.
-struct SquareDither: View {
-    let level: Int
-    var color: Color = DesignTokens.Colors.ink
-    var cell: CGFloat = 2
-
-    var body: some View {
-        Canvas { context, size in
-            let columns = Int((size.width / cell).rounded(.up)), rows = Int((size.height / cell).rounded(.up))
-            var path = Path()
-            for row in 0..<rows {
-                for column in 0..<columns where squareBayer[(row % 4) * 4 + column % 4] < level {
-                    path.addRect(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell))
-                }
-            }
-            context.fill(path, with: .color(color))
-        }
-        .allowsHitTesting(false)
     }
 }
 
