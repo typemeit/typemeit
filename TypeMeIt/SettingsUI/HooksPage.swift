@@ -11,7 +11,8 @@ struct HooksPage: View {
     @State private var claudeCheck = ClaudeCheck.shared
     /// The hook open for editing; first the one a meeting asked for.
     @State private var editing: UUID? = AppState.shared.editHook
-    @State private var deleting: UUID?
+    /// How far a hold on the open hook's delete has got.
+    @State private var deleting = 0.0
     /// A hook being written: kept out of the list until it has a name.
     @State private var draft: MeetingHook?
 
@@ -116,10 +117,11 @@ struct HooksPage: View {
                     SquarePromptEditor(text: hook.prompt, placeholder: "what claude should do with the meeting")
                     HStack {
                         Spacer()
-                        Button("delete") { deleting = id }
+                        Button("delete") {}
                             .buttonStyle(SquareButtonStyle(kind: .quiet, small: true))
-                            .squareConfirmDelete(isPresented: Binding(get: { deleting == id }, set: { if !$0 { deleting = nil } }),
-                                                 title: "delete \(hook.wrappedValue.name)?") { remove(id) }
+                            .squareHold(progress: $deleting, name: "delete \(hook.wrappedValue.name)") { remove(id) }
+                            .squareHoldFill(deleting)
+                            .help("hold to delete")
                     }
                 }
                 .padding(.leading, 46)

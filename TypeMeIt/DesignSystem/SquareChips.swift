@@ -55,14 +55,15 @@ struct SquareChip: View {
 
 /// A dictionary word: a sparkle first when it was learned from a correction
 /// rather than typed in, the word, what else it has been heard as in ink-3,
-/// and a cross that forgets it.
+/// and a cross that forgets it once held, the chip filling as it is.
 struct SquareWordChip: View {
     let word: String
     var heardAs: [String] = []
     /// What the correction changed, for the sparkle's tooltip.
     var learnedFrom: String?
     var forget: (() -> Void)?
-    @State private var forgetting = false
+    /// How far a hold on the cross has got.
+    @State private var forgetting = 0.0
 
     var body: some View {
         HStack(spacing: 6) {
@@ -80,8 +81,9 @@ struct SquareWordChip: View {
                     .centredLetters(heard, size: 11)
                     .help("heard as \(heard)")
             }
-            if forget != nil {
-                SquareCross(help: "forget \(word)", action: { forgetting.toggle() }, rest: DesignTokens.Colors.ink3)
+            if let forget {
+                SquareCross(help: "hold to forget \(word)", action: {}, rest: DesignTokens.Colors.ink3)
+                    .squareHold(progress: $forgetting, name: "forget \(word)", perform: forget)
             }
         }
         .font(Square.mono(Square.controlSize))
@@ -90,9 +92,7 @@ struct SquareWordChip: View {
         .padding(.trailing, forget == nil ? 9 : 2)
         .frame(height: 26)
         .background(DesignTokens.Colors.inkA08)
-        .squareConfirmDelete(isPresented: $forgetting, title: "forget “\(word)”?",
-                             detail: heardAs.isEmpty ? SquareDeleteConfirm.gone(1) : "it and \(counted(heardAs.count, "spelling")) can't be recovered.",
-                             confirm: "forget") { forget?() }
+        .squareHoldFill(forgetting)
     }
 }
 

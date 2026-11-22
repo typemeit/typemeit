@@ -147,6 +147,7 @@ struct HistoryTab: View {
     @State private var askedClaude: Bool?
     @State private var claudeOpen = false
     @State private var selection = ListSelection()
+    @State private var boxFrames = ListBoxFrames()
     /// The row whose copy ran last, which shows a check for it.
     @State private var copied: UUID?
     /// The dictation shown as its own page, or nil for the list.
@@ -216,6 +217,7 @@ struct HistoryTab: View {
                                 SquareDayHeader(day: day, date: date, total: total, totalWidth: HistoryColumns.total, trailing: HistoryColumns.trailing)
                             case .row(let entry):
                                 HistoryRow(entry: entry, picked: $selection.box(entry.id) { filtered.map(\.id) },
+                                           drag: $selection.drag(entry.id, frames: boxFrames) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty, copied: copied == entry.id,
                                            open: { open = entry.id },
                                            copy: {
@@ -230,6 +232,7 @@ struct HistoryTab: View {
                             }
                         }
                     }
+                    .coordinateSpace(.named(squareListSpace))
                     .padding(.horizontal, SquareListColumns.page)
                     .padding(.bottom, 20)
                 }
@@ -394,6 +397,7 @@ enum HistoryColumns {
 private struct HistoryRow: View {
     let entry: HistoryEntry
     @Binding var picked: Bool
+    let drag: ListBoxDrag
     /// Something is picked, so every box shows.
     let picking: Bool
     let copied: Bool
@@ -401,16 +405,18 @@ private struct HistoryRow: View {
     let copy: () -> Void
     let delete: () -> Void
     @State private var hovering = false
-    @State private var deleting = false
+    /// How far a hold on the bin has got.
+    @State private var deleting = 0.0
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Toggle("select", isOn: $picked)
                 .toggleStyle(SquareTickStyle(faint: true))
                 .labelsHidden()
+                .listBoxDrag(drag)
                 .frame(width: SquareListColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
-                .help(picked ? "deselect" : "select · shift-click for a range")
+                .help(picked ? "deselect" : "select · drag or shift-click for a range")
                 .onFirstLine()
                 .padding(.trailing, SquareListColumns.edge)
             Button(action: open) {
@@ -455,11 +461,12 @@ private struct HistoryRow: View {
                     .animation(.easeOut(duration: DesignTokens.Duration.n1), value: copied)
                     .help("copy")
                     .accessibilityLabel("copy")
-                Button { deleting.toggle() } label: { SquareIcon("akar-trash-can", size: 14) }
+                Button {} label: { SquareIcon("akar-trash-can", size: 14) }
                     .buttonStyle(SquareIconButtonStyle(side: HistoryColumns.action))
-                    .help("delete")
+                    .squareHold(progress: $deleting, name: "delete", perform: delete)
+                    .squareHoldFill(deleting)
+                    .help("hold to delete")
                     .accessibilityLabel("delete")
-                    .squareConfirmDelete(isPresented: $deleting, title: "delete this dictation?", delete: delete)
             }
             .onFirstLine()
             .padding(.leading, HistoryColumns.actionLead)

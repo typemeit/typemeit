@@ -76,6 +76,64 @@ final class ListSelectionTests: XCTestCase {
     }
 }
 
+final class ListSelectionDragTests: XCTestCase {
+    private func indices(_ selection: ListSelection) -> Set<Int> {
+        Set(selection.picked.map { rows.firstIndex(of: $0)! })
+    }
+
+    func testADragDownTheBoxesTicksEachOne() {
+        var selection = ListSelection()
+        selection.startDrag(rows[1], extending: false, in: rows)
+        selection.drag(over: rows[2], in: rows)
+        selection.drag(over: rows[4], in: rows)
+        selection.endDrag()
+        XCTAssertEqual(indices(selection), [1, 2, 3, 4])
+    }
+
+    /// Starting on a ticked box unticks, and so does every box after it.
+    func testADragFromATickedBoxUnticks() {
+        var selection = ListSelection(picked: Set(rows[0...5]))
+        selection.startDrag(rows[2], extending: false, in: rows)
+        selection.drag(over: rows[4], in: rows)
+        XCTAssertEqual(indices(selection), [0, 1, 5])
+    }
+
+    /// Going back up over boxes the drag ticked leaves them ticked.
+    func testADragBackUpKeepsWhatItTicked() {
+        var selection = ListSelection()
+        selection.startDrag(rows[2], extending: false, in: rows)
+        selection.drag(over: rows[5], in: rows)
+        selection.drag(over: rows[0], in: rows)
+        XCTAssertEqual(indices(selection), [0, 1, 2, 3, 4, 5])
+    }
+
+    /// The next shift-click measures from where the drag ended.
+    func testTheDragLeavesTheAnchorOnItsLastBox() {
+        var selection = ListSelection()
+        selection.startDrag(rows[1], extending: false, in: rows)
+        selection.drag(over: rows[3], in: rows)
+        selection.endDrag()
+        selection.click(rows[6], extending: true, in: rows)
+        XCTAssertEqual(indices(selection), [1, 2, 3, 4, 5, 6])
+    }
+
+    /// A press with nothing to drag over is the click it always was.
+    func testAPressAloneIsAClick() {
+        var selection = ListSelection(picked: [rows[3]])
+        selection.startDrag(rows[3], extending: false, in: rows)
+        selection.endDrag()
+        XCTAssertEqual(indices(selection), [])
+        XCTAssertNil(selection.dragging)
+    }
+
+    func testOverARowNoLongerListedDoesNothing() {
+        var selection = ListSelection()
+        selection.startDrag(rows[1], extending: false, in: rows)
+        selection.drag(over: UUID(), in: rows)
+        XCTAssertEqual(indices(selection), [1])
+    }
+}
+
 final class HistoryEntryDisplayTests: XCTestCase {
     private func entry(postProcessed: String?, typed: String?) -> HistoryEntry {
         HistoryEntry(timestamp: Date(), transcript: "a hundred and thirty four", postProcessed: postProcessed, postProcessRequested: true, typed: typed, dictionaryFixes: 0)

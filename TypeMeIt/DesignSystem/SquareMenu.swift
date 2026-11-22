@@ -1,23 +1,54 @@
 import SwiftUI
 
+/// The choice's coordinate space, where the slab and the segments' frames are measured.
+private let squareChoiceSpace = "square-choice"
+
 /// The square choice: options side by side in one ink outline, split by
 /// ink-a20 hairlines, the chosen one inverted to the slab. The pointer
-/// washes the others.
+/// washes the others. Choosing another moves the slab there as the tabs'
+/// does, in hard steps with a dithered ghost left behind.
 struct SquareChoice<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [Value]
     var label: (Value) -> String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Each segment's frame in the choice.
+    @State private var frames: [Int: CGRect] = [:]
+    @State private var motion = SquareSlabMotion()
+    @State private var jump: Task<Void, Never>?
+
+    private var picked: Int? { options.firstIndex(of: selection) }
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(options.enumerated()), id: \.element) { i, option in
                 if i > 0 { Rectangle().fill(DesignTokens.Colors.inkA20).frame(width: DesignTokens.hairline) }
-                SquareSegment(text: label(option), chosen: option == selection) { selection = option }
+                SquareSegment(text: label(option), chosen: option == selection,
+                              onSlab: motion.covers(frames[i]) ?? (i == picked)) { selection = option }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(squareChoiceSpace)) } action: { frame in
+                        frames[i] = frame
+                        if i == picked && jump == nil { motion.slab = frame }
+                    }
             }
         }
+        .background(alignment: .topLeading) { SquareSlabLayer(motion: motion) }
+        .coordinateSpace(.named(squareChoiceSpace))
         .padding(DesignTokens.hairline)
         .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink, lineWidth: DesignTokens.hairline))
         .fixedSize()
+        .onChange(of: selection) { _, _ in jumpSlab() }
+    }
+
+    private func jumpSlab() {
+        jump?.cancel()
+        jump = nil
+        guard let index = picked, let target = frames[index],
+              motion.start(to: target, reduceMotion: reduceMotion) else { return }
+        jump = Task {
+            guard await SquarePixel.run({ motion.advance() }) else { return }
+            motion.settle(at: frames[index])
+            jump = nil
+        }
     }
 }
 
@@ -30,6 +61,8 @@ extension SquareChoice where Value == String {
 private struct SquareSegment: View {
     let text: String
     let chosen: Bool
+    /// The slab is under this segment's middle, now or on its way.
+    let onSlab: Bool
     let choose: () -> Void
     @Environment(\.squarePose) private var pose
     @State private var hovering = false
@@ -39,30 +72,34 @@ private struct SquareSegment: View {
             Text(text)
                 .font(Square.mono(Square.controlSize))
                 .centredLetters(text)
-                .foregroundStyle(chosen ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink2)
+                .foregroundStyle(onSlab ? DesignTokens.Colors.onSlab : DesignTokens.Colors.ink2)
                 .padding(.horizontal, 9)
                 .frame(height: 22)
-                .background(Rectangle().fill(fill))
+                .background(Rectangle().fill(onSlab || !pose.hot(hovering) ? Color.clear : DesignTokens.Colors.inkA04))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
-
-    private var fill: Color {
-        if chosen { return DesignTokens.Colors.slab }
-        return pose.hot(hovering) ? DesignTokens.Colors.inkA04 : .clear
-    }
 }
 
 /// Where the cloud sits, chosen on a drawing of the screen: its outline and
 /// a menu bar with the Apple menu, with a dot at each place the cloud can go.
 /// The chosen dot is ink and a size up; the pointer darkens the others.
+/// Choosing another place moves the ink dot there in the square parts'
+/// hard steps, and the place it left keeps a dithered ghost of it.
 struct SquareScreenPicker: View {
     @Binding var selection: CloudPosition
     @Environment(\.squarePose) private var pose
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered: CloudPosition?
+    /// Where the ink dot is drawn while it moves; nil once it has landed.
+    @State private var moving: CGPoint?
+    /// The place it left, while its ghost fades, and how many of 16 cells are inked.
+    @State private var ghost: CGPoint?
+    @State private var ghostLevel = 0
+    @State private var run: Task<Void, Never>?
 
     private static let width: CGFloat = 112
     /// The Mac's own screen shape, 1512 by 982 on a 14-inch MacBook Pro.
@@ -90,10 +127,54 @@ struct SquareScreenPicker: View {
             ForEach(CloudPosition.allCases, id: \.self) { position in
                 dot(position).position(SquareScreenPicker.centre(of: position))
             }
+            if let ghost, ghostLevel > 0 {
+                SquareDither(level: ghostLevel, color: DesignTokens.Colors.ink)
+                    .frame(width: SquareScreenPicker.chosenDot, height: SquareScreenPicker.chosenDot)
+                    .clipShape(Circle())
+                    .position(ghost)
+            }
+            Circle()
+                .fill(DesignTokens.Colors.ink)
+                .frame(width: SquareScreenPicker.chosenDot, height: SquareScreenPicker.chosenDot)
+                .position(moving ?? SquareScreenPicker.centre(of: selection))
+                .allowsHitTesting(false)
         }
         .frame(width: SquareScreenPicker.width, height: SquareScreenPicker.height)
         .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
         .fixedSize()
+        .onChange(of: selection) { was, now in move(from: was, to: now) }
+        .onDisappear { run?.cancel() }
+    }
+
+    private static var chosenDot: CGFloat { dot * 1.4 }
+
+    /// Steps the ink dot to its new place, from wherever a move still
+    /// running has got to, and fades the ghost it leaves.
+    private func move(from was: CloudPosition, to now: CloudPosition) {
+        run?.cancel()
+        run = nil
+        guard !reduceMotion else {
+            moving = nil
+            ghost = nil
+            return
+        }
+        let from = moving ?? SquareScreenPicker.centre(of: was), to = SquareScreenPicker.centre(of: now)
+        ghost = from
+        ghostLevel = SquarePixel.ghostStart
+        run = Task {
+            var step = 0
+            guard await SquarePixel.run({
+                if step < SquarePixel.steps {
+                    step += 1
+                    moving = SquarePixel.point(from: from, to: to, step: step)
+                }
+                ghostLevel = max(0, ghostLevel - SquarePixel.ghostThin)
+                return step < SquarePixel.steps || ghostLevel > 0
+            }) else { return }
+            moving = nil
+            ghost = nil
+            run = nil
+        }
     }
 
     /// Where `OverlayPanel` puts the cloud: the sides halfway down the space
@@ -111,13 +192,13 @@ struct SquareScreenPicker: View {
 
     private func dot(_ position: CloudPosition) -> some View {
         let chosen = position == selection
-        let fill = chosen ? DesignTokens.Colors.ink : (pose.hot(hovered == position) ? DesignTokens.Colors.inkA64 : DesignTokens.Colors.inkA32)
+        // The chosen place's own dot stays plain: the ink dot drawn over the
+        // picker covers it once it lands.
+        let fill = pose.hot(hovered == position) && !chosen ? DesignTokens.Colors.inkA64 : DesignTokens.Colors.inkA32
         return Button { selection = position } label: {
             Circle()
                 .fill(fill)
                 .frame(width: SquareScreenPicker.dot, height: SquareScreenPicker.dot)
-                .scaleEffect(chosen ? 1.4 : 1)
-                .animation(.easeOut(duration: DesignTokens.Duration.n2), value: chosen)
                 .frame(width: SquareScreenPicker.target, height: SquareScreenPicker.target)
                 .contentShape(Rectangle())
         }
@@ -266,15 +347,24 @@ struct SquareMenuLine: View {
 
 /// A list's filter: a square button naming what it filters by, with its
 /// menu under it. Once something is picked it inverts to the slab, shows the
-/// pick and grows a cross that clears it.
+/// pick and grows a cross that clears it. The slab dithers in over the
+/// square parts' steps as the cross steps out from behind, and the other way
+/// on clearing.
 struct SquareFilter<Popover: View>: View {
     let label: String
     var active = false
     var clear: () -> Void = {}
     @Binding var open: Bool
     @ViewBuilder var popover: () -> Popover
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The slab, 0...16, while it dithers in or out; nil once it has landed.
+    @State private var moving: Int?
+    @State private var run: Task<Void, Never>?
+
+    private static var crossWidth: CGFloat { 22 }
 
     var body: some View {
+        let level = moving ?? (active ? 16 : 0)
         HStack(spacing: 0) {
             Button { open.toggle() } label: {
                 HStack(spacing: 7) {
@@ -282,13 +372,14 @@ struct SquareFilter<Popover: View>: View {
                     SquareIcon("akar-chevron-down", size: 9)
                 }
             }
-            .buttonStyle(SquareButtonStyle(kind: active ? .primary : .outline))
+            .buttonStyle(SquareButtonStyle(kind: level >= 16 ? .primary : .outline))
+            .background { if level > 0 && level < 16 { SquareDither(level: level, color: DesignTokens.Colors.slab) } }
             .help(label)
-            if active {
+            if level > 0 {
                 Button(action: clear) {
                     SquareIcon("akar-cross", size: 8)
                         .foregroundStyle(DesignTokens.Colors.onSlab)
-                        .frame(width: 22, height: SquareButtonStyle.height)
+                        .frame(width: Self.crossWidth, height: SquareButtonStyle.height)
                         .background(DesignTokens.Colors.slab)
                         .overlay(alignment: .leading) {
                             Rectangle().fill(DesignTokens.Colors.onSlab.opacity(0.28)).frame(width: DesignTokens.hairline)
@@ -296,11 +387,35 @@ struct SquareFilter<Popover: View>: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(width: (Self.crossWidth * CGFloat(level) / 16).rounded(), alignment: .leading)
+                .clipped()
                 .help("clear")
                 .accessibilityLabel("clear \(label)")
             }
         }
         .squarePopover(isPresented: $open, content: popover)
+        .onChange(of: active) { was, now in step(from: was, to: now) }
+        .onDisappear { run?.cancel() }
+    }
+
+    private func step(from was: Bool, to now: Bool) {
+        run?.cancel()
+        run = nil
+        guard !reduceMotion else {
+            moving = nil
+            return
+        }
+        let start = moving ?? (was ? 16 : 0), end = now ? 16 : 0
+        run = Task {
+            var step = 0
+            guard await SquarePixel.run({
+                step += 1
+                moving = SquarePixel.level(from: start, to: end, step: step)
+                return step < SquarePixel.steps
+            }) else { return }
+            moving = nil
+            run = nil
+        }
     }
 }
 

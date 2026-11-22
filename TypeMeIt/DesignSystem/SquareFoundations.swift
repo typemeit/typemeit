@@ -178,6 +178,7 @@ struct SquareGallery: View {
             ("tabs", "navigation segmented", AnyView(SquareTabsSpecimen())),
             ("claude output", "markdown thread ai stream", AnyView(SquareClaudeThreadSpecimen())),
             ("confirm and help", "alert dialog popover tooltip", AnyView(SquareConfirmSpecimen())),
+            ("hold", "delete confirm press long", AnyView(SquareHoldSpecimen())),
         ]
     }
 

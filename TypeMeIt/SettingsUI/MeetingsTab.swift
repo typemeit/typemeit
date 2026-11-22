@@ -24,6 +24,7 @@ struct MeetingsTab: View {
     @State private var whoOpen = false
     @State private var whenOpen = false
     @State private var selection = ListSelection()
+    @State private var boxFrames = ListBoxFrames()
     /// Meetings whose stop was clicked, until their transcription lets go.
     @State private var stopping: Set<UUID> = []
     @State private var deletingPicked = false
@@ -102,6 +103,7 @@ struct MeetingsTab: View {
                                 SquareDayHeader(day: day, date: date, total: total, totalWidth: MeetingColumns.total(place: placeWidth), trailing: MeetingColumns.trail)
                             case .row(let meeting):
                                 MeetingRow(meeting: meeting, place: placeWidth, picked: $selection.box(meeting.id) { filtered.map(\.id) },
+                                           drag: $selection.drag(meeting.id, frames: boxFrames) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty,
                                            stopping: stopping.contains(meeting.id),
                                            open: {
@@ -119,6 +121,7 @@ struct MeetingsTab: View {
                             }
                         }
                     }
+                    .coordinateSpace(.named(squareListSpace))
                     .padding(.horizontal, SquareListColumns.page)
                     .padding(.bottom, 20)
                 }
@@ -377,6 +380,7 @@ private struct MeetingRow: View {
     let meeting: Meeting
     let place: CGFloat
     @Binding var picked: Bool
+    let drag: ListBoxDrag
     /// Something is picked, so every box shows.
     let picking: Bool
     /// Its stop was clicked and the transcription is letting go.
@@ -401,9 +405,10 @@ private struct MeetingRow: View {
             Toggle("select", isOn: $picked)
                 .toggleStyle(SquareTickStyle(faint: true))
                 .labelsHidden()
+                .listBoxDrag(drag)
                 .frame(width: SquareListColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
-                .help(picked ? "deselect" : "select · shift-click for a range")
+                .help(picked ? "deselect" : "select · drag or shift-click for a range")
             HStack(alignment: .center, spacing: SquareListColumns.gap) {
                 Text(meeting.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
                     .font(Square.mono(12))
