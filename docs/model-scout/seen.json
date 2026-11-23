@@ -2324,6 +2324,418 @@
         }
       },
       "verdict": "near miss: number (card not readable)"
+    },
+    {
+      "id": "China Telecom AI Xing-Audio4.0-ASR-Preview (eval reference)",
+      "date": "2026-11-23",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": null,
+          "why": "no public API documentation found; Artificial Analysis lists it at $1.51 per 1,000 minutes, speed factor 17.3, with no model id, speaker labels or word timestamps stated"
+        },
+        "number": {
+          "pass": null,
+          "why": "Artificial Analysis AA-WER 2.0% vs Universal-3.5 Pro 3.0% and AssemblyAI-STT-3.7 2.5%, level with MAI-Transcribe-2 (2.0%); no AMI or conversational number, and not on Voice Arena or the Open ASR Leaderboard"
+        }
+      },
+      "verdict": "near miss: api (no public API documentation; a preview)"
+    },
+    {
+      "id": "babybirdprd/Underdog-Bark-3.0 copies",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML and MLX builds"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B, 1.25 GB bf16 for Pro"
+        },
+        "number": {
+          "pass": false,
+          "why": "the same card and numbers as conwayresearch/Underdog-Bark-3.0 (7-set mean 4.29% for Pro)"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "copies of Underdog Bark 3.0, 3.0 Clean, Plus and Pro; Pro and Plus rejected 2026-10-22"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no new benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (copies of Underdog Bark 3.0, rejected 2026-10-22)"
+    },
+    {
+      "id": "Straylight-dev/fluid-speech-pro-gguf",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF for transcribe.cpp, Q8_0"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers beyond the source model"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "GGUF port of Fluid Speech Pro, rejected 2026-11-14"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (GGUF port of Fluid Speech Pro)"
+    },
+    {
+      "id": "onlyTheOnionNews/phonon-2-onnx",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX, built for ONNX Runtime Web; encoder about 610 MB"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers beyond the source model"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "ONNX port of Phonon-2, rejected 2026-10-11"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (ONNX port of Phonon-2)"
+    },
+    {
+      "id": "otter-app GGUF mirrors",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among others; two repos are Hebrew and one Slovak"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0 for Parakeet, OpenMDW-1.1 for Nemotron"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B and under"
+        },
+        "number": {
+          "pass": false,
+          "why": "unchanged copies of other GGUF conversions (Parakeet TDT v3, Nemotron 3.5 ASR streaming, Nemotron 3 Diarization, Breeze ASR 25, Zipformer2) for the Otter app"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Nemotron 3 Diarization is the shipped diarizer; Nemotron streaming ASR rejected 2026-09-30"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (app mirrors of models already shipped, seen or tried)"
+    },
+    {
+      "id": "nyamkhuu/Nemotron-Labs-Unified-ASR-0.6B-hf",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "Transformers format; no Apple Silicon build in this repo"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among 25 European languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "tensor values unchanged from nvidia/nemotron-labs-unified-asr-0.6b; no new numbers"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Parakeet Unified rejected 2026-09-26 and 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (format conversion of Nemotron Labs Unified ASR)"
+    },
+    {
+      "id": "bingokingooo/shruti-coreml",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, 49.5-54.1 MB per language pack"
+        },
+        "english": {
+          "pass": null,
+          "why": "22 Indian languages; each pack also accepts English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "about 50 MB a pack"
+        },
+        "number": {
+          "pass": false,
+          "why": "LibriSpeech test-clean 7.48% from the Hindi pack; Parakeet TDT v3 is 1.52% on that set per the Underdog Bark card"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Udgam Labs Shruti, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "training data not read"
+        }
+      },
+      "verdict": "near miss: number (LibriSpeech test-clean 7.48%, far behind Parakeet)"
+    },
+    {
+      "id": "labhamlet/speech-jepa-base-asr-960h",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "Transformers CTC checkpoint; no Apple Silicon build"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "BSD-3-Clause"
+        },
+        "fits": {
+          "pass": true,
+          "why": "base-size encoder"
+        },
+        "number": {
+          "pass": false,
+          "why": "LibriSpeech-only, character-level CTC with no punctuation; no comparison against Parakeet"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "new self-supervised encoder"
+        },
+        "heldOut": {
+          "pass": false,
+          "why": "trained and tested on LibriSpeech"
+        }
+      },
+      "verdict": "near miss: number (LibriSpeech-only research checkpoint)"
+    },
+    {
+      "id": "fihriaLab/fihrIA-ASR (0.6B and 1.7B)",
+      "date": "2026-11-23",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF Q4_K_M builds"
+        },
+        "english": {
+          "pass": false,
+          "why": "Moroccan Darija with French and English code-switching, Arabic script output"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B and 1.7B"
+        },
+        "number": {
+          "pass": false,
+          "why": "no English number"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR fine-tune; Qwen3-ASR 0.6B rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not read"
+        }
+      },
+      "verdict": "near miss: english (Moroccan Darija)"
+    },
+    {
+      "id": "espnet/frontia_vad_v2_3",
+      "date": "2026-11-23",
+      "role": "voice activity detection",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "ESPnet checkpoint; no Core ML or ONNX build"
+        },
+        "english": {
+          "pass": true,
+          "why": "language-independent"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "small TCN: 5 blocks x 2 repeats, hidden 128"
+        },
+        "number": {
+          "pass": false,
+          "why": "card says it is not yet scored on the v1 evaluation sets; no comparison against Silero VAD"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "decision rule tuned on an AMI dev set; no test number"
+        }
+      },
+      "verdict": "near miss: number (not yet scored)"
+    },
+    {
+      "id": "matthiastl/sava-telephony",
+      "date": "2026-11-23",
+      "role": "turn-taking / VAD",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "small streaming model"
+        },
+        "number": {
+          "pass": false,
+          "why": "end-of-turn accuracy on simulated phone lines (93.0% landline, 92.4% GSM); the app has no end-of-turn role and no phone audio"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "fine-tune of inworld/sava, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "tested on simulated lines"
+        }
+      },
+      "verdict": "near miss: number (end-of-turn model for phone audio; no role in the app)"
+    },
+    {
+      "id": "arXiv 2611.26796 (multi-talker ASR on two speaker-agnostic activity streams)",
+      "date": "2026-11-23",
+      "role": "meetings speech and diarization",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "paper only; the abstract names no released weights"
+        },
+        "english": {
+          "pass": true,
+          "why": "conversational English"
+        },
+        "licence": {
+          "pass": null,
+          "why": "no release"
+        },
+        "fits": {
+          "pass": null,
+          "why": "no release"
+        },
+        "number": {
+          "pass": null,
+          "why": "abstract gives no number against Nemotron or pyannote"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "new method"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not read"
+        }
+      },
+      "verdict": "near miss: onDevice (no released weights)"
     }
   ]
 }
