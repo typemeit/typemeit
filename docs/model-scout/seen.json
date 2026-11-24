@@ -2736,6 +2736,906 @@
         }
       },
       "verdict": "near miss: onDevice (no released weights)"
+    },
+    {
+      "id": "clouddevaakash/murmur-cleanup-2b",
+      "date": "2026-11-24",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX 4-bit"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "1.18 GB file, inside the size budget; p95 1.42 s on an M3 is over the 500 ms clean-up budget"
+        },
+        "number": {
+          "pass": null,
+          "why": "card: 3.8% hard failures on its own 290-row test set, p50/p95 0.53/1.42 s; no comparison with Apple's model or another clean-up model"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "fine-tune of Qwen3.5 2B, rejected 2026-09-05"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "card says the 290 rows are held out"
+        }
+      },
+      "verdict": "near miss: notRejected (Qwen3.5 2B fine-tune; p95 1.42 s is also over the 500 ms budget)"
+    },
+    {
+      "id": "herald-dictation/herald-cleanup-1.7B-GGUF",
+      "date": "2026-11-24",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, llama.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "1.83 GB Q8_0 file, over the 1.5 GB budget"
+        },
+        "number": {
+          "pass": false,
+          "why": "card gives no score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "Qwen3 1.7B fine-tune; that size is untried, Qwen3-4B-Instruct-2507 was rejected 2026-09-25"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark; trained on AMI, VoxPopuli and LibriSpeech transcripts"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "0xemanuelel/rambleflow-cleanup-1.7b-gguf",
+      "date": "2026-11-24",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, llama.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0; training data includes CC BY 4.0 material"
+        },
+        "fits": {
+          "pass": true,
+          "why": "1.05 GB Q4 file; median 308 ms on an Apple silicon Mac, p95 not given"
+        },
+        "number": {
+          "pass": false,
+          "why": "card: 37 of 40 transcripts match the unquantized model and a similar error count to an unnamed reference on 648 development cases; no score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "Qwen3 1.7B fine-tune; that size is untried, Qwen3-4B-Instruct-2507 was rejected 2026-09-25"
+        },
+        "heldOut": {
+          "pass": false,
+          "why": "card says it was measured during development, not on a held-out set"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "satoshiNakomoroReal/murmur-cleanup",
+      "date": "2026-11-24",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "card says no weights are published"
+        },
+        "english": {
+          "pass": true,
+          "why": "English and Russian planned"
+        },
+        "licence": {
+          "pass": null,
+          "why": "licence of each base model, once published"
+        },
+        "fits": {
+          "pass": null,
+          "why": "0.87B to 2.27B planned"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "planned on Qwen3.5 0.8B, Qwen3.5 2B and LFM3 1.7B; Qwen3.5 2B was rejected 2026-09-05"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: onDevice (no weights published yet)"
+    },
+    {
+      "id": "Lucasgitguy-co/Turbo-Kev-Dictate-1.4B",
+      "date": "2026-11-24",
+      "role": "speech recognition and clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, llama.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "1.33 GB GGUF bundle, inside the size budget; memory and latency not given"
+        },
+        "number": {
+          "pass": false,
+          "why": "card: FLEURS 8.81% vs Whisper-turbo 5.74%, 75 to 81 s recordings 30.85% vs 11.64%, 64.95% of dictated questions transcribed rather than answered"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Whisper-turbo encoder with Kev-0.8B; not tried"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "card says the tests are held out; FLEURS is named in its training datasets"
+        }
+      },
+      "verdict": "near miss: number (fails its own release gate: FLEURS 8.81% against Whisper-turbo 5.74%)"
+    },
+    {
+      "id": "Hansda/tiny-dictation-en",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "17.9 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "FLEURS en 9.97%, LibriSpeech test-clean 3.41%; no Open ASR row; Parakeet Ultra is 4.70% on an English and French FLEURS subset (aufklarer card)"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Citrinet and Conformer CTC small; not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "FLEURS and LibriSpeech are in its training datasets; card says the full test splits were not used"
+        }
+      },
+      "verdict": "near miss: number (FLEURS 9.97%, LibriSpeech test-clean 3.41%; far behind Parakeet)"
+    },
+    {
+      "id": "aufklarer/Parakeet-Ultra-CoreML-INT8-30s",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, 30 s encoder window"
+        },
+        "english": {
+          "pass": true,
+          "why": "25 European languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "640 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "80 English and 80 French FLEURS clips: 4.70% vs 5.22% for v3; no number against the Ultra build the app ships"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "the shipped model's weights, for the speech-swift runtime"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "FLEURS subset"
+        }
+      },
+      "verdict": "near miss: notRejected (Core ML export of Parakeet Ultra, the shipped model)"
+    },
+    {
+      "id": "doanhlt/cabin-asr-en-parakeet-tdt-offline-p3",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX int8, sherpa-onnx"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": null,
+          "why": "licence \"other\"; base Parakeet TDT v2 is CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "661 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "card gives only pass or fail against its int8 Parakeet TDT v2 baseline, no WER"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "fine-tune of Parakeet TDT v2; that fine-tune is untried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "Common Voice, VoxPopuli and FLEURS train splits are in training"
+        }
+      },
+      "verdict": "near miss: number (gate results are pass/fail only)"
+    },
+    {
+      "id": "doanhlt/cabin-asr-eu and -ja Parakeet packages",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX int8, sherpa-onnx"
+        },
+        "english": {
+          "pass": null,
+          "why": "the eu package trains on French, German, Spanish and Italian, the ja package is Japanese"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not read"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not read"
+        },
+        "number": {
+          "pass": false,
+          "why": "siblings of cabin-asr-en, whose card gives only pass or fail"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "Parakeet TDT fine-tunes"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not read"
+        }
+      },
+      "verdict": "near miss: number (no WER published)"
+    },
+    {
+      "id": "lionellee/Qwen3-ASR-CoreML",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "repo holds 1.6 GB of weights, over the 1.5 GB budget as published"
+        },
+        "number": {
+          "pass": null,
+          "why": "port of Qwen3-ASR-0.6B: Open ASR average 7.07% vs Parakeet TDT v2 6.93%"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR 0.6B was tried 2026-10-12 and rejected"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: notRejected (Core ML port of Qwen3-ASR 0.6B, rejected)"
+    },
+    {
+      "id": "goodpixelltd/qwen3-asr-1.7b-coreml",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, Neural Engine, 8 s windows"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "4-bit decoder; total size not checked"
+        },
+        "number": {
+          "pass": null,
+          "why": "port of Qwen3-ASR-1.7B: Open ASR average 6.15% vs Parakeet TDT v2 6.93%; no number for the port"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture, rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: notRejected (Core ML port of Qwen3-ASR 1.7B, same architecture as the rejected 0.6B)"
+    },
+    {
+      "id": "phathat/parakeet-tdt-0.6b-v3-fp16-coreml",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, Neural Engine"
+        },
+        "english": {
+          "pass": true,
+          "why": "25 European languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "1.23 GB encoder, plus the original decoder and joint"
+        },
+        "number": {
+          "pass": false,
+          "why": "no WER; same weights as Parakeet TDT v3 (Open ASR 7.04%)"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 weights, not rejected in model-trials.md"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (fp16 encoder export of Parakeet TDT v3, no score)"
+    },
+    {
+      "id": "CrazyDipole/parakeet-tdt-0.6b-v3-coreai",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core AI on macOS 27 and iOS 27"
+        },
+        "english": {
+          "pass": true,
+          "why": "25 European languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "484 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "speed only in the part of the card read: 123 times realtime on an A16 iPad"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v3 weights, not rejected in model-trials.md"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark read"
+        }
+      },
+      "verdict": "near miss: number (6-bit Core AI build of Parakeet TDT v3, no WER checked)"
+    },
+    {
+      "id": "GiovanniManzoni/nemotron-unified-asr-0.6b-sherpa-onnx",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX int8, sherpa-onnx"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1"
+        },
+        "fits": {
+          "pass": true,
+          "why": "672 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "port of nvidia/nemotron-labs-unified-asr-0.6b, seen 2026-11-03"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (byte-for-byte copy of an ONNX port of Nemotron Labs Unified ASR, seen 2026-11-03)"
+    },
+    {
+      "id": "cstr/musci-asr-qwen-1019-GGUF",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF"
+        },
+        "english": {
+          "pass": true,
+          "why": "52 languages, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "2.04B parameters; file sizes not checked"
+        },
+        "number": {
+          "pass": null,
+          "why": "the original has an Open ASR average of 5.70% vs Parakeet TDT v2 6.93%; no number for the port"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture, rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "leaderboard lists its training data; not checked"
+        }
+      },
+      "verdict": "near miss: notRejected (GGUF port of Musci-ASR-qwen-1019, Qwen3-ASR architecture)"
+    },
+    {
+      "id": "Parakeet and Whisper mirrors, 2026-11-17 to 2026-11-24",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX, GGUF or GGML"
+        },
+        "english": {
+          "pass": true,
+          "why": "includes English"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked one by one"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked one by one"
+        },
+        "number": {
+          "pass": false,
+          "why": "names only: mrsoundmind, warlockzero, moonbox-dev, kaptionai, Koptev, JoaoZaokk, onemira, fyychs and similar repos; no numbers seen in the listing"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "conversions of Parakeet v2, v3, Ultra and Unified, Whisper and Qwen3-ASR"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (copies and format conversions of seen models)"
+    },
+    {
+      "id": "MUC-HeTong/HeTong-Omni-ASR-300M",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "PyTorch checkpoint only"
+        },
+        "english": {
+          "pass": null,
+          "why": "multilingual; the card example is Tibetan"
+        },
+        "licence": {
+          "pass": null,
+          "why": "no licence on the card"
+        },
+        "fits": {
+          "pass": true,
+          "why": "300M class model, 6.5 GB of checkpoints as published"
+        },
+        "number": {
+          "pass": false,
+          "why": "no WER on the card"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "omniASR LLM architecture, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (no score)"
+    },
+    {
+      "id": "SpeechTek/speechllm_fama_meusli_villanova_asr_en_v1",
+      "date": "2026-11-24",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "PyTorch and SLAM-LLM only"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "FAMA medium encoder with a 2B LLM"
+        },
+        "number": {
+          "pass": false,
+          "why": "no Open ASR row; trained on VoxPopuli"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "FAMA encoder with Villanova-2B, not tried"
+        },
+        "heldOut": {
+          "pass": false,
+          "why": "VoxPopuli, an Open ASR set, is its training dataset"
+        }
+      },
+      "verdict": "near miss: number (no Open ASR row)"
+    },
+    {
+      "id": "mshwiesner/longform-multitalker-alignment",
+      "date": "2026-11-24",
+      "role": "meetings speech and diarization",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "needs a custom CUDA loss extension and an icefall recipe"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": false,
+          "why": "CC-BY-SA-3.0: share-alike would carry to a Core ML build"
+        },
+        "fits": {
+          "pass": true,
+          "why": "1.28 GB"
+        },
+        "number": {
+          "pass": null,
+          "why": "the part of the card read has no DER or wrong-speaker rate"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "WavLM Large with eight speaker slots, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "trained on LibriSpeech mixtures and YODAS"
+        }
+      },
+      "verdict": "near miss: onDevice (icefall research checkpoint)"
+    },
+    {
+      "id": "diarizers-community/DiarizationLM-Gemma-4-E4B-v2",
+      "date": "2026-11-24",
+      "role": "diarization correction",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, llama.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "5.30 GB Q4_K_M file and about 7.6 GiB of memory on the card, over the 1.5 GB and 6 GB meeting budgets"
+        },
+        "number": {
+          "pass": null,
+          "why": "AMI word error attributed to the wrong speaker 9.48% to 8.45% over an ECAPA baseline; no number on top of Nemotron or pyannote turns"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Gemma 4 E4B was rejected for clean-up; this is a different role"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "card says the 211 recordings are held out"
+        }
+      },
+      "verdict": "near miss: fits (5.3 GB Q4 file, over the 1.5 GB size budget; about 7.6 GiB of memory)"
+    },
+    {
+      "id": "diarizers-community/DiarizationLM-Gemma-4-12B-v1",
+      "date": "2026-11-24",
+      "role": "diarization correction",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, llama.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual, includes English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "7.38 GB Q4_K_M file, over the 1.5 GB size and 6 GB memory budgets"
+        },
+        "number": {
+          "pass": null,
+          "why": "AMI word error attributed to the wrong speaker 9.48% to 8.11% over an ECAPA baseline; no number on top of Nemotron or pyannote turns"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Gemma 4 12B, not tried"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "card says the 211 recordings are held out"
+        }
+      },
+      "verdict": "near miss: fits (7.38 GB Q4 file, over the 1.5 GB size budget)"
+    },
+    {
+      "id": "lionellee/Nemotron-3-Diarization-100M-CoreML-INT8",
+      "date": "2026-11-24",
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML INT8, 30.4 s chunks"
+        },
+        "english": {
+          "pass": true,
+          "why": "language independent"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1"
+        },
+        "fits": {
+          "pass": true,
+          "why": "107 MB"
+        },
+        "number": {
+          "pass": null,
+          "why": "11.20% pooled DER on 132 internal recordings; 0.03 to 0.06% of speaker decisions differ from the source checkpoint; no number against the Core ML build the app ships"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "the shipped model's weights"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "internal recordings"
+        }
+      },
+      "verdict": "near miss: notRejected (INT8 Core ML export of the shipped Nemotron 3 Diarization)"
+    },
+    {
+      "id": "canersamut/nemotron-3-diarization-coreml-low-w8",
+      "date": "2026-11-24",
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, loads in FluidAudio as Nemotron3Config.low"
+        },
+        "english": {
+          "pass": true,
+          "why": "language independent"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1"
+        },
+        "fits": {
+          "pass": true,
+          "why": "99.9 MB against 198.6 MB at 16 bits"
+        },
+        "number": {
+          "pass": null,
+          "why": "card: 44.03% DER vs 43.84% for the 16-bit low preset; not compared with the offline preset the app ships"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "the shipped model's weights in the streaming preset; the app uses the offline one"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark read"
+        }
+      },
+      "verdict": "near miss: notRejected (8-bit weights of the shipped Nemotron 3 Diarization, streaming low preset)"
+    },
+    {
+      "id": "Nemotron 3 Diarization ONNX copies (Dazarang, ooobo, jparedesDS)",
+      "date": "2026-11-24",
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "language independent"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1 on the Dazarang copy"
+        },
+        "fits": {
+          "pass": true,
+          "why": "400 MB on the Dazarang copy"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers on the Dazarang card; the other two were not read"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "the shipped model's weights"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (ONNX exports of the shipped model)"
+    },
+    {
+      "id": "kayal75/eres2net-sv-voxceleb-16k",
+      "date": "2026-11-24",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "VoxCeleb, mostly English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "26 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no EER on the card"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "ERes2Net, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "VoxCeleb trained; no benchmark"
+        }
+      },
+      "verdict": "near miss: number (unmodified copy of 3D-Speaker ERes2Net, no EER on the card)"
     }
   ]
 }
