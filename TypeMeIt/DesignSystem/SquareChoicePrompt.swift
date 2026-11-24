@@ -29,7 +29,7 @@ struct SquareChoicePrompt: View {
             .padding(.leading, 14)
             .padding(.trailing, 10)
             .frame(height: 48)
-            .overlay(alignment: .bottom) { Rectangle().fill(fg.opacity(0.18)).frame(height: DesignTokens.hairline) }
+            .overlay(alignment: .bottom) { SquareRule(color: SquareEdge.slabRule) }
             VStack(spacing: 0) {
                 ForEach(Array(choices.enumerated()), id: \.offset) { position, choice in
                     SquareChoiceRow(number: position + 1, text: choice, verb: verb, fg: fg) { onPick(position) }
@@ -65,10 +65,9 @@ private struct SquareChoiceRow: View {
             }
             .padding(.horizontal, 14)
             .frame(height: SquareHookTray.rowHeight)
-            .background(hovering ? fg.opacity(0.1) : .clear)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SquareSlabLineStyle(hot: hovering))
         .onHover { hovering = $0 }
         .accessibilityLabel("\(verb) \(text)")
     }

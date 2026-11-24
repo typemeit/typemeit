@@ -41,7 +41,7 @@ struct CloudView: View {
         .onHover { inside in
             if inside, clickable { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .help(model.state == .pinned ? "Finish" : model.state == .recording ? "Pin" : "")
+        .help(model.state == .pinned ? "finish" : model.state == .recording ? "pin" : "")
         .scaleEffect(grown ? 1 : CloudView.arrivalScale)
         .animation(.spring(duration: PuffView.arrivalDuration, bounce: 0.15), value: grown)
         .offset(y: CloudView.size / 2 - CloudView.restHeight)

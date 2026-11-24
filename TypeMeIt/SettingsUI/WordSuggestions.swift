@@ -38,7 +38,7 @@ struct WordSuggestions: View {
             HStack(spacing: 8) {
                 SquareClaudeSpinner()
                     .foregroundStyle(DesignTokens.Colors.claude)
-                Text("checking \(counted(n, "dictation"))")
+                Text("checking \(counted(n, "dictation"))…")
                     .foregroundStyle(DesignTokens.Colors.ink2)
                 Button("stop") { check.stop() }.buttonStyle(SquareButtonStyle(kind: .quiet))
             }

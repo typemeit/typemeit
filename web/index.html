@@ -23,6 +23,7 @@
 <meta name="twitter:title" content="type me it · Offline dictation and meeting transcription">
 <meta name="twitter:description" content="A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.">
 <meta name="twitter:image" content="https://typeme.it/og.png">
+<meta name="theme-color" content="#0b0b0b">
 <link rel="canonical" href="https://typeme.it/">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"type me it","url":"https://typeme.it/","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 26 or newer, Apple silicon","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://typeme.it/download","description":"A free, offline alternative to Granola and Wispr Flow for Mac: dictation in any app, and meeting transcription with speakers named, all on your Mac.","author":{"@type":"Person","name":"Max"},"sameAs":"https://github.com/typemeit/typemeit","featureList":["Dictation into any app: hold fn 🌐, speak, let go","Meeting transcription for calls in any app and for rooms","Speakers told apart and named by voice","A local MCP server for Claude, Codex and other assistants","Ask Claude Code by name in a call or a dictation","Hooks: prompts Claude Code runs on each meeting once it ends","Runs NVIDIA Parakeet and Nemotron and Apple Intelligence on the Mac"]}
@@ -140,6 +141,9 @@ html {
   text-rendering: optimizeLegibility;
   scroll-padding-top: var(--stick-top);
 }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 body { margin: 0; font-size: 15px; line-height: 1.55; letter-spacing: -0.005em; }
 h1, h2, h3, p { margin: 0; font-weight: 400; }
 h1, h2 { text-wrap: balance; }
@@ -162,15 +166,18 @@ a { color: inherit; }
   font: 400 12px/1 var(--font-mono); letter-spacing: 0;
   color: var(--tmi-ink); background: transparent;
   text-decoration: none; cursor: pointer; white-space: nowrap;
-  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out);
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out), transform var(--duration-1) var(--ease-out);
 }
 .btn .icon { font-size: 14px; }
 .btn-sm { height: 24px; padding: 0 8px; font-size: 11px; }
 .btn-lg { height: 38px; padding: 0 16px; font-size: 14px; }
 .btn-lg .icon { font-size: 16px; }
 .btn-primary { background: var(--tmi-slab); color: var(--tmi-on-slab); border-color: var(--tmi-slab); }
-.btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+}
 .btn-primary:active { background: color-mix(in srgb, var(--tmi-slab) 72%, transparent); }
+.btn:active { transform: scale(0.97); }
 .btn-quiet { color: var(--tmi-ink-2); }
 
 /* Keycap. The fn key keeps its globe and goes down while the demo speaks. */
@@ -192,7 +199,8 @@ a { color: inherit; }
 
 .top { position: absolute; inset: 0 0 auto; z-index: 6; }
 .top .wrap { padding-top: 24px; }
-.name { font: 400 14px/1.35 var(--font-mono); letter-spacing: 0; text-decoration: none; }
+.name { position: relative; font: 400 14px/1.35 var(--font-mono); letter-spacing: 0; text-decoration: none; }
+.name::after { content: ""; position: absolute; inset: -12px; }
 
 /* Once the first screen's cloud has gone: a bar with a small cloud on the left and the download on the right. */
 .bar {
@@ -299,7 +307,7 @@ a { color: inherit; }
 .end h2 { max-width: 30ch; }
 
 /* Copy the scroll has not typed yet, in a text field's placeholder grey. */
-.w { color: var(--tmi-ink-a20); transition: color var(--duration-2) var(--ease-out); }
+.w { color: var(--tmi-ink-a48); transition: color var(--duration-2) var(--ease-out); }
 .w.on { color: inherit; }
 
 .foot { border-top: 1px solid var(--tmi-rule); padding: 28px 0 40px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; font: 400 12px/1.35 var(--font-mono); letter-spacing: 0; color: var(--tmi-ink-3); }
@@ -327,9 +335,15 @@ a { color: inherit; }
   /* The shorter column of each row stays under the bar while the taller one passes. */
   .stick { position: sticky; top: var(--stick-top); }
   .end { padding-block: 120px 160px; }
+  .opening { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(40px, 5vw, 80px); }
+  .opening h2 { margin-bottom: 0; }
+  .opening .text { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 40px; align-content: start; }
+  .opening .text p + p { margin-top: 0; }
 }
 
 @media (max-width: 760px) {
+  .bar .btn { height: 38px; padding: 0 14px; font-size: 13px; }
+  .bar .btn::after { content: ""; position: absolute; inset: -4px; }
   .foot a { display: inline-block; padding: 12px 0; }
 }
 @media (max-width: 480px) {
@@ -342,14 +356,14 @@ a { color: inherit; }
 </style>
 </head>
 <body>
-<header class="top"><div class="wrap"><a class="name" href="/">type me it</a></div></header>
+<header class="top"><div class="wrap"><a class="name" href="#main">type me it</a></div></header>
 <nav class="bar" aria-label="type me it"><div class="wrap">
   <span class="spot"><canvas aria-hidden="true"></canvas></span>
   <a class="btn btn-primary" href="/download"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v9M4 7l4 4 4-4M3 14h10"/></svg>Download</a>
 </div></nav>
 <section class="first"><canvas id="puff" aria-hidden="true"></canvas></section>
 
-<main class="wrap">
+<main class="wrap" id="main">
   <section class="hero">
     <div class="mark"><svg viewBox="2.45 1.45 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M 42.99 43.81 A 6.00 6.00 0 0 1 33.58 48.46 A 8.00 8.00 0 0 1 18.58 43.33 A 7.50 7.50 0 0 1 13.68 32.25 A 9.50 9.50 0 0 1 20.62 17.68 A 13.00 13.00 0 0 1 44.93 19.37 A 9.00 9.00 0 0 1 50.29 34.46 A 6.50 6.50 0 0 1 42.99 43.81 Z"/><path d="M 33.58 48.46 A 8.00 8.00 0 0 0 34.19 42.93"/><path d="M 13.68 32.25 A 9.50 9.50 0 0 0 21.67 36.62"/><path d="M 20.62 17.68 A 13.00 13.00 0 0 0 21.17 29.48"/><path d="M 44.93 19.37 A 9.00 9.00 0 0 0 34.88 26.66"/></svg></div>
     <h1 class="d2">Offline dictation and meeting transcription.</h1>
@@ -361,17 +375,19 @@ a { color: inherit; }
 
   <section class="opening">
     <h2 class="d3">A free alternative to Granola and Wispr Flow for those who want to own their data.</h2>
-    <p>You’re in control of your data. Meetings and dictations are some of the most sensitive data you own, so type me it keeps them on your Mac: no account, no cloud, and no third parties. You can read, export, share or delete it.</p>
+    <div class="text">
+    <p>Meetings and dictations are some of the most sensitive data you own, so type me it keeps them on your Mac: no account, no cloud, and no third parties. You can read, export, share or delete it.</p>
     <p>Hold <kbd class="kbd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd>, speak, and it types wherever your cursor is. Apple Intelligence tidies the text on your Mac, and it learns your vocabulary from the corrections you make.</p>
-    <p>It puts names to voices in any meeting, not only Slack and Google Meet. Voices are biometric data under GDPR, so voice prints stay on your device.</p>
-    <p>Running NVIDIA’s Parakeet and Nemotron models on Apple silicon, with quality close to the paid cloud tools. A local MCP server lets Claude or any assistant you choose read your meetings and write summaries that know who said what, on your terms. Say “Claude, …?” on a call and Claude Code answers from your own tools. Hooks run it on each meeting once it ends.</p>
+    <p>It puts names to voices in any meeting, not only Slack and Google&nbsp;Meet. Voices are biometric data under GDPR, so voice prints stay on your device.</p>
+    <p>It runs NVIDIA’s Parakeet and Nemotron models on Apple silicon, with quality close to the paid cloud tools. A local MCP server lets Claude or any assistant you choose read your meetings and write summaries that know who said what, on your terms. Say “Claude, …?” on a call and Claude&nbsp;Code answers from your own tools. Hooks run it on each meeting once it ends.</p>
+    </div>
   </section>
 
   <section class="band" id="dictation"><div class="band-grid">
     <div class="cell words"><div class="stick">
       <div class="cap">
         <h2 class="d3">Dictation</h2>
-        <p class="say">Simply hold <kbd class="kbd" data-for="demo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd> and speak.</p>
+        <p class="say">Hold <kbd class="kbd" data-for="demo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.6" ry="6.2"/><path d="M1.8 8h12.4"/></svg>fn</kbd> and speak.</p>
         <p>It types wherever your cursor is, like a Slack message or a Claude prompt. It adds punctuation and capitals, and can write digits, format lists and cut filler words.</p>
       </div>
     </div></div>
@@ -402,7 +418,7 @@ a { color: inherit; }
       </div>
       <div class="cap">
         <h3>Speakers</h3>
-        <p>On a call it tells the voices apart and takes their names from the Slack or Meet window. In a room, start a recording from the menu bar or a shortcut and it splits one microphone into voices. A voice it doesn't know opens with a clip playing: type a name, pick someone from past calls, or merge it with a voice you've named.</p>
+        <p>On a call it tells the voices apart and takes their names from the Slack or Meet window. In a room, start a recording from the menu bar or a shortcut and it splits one microphone into voices. A voice it doesn’t know opens with a clip playing: type a name, pick someone from past calls, or merge it with a voice you’ve named.</p>
         <p class="note">Turn on learn voices and it suggests names from earlier meetings.</p>
       </div>
     </div></div>
@@ -500,7 +516,6 @@ Sam said he'd send the revised numbers on Friday. That was in this morning's "La
     if (puff && hit(ev, canvas)) { puff.flash(); return; }
     if (barPuff && bar.classList.contains("shown") && hit(ev, barCanvas)) barPuff.flash();
   });
-  document.querySelector(".name").addEventListener("click", (ev) => { ev.preventDefault(); scrollTo(0, 0); });
 }
 
 // A column taller than the window sticks by its bottom edge instead of its
@@ -535,7 +550,7 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
   const FROM = 0.92, TO = 0.55;
   const WORDS_PER_SECOND = 40;
 
-  const blocks = [...document.querySelectorAll(".hero, .opening > h2, .opening > p, .band .cap, .end")].map((el) => {
+  const blocks = [...document.querySelectorAll(".hero, .opening h2, .opening p, .band .cap, .end")].map((el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
       acceptNode: (t) => !t.data.trim() || t.parentElement.closest(".cta, .prompt, .pill, .tools, kbd") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });

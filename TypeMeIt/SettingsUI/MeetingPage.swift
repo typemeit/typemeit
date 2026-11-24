@@ -616,7 +616,7 @@ struct MeetingPage: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help(unknown ? "name" : "rename")
+                        .help(unknown ? "name" : speaker.name)
                     }
                 }
                 .frame(width: 144, alignment: .leading)
@@ -647,7 +647,7 @@ struct MeetingPage: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("matched by voice. click to accept")
+                .help("matched by voice · click to accept")
             }
         }
     }
@@ -976,6 +976,7 @@ private struct MeetingTranscript: View {
             .padding(.horizontal, 4)
             .background(open ? DesignTokens.Colors.slab : unknown ? DesignTokens.Colors.inkA08 : .clear)
             .padding(.horizontal, -4)
+            .help(meeting.speakerName(id))
     }
 
     private func isBackground(_ id: String) -> Bool {

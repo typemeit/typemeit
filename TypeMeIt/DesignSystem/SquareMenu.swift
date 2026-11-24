@@ -382,7 +382,7 @@ struct SquareFilter<Popover: View>: View {
                         .frame(width: Self.crossWidth, height: SquareButtonStyle.height)
                         .background(DesignTokens.Colors.slab)
                         .overlay(alignment: .leading) {
-                            Rectangle().fill(DesignTokens.Colors.onSlab.opacity(0.28)).frame(width: DesignTokens.hairline)
+                            Rectangle().fill(SquareEdge.slabRule).frame(width: DesignTokens.hairline)
                         }
                         .contentShape(Rectangle())
                 }

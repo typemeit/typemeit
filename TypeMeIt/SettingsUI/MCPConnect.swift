@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// This build's own `typemeit-mcp`, and Claude Code's entry for it, which is
@@ -57,9 +58,10 @@ extension MCPSetup {
 }
 
 /// "add to claude code", which runs `claude mcp add`, or "added to claude
-/// code" once Claude Code names this copy.
+/// code" once Claude Code names this copy; "install" without Claude Code.
 struct MCPAddToClaudeCode: View {
     @State private var status: ClaudeCodeMCPStatus?
+    @State private var checking = true
     @State private var adding = false
     @State private var failed = false
 
@@ -71,15 +73,27 @@ struct MCPAddToClaudeCode: View {
             case .thisCopy:
                 Text("added to claude code").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
             case .missing, .otherCopy:
-                Button(adding ? "adding…" : "add to claude code", action: add)
-                    .buttonStyle(SquareButtonStyle(small: true))
-                    .disabled(adding)
-                if failed { Text("couldn't add").font(Square.sans(11.5)).foregroundStyle(DesignTokens.Colors.ink2) }
+                if failed {
+                    Text("couldn’t add").font(Square.sans(11.5)).foregroundStyle(DesignTokens.Colors.ink2)
+                    Button("retry", action: add).buttonStyle(SquareButtonStyle(small: true))
+                } else {
+                    Button(adding ? "adding…" : "add to claude code", action: add)
+                        .buttonStyle(SquareButtonStyle(small: true))
+                        .disabled(adding)
+                }
             case nil:
-                EmptyView()
+                if !ClaudeRun.isAvailable {
+                    Button("install") { NSWorkspace.shared.open(ClaudeRun.installPage) }.buttonStyle(SquareButtonStyle(small: true))
+                } else if checking {
+                    SquareSpinner()
+                }
             }
         }
-        .task { status = await MCPSetup.claudeCodeStatus() }
+        .task(id: ClaudeRun.isAvailable) {
+            checking = true
+            status = await MCPSetup.claudeCodeStatus()
+            checking = false
+        }
     }
 
     private func add() {

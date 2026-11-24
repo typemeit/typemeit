@@ -52,7 +52,7 @@ struct HooksPage: View {
             if settings.meetingHooks.isEmpty, draft == nil {
                 Text("no hooks yet")
                     .font(Square.mono(12))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
+                    .foregroundStyle(DesignTokens.Colors.ink2)
                     .padding(20)
             } else {
                 ScrollViewReader { reader in
@@ -65,7 +65,6 @@ struct HooksPage: View {
                     .task { if let editing { reader.scrollTo(editing, anchor: .center) } }
                 }
                 .disabled(!ready)
-                .opacity(ready ? 1 : 0.45)
             }
             Spacer(minLength: 0)
         }

@@ -154,7 +154,7 @@ struct OnboardingView: View {
                 case .available:
                     SquareSettingsRow(label: "apple intelligence") { SquareStatus("on", done: true) }
                 case .unavailable(.appleIntelligenceNotEnabled):
-                    SquareSettingsRow(label: "apple intelligence", help: "turn it on in system settings. this page moves on by itself once it is on.") {
+                    SquareSettingsRow(label: "apple intelligence", help: "turn it on in system settings · this page moves on once it is on") {
                         Button("system settings") { NSWorkspace.shared.open(SecureInput.appleIntelligenceSettingsURL) }.buttonStyle(SquareButtonStyle(kind: .primary))
                     }
                 case .unavailable(.modelNotReady):
@@ -186,9 +186,8 @@ struct OnboardingView: View {
                         .onAppear { scratchFocused = true }
                         .font(DesignTokens.Fonts.ui)
                         .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).fill(DesignTokens.Colors.paperRaised))
-                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).strokeBorder(DesignTokens.Colors.ruleControl, lineWidth: 0.5))
+                        .frame(height: SquareButtonStyle.height)
+                        .overlay(Rectangle().strokeBorder(scratchFocused ? DesignTokens.Colors.ink : DesignTokens.Colors.ruleControl, lineWidth: DesignTokens.hairline))
                 }
             }
         }
