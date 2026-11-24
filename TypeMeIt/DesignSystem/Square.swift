@@ -56,6 +56,8 @@ struct SquareIcon: View {
 /// A part's hairline edge; dashed, it says a recorder is listening.
 enum SquareEdge {
     static let dash: [CGFloat] = [3, 2]
+    /// A hairline on the slab.
+    static let slabRule = DesignTokens.Colors.onSlab.opacity(0.18)
 
     static func style(dashed: Bool) -> StrokeStyle {
         StrokeStyle(lineWidth: DesignTokens.hairline, dash: dashed ? dash : [])

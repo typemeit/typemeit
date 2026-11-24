@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// How long the pointer rests on a help chip before its note opens.
+private let helpChipHoverRest: Duration = .milliseconds(400)
+
 /// Claude Code's own mark, the "✻" its terminal shows, on whatever Claude
 /// does: a question offered, asked or answered.
 struct SquareClaudeMark: View {
@@ -106,20 +109,30 @@ struct SquareHelpChip: View {
     var off = false
     var toggle: (() -> Void)?
     @State private var hovering = false
+    @State private var helpOpen = false
 
     var body: some View {
-        Text(text)
-            .font(Square.mono(11))
-            .strikethrough(off)
-            .foregroundStyle(off ? DesignTokens.Colors.ink3 : hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink3.opacity(hovering ? 1 : 0.4), style: StrokeStyle(lineWidth: 1, dash: hovering ? [2, 2] : [])))
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .onTapGesture { toggle?() }
-            .accessibilityHint(help)
-            .squarePopover(isPresented: $hovering) { SquareHelpNote(text: help) }
+        Button { toggle?() } label: {
+            Text(text)
+                .font(Square.mono(11))
+                .strikethrough(off)
+                .foregroundStyle(off ? DesignTokens.Colors.ink3 : hovering ? DesignTokens.Colors.ink : DesignTokens.Colors.ink2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .overlay(Rectangle().strokeBorder(DesignTokens.Colors.ink3.opacity(hovering ? 1 : 0.4), style: StrokeStyle(lineWidth: 1, dash: hovering ? [2, 2] : [])))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .task(id: hovering) {
+            helpOpen = false
+            guard hovering else { return }
+            // The pointer leaving cancels the sleep, which throws.
+            guard (try? await Task.sleep(for: helpChipHoverRest)) != nil else { return }
+            helpOpen = true
+        }
+        .accessibilityHint(help)
+        .squarePopover(isPresented: $helpOpen) { SquareHelpNote(text: help) }
     }
 }
 

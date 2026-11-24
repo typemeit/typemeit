@@ -153,7 +153,7 @@ struct SquareHookTray: View {
         .overlay(alignment: .top) { rule }
     }
 
-    private var rule: some View { Rectangle().fill(fg.opacity(0.18)).frame(height: DesignTokens.hairline) }
+    private var rule: some View { Rectangle().fill(SquareEdge.slabRule).frame(height: DesignTokens.hairline) }
 }
 
 /// One hook in the tray: its number, its tick, its name and its note; a
@@ -185,10 +185,9 @@ private struct SquareHookTrayRow: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 30)
-            .background(hot || hovering ? fg.opacity(0.1) : .clear)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SquareSlabLineStyle(hot: hot || hovering))
         .onHover { hovering = $0 }
         .accessibilityValue(item.picked ? "ticked" : "not ticked")
     }

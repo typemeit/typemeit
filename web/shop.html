@@ -182,15 +182,18 @@ a { color: inherit; }
   font: 400 12px/1 var(--font-mono); letter-spacing: 0;
   color: var(--tmi-ink); background: transparent;
   text-decoration: none; cursor: pointer; white-space: nowrap;
-  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out);
+  transition: background-color var(--duration-1) var(--ease-out), color var(--duration-1) var(--ease-out), border-color var(--duration-1) var(--ease-out), transform var(--duration-1) var(--ease-out);
 }
 .btn .icon { font-size: 14px; }
 .btn-sm { height: 24px; padding: 0 8px; font-size: 11px; }
 .btn-lg { height: 38px; padding: 0 16px; font-size: 14px; }
 .btn-lg .icon { font-size: 16px; }
 .btn-primary { background: var(--tmi-slab); color: var(--tmi-on-slab); border-color: var(--tmi-slab); }
-.btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover { background: color-mix(in srgb, var(--tmi-slab) 84%, transparent); border-color: transparent; }
+}
 .btn-primary:active { background: color-mix(in srgb, var(--tmi-slab) 72%, transparent); }
+.btn:active { transform: scale(0.97); }
 .btn-quiet { color: var(--tmi-ink-2); }
 
 /* Page frame. Everything shares one left edge; the bands run wider than the text. */
@@ -257,6 +260,8 @@ main { padding-top: var(--bar); }
   .stickers { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
 }
 @media (max-width: 760px) {
+  .bar .btn { height: 38px; padding: 0 14px; font-size: 13px; }
+  .bar .btn::after { content: ""; position: absolute; inset: -4px; }
   .foot a { display: inline-block; padding: 12px 0; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -16,10 +16,19 @@ struct SquareButtonStyle: ButtonStyle {
 
     static let height: CGFloat = 26
     static let smallHeight: CGFloat = 24
+    /// On-slab's opacity on the slab, under the pointer and held.
+    static let slabHover = 0.16
+    static let slabPressed = 0.24
 
     /// A filled button's fill under the pointer and held.
     static func fill(_ fill: Color, hot: Bool, down: Bool) -> Color {
         fill.opacity(down ? 0.72 : hot ? 0.84 : 1)
+    }
+
+    /// What a part with no fill of its own washes with on the slab.
+    static func slabWash(hot: Bool, down: Bool) -> Color {
+        guard hot || down else { return .clear }
+        return DesignTokens.Colors.onSlab.opacity(down ? slabPressed : slabHover)
     }
 
     func makeBody(configuration: Configuration) -> some View {
@@ -74,7 +83,7 @@ private struct SquareButtonLabel: View {
         if inverse || kind == .primary {
             return SquareButtonStyle.fill(inverse ? DesignTokens.Colors.onSlab : DesignTokens.Colors.slab, hot: hot, down: down)
         }
-        if onSlab { return down ? DesignTokens.Colors.onSlab.opacity(0.24) : hot ? DesignTokens.Colors.onSlab.opacity(0.16) : .clear }
+        if onSlab { return SquareButtonStyle.slabWash(hot: hot, down: down) }
         return down ? DesignTokens.Colors.inkA12 : hot ? DesignTokens.Colors.inkA08 : .clear
     }
 
@@ -94,6 +103,17 @@ private struct SquareButtonLabelStyle: LabelStyle {
             configuration.icon
             configuration.title
         }
+    }
+}
+
+/// A line of a list on the slab: the wash a quiet button takes there, across
+/// the line. `hot` comes from the line, which also shows its pointer state.
+struct SquareSlabLineStyle: ButtonStyle {
+    let hot: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(SquareButtonStyle.slabWash(hot: hot, down: configuration.isPressed))
     }
 }
 
@@ -138,7 +158,7 @@ private struct SquareIconButtonBody: View {
     }
 
     private var wash: Color {
-        if onSlab { return down ? DesignTokens.Colors.onSlab.opacity(0.24) : hot ? DesignTokens.Colors.onSlab.opacity(0.16) : .clear }
+        if onSlab { return SquareButtonStyle.slabWash(hot: hot, down: down) }
         return down ? DesignTokens.Colors.inkA12 : hot ? DesignTokens.Colors.inkA08 : .clear
     }
 }

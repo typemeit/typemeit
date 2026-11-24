@@ -88,7 +88,7 @@ struct DictionaryTab: View {
         case .checking(let word, let scanned, let total):
             HStack(spacing: 10) {
                 SquareSpinner()
-                Text("checking recent dictations for '\(word)' · \(scanned)/\(total)")
+                Text("checking recent dictations for “\(word)” · \(scanned)/\(total)")
                     .font(Square.mono(12))
                     .foregroundStyle(DesignTokens.Colors.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,8 +116,8 @@ struct DictionaryTab: View {
     }
 
     private func headline(for word: String, matches: [VerifyCustomWord.Match], scanned: Int) -> String {
-        if matches.isEmpty { return "'\(word)' would not have changed the last \(counted(scanned, "dictation"))" }
-        return "'\(word)' would have caught \(matches.count) of the last \(counted(scanned, "dictation"))"
+        if matches.isEmpty { return "“\(word)” would not have changed the last \(counted(scanned, "dictation"))" }
+        return "“\(word)” would have caught \(matches.count) of the last \(counted(scanned, "dictation"))"
     }
 
     /// A dictation the word would have changed: when, its audio, and the

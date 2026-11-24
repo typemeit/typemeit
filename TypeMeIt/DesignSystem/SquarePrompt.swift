@@ -358,7 +358,7 @@ private struct SquareAskPillSpecimen: View {
             }
             if stage == .answered, expanded {
                 VStack(spacing: 0) {
-                    Rectangle().fill(DesignTokens.Colors.onSlab.opacity(0.16)).frame(height: DesignTokens.hairline)
+                    SquareRule(color: SquareEdge.slabRule)
                     ClaudeMarkdown(reply: "Two plans, both monthly:\n\n- **Solo** stays at the current price\n- **Team** moves to per seat\n\n| plan | seats |\n|---|---|\n| solo | 1 |\n| team | 5+ |\n\nThe page goes out once it is signed off.",
                                    font: Square.mono(12), colour: DesignTokens.Colors.onSlab.opacity(0.92))
                         .frame(maxWidth: .infinity, alignment: .leading)

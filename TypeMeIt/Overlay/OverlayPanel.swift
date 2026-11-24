@@ -169,7 +169,7 @@ final class OverlayPanel {
         let shrinking = model.presentation == .cloud
         if shrinking, model.departedAt == nil { model.departedAt = Date() }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = shrinking ? PuffView.departureDuration : 0.24
+            ctx.duration = shrinking ? PuffView.departureDuration : DesignTokens.Duration.n1
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
@@ -255,6 +255,6 @@ private struct OverlayRoot: View {
             }
         }
         .frame(width: OverlayPanel.size.width, height: OverlayPanel.size.height, alignment: .bottom)
-        .animation(.spring(duration: 0.46, bounce: 0.1), value: model.presentation)
+        .animation(.spring(duration: DesignTokens.Duration.n3, bounce: 0.1), value: model.presentation)
     }
 }

@@ -163,7 +163,7 @@ struct OnePageSettings: View {
             } below: {
                 if settings.mcpEnabled, !MCPSetup.translocated {
                     VStack(alignment: .leading, spacing: 10) {
-                        if ClaudeRun.isAvailable { MCPAddToClaudeCode() }
+                        if !Sandbox.isActive { MCPAddToClaudeCode() }
                         MCPToolList()
                     }
                 }
@@ -292,7 +292,7 @@ struct OnePageSettings: View {
                 }
             }
             SquareSettingsRow(label: "check audio", help: "tests your mic and speakers · writes the results to the debug log and your clipboard · plays a short tone · includes device and app names") {
-                Button(checkingAudio ? "running" : "run") {
+                Button(checkingAudio ? "running…" : "run") {
                     checkingAudio = true
                     Task {
                         await AudioCheck.run()

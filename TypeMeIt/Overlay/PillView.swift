@@ -27,7 +27,7 @@ struct PillView: View {
             // ends still read.
             .frame(maxWidth: OverlayPanel.size.width - 40)
             .fixedSize(horizontal: true, vertical: false)
-            .animation(.spring(duration: 0.46, bounce: 0.1), value: model.width)
+            .animation(.spring(duration: DesignTokens.Duration.n3, bounce: 0.1), value: model.width)
             .onHover { model.toastPaused = $0 }
     }
 

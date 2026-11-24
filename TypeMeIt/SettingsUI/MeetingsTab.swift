@@ -201,7 +201,7 @@ struct MeetingsTab: View {
             .padding(.horizontal, SquareListColumns.page + SquareListColumns.lead)
             .padding(.bottom, 12)
         case .verifying:
-            Text("checking the speaker model")
+            Text("checking the speaker model…")
                 .font(Square.mono(11))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .padding(.horizontal, SquareListColumns.page + SquareListColumns.lead)
@@ -409,43 +409,61 @@ private struct MeetingRow: View {
                 .frame(width: SquareListColumns.tick)
                 .opacity(hovering || picking || picked ? 1 : 0)
                 .help(picked ? "deselect" : "select · drag or shift-click for a range")
-            HStack(alignment: .center, spacing: SquareListColumns.gap) {
-                Text(meeting.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
-                    .font(Square.mono(12))
-                    .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Colors.ink2)
-                    .frame(width: SquareListColumns.time, alignment: .leading)
-                SquareFingerprint(content: .of(meeting, square, coordinator: coordinator),
-                                  cell: MeetingRow.squareSide / CGFloat(MeetingFingerprint.side))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(meeting.title)
-                        .font(Square.sans(13.5))
-                        .foregroundStyle(DesignTokens.Colors.ink)
+            Button(action: open) {
+                HStack(alignment: .center, spacing: SquareListColumns.gap) {
+                    Text(meeting.started.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                        .font(Square.mono(12))
+                        .monospacedDigit()
+                        .foregroundStyle(DesignTokens.Colors.ink2)
+                        .frame(width: SquareListColumns.time, alignment: .leading)
+                    SquareFingerprint(content: .of(meeting, square, coordinator: coordinator),
+                                      cell: MeetingRow.squareSide / CGFloat(MeetingFingerprint.side))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(meeting.title)
+                            .font(Square.sans(13.5))
+                            .foregroundStyle(DesignTokens.Colors.ink)
+                            .lineLimit(1)
+                            .help(meeting.title)
+                        state
+                            .hidden()
+                            .anchorPreference(key: MeetingStateBounds.self, value: .bounds) { $0 }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(whoLine)
+                        .font(Square.sans(12))
+                        .foregroundStyle(DesignTokens.Colors.ink2)
                         .lineLimit(1)
-                    state
+                        .frame(width: MeetingColumns.who, alignment: .leading)
+                        .help(whoLine)
+                    Text(MeetingsTab.app(of: meeting))
+                        .font(Square.mono(11))
+                        .foregroundStyle(DesignTokens.Colors.ink3)
+                        .lineLimit(1)
+                        .frame(width: place, alignment: .leading)
+                    Text(MeetingsTab.length(meeting.durationMs))
+                        .font(Square.mono(12))
+                        .monospacedDigit()
+                        .foregroundStyle(DesignTokens.Colors.ink)
+                        .frame(width: MeetingColumns.length, alignment: .trailing)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text(whoLine)
-                    .font(Square.sans(12))
-                    .foregroundStyle(DesignTokens.Colors.ink2)
-                    .lineLimit(1)
-                    .frame(width: MeetingColumns.who, alignment: .leading)
-                Text(MeetingsTab.app(of: meeting))
-                    .font(Square.mono(11))
-                    .foregroundStyle(DesignTokens.Colors.ink3)
-                    .lineLimit(1)
-                    .frame(width: place, alignment: .leading)
-                Text(MeetingsTab.length(meeting.durationMs))
-                    .font(Square.mono(12))
-                    .monospacedDigit()
-                    .foregroundStyle(DesignTokens.Colors.ink)
-                    .frame(width: MeetingColumns.length, alignment: .trailing)
+                .padding(.leading, SquareListColumns.inset)
+                .padding(.trailing, MeetingColumns.trail)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
             }
-            .padding(.leading, SquareListColumns.inset)
-            .padding(.trailing, MeetingColumns.trail)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: open)
+            .buttonStyle(.plain)
+            // The state's own buttons sit over the row's, not inside its
+            // label, where the keyboard and VoiceOver would not reach them.
+            .overlayPreferenceValue(MeetingStateBounds.self) { stateBounds in
+                GeometryReader { geometry in
+                    if let stateBounds {
+                        let stateFrame = geometry[stateBounds]
+                        state
+                            .frame(width: stateFrame.width, height: stateFrame.height, alignment: .leading)
+                            .offset(x: stateFrame.minX, y: stateFrame.minY)
+                    }
+                }
+            }
         }
         .background(hovering ? DesignTokens.Colors.inkA04 : .clear)
         .overlay(alignment: .top) { SquareRule() }
@@ -460,7 +478,8 @@ private struct MeetingRow: View {
     }
 
     /// The summary, or while it transcribes how far it has got and a pause,
-    /// or what the meeting is waiting for.
+    /// or what the meeting is waiting for. Its text lets clicks through to
+    /// the row's button under it.
     @ViewBuilder private var state: some View {
         switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: diarizer) {
         case .transcribing(let run):
@@ -469,16 +488,17 @@ private struct MeetingRow: View {
                     .font(Square.mono(11))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
+                    .allowsHitTesting(false)
                 // A pause takes effect between chunks, so only while there are chunks left.
                 if case .transcribing = run.progress, !stopping { stopButton }
             }
         case .queued:
             HStack(spacing: 10) {
-                Text(MeetingPhase.queuedLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+                Text(MeetingPhase.queuedLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2).allowsHitTesting(false)
                 stopButton
             }
         case .summarising:
-            Text(MeetingPhase.summarisingLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2)
+            Text(MeetingPhase.summarisingLabel).font(Square.mono(11)).foregroundStyle(DesignTokens.Colors.ink2).allowsHitTesting(false)
         case .needs:
             MeetingChips(meeting: meeting)
         case .unknownSpeakers(let unknown):
@@ -489,6 +509,7 @@ private struct MeetingRow: View {
                 .font(Square.sans(12))
                 .foregroundStyle(DesignTokens.Colors.ink2)
                 .lineLimit(1)
+                .allowsHitTesting(false)
         case .none:
             EmptyView()
         }
@@ -501,6 +522,15 @@ private struct MeetingRow: View {
             .buttonStyle(SquareIconButtonStyle(side: 18))
             .help("pause transcribing")
             .accessibilityLabel("pause transcribing")
+    }
+}
+
+/// Where a row's button leaves room for its state.
+private struct MeetingStateBounds: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = value ?? nextValue()
     }
 }
 
@@ -580,16 +610,16 @@ struct MeetingChips: View {
             if MeetingState.canAddSpeakers(m, coordinator: coordinator, diarizer: diarizer) {
                 Button("add speakers") { coordinator.transcribeAgain(m.id) }.buttonStyle(SquareButtonStyle(small: true))
             }
-            if m.onlyYourSide { SquareTag(text: "only your side") }
+            if m.onlyYourSide { SquareTag(text: "only your side").allowsHitTesting(false) }
             if m.transcription.state == .failed {
-                SquareFailure(text: "transcription failed")
+                SquareFailure(text: "transcription failed").allowsHitTesting(false)
                 Button("retry") { coordinator.retry(m.id) }.buttonStyle(SquareButtonStyle(small: true))
             }
             if waitingForModel {
-                SquareTag(text: "waiting for the speech model")
+                SquareTag(text: "waiting for the speech model").allowsHitTesting(false)
                 Button("download") { ModelStore.shared.download() }.buttonStyle(SquareButtonStyle(small: true))
             }
-            if MeetingState.folderMissing(m, store: store) { SquareFailure(text: "meetings folder unavailable") }
+            if MeetingState.folderMissing(m, store: store) { SquareFailure(text: "meetings folder unavailable").allowsHitTesting(false) }
         }
     }
 }

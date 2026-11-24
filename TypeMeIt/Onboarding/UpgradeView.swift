@@ -68,7 +68,7 @@ struct ModelDownloadRows: View {
         case .verifying:
             SquareSettingsRow(label: ModelStore.displayName) { SquareStatus("checking the model…") }
         case .failed(let message):
-            SquareSettingsRow(label: ModelStore.displayName, help: message.lowercased()) {
+            SquareSettingsRow(label: ModelStore.displayName, help: message.lowercased(), caption: "didn’t download") {
                 Button("retry") { modelStore.download() }.buttonStyle(SquareButtonStyle(kind: .primary))
             }
         case .missing:

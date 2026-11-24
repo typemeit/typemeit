@@ -38,7 +38,7 @@ struct AnswerPill: View {
         VStack(spacing: 0) {
             row
             if case .answered(let answer) = stage, model.answerExpanded {
-                Rectangle().fill(DesignTokens.Colors.onSlab.opacity(0.16)).frame(height: DesignTokens.hairline)
+                SquareRule(color: SquareEdge.slabRule)
                 answerBody(answer)
             }
         }
