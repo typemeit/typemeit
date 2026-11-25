@@ -3636,6 +3636,739 @@
         }
       },
       "verdict": "near miss: number (unmodified copy of 3D-Speaker ERes2Net, no EER on the card)"
+    },
+    {
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B on DeepInfra (eval reference)",
+      "date": "2026-11-25",
+      "role": "eval reference",
+      "pick": true,
+      "checks": {
+        "api": {
+          "pass": true,
+          "why": "DeepInfra, $0.12 per hour; diarize=true and chunk_level=word return speaker and word times; recordings up to 1 hour; no file size limit published"
+        },
+        "number": {
+          "pass": true,
+          "why": "Artificial Analysis Diarization Index 3.3% vs STT-3.7 8.0% and Universal-3.5 Pro 8.9%; Voice Arena cpWER 32.43% vs Universal-3.6 Pro 47.81%. Words: AA-WER 3.42% vs 2.99%, private conversational 13.01 vs 12.62, behind"
+        }
+      },
+      "verdict": "pick: number (speaker labels); its speaker encoder is the shipped Nemotron 3 Diarization, so its errors are not independent of ours"
+    },
+    {
+      "id": "wq2012/univ_full_eres2conformer_xl (FlaxSpeaker family, 2026-11-20 to 2026-11-24)",
+      "date": "2026-11-25",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "JAX weights; TFLite with a fixed 1.8 s window only; no Core ML, MLX, GGUF or ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "VoxCeleb and LibriSpeech, with CN-Celeb"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "64.4M parameters, 258 MB fp32"
+        },
+        "number": {
+          "pass": true,
+          "why": "VoxCeleb1-O EER 0.44% on whole clips vs WeSpeaker ResNet34 about 0.72%; 1.67% in the TFLite build"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "ERes2Net-Conformer, not tried"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "VoxCeleb1-O speakers held out of VoxCeleb1-dev and VoxCeleb2"
+        }
+      },
+      "verdict": "near miss: onDevice (JAX and 1.8 s TFLite only; EER 0.44% vs about 0.72% shipped)"
+    },
+    {
+      "id": "wq2012/univ_full_eres2conformer_xl_diar (and v2_diar, xl_diar_pfas, xl_diar_adapt)",
+      "date": "2026-11-25",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "JAX and 1.8 s TFLite only"
+        },
+        "english": {
+          "pass": true,
+          "why": "VoxCeleb, LibriSpeech, Fisher, AMI, ICSI and CALLHOME, with CN-Celeb"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "64.4M parameters"
+        },
+        "number": {
+          "pass": true,
+          "why": "VoxCeleb1-O EER 0.57% vs about 0.72%; AMI test within-session 8.69%, no WeSpeaker number beside it"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "VoxCeleb1-O held out; AMI test is speaker-disjoint but AMI is in training"
+        }
+      },
+      "verdict": "near miss: onDevice (JAX and 1.8 s TFLite only)"
+    },
+    {
+      "id": "alkove-ai/alkove-timbre-1",
+      "date": "2026-11-25",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "runs on Apple Silicon only through the Alkove engine; no Core ML, MLX, GGUF or ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "11 languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.97 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "Common Voice EER 2.07% vs CAM++ 1.54% on the same test; no VoxCeleb1-O"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "2,325 speakers not in training"
+        }
+      },
+      "verdict": "near miss: number (behind CAM++ on its own test)"
+    },
+    {
+      "id": "SOTAagi2030/quillmere-spk-embed-xb9cc7",
+      "date": "2026-11-25",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": null,
+          "why": "not stated"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "size not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "mean EER 2.44% on unnamed trial lists"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "ResNet, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "trial lists unnamed"
+        }
+      },
+      "verdict": "near miss: number (unnamed trial lists)"
+    },
+    {
+      "id": "ECAPA and CAM++ copies (Ransom070/cheta-ecapa-onnx, SixStones233 CAM++ zh, ivrit-ai ECAPA ggml)",
+      "date": "2026-11-25",
+      "role": "speaker embeddings",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX and ggml"
+        },
+        "english": {
+          "pass": null,
+          "why": "ECAPA yes; the CAM++ copy is Chinese"
+        },
+        "licence": {
+          "pass": null,
+          "why": "Apache-2.0 on cheta-ecapa; the others not checked"
+        },
+        "fits": {
+          "pass": true,
+          "why": "under 100 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no scores"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (unmodified exports)"
+    },
+    {
+      "id": "Streaming Sortformer v2 copies (Bragi-GmbH ONNX, Mappyzza GGUF, altalt-org Core ML)",
+      "date": "2026-11-25",
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX, GGUF and Core ML"
+        },
+        "english": {
+          "pass": true,
+          "why": "English upstream"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0 on Bragi and Mappyzza; altalt-org has no card"
+        },
+        "fits": {
+          "pass": true,
+          "why": "182 to 492 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "Mappyzza DER 6.2% on two French meetings; no English number against Nemotron 3 Diarization"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "Sortformer streaming, seen 2026-10-14"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not stated"
+        }
+      },
+      "verdict": "near miss: number (format conversions)"
+    },
+    {
+      "id": "Nemotron 3 Diarization ports, 2026-11-23 to 2026-11-25 (otter-app, Dazarang, investguy, WillisBack, Infinix-io, dcharlot65-openie)",
+      "date": "2026-11-25",
+      "role": "diarization",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF and ONNX; LittleBit needs JouleDB"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "OpenMDW-1.1 upstream"
+        },
+        "fits": {
+          "pass": true,
+          "why": "about 100M parameters"
+        },
+        "number": {
+          "pass": false,
+          "why": "no new scores"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "the shipped model"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (ports of the shipped model)"
+    },
+    {
+      "id": "Thuul/swiss-parakeet-ultra",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML and ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among five languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "English VoxPopuli 5.5 vs Ultra 5.4, FLEURS 3.8 vs Ultra 3.5, its own test"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "fine-tune of the shipped Parakeet Ultra"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "test sets not in training, says the card"
+        }
+      },
+      "verdict": "near miss: number (behind Ultra on English)"
+    },
+    {
+      "id": "BuilderHelm/Cadence-Masubi-Multilingual (Core ML and GGUF)",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML and GGUF"
+        },
+        "english": {
+          "pass": true,
+          "why": "one of 25 languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "1.27 GB"
+        },
+        "number": {
+          "pass": false,
+          "why": "FLEURS mean 12.61% over 25 languages; no Open ASR row"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Parakeet TDT v3 fine-tune, as Orukeet"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (FLEURS only)"
+    },
+    {
+      "id": "turintech/Qwen3-ASR-1.7B-Artemis-GGUF",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, transcribe.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "1.51 GB Q5_K_M, at the 1.5 GB budget"
+        },
+        "number": {
+          "pass": false,
+          "why": "7.91% on its own 8-domain test; no Parakeet number"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture, rejected"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "test splits held out, says the card"
+        }
+      },
+      "verdict": "near miss: notRejected (Qwen3-ASR architecture)"
+    },
+    {
+      "id": "investguy/oruk-fourier-2b ONNX int4",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": false,
+          "why": "CC-BY-NC-4.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "size not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no scores of its own"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture, rejected"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: licence (CC-BY-NC)"
+    },
+    {
+      "id": "TalkMate/rumble-2-flash-gguf",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, transcribe.cpp"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "size not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no new scores"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR architecture, rejected"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: notRejected (port of Rumble-2-Flash)"
+    },
+    {
+      "id": "Moonshine, Granite and Parakeet v3 mirrors, 2026-11-23 to 2026-11-25 (milkrice, russotlaw, onemira, moonbox-dev, dcharlot65-openie)",
+      "date": "2026-11-25",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX for most; TensorRT and JouleDB for two"
+        },
+        "english": {
+          "pass": true,
+          "why": "English upstream"
+        },
+        "licence": {
+          "pass": null,
+          "why": "MIT on milkrice, CC-BY-4.0 on LittleBit; the others not checked"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B or smaller"
+        },
+        "number": {
+          "pass": false,
+          "why": "no scores"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "Parakeet v3, Moonshine and Granite TurboCTC, seen earlier"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (copies of seen models)"
+    },
+    {
+      "id": "isseninc/issen-vad",
+      "date": "2026-11-25",
+      "role": "voice activity detection",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English among others"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "18.6 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "VAD AUC only; no role in the app to compare against"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "SAVA-based, not tried"
+        },
+        "heldOut": {
+          "pass": true,
+          "why": "held-out benchmarks, says the card"
+        }
+      },
+      "verdict": "near miss: number (no VAD role in the app)"
+    },
+    {
+      "id": "aufklarer/Inworld-Voice-Isolator-v1-CoreML",
+      "date": "2026-11-25",
+      "role": "voice isolation",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML"
+        },
+        "english": {
+          "pass": true,
+          "why": "multilingual"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "258 MB, 1.24 GB peak"
+        },
+        "number": {
+          "pass": false,
+          "why": "waveform match only"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (no voice isolation role in the app)"
+    },
+    {
+      "id": "MimicScribe/action-item-detector-coreml",
+      "date": "2026-11-25",
+      "role": "meeting action items",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML"
+        },
+        "english": {
+          "pass": null,
+          "why": "not stated"
+        },
+        "licence": {
+          "pass": true,
+          "why": "MIT"
+        },
+        "fits": {
+          "pass": true,
+          "why": "125 MB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no score"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "XLM-R classifier, not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (no score, and no such role)"
+    },
+    {
+      "id": "KRAFTON/Raon-1-mini",
+      "date": "2026-11-25",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "safetensors; a GGUF exists"
+        },
+        "english": {
+          "pass": true,
+          "why": "English and Korean"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "30B MoE, 32.7 GB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no clean-up score"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: fits (32.7 GB)"
+    },
+    {
+      "id": "Aleph-Alpha/Kolibri-1.1",
+      "date": "2026-11-25",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF"
+        },
+        "english": {
+          "pass": true,
+          "why": "German and English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "75B parameters, 77.5 GB"
+        },
+        "number": {
+          "pass": false,
+          "why": "no clean-up score"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: fits (77.5 GB)"
+    },
+    {
+      "id": "baidu/ERNIE-5.5-Flash-Preview",
+      "date": "2026-11-25",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no clean-up score found"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "not tried"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "no benchmark"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "Deepgram Nova-3 English batch update 2026-11-24 (eval reference)",
+      "date": "2026-11-25",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": true,
+          "why": "self-serve API with diarization and word timestamps; not rechecked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no numbers published; Nova-3 AA-WER 5.18%, Voice Arena cpWER 71.89%"
+        }
+      },
+      "verdict": "near miss: number (none published for the update)"
+    },
+    {
+      "id": "Azure LLM Speech 11-2026 (eval reference)",
+      "date": "2026-11-25",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "speed release, no accuracy numbers"
+        }
+      },
+      "verdict": "near miss: number (speed release only)"
     }
   ]
 }
