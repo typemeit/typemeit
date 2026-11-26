@@ -4369,6 +4369,434 @@
         }
       },
       "verdict": "near miss: number (speed release only)"
+    },
+    {
+      "id": "p99lab/audrey-1 (eval reference)",
+      "date": "2026-11-26",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": false,
+          "why": "self-serve, files up to 2 h and 100 MB; diarize=true adds segments and speakers, but no word timestamps are documented (p99lab.com/docs/api/transcribe)"
+        },
+        "number": {
+          "pass": true,
+          "why": "Open ASR Leaderboard 25-11-2026: average 5.37, AMI-Cleaned 6.31, private conversational 12.01, against Universal-3.5 Pro 6.21, 10.63, 12.62; not on Artificial Analysis or Voice Arena; who ran it not checked"
+        }
+      },
+      "verdict": "near miss: api (no word timestamps)"
+    },
+    {
+      "id": "modulate/velma-2-stt-batch (eval reference)",
+      "date": "2026-11-26",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": true,
+          "why": "self-serve; the English VFast endpoint returns word times and speaker turns, with no length ceiling when diarization is on; 100 MB upload limit"
+        },
+        "number": {
+          "pass": false,
+          "why": "Artificial Analysis (independent) has Modulate STT Batch English VFast at 4.23% WER, behind Universal-3.5 Pro 2.99% and STT-3.7 2.51%; Open ASR Leaderboard 25-11-2026 row 5.57 average, AMI-Cleaned 6.58, private conversational 12.02"
+        }
+      },
+      "verdict": "near miss: number (behind the current reference on Artificial Analysis)"
+    },
+    {
+      "id": "efficient-speech/MOSS-Transcribe-Diarize-MLX-INT8",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "efficient-speech/VibeVoice-ASR-MLX-INT8",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "efficient-speech/Voxtral-Mini-3B-2507-MLX-INT8",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "moonbox-dev/nemotron-3.5-asr-streaming-0.6b-ONNX",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "moonbox-dev/MOSS-Transcribe-Diarize-ONNX",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "GhaythMahadin/parakeet-tdt-1.1b-gguf",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "Thuul/parakeet-ultra-onnx",
+      "date": "2026-11-26",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "MLX, ONNX or GGUF conversion"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "conversion of a seen model, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion of a seen or shipped model)"
+    },
+    {
+      "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF",
+      "date": "2026-11-26",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no dictation clean-up or text-normalisation score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "inclusionAI/LingSante-3.1-flash",
+      "date": "2026-11-26",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no dictation clean-up or text-normalisation score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "MemTensor/MemT-1.0-Pro",
+      "date": "2026-11-26",
+      "role": "clean-up",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "no dictation clean-up or text-normalisation score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (no clean-up score)"
+    },
+    {
+      "id": "handy-computer/smart-turn-v3.2-gguf and sava-gguf",
+      "date": "2026-11-26",
+      "role": "turn detection",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "GGUF, transcribe.cpp 0.5.0 TURN role"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "the app has no end-of-turn role"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: no role"
     }
   ]
 }
