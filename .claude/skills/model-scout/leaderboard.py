@@ -94,7 +94,10 @@ def main():
         # returns {"error": null} instead of a table. Unknown ones keep their
         # default; max_size's default is its slider's top, so no row is hidden
         # (a value above the top also returns {"error": null}).
-        values = {"version_id": args.version, "search_query": "", "show_proprietary": True,
+        # show_proprietary is a checkbox group since 2026-11-25: a bool there
+        # also returns {"error": null}. Tick both boxes to keep every row.
+        values = {"version_id": args.version, "search_query": "",
+                  "show_proprietary": ["Show proprietary (API) models", "Show ensemble models"],
                   "show_llm": True, "selected_columns": main_table_columns()}
         data = [values.get(p["parameter_name"], p.get("parameter_default"))
                 for p in endpoint_parameters("_main_table_update")]
