@@ -4797,6 +4797,310 @@
         }
       },
       "verdict": "near miss: no role"
+    },
+    {
+      "id": "ai-sage/GigaAM-v4",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "238M RNN-T/CTC, the card documents an ONNX export (full-context and streaming)"
+        },
+        "english": {
+          "pass": true,
+          "why": "Russian and English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "MIT"
+        },
+        "fits": {
+          "pass": true,
+          "why": "238M params, one model.safetensors"
+        },
+        "number": {
+          "pass": false,
+          "why": "self-reported Open ASR public-subset average 7.28% (RNN-T) against 6.56% for moondream/parakeet-ultra on the leaderboard; AMI-Cleaned 7.47% against 8.42%. Not on the leaderboard itself"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Zapformer encoder, no rejected trial of this family"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "58,000 supervised hours, corpora not listed, so the AMI lead may not be held out"
+        }
+      },
+      "verdict": "near miss: number (average 0.72 points behind Ultra, outside the 0.2 tie; AMI lead unverified for held-out)"
+    },
+    {
+      "id": "Infatoshi/phonon-2.0",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "safetensors only, decoder in NVFP4 (an NVIDIA format); no Core ML, MLX, GGUF or ONNX build"
+        },
+        "english": {
+          "pass": true,
+          "why": "English plus four languages"
+        },
+        "licence": {
+          "pass": true,
+          "why": "Apache-2.0"
+        },
+        "fits": {
+          "pass": false,
+          "why": "13 GB decoder + 606 MB audio tower, over the 1.5 GB file budget"
+        },
+        "number": {
+          "pass": false,
+          "why": "only private sets (80-clip personal holdout 8.17%, hard500 9.15%); no Open ASR Leaderboard number"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "Qwen3-ASR encoder; Qwen3-ASR-0.6B was rejected 2026-10-12"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "own holdouts only"
+        }
+      },
+      "verdict": "near miss: fits (13 GB NVFP4 decoder) and number"
+    },
+    {
+      "id": "Sonaflow/bessel-consensus3-r1 (eval reference)",
+      "date": "2026-11-27",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": false,
+          "why": "no public docs or sign-up found; the leaderboard provider (huggingface/open_asr_leaderboard#255, 2026-11-26) reads a private BESSEL_API_URL, rejects files over 24 MiB and prompts, and returns text only, so no 1-hour file, speaker labels or word timestamps shown"
+        },
+        "number": {
+          "pass": true,
+          "why": "Open ASR Leaderboard 26-11-2026: average 5.40% (rank 6), AMI-Cleaned 8.19%, private conversational 12.14% against 12.62% for Universal-3.5 Pro; added by a contributor PR, not maintainer-run"
+        }
+      },
+      "verdict": "near miss: api (24 MiB limit, no self-serve docs, no speaker labels)"
+    },
+    {
+      "id": "moondream/parakeet-ultra",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "FastConformer TDT, the family the app ships through FluidAudio"
+        },
+        "english": {
+          "pass": true,
+          "why": "25 languages incl. English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "cc-by-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.63B, 1.255 GB checkpoint"
+        },
+        "number": {
+          "pass": null,
+          "why": "new leaderboard row 26-11-2026: average 6.56%, AMI-Cleaned 8.42%, private conversational 13.03%, against 6.93 / 9.09 / 13.70 for parakeet-tdt-0.6b-v2; this is Parakeet Ultra, the shipped model"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "shipped"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "training data disclosure NA"
+        }
+      },
+      "verdict": "seen: the shipped model's first leaderboard row; numbers recorded as the baseline for later rows"
+    },
+    {
+      "id": "Vathivis/canary-1b-v2-fp16",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "fp16 conversion of NVIDIA Canary 1B v2, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion or copy with no new score)"
+    },
+    {
+      "id": "SIXlabdesign/cctype-qwen3-asr-0.6b and -1.7b",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "Qwen3-ASR copies; same architecture as the rejected 0.6B"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion or copy with no new score)"
+    },
+    {
+      "id": "enconvo/thewhisper-large-v3-turbo-coreml and -8bit-mlx",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "Whisper large-v3 turbo conversions, no new score"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion or copy with no new score)"
+    },
+    {
+      "id": "corygong/stt_en_conformer_ctc_small",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "re-upload of NVIDIA's 2021 Conformer-CTC small, LibriSpeech-other 8.1%"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion or copy with no new score)"
+    },
+    {
+      "id": "efficient-speech MLX INT4/BF16 builds (Voxtral, VibeVoice, MOSS-Transcribe-Diarize)",
+      "date": "2026-11-27",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "other quantisations of the INT8 builds seen 2026-11-26"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversion or copy with no new score)"
     }
   ]
 }
