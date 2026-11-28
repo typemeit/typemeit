@@ -5,7 +5,8 @@ import Foundation
 #endif
 
 /// The tools `typemeit-mcp` exposes (docs/meetings.md 7.15): reading
-/// meetings and dictations, and writing hooks. Pure over the meetings folder,
+/// meetings and dictations, writing hooks, and asking the app to change a
+/// meeting's title or summary. Pure over the meetings folder,
 /// history file and hook store passed in by the caller. Compiled
 /// directly into the `typemeit-mcp` target alongside its own copy of
 /// `Meeting.swift`, and into `TypeMeItTests` (via `canImport(TypeMeIt)`
@@ -189,6 +190,30 @@ enum MCPTools {
 
     static func renderStats(_ stats: Stats) -> String {
         encodeJSON(stats)
+    }
+
+    // MARK: edit_meeting
+
+    /// What `edit_meeting` says once the edit is left for the app.
+    static let editSavedMessage = "saved: type me it applies it while it's running, or when it next opens"
+
+    /// Leaves a new title, summary or both for the meeting `id` in `root`
+    /// (`MeetingEdit`). `id` is matched against the meetings there, never
+    /// made into a path.
+    static func editMeeting(root: URL, id: String, title: String?, summary: String?) -> Result<MeetingEdit, ToolError> {
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let summary = summary?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title?.isEmpty == false || summary?.isEmpty == false else {
+            return .failure(.badArgument("edit_meeting requires a title or a summary"))
+        }
+        guard let entry = meetings(under: root).first(where: { $0.meeting.id.uuidString == id }) else { return .failure(.notFound) }
+        let edit = MeetingEdit(meeting: entry.meeting.id, title: title?.isEmpty == false ? title : nil, summary: summary?.isEmpty == false ? summary : nil)
+        do {
+            _ = try MeetingEdit.write(edit, into: root)
+        } catch {
+            return .failure(.badArgument("couldn't save the edit: \(error.localizedDescription)"))
+        }
+        return .success(edit)
     }
 
     // MARK: hooks

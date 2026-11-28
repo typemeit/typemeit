@@ -37,8 +37,9 @@ final class MeetingStore {
 
     // MARK: Reading
 
-    /// Re-reads both roots. Called at launch and when the published folder
-    /// changes on disk.
+    /// Re-reads both roots, then applies any edit the MCP server left.
+    /// Called at launch and when the published folder changes on disk,
+    /// which a new edit file does.
     func reload() {
         let root = publishedRoot
         folderAvailable = FileManager.default.fileExists(atPath: root.path) || MeetingFolder.parentResolves(root)
@@ -50,6 +51,25 @@ final class MeetingStore {
         meetings = byId.values.map { $0.1 }.sorted { $0.started > $1.started }
         diskUsage = folderAvailable ? MeetingFolder.diskUsage(of: root) : nil
         watch(root)
+        if folderAvailable { applyEdits(in: root) }
+    }
+
+    /// The titles and summaries asked for over MCP (`MeetingEdit`), oldest
+    /// first. Each file goes once read, whether or not its meeting is here.
+    /// A title counts as the user's own, as if typed on the page: the hook
+    /// that wrote it is theirs, and a re-run keeps it.
+    private func applyEdits(in root: URL) {
+        for (file, edit) in MeetingEdit.pending(in: root) {
+            try? FileManager.default.removeItem(at: file)
+            guard let edit, meeting(edit.meeting) != nil else { continue }
+            if let title = edit.title { rename(id: edit.meeting, title: title) }
+            if let summary = edit.summary, var meeting = meeting(edit.meeting) {
+                meeting.summary = summary
+                meeting.summaryFromClaude = true
+                save(meeting)
+            }
+            DebugLog.write("Meeting edited over MCP: \(edit.title == nil ? "" : "title ")\(edit.summary == nil ? "" : "summary")")
+        }
     }
 
     /// Re-reads when the published folder changes: a rename or a delete in

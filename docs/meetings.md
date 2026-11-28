@@ -1795,9 +1795,18 @@ a small source list rather than a copy:
   string against the current MCP spec when it is built, not from memory),
   `tools/list`, `tools/call`, and the matching notifications. Roughly 200
   lines of framing; no SDK dependency.
-- **Read-only, and it never writes anywhere.** No delete, no rename, no
-  re-transcribe. Writes would need the app running to keep the UI honest;
-  section 10 has them.
+- **It reads, and writes only through the app.** No delete, no
+  re-transcribe. The one meeting write, `edit_meeting`, never touches
+  `meeting.json`: the app is its only writer, and a hook that calls the tool
+  ends by saving its own result from the app's copy, which would undo a
+  change made to the file underneath. The server leaves the edit as a hidden
+  `.edit-<ms>-<uuid>.json` (`MeetingEdit`) in the published folder; the
+  store's folder watch sees it, applies it with the page's own rename and
+  summary paths, and deletes it. With the app closed it waits for the next
+  launch. A title from an edit counts as the user's (`titleSource` `user`,
+  kept by transcribe again); a summary sets `summaryFromClaude`, so the rail
+  says `claude` where it would say `apple intelligence`, and transcribe
+  again drops it with the rest.
 - **Off unless the user turns it on.** The binary cannot be stopped from
   being launched, so the switch lives in the binary: it reads
   `UserDefaults(suiteName:)` for the bundle id of the `.app` it is inside
@@ -1818,6 +1827,7 @@ Tools:
 | `get_meeting` | `id`, `part` (default 1) | `transcript.md`, whole when it fits `Fixed.meetingMCPBudgetBytes` (24 KB), else that part and a count of the rest |
 | `search_meetings` | `query`, `limit` (default 20) | Case- and diacritic-insensitive literal matches, each with the meeting, the speaker, the timestamp and the paragraph it sits in |
 | `meeting_stats` | `from`, `to` | Count, total duration, talk time by speaker |
+| `edit_meeting` | `id`, `title`, `summary` (one at least) | That the edit is saved for the app; the meeting changes when the app applies it |
 
 `list_meetings` reads front matter only, so a library of a few hundred
 meetings lists without touching the text; `search_meetings` reads the bodies
@@ -1869,7 +1879,8 @@ a request and response pair; `list_meetings` filters by date, app and
 speaker; `get_meeting` budget split and reassembly; `search_meetings` finds a
 word across two meetings with the right speaker and timestamp; a path
 argument pointing outside the folder is refused; every tool with the setting
-off returns the same error.
+off returns the same error; `edit_meeting` leaves an edit file in order and
+leaves `meeting.json` alone, and refuses a bad id or an empty edit.
 
 ### 7.16 Sharing a meeting as a `.tmi` file
 

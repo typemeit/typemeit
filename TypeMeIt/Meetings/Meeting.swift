@@ -253,6 +253,9 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
     /// A few sentences from the on-device model, for the meeting's page.
     /// Not rendered into `transcript.md` and never returned by the MCP.
     var summary: String? = nil
+    /// True when `summary` came over MCP (`MeetingEdit`), such as from a
+    /// hook, not from the on-device model.
+    var summaryFromClaude: Bool? = nil
     /// The meeting this recording is a rejoin of: it is joined onto that
     /// one before transcription and then deleted (`MeetingMerge`).
     var continues: UUID? = nil
