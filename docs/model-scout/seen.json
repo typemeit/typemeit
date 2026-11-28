@@ -5101,6 +5101,238 @@
         }
       },
       "verdict": "near miss: number (conversion or copy with no new score)"
+    },
+    {
+      "id": "crxssrazr93/Nemotron-3.5-Transcribe-Lite-ASR",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "NeMo PyTorch build for CUDA or CPU; no Core ML, MLX, GGUF or ONNX"
+        },
+        "english": {
+          "pass": true,
+          "why": "English only"
+        },
+        "licence": {
+          "pass": null,
+          "why": "openmdw-1.1, inherited from NVIDIA Nemotron 3.5 Transcribe; not read"
+        },
+        "fits": {
+          "pass": true,
+          "why": "3 GB at fp16 per the card"
+        },
+        "number": {
+          "pass": false,
+          "why": "card publishes no WER; community extraction of the encoder and CTC head of Nemotron 3.5 Transcribe 30B-A4B"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "no trial of this encoder on its own"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: onDevice (PyTorch CUDA or CPU only) and number (no WER)"
+    },
+    {
+      "id": "Banafo/KrokoMusci",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": false,
+          "why": "pipeline builds a TensorRT engine and runs on one NVIDIA GPU"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": null,
+          "why": "no score on the card"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "combines Kroko ASR XL (seen) with Musci, a Qwen3-ASR fine-tune"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: onDevice (TensorRT on an NVIDIA GPU)"
+    },
+    {
+      "id": "stateofmaryland/parakeet-tdt-0.6b-v2-maryland-bill-hearings",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "int8 ONNX for sherpa-onnx"
+        },
+        "english": {
+          "pass": true,
+          "why": "English"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": true,
+          "why": "0.6B"
+        },
+        "number": {
+          "pass": false,
+          "why": "3.06% WER on its own Maryland hearings test set; no Open ASR row or general score"
+        },
+        "notRejected": {
+          "pass": true,
+          "why": "Parakeet TDT v2 fine-tune"
+        },
+        "heldOut": {
+          "pass": false,
+          "why": "tested on its own training domain"
+        }
+      },
+      "verdict": "near miss: number (in-domain score only)"
+    },
+    {
+      "id": "talkxo/sangam-coreml",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "Core ML, Neural Engine"
+        },
+        "english": {
+          "pass": false,
+          "why": "Hindi and Hinglish model; 8.85% WER on the leaderboard's Hindi set"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": true,
+          "why": "234 MB"
+        },
+        "number": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: english (Hindi and Hinglish)"
+    },
+    {
+      "id": "GigaAM-v4 and GigaAM Multilingual v2 ports, 2026-11-27 to 2026-11-28 (TypeWhisper, 70sh1, aystream, zvasil, ilsvls, ai-babai, Altushkins, guest363, CaptainBlt, SpruAgent, DonYin, infosave)",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": true,
+          "why": "ONNX, MLX, Core ML and GGUF builds"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "format conversions; GigaAM-v4 averaged 0.72 points behind Ultra (seen 2026-11-27)"
+        },
+        "notRejected": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversions of GigaAM-v4, seen 2026-11-27, with no new score)"
+    },
+    {
+      "id": "Parakeet Ultra conversions, 2026-11-27 to 2026-11-28 (timmyboy26 LiteRT NPU, kkrishnan90/whispr-asr ONNX INT4, wothers ONNX int8, twmht fp16)",
+      "date": "2026-11-28",
+      "role": "speech recognition",
+      "checks": {
+        "onDevice": {
+          "pass": null,
+          "why": "LiteRT for Android NPUs and ONNX builds"
+        },
+        "english": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "licence": {
+          "pass": true,
+          "why": "CC-BY-4.0"
+        },
+        "fits": {
+          "pass": null,
+          "why": "not checked"
+        },
+        "number": {
+          "pass": false,
+          "why": "format conversions of Parakeet Ultra with no new score"
+        },
+        "notRejected": {
+          "pass": false,
+          "why": "same weights as the shipped model"
+        },
+        "heldOut": {
+          "pass": null,
+          "why": "not checked"
+        }
+      },
+      "verdict": "near miss: number (conversions of the shipped model)"
+    },
+    {
+      "id": "AirCaps Live 1 (eval reference)",
+      "date": "2026-11-28",
+      "role": "eval reference",
+      "checks": {
+        "api": {
+          "pass": false,
+          "why": "streaming voice-agent endpoint; AirCaps's batch model with speaker labels is A5S Async v1, seen 2026-11-15"
+        },
+        "number": {
+          "pass": null,
+          "why": "announced on r/speechtech 2026-11-27; benchmark post not readable"
+        }
+      },
+      "verdict": "near miss: api (streaming speech-to-text for voice agents, not a 1-hour batch request)"
     }
   ]
 }
