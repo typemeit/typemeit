@@ -228,11 +228,13 @@ final class Shortcuts {
     }
 
     /// The menu's Start Recording. Opens the microphone already pinned, since
-    /// there is no key to release.
+    /// there is no key to release. A start that fails sets the phase back
+    /// to idle while handling `.recordingStarted`, and then nothing is pinned.
     func startFromMenu() {
         guard phase == .idle else { return }
         phase = .pinned
         onEvent?(.recordingStarted)
+        guard phase == .pinned else { return }
         onEvent?(.pinned)
     }
 

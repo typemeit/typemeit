@@ -78,7 +78,7 @@ final class Updates: NSObject, SPUUpdaterDelegate {
             }
         } catch {
             Log.app.error("Updater failed to start: \(error.localizedDescription)")
-            state = .unreachable
+            set(.unreachable)
         }
     }
 
@@ -149,7 +149,7 @@ final class Updates: NSObject, SPUUpdaterDelegate {
         case .readyToInstall:
             guard let reply = driver.installReply else { return }
             driver.installReply = nil
-            state = .installing
+            set(.installing)
             reply(.install)
         default:
             return

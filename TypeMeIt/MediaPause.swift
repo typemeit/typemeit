@@ -10,7 +10,16 @@ enum MediaPause {
     /// system, and the second is lost.
     private static let minimumKeyGap: TimeInterval = 1.5
 
-    private static var pressedAt: Date?
+    private enum Press {
+        case idle
+        /// The first press paused playback.
+        case paused(at: Date)
+        /// The second press waits out `minimumKeyGap`. Cancelling it leaves
+        /// playback paused from the first press.
+        case resumePending(Task<Void, Never>, pausedAt: Date)
+    }
+
+    private static var press: Press = .idle
 
     /// Bundle ids of the processes other than this one with output running,
     /// from CoreAudio's per-process objects. The app's own cues keep a
@@ -37,21 +46,37 @@ enum MediaPause {
     }
 
     static func pause() {
-        guard pressedAt == nil else { return }
+        switch press {
+        case .paused:
+            return
+        case .resumePending(let resumePress, let pausedAt):
+            // A new recording inside the gap: playback is still paused, so the resume press is called off.
+            resumePress.cancel()
+            press = .paused(at: pausedAt)
+            DebugLog.write("Pause: resume called off, playback stays paused")
+            return
+        case .idle:
+            break
+        }
         let playing = playingProcesses()
         guard !playing.isEmpty else { DebugLog.write("Pause: nothing playing"); return }
         DebugLog.write("Pause: play/pause pressed, output running in \(playing.joined(separator: ", "))")
-        pressedAt = Date()
+        press = .paused(at: Date())
         pressPlayPause()
     }
 
     /// Presses again to resume, no sooner than `minimumKeyGap` after the
     /// pause press.
     static func resume() {
-        guard let pressedAt else { return }
-        self.pressedAt = nil
-        let wait = max(0, minimumKeyGap - Date().timeIntervalSince(pressedAt))
+        guard case .paused(let pausedAt) = press else { return }
+        let wait = max(0, minimumKeyGap - Date().timeIntervalSince(pausedAt))
         DebugLog.write("Pause: play/pause pressed again to resume\(wait > 0 ? String(format: ", after %.1f s", wait) : "")")
-        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { pressPlayPause() }
+        let resumePress = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled else { return }
+            press = .idle
+            pressPlayPause()
+        }
+        press = .resumePending(resumePress, pausedAt: pausedAt)
     }
 }
