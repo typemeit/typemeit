@@ -134,14 +134,15 @@ struct MeetingShareTests {
 struct MeetingShareClaudeTests {
     private let sender = "Max Mitchell"
 
-    /// The example with one answered question, one turned down, one hook
-    /// result and one failed run.
+    /// The example with one answered question, one turned down, one that
+    /// got no answer, one hook result and one failed run.
     private var answered: Meeting {
         var meeting = MeetingFixtures.example
         meeting.questions = [
             Meeting.Question(atMs: 83_000, text: "What's in the deploy?", answer: "## Changes\n\nTwo fixes --> both merged.", outcome: .asked,
                              sessionID: "session-1"),
             Meeting.Question(atMs: 90_000, text: "Who's on call?", outcome: .dismissed),
+            Meeting.Question(atMs: 95_000, text: "When's the freeze?", answer: "Claude Code timed out.", failed: true, outcome: .asked),
         ]
         meeting.hookRuns = [
             Meeting.HookRun(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!, name: "Action items", prompt: "List the action items",

@@ -1892,7 +1892,7 @@ a hidden `<!-- tmi ask {…} -->` or `<!-- tmi hook {…} -->` line that holds
 the question and its time, or the hook's id, name, prompt and run time, as
 JSON with `>` escaped. Answers and hook output are Markdown with headings of
 their own, so only these lines can say where one ends. Questions the user
-turned down or let pass, failed runs, Claude's tool calls and session ids
+turned down or let pass, questions that got no answer, failed runs, Claude's tool calls and session ids
 stay out.
 
 The file is `transcript.md`'s Markdown (7.9) with `echo` left out and three

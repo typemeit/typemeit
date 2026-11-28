@@ -30,9 +30,9 @@ enum MeetingShare {
     // MARK: Claude's part
 
     /// The questions Claude answered: offered ones the user turned down or
-    /// let pass are not the meeting's to share.
+    /// let pass, and asked ones that got no answer, are not the meeting's to share.
     static func answers(_ meeting: Meeting) -> [Meeting.Question] {
-        (meeting.questions ?? []).filter { $0.result == .asked && $0.answer?.isEmpty == false }
+        (meeting.questions ?? []).filter { $0.result == .asked && $0.failed != true && $0.answer?.isEmpty == false }
     }
 
     /// The hook runs that came back with a result.
