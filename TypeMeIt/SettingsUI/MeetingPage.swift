@@ -760,7 +760,7 @@ struct MeetingPage: View {
             rows.append(RailFact(key: "transcribed", value: "\(lengthInSeconds(ms: took)) · \(timesFaster(audioMs: meeting.durationMs, tookMs: took))"))
         }
         let writing = coordinator.summarising.contains(meeting.id) || stage == .summarising
-        let summary = meeting.summary.map { _ in MeetingPage.timed("apple intelligence", t.summaryMs) } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
+        let summary = meeting.summary.map { _ in meeting.summaryFromClaude == true ? "claude" : MeetingPage.timed("apple intelligence", t.summaryMs) } ?? (writing ? "writing" : meeting.isDone ? "none" : "waiting")
         rows.append(RailFact(key: "summary", value: summary, waiting: meeting.summary == nil))
         rows.append(RailFact(key: "title", value: MeetingPage.titleSource(meeting.titleSource)))
         return rows

@@ -732,6 +732,7 @@ final class MeetingCoordinator {
         meeting.transcription.done = [:]
         meeting.forgettingParagraphs()
         meeting.summary = nil
+        meeting.summaryFromClaude = nil
         // A generated or roster title is made again from the new words; a typed one stays.
         if meeting.titleSource == .generated || meeting.titleSource == .roster {
             meeting.title = meeting.app?.name ?? "Room"

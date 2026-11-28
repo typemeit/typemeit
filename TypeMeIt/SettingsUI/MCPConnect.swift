@@ -141,6 +141,7 @@ struct MCPToolList: View {
         ("get_meeting", "reads one meeting's transcript"),
         ("search_meetings", "finds a phrase in your meeting transcripts"),
         ("meeting_stats", "counts meetings, hours and talk time per person over a date range"),
+        ("edit_meeting", "changes a meeting's title or summary"),
         ("list_dictations", "lists your dictations, newest first · the text and the app it went into"),
         ("search_dictations", "finds a phrase in your dictations"),
         ("list_hooks", "lists your hooks"),

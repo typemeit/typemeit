@@ -356,6 +356,7 @@ final class MCPTests {
             ("add_hook", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_hook","arguments":{"name":"x","prompt":"x"}}}"#),
             ("update_hook", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"update_hook","arguments":{"id":"x"}}}"#),
             ("remove_hook", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"remove_hook","arguments":{"id":"x"}}}"#),
+            ("edit_meeting", #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit_meeting","arguments":{"id":"x","title":"x"}}}"#),
         ]
         try writeHistory(to: history)
         for (name, line) in calls {
@@ -407,6 +408,49 @@ final class MCPTests {
         try StoredJSON.fileEncoder.encode([entry]).write(to: history)
         #expect(MCPTools.listDictations(history: history) == [MCPTools.DictationSummary(
             id: entry.id.uuidString, time: iso("2026-02-04T11:00:00Z"), app: "Notes", window: nil, text: entry.displayText)])
+    }
+
+    // MARK: edit_meeting
+
+    @Test func anEditIsLeftForTheAppAndChangesNoFile() throws {
+        try writeFixture(in: root)
+        let before = try Data(contentsOf: root.appendingPathComponent("Slack Meeting/\(SupportPaths.meetingFile)"))
+        let edit = try MCPTools.editMeeting(root: root, id: slackID.uuidString, title: "  Launch plan ", summary: "We moved the launch.").get()
+        #expect(edit == MeetingEdit(meeting: slackID, title: "Launch plan", summary: "We moved the launch."))
+        #expect(MeetingEdit.pending(in: root).map(\.edit) == [edit])
+        #expect(try Data(contentsOf: root.appendingPathComponent("Slack Meeting/\(SupportPaths.meetingFile)")) == before)
+        // The edit file is not a meeting.
+        #expect(MCPTools.listMeetings(root: root).count == 3)
+    }
+
+    @Test func editsComeBackInTheOrderTheyWereWritten() throws {
+        let first = MeetingEdit(meeting: slackID, title: "First", summary: nil)
+        let second = MeetingEdit(meeting: slackID, title: "Second", summary: nil)
+        _ = try MeetingEdit.write(second, into: root, at: Date(timeIntervalSince1970: 1_800_000_000))
+        _ = try MeetingEdit.write(first, into: root, at: Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(MeetingEdit.pending(in: root).map(\.edit) == [first, second])
+    }
+
+    @Test func anEditWithABadIdOrNothingInItIsRefused() throws {
+        try writeFixture(in: root)
+        #expect(MCPTools.editMeeting(root: root, id: "../Slack Meeting", title: "x", summary: nil) == .failure(.notFound))
+        #expect(MCPTools.editMeeting(root: root, id: slackID.uuidString, title: " ", summary: nil)
+            == .failure(.badArgument("edit_meeting requires a title or a summary")))
+        #expect(MeetingEdit.pending(in: root).isEmpty)
+    }
+
+    @Test func editMeetingOverTheProtocolSaysWhenItApplies() throws {
+        try writeFixture(in: root)
+        let line = #"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit_meeting","arguments":{"id":"\#(slackID.uuidString)","summary":"We moved the launch."}}}"#
+        #expect(decodeJSONValue(handle(line, enabled: true)) == .object([
+            "jsonrpc": .string("2.0"),
+            "id": .number(1),
+            "result": .object([
+                "content": .array([.object(["type": .string("text"), "text": .string(MCPTools.editSavedMessage)])]),
+                "isError": .bool(false),
+            ]),
+        ]))
+        #expect(MeetingEdit.pending(in: root).map(\.edit) == [MeetingEdit(meeting: slackID, title: nil, summary: "We moved the launch.")])
     }
 
     // MARK: hooks
