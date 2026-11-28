@@ -72,8 +72,8 @@ enum TranscriptRender {
     /// instead of asking. Headings, not the `**speaker** ·` form, so nothing
     /// reads it back as speech.
     static func offered(_ questions: [Meeting.Question]) -> String {
-        (["## Questions for Claude"] + questions.map { question in
-            let heading = "### \(question.text) · \(timestamp(ms: question.atMs))"
+        ([questionsHeading] + questions.map { question in
+            let heading = questionHeading(question)
             guard question.result == .asked else { return "\(heading) · \(outcome(question.result))" }
             let shownHeading = question.failed == true ? "\(heading) · failed" : heading
             return question.answer.map { "\(shownHeading)\n\n\($0)" } ?? shownHeading
@@ -81,10 +81,16 @@ enum TranscriptRender {
         .joined(separator: "\n\n")
     }
 
+    static let questionsHeading = "## Questions for Claude"
+    static let hooksHeading = "## Hooks"
+
+    static func questionHeading(_ question: Meeting.Question) -> String { "### \(question.text) · \(timestamp(ms: question.atMs))" }
+    static func hookHeading(_ run: Meeting.HookRun) -> String { "### \(run.name)" }
+
     /// The hooks run on the meeting: a heading per run, its output under it.
     static func hooks(_ runs: [Meeting.HookRun]) -> String {
-        (["## Hooks"] + runs.map { run in
-            "### \(run.name)\(run.failed ? " · failed" : "")\n\n\(run.output)" + (run.sessionID.map { "\n\nclaude --resume \($0)" } ?? "")
+        ([hooksHeading] + runs.map { run in
+            "\(hookHeading(run))\(run.failed ? " · failed" : "")\n\n\(run.output)" + (run.sessionID.map { "\n\nclaude --resume \($0)" } ?? "")
         })
             .joined(separator: "\n\n")
     }

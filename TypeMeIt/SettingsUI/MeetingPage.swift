@@ -36,6 +36,8 @@ struct MeetingPage: View {
     @State private var settings = Settings.shared
     /// The `.tmi` file the share menu is showing.
     @State private var sharing: URL?
+    /// The question before sharing a meeting Claude answered or ran hooks on.
+    @State private var askingShare = false
     /// What the find field looks for in the transcript.
     @State private var find: String
     /// Which of the find's hits is current.
@@ -134,12 +136,13 @@ struct MeetingPage: View {
             }
             PageCopyButton(help: "copy the transcript") { Output.copyToClipboard(meeting.transcriptText) }
                 .disabled(meeting.paragraphs.isEmpty)
-            if meeting.isDone, !meeting.paragraphs.isEmpty, !live {
-                // The share menu under the button; the button can also be
-                // dragged, which drops the `.tmi` file into a message or a
-                // folder (docs/meetings.md 7.16).
+            if shareReady {
+                // The share menu under the button, after asking whether
+                // Claude's part goes too; the button can also be dragged,
+                // which drops the transcript-only `.tmi` file into a message
+                // or a folder (docs/meetings.md 7.16).
                 Button {
-                    if let file = store.shareFile(meeting.id) { sharing = file }
+                    if MeetingShare.hasClaude(meeting) { askingShare = true } else { share(includingClaude: false) }
                 } label: {
                     SquareIcon("akar-share-box", size: 14)
                 }
@@ -147,6 +150,7 @@ struct MeetingPage: View {
                 .help("share")
                 .accessibilityLabel("share")
                 .background(SharePicker(file: sharing) { sharing = nil })
+                .squarePopover(isPresented: $askingShare) { shareConfirm }
                 .onDrag { store.shareFile(meeting.id).flatMap(NSItemProvider.init(contentsOf:)) ?? NSItemProvider() }
             }
             // Edits the title and every speaker's name, those the meeting gave too.
@@ -173,6 +177,29 @@ struct MeetingPage: View {
                     .accessibilityLabel("delete")
                     .squarePopover(isPresented: $deleting) { deleteConfirm }
             }
+        }
+    }
+
+    /// Shared once nothing is still being added to it: the transcription
+    /// pass, which learns the voices before it marks the meeting done, the
+    /// summary and title, and any hooks running on it.
+    private var shareReady: Bool {
+        meeting.isDone && !meeting.paragraphs.isEmpty && !live
+            && coordinator.transcribing?.id != meeting.id && !coordinator.queued.contains(meeting.id)
+            && !coordinator.summarising.contains(meeting.id) && coordinator.runningHooks[meeting.id] == nil
+    }
+
+    private func share(includingClaude: Bool) {
+        askingShare = false
+        if let file = store.shareFile(meeting.id, includingClaude: includingClaude) { sharing = file }
+    }
+
+    private var shareConfirm: some View {
+        let counts = [(MeetingShare.hookResults(meeting).count, "hook result"), (MeetingShare.answers(meeting).count, "answer")]
+        let detail = counts.filter { $0.0 > 0 }.map { counted($0.0, $0.1) }.joined(separator: " · ")
+        return SquareConfirm(title: "include claude's part?", detail: detail) {
+            Button("transcript only") { share(includingClaude: false) }.buttonStyle(SquareButtonStyle())
+            Button("include") { share(includingClaude: true) }.buttonStyle(SquareButtonStyle(kind: .primary))
         }
     }
 

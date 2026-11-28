@@ -2,14 +2,20 @@ import Foundation
 
 /// A meeting as a `.tmi` file (docs/meetings.md 7.16): `transcript.md`'s
 /// Markdown with who shared it, the meeting's id and the format's version
-/// added to the front matter. A text editor shows it as a transcript; type
-/// me it opens it as a meeting without audio. Pure: `MeetingStore` reads
-/// and writes the files.
+/// added to the front matter, and Claude's answers and hook results when
+/// the user chose to include them. A text editor shows it as a transcript;
+/// type me it opens it as a meeting without audio. Pure: `MeetingStore`
+/// reads and writes the files.
 enum MeetingShare {
     /// As declared for `it.typeme.meeting` in project.yml.
     static let fileExtension = "tmi"
-    /// The format this build writes, and the newest it reads.
-    static let version = 1
+    /// The newest format this build reads. A file with no Claude answers or
+    /// hook results is written as format 1, which builds from before
+    /// `claudeFormat` open; one with them is `claudeFormat`, which those
+    /// builds refuse rather than read the answers as the last speaker's words.
+    static let version = claudeFormat
+    static let transcriptFormat = 1
+    static let claudeFormat = 2
     /// On its own line under the front matter, for anyone who opens the file
     /// without type me it. Reading skips everything before the first heading.
     static let website = Fixed.websiteURL.host() ?? Fixed.websiteURL.absoluteString
@@ -21,11 +27,79 @@ enum MeetingShare {
         case newerVersion
     }
 
+    // MARK: Claude's part
+
+    /// The questions Claude answered: offered ones the user turned down or
+    /// let pass, and asked ones that got no answer, are not the meeting's to share.
+    static func answers(_ meeting: Meeting) -> [Meeting.Question] {
+        (meeting.questions ?? []).filter { $0.result == .asked && $0.failed != true && $0.answer?.isEmpty == false }
+    }
+
+    /// The hook runs that came back with a result.
+    static func hookResults(_ meeting: Meeting) -> [Meeting.HookRun] {
+        (meeting.hookRuns ?? []).filter { !$0.failed }
+    }
+
+    static func hasClaude(_ meeting: Meeting) -> Bool { !answers(meeting).isEmpty || !hookResults(meeting).isEmpty }
+
+    /// Opens a question or hook run: an HTML comment, which Markdown viewers
+    /// hide, holding what the heading under it can't carry back exactly.
+    /// Answers and hook results are Markdown with headings of their own, so
+    /// only this line can say where one ends.
+    private static let markPrefix = "<!-- tmi "
+    private static let markSuffix = " -->"
+    private enum MarkKind: String { case ask, hook }
+
+    private struct AskMark: Codable {
+        var atMs: Int
+        var text: String
+    }
+
+    private struct HookMark: Codable {
+        var id: UUID
+        var name: String
+        var prompt: String
+        var ranAt: Date
+    }
+
+    private static func mark<Mark: Encodable>(_ kind: MarkKind, _ mark: Mark) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(mark) else { return markPrefix + kind.rawValue + markSuffix }
+        // `>` only ever appears inside a JSON string here, so escaping it
+        // keeps a "-->" in a question from closing the comment early.
+        let json = String(decoding: data, as: UTF8.self).replacingOccurrences(of: ">", with: "\\u003e")
+        return markPrefix + kind.rawValue + " " + json + markSuffix
+    }
+
+    /// The answers, then the hook results, under the headings `transcript.md` uses.
+    private static func claudeSections(_ meeting: Meeting) -> [String] {
+        var sections: [String] = []
+        let answers = answers(meeting)
+        if !answers.isEmpty {
+            sections.append(([TranscriptRender.questionsHeading] + answers.map { question in
+                [mark(.ask, AskMark(atMs: question.atMs, text: question.text)), TranscriptRender.questionHeading(question), "", question.answer ?? ""]
+                    .joined(separator: "\n")
+            }).joined(separator: "\n\n"))
+        }
+        let runs = hookResults(meeting)
+        if !runs.isEmpty {
+            sections.append(([TranscriptRender.hooksHeading] + runs.map { run in
+                [mark(.hook, HookMark(id: run.id, name: run.name, prompt: run.prompt, ranAt: run.ranAt)), TranscriptRender.hookHeading(run), "", run.output]
+                    .joined(separator: "\n")
+            }).joined(separator: "\n\n"))
+        }
+        return sections
+    }
+
     // MARK: Writing
 
     /// The file's text. The user's own speaker is named `sender` unless the
     /// user renamed it: in anyone else's copy, "You" is the wrong person.
-    static func markdown(_ meeting: Meeting, sender: String) -> String {
+    /// `includingClaude` adds Claude's answers and hook results, which only
+    /// go when the user says so: they can hold what Claude read elsewhere.
+    static func markdown(_ meeting: Meeting, sender: String, includingClaude: Bool = false) -> String {
         var shared = meeting.withoutBackground
         for i in shared.speakers.indices where shared.speakers[i].isYou && shared.speakers[i].nameSource != .user {
             shared.speakers[i].name = sender
@@ -44,11 +118,10 @@ enum MeetingShare {
             "speakers: [\(shared.speakers.map { quoted($0.name) }.joined(separator: ", "))]",
             "from: \(quoted(sender))",
             "id: \(shared.id.uuidString)",
-            "format: \(version)",
-            "---",
-            "",
         ]
-        return (frontMatter + [website, "", TranscriptRender.paragraphs(shared)]).joined(separator: "\n") + "\n"
+        let claude = includingClaude ? claudeSections(shared) : []
+        frontMatter += ["format: \(claude.isEmpty ? transcriptFormat : claudeFormat)", "---", ""]
+        return (frontMatter + [website, "", ([TranscriptRender.paragraphs(shared)] + claude).joined(separator: "\n\n")]).joined(separator: "\n") + "\n"
     }
 
     /// JSON's string syntax, which YAML reads as a double-quoted string:
@@ -82,8 +155,10 @@ enum MeetingShare {
         let durationMs = fields["duration"].flatMap { milliseconds($0[...]) } ?? 0
 
         var names = list(fields["speakers"])
+        let body = lines[(close + 1)...]
+        let claudeStart = body.firstIndex { isClaudeLine($0) } ?? body.endIndex
         var turns: [(name: String, startMs: Int, lines: [Substring])] = []
-        for line in lines[(close + 1)...] {
+        for line in body[..<claudeStart] {
             // A line that only looks like a heading, naming no listed speaker, is words.
             if let heading = heading(line), names.isEmpty || names.contains(heading.name) {
                 turns.append((heading.name, heading.startMs, []))
@@ -106,6 +181,7 @@ enum MeetingShare {
                                    talkMs: said.map { $0.endMs - $0.startMs }.reduce(0, +), nameSource: .user)
         }
         let title = string(fields["title"]) ?? ""
+        let claude = claudeParts(body[claudeStart...])
 
         return Meeting(
             id: id,
@@ -129,7 +205,51 @@ enum MeetingShare {
             speakers: speakers,
             transcription: Meeting.Transcription(state: .done, error: nil, asr: nil, diarizer: nil, tookMs: nil),
             paragraphs: paragraphs,
-            sharedBy: string(fields["from"]) ?? "")
+            sharedBy: string(fields["from"]) ?? "",
+            questions: claude.questions.isEmpty ? nil : claude.questions,
+            hookRuns: claude.hookRuns.isEmpty ? nil : claude.hookRuns)
+    }
+
+    /// Where the transcript ends: a mark, or a heading Claude's part starts with.
+    private static func isClaudeLine(_ line: Substring) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix(markPrefix) || trimmed == TranscriptRender.questionsHeading || trimmed == TranscriptRender.hooksHeading
+    }
+
+    /// The questions and hook runs after the transcript, one per mark. Each
+    /// mark's text runs to the next mark, less the heading under the mark
+    /// and the section heading that may close it.
+    private static func claudeParts(_ lines: ArraySlice<Substring>) -> (questions: [Meeting.Question], hookRuns: [Meeting.HookRun]) {
+        var items: [(kind: MarkKind, json: Data, lines: [Substring])] = []
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix(markPrefix), trimmed.hasSuffix(markSuffix) {
+                let inside = trimmed.dropFirst(markPrefix.count).dropLast(markSuffix.count)
+                let kind = inside.prefix { $0 != " " }
+                guard let markKind = MarkKind(rawValue: String(kind)) else { continue }
+                items.append((markKind, Data(inside.dropFirst(kind.count).utf8), []))
+            } else if !items.isEmpty {
+                items[items.count - 1].lines.append(line)
+            }
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var questions: [Meeting.Question] = []
+        var runs: [Meeting.HookRun] = []
+        for item in items {
+            var text = Array(item.lines.drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }.dropFirst())
+            while let last = text.last, last.trimmingCharacters(in: .whitespaces).isEmpty || isClaudeLine(last) { text.removeLast() }
+            let joined = text.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            switch item.kind {
+            case .ask:
+                guard let mark = try? decoder.decode(AskMark.self, from: item.json) else { continue }
+                questions.append(Meeting.Question(atMs: mark.atMs, text: mark.text, answer: joined, outcome: .asked))
+            case .hook:
+                guard let mark = try? decoder.decode(HookMark.self, from: item.json) else { continue }
+                runs.append(Meeting.HookRun(id: mark.id, name: mark.name, prompt: mark.prompt, ranAt: mark.ranAt, output: joined, failed: false))
+            }
+        }
+        return (questions, runs)
     }
 
     /// `s1`, `s2`, …, as a room's speakers are numbered.

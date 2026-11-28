@@ -125,7 +125,107 @@ struct MeetingShareTests {
     }
 
     @Test func aNewerFormatIsRefused() {
-        let text = MeetingShare.markdown(MeetingFixtures.example, sender: sender).replacingOccurrences(of: "format: 1\n", with: "format: 2\n")
+        let text = MeetingShare.markdown(MeetingFixtures.example, sender: sender)
+            .replacingOccurrences(of: "format: 1\n", with: "format: \(MeetingShare.version + 1)\n")
+        #expect(throws: MeetingShare.ReadError.newerVersion) { try MeetingShare.meeting(from: text) }
+    }
+}
+
+struct MeetingShareClaudeTests {
+    private let sender = "Max Mitchell"
+
+    /// The example with one answered question, one turned down, one that
+    /// got no answer, one hook result and one failed run.
+    private var answered: Meeting {
+        var meeting = MeetingFixtures.example
+        meeting.questions = [
+            Meeting.Question(atMs: 83_000, text: "What's in the deploy?", answer: "## Changes\n\nTwo fixes --> both merged.", outcome: .asked,
+                             sessionID: "session-1"),
+            Meeting.Question(atMs: 90_000, text: "Who's on call?", outcome: .dismissed),
+            Meeting.Question(atMs: 95_000, text: "When's the freeze?", answer: "Claude Code timed out.", failed: true, outcome: .asked),
+        ]
+        meeting.hookRuns = [
+            Meeting.HookRun(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!, name: "Action items", prompt: "List the action items",
+                            ranAt: Date(timeIntervalSince1970: 1_789_826_700), output: "### Max\n\n- ship it", failed: false),
+            Meeting.HookRun(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!, name: "Notes", prompt: "Write notes",
+                            ranAt: Date(timeIntervalSince1970: 1_789_826_800), output: "claude is not installed", failed: true),
+        ]
+        return meeting
+    }
+
+    @Test func leavesClaudeOutUnlessAsked() {
+        #expect(MeetingShare.markdown(answered, sender: sender) == MeetingShare.markdown(MeetingFixtures.example, sender: sender))
+    }
+
+    @Test func onlyAnswersAndResultsCount() {
+        #expect(MeetingShare.answers(answered).map(\.text) == ["What's in the deploy?"])
+        #expect(MeetingShare.hookResults(answered).map(\.name) == ["Action items"])
+        #expect(MeetingShare.hasClaude(answered))
+        #expect(!MeetingShare.hasClaude(MeetingFixtures.example))
+    }
+
+    @Test func writesClaudesPart() {
+        let expected = """
+        ---
+        title: "Slack"
+        kind: call
+        started: "2026-09-19 14:30 +01:00"
+        duration: 34:36
+        app: "Slack"
+        speakers: ["Max Mitchell", "Them"]
+        from: "Max Mitchell"
+        id: 9F2C0000-0000-0000-0000-000000000000
+        format: 2
+        ---
+
+        typeme.it
+
+        **Max Mitchell** · 0:14
+        Morning. Shall we start with the deploy?
+
+        **Them** · 0:21
+        Sure, give me a second to pull it up.
+
+        ## Questions for Claude
+
+        <!-- tmi ask {"atMs":83000,"text":"What's in the deploy?"} -->
+        ### What's in the deploy? · 1:23
+
+        ## Changes
+
+        Two fixes --> both merged.
+
+        ## Hooks
+
+        <!-- tmi hook {"id":"00000000-0000-0000-0000-0000000000B1","name":"Action items","prompt":"List the action items","ranAt":"2026-09-19T14:05:00Z"} -->
+        ### Action items
+
+        ### Max
+
+        - ship it
+
+        """
+        #expect(MeetingShare.markdown(answered, sender: sender, includingClaude: true) == expected)
+    }
+
+    @Test func readsClaudesPartBack() throws {
+        let m = try MeetingShare.meeting(from: MeetingShare.markdown(answered, sender: sender, includingClaude: true))
+        #expect(m.paragraphs.map(\.text) == MeetingFixtures.example.paragraphs.map(\.text))
+        #expect(m.questions == [Meeting.Question(atMs: 83_000, text: "What's in the deploy?", answer: "## Changes\n\nTwo fixes --> both merged.", outcome: .asked)])
+        #expect(m.hookRuns == [answered.hookRuns![0]])
+    }
+
+    @Test func aMarkClosingStringIsEscaped() throws {
+        var meeting = answered
+        meeting.questions![0].text = "Is it --> done?"
+        let text = MeetingShare.markdown(meeting, sender: sender, includingClaude: true)
+        let m = try MeetingShare.meeting(from: text)
+        #expect(m.questions?.map(\.text) == ["Is it --> done?"])
+    }
+
+    @Test func aNewerFormatIsRefused() {
+        let text = MeetingShare.markdown(answered, sender: sender, includingClaude: true)
+            .replacingOccurrences(of: "format: \(MeetingShare.version)\n", with: "format: \(MeetingShare.version + 1)\n")
         #expect(throws: MeetingShare.ReadError.newerVersion) { try MeetingShare.meeting(from: text) }
     }
 }
