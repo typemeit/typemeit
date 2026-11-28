@@ -91,7 +91,7 @@ struct DictationPage: View {
                 }
             }
             if let answer {
-                ClaudeRunOutput(id: entry.id, kept: .init(prompt: question.text, answer: answer, failed: false, calls: question.calls))
+                ClaudeRunOutput(id: entry.id, kept: .init(prompt: question.text, answer: answer, failed: question.failed == true, calls: question.calls))
             } else if live.runs[entry.id] != nil {
                 ClaudeRunOutput(id: entry.id)
             } else {

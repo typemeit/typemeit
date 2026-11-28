@@ -75,7 +75,8 @@ enum TranscriptRender {
         (["## Questions for Claude"] + questions.map { question in
             let heading = "### \(question.text) · \(timestamp(ms: question.atMs))"
             guard question.result == .asked else { return "\(heading) · \(outcome(question.result))" }
-            return question.answer.map { "\(heading)\n\n\($0)" } ?? heading
+            let shownHeading = question.failed == true ? "\(heading) · failed" : heading
+            return question.answer.map { "\(shownHeading)\n\n\($0)" } ?? shownHeading
         })
         .joined(separator: "\n\n")
     }

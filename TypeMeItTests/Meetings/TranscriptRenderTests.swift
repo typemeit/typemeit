@@ -76,6 +76,17 @@ struct TranscriptRenderTests {
         #expect(TranscriptRender.markdown(meeting) == expected)
     }
 
+    @Test func anAnswerThatFailedIsMarkedFailed() {
+        let question = Meeting.Question(atMs: 75_000, text: "Which table?", answer: "Log in to Claude Code.", failed: true, outcome: .asked)
+        #expect(TranscriptRender.offered([question]) == """
+        ## Questions for Claude
+
+        ### Which table? · 1:15 · failed
+
+        Log in to Claude Code.
+        """)
+    }
+
     @Test func aSaveKeepsQuestionsEitherCopyHas() {
         let first = Meeting.Question(atMs: 10_000, text: "Which table?", answer: "calls")
         let second = Meeting.Question(atMs: 5_000, text: "How many?", answer: "12")

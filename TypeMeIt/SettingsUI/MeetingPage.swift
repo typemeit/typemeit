@@ -15,7 +15,6 @@ struct MeetingPage: View {
     @State private var player = RecordingPlayer.shared
     @State private var deleting = false
     @State private var renaming = false
-    @State private var pausing = false
     @State private var title = ""
     @State private var titleFocused = true
     /// The speaker whose name field is open in the rail, and what is typed in it.
@@ -468,24 +467,20 @@ struct MeetingPage: View {
         switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: DiarizerModelStore.shared) {
         case .transcribing(let run):
             HStack(spacing: 12) {
-                Text(pausing ? "pausing…" : run.progress.label)
+                Text(run.stopRequested ? "pausing…" : run.progress.label)
                     .font(Square.mono(12))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
                 // A pause takes effect between chunks, so only while there are chunks left.
                 if case .transcribing = run.progress {
                     SquareBar(fraction: run.fraction, width: 220)
-                    if !pausing {
-                        Button("pause") {
-                            pausing = true
-                            coordinator.stopTranscribing(meeting.id)
-                        }
+                    if !run.stopRequested {
+                        Button("pause") { coordinator.stopTranscribing(meeting.id) }
                         .buttonStyle(SquareButtonStyle(small: true))
                         .help("stops after this chunk. carry on starts from the next")
                     }
                 }
             }
-            .onChange(of: coordinator.transcribing?.id) { _, running in if running != meeting.id { pausing = false } }
         case .queued:
             Text(MeetingPhase.queuedLabel).font(Square.sans(14)).foregroundStyle(DesignTokens.Colors.ink3)
         case .summarising:
@@ -944,7 +939,7 @@ private struct MeetingTranscript: View {
                         .foregroundStyle(question.result == .asked ? DesignTokens.Colors.ink : DesignTokens.Colors.ink3)
                 }
                 if question.result == .asked, let answer = question.answer {
-                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: false, sessionID: question.sessionID, calls: question.calls), meeting: meeting.id)
+                    ClaudeRunOutput(id: question.runID ?? UUID(), kept: .init(prompt: question.text, answer: answer, failed: question.failed == true, sessionID: question.sessionID, calls: question.calls), meeting: meeting.id)
                 } else if let runID = question.runID, ClaudeLive.shared.running.contains(runID) {
                     ClaudeRunOutput(id: runID, meeting: meeting.id)
                 } else {

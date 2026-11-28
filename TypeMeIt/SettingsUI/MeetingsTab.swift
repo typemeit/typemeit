@@ -25,8 +25,6 @@ struct MeetingsTab: View {
     @State private var whenOpen = false
     @State private var selection = ListSelection()
     @State private var boxFrames = ListBoxFrames()
-    /// Meetings whose stop was clicked, until their transcription lets go.
-    @State private var stopping: Set<UUID> = []
     @State private var deletingPicked = false
     /// The meeting shown as its own page, or nil for the list.
     @State private var open: UUID?
@@ -65,7 +63,6 @@ struct MeetingsTab: View {
             if let id = open, !ids.contains(id) { open = nil }
             selection.picked.formIntersection(ids)
         }
-        .onChange(of: coordinator.transcribing?.id) { _, running in stopping = stopping.filter { $0 == running } }
     }
 
     /// The pill's `show` opens the meeting it names.
@@ -105,7 +102,6 @@ struct MeetingsTab: View {
                                 MeetingRow(meeting: meeting, place: placeWidth, picked: $selection.box(meeting.id) { filtered.map(\.id) },
                                            drag: $selection.drag(meeting.id, frames: boxFrames) { filtered.map(\.id) },
                                            picking: !selection.picked.isEmpty,
-                                           stopping: stopping.contains(meeting.id),
                                            open: {
                                                nameOnOpen = false
                                                open = meeting.id
@@ -114,10 +110,7 @@ struct MeetingsTab: View {
                                                nameOnOpen = true
                                                open = meeting.id
                                            },
-                                           stop: {
-                                               stopping.insert(meeting.id)
-                                               coordinator.stopTranscribing(meeting.id)
-                                           })
+                                           stop: { coordinator.stopTranscribing(meeting.id) })
                             }
                         }
                     }
@@ -383,8 +376,6 @@ private struct MeetingRow: View {
     let drag: ListBoxDrag
     /// Something is picked, so every box shows.
     let picking: Bool
-    /// Its stop was clicked and the transcription is letting go.
-    let stopping: Bool
     let open: () -> Void
     /// Opens the page on its first unknown speaker.
     let name: () -> Void
@@ -484,13 +475,13 @@ private struct MeetingRow: View {
         switch MeetingState.phase(meeting, coordinator: coordinator, store: store, diarizer: diarizer) {
         case .transcribing(let run):
             HStack(spacing: 10) {
-                Text(stopping ? "pausing…" : run.progress.label)
+                Text(run.stopRequested ? "pausing…" : run.progress.label)
                     .font(Square.mono(11))
                     .monospacedDigit()
                     .foregroundStyle(DesignTokens.Colors.ink2)
                     .allowsHitTesting(false)
                 // A pause takes effect between chunks, so only while there are chunks left.
-                if case .transcribing = run.progress, !stopping { stopButton }
+                if case .transcribing = run.progress, !run.stopRequested { stopButton }
             }
         case .queued:
             HStack(spacing: 10) {

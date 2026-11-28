@@ -267,7 +267,7 @@ final class MeetingStore {
                 meeting.durationMs = longest / Meeting.framesPerMs
                 meeting.recordedMs = meeting.durationMs
                 meeting.ended = meeting.started.addingTimeInterval(TimeInterval(meeting.durationMs) / 1000)
-                if meeting.kind == .call, meeting.durationMs < Fixed.meetingMinimumSeconds * 1000 {
+                if !MeetingMachine.Rules.fixed.keeps(meeting.kind, recordedMs: meeting.recordedMs) {
                     DebugLog.write("Meeting recovered at launch and dropped: \(meeting.durationMs) ms")
                     try? FileManager.default.removeItem(at: folder)
                     drop(meeting.id)
