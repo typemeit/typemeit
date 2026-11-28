@@ -95,8 +95,11 @@ final class ClaudeCheck {
         let now = Self.conditions
         if let installing { return .installing(version: installing) }
         if checking != nil { return .checking }
-        if let pass, pass.conditions == now { return .passed(version: pass.version) }
+        // A failure is always newer than the pass beside it: a check that
+        // passes clears the failure, and one that fails keeps the pass for
+        // `rollback`.
         if let failure, failure.conditions == now { return .failed(version: failure.version, problems: failure.problems, error: failure.error) }
+        if let pass, pass.conditions == now { return .passed(version: pass.version) }
         return .unchecked
     }
 

@@ -9,6 +9,19 @@ final class WordCheckTests: XCTestCase {
         HistoryEntry(timestamp: Date(), transcript: text, postProcessRequested: false, typed: text, dictionaryFixes: 0)
     }
 
+    func testAStoppedRunGoesBackToIdleWhateverItAnswered() {
+        XCTAssertEqual(WordCheck.status(endingRunIn: .stopping, failure: nil), .idle)
+        XCTAssertEqual(WordCheck.status(endingRunIn: .stopping, failure: "interrupted"), .idle)
+    }
+
+    func testAFailedRunShowsItsError() {
+        XCTAssertEqual(WordCheck.status(endingRunIn: .checking(dictations: 3), failure: "exit 1"), .failed("exit 1"))
+    }
+
+    func testAnAnswerThatDidNotFailIsRead() {
+        XCTAssertNil(WordCheck.status(endingRunIn: .checking(dictations: 3), failure: nil))
+    }
+
     func testABatchStopsBeforeTheWordsRunOut() {
         let entries = [entry("one two three"), entry("four five"), entry("six")]
         XCTAssertEqual(WordCheck.batch(entries, words: 5).map(\.id), entries.prefix(2).map(\.id))

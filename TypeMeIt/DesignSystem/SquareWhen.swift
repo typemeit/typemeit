@@ -103,6 +103,8 @@ struct SquareCalendar: View {
     @Binding var when: SquareWhen
     var today: Date = .now
     @State private var month: Date?
+    /// The first day of a run being picked. It holds only while `when` is
+    /// still that one day: a preset or a cleared filter ends the run.
     @State private var picking: Date?
 
     private let calendar = Calendar.current
@@ -175,7 +177,7 @@ struct SquareCalendar: View {
     }
 
     private func pick(_ day: Date) {
-        if let start = picking {
+        if let start = picking, when == .days(start...start) {
             when = .days(min(start, day)...max(start, day))
             picking = nil
         } else {

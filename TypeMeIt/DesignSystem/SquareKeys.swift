@@ -43,17 +43,20 @@ struct SquareShortcutRecorder: View {
     /// Told when any recorder starts or stops listening, so system hotkeys
     /// can step aside and the keys reach the recorder.
     static var listeningChanged: (@MainActor (Bool) -> Void)?
-    @State private var listening: Bool
-    @State private var monitor: Any?
+    @State private var recorder = UUID()
+    /// Drawn listening with no key monitor, for a preview of that state.
+    @State private var previewsListening: Bool
     @State private var hovering = false
     @Environment(\.squarePose) private var pose
 
-    /// `listening` starts it listening, for a preview of that state.
+    /// `listening` draws it listening, for a preview of that state.
     init(combo: Binding<KeyCombo?>, clearable: Bool = true, listening: Bool = false) {
         _combo = combo
         self.clearable = clearable
-        _listening = State(initialValue: listening)
+        _previewsListening = State(initialValue: listening)
     }
+
+    private var listening: Bool { previewsListening || SquareShortcutListening.shared.recorder == recorder }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -100,9 +103,7 @@ struct SquareShortcutRecorder: View {
     }
 
     private func start() {
-        listening = true
-        Self.listeningChanged?(true)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        SquareShortcutListening.shared.start(recorder) { event in
             let bare = KeyCombo.Modifiers(event.modifierFlags).isEmpty
             if event.keyCode == 53, bare {  // esc
                 stop()
@@ -113,15 +114,48 @@ struct SquareShortcutRecorder: View {
                 combo = new
                 stop()
             }
-            return nil
         }
     }
 
     private func stop() {
+        SquareShortcutListening.shared.stop(recorder)
+        previewsListening = false
+    }
+}
+
+/// The one shortcut recorder listening, app-wide. Starting one stops any
+/// other, so a key lands in one recorder only, and system hotkeys stay
+/// paused exactly while some recorder listens.
+@MainActor
+@Observable
+final class SquareShortcutListening {
+    static let shared = SquareShortcutListening()
+
+    private(set) var recorder: UUID?
+    @ObservationIgnored private var monitor: Any?
+
+    private init() {}
+
+    /// Listens for `recorder`, taking every key down from the window and
+    /// handing it to `keyDown`.
+    func start(_ recorder: UUID, keyDown: @escaping @MainActor (NSEvent) -> Void) {
+        let wasListening = self.recorder != nil
         if let monitor { NSEvent.removeMonitor(monitor) }
-        if monitor != nil { Self.listeningChanged?(false) }
+        self.recorder = recorder
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            keyDown(event)
+            return nil
+        }
+        if !wasListening { SquareShortcutRecorder.listeningChanged?(true) }
+    }
+
+    /// Stops listening, unless another recorder has taken over since.
+    func stop(_ recorder: UUID) {
+        guard self.recorder == recorder else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        listening = false
+        self.recorder = nil
+        SquareShortcutRecorder.listeningChanged?(false)
     }
 }
 

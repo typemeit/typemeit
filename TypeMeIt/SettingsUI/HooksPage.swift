@@ -89,7 +89,7 @@ struct HooksPage: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 16) {
                 Toggle(hook.wrappedValue.name, isOn: hookSwitch(id))
-                Button { editing = open ? nil : id } label: {
+                Button { if open { editing = nil } else { edit(id) } } label: {
                     HStack(spacing: 16) {
                         Text(hook.wrappedValue.name)
                             .font(Square.mono(13))
@@ -153,9 +153,16 @@ struct HooksPage: View {
         .overlay(alignment: .bottom) { SquareRule() }
     }
 
+    /// One hook is open at a time, the draft or one of the list's: opening
+    /// one closes the other, as cancel would.
     private func add() {
         editing = nil
         draft = MeetingHook(name: "")
+    }
+
+    private func edit(_ id: UUID) {
+        draft = nil
+        editing = id
     }
 
     private func save(_ hook: MeetingHook) {
