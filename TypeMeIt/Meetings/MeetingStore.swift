@@ -290,12 +290,12 @@ final class MeetingStore {
     /// The meeting as a `.tmi` file, written into a temporary folder of its
     /// own for the share menu or a drag (docs/meetings.md 7.16). Nil when it
     /// cannot be written.
-    func shareFile(_ id: UUID) -> URL? {
+    func shareFile(_ id: UUID, includingClaude: Bool = false) -> URL? {
         guard let meeting = meeting(id) else { return nil }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shared Meetings", isDirectory: true)
             .appendingPathComponent(id.uuidString, isDirectory: true)
         do {
-            return try MeetingFolder.writeShare(meeting, sender: NSFullUserName(), into: folder)
+            return try MeetingFolder.writeShare(meeting, sender: NSFullUserName(), includingClaude: includingClaude, into: folder)
         } catch {
             Log.meetings.error("Could not write the meeting to share: \(error.localizedDescription)")
             return nil

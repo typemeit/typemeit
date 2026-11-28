@@ -1874,14 +1874,31 @@ off returns the same error.
 ### 7.16 Sharing a meeting as a `.tmi` file
 
 A meeting leaves the Mac only as a file the user sends; type me it runs no
-server. The share button (`akar-share-box`, help `share`), on a done meeting
-with words, writes `<folder name>.tmi` into `$TMPDIR/Shared Meetings/<id>/`
-and opens the system share menu under itself: AirDrop, Mail, Messages.
-Dragged, the same button drops the file into a message or a folder.
+server. The share button (`akar-share-box`, help `share`) shows on a done
+meeting with words once nothing is still being added to it: no transcription
+pass running or queued (the pass learns the voices before it marks the
+meeting done), no summary or title being written, no hooks running. It
+writes `<folder name>.tmi` into `$TMPDIR/Shared Meetings/<id>/` and opens the
+system share menu under itself: AirDrop, Mail, Messages. Dragged, the same
+button drops the transcript-only file into a message or a folder.
+
+A meeting with an answered Ask Claude question or a hook result asks first,
+on a popup under the button: `include claude's part?`, the counts
+(`2 hook results · 1 answer`), and `transcript only` or `include`. Those
+can hold what Claude read from the user's own tools, so they never go
+unasked. Included, they follow the transcript under the headings
+`transcript.md` uses (`## Questions for Claude`, `## Hooks`), each opened by
+a hidden `<!-- tmi ask {…} -->` or `<!-- tmi hook {…} -->` line that holds
+the question and its time, or the hook's id, name, prompt and run time, as
+JSON with `>` escaped. Answers and hook output are Markdown with headings of
+their own, so only these lines can say where one ends. Questions the user
+turned down or let pass, failed runs, Claude's tool calls and session ids
+stay out.
 
 The file is `transcript.md`'s Markdown (7.9) with `echo` left out and three
 keys added: `from` (`NSFullUserName()`), `id` (the meeting's) and `format`
-(1). Under the front matter, `typeme.it` (`Fixed.websiteURL`'s host)
+(1, or 2 with Claude's part, which earlier builds refuse rather than read
+as the last speaker's words). Under the front matter, `typeme.it` (`Fixed.websiteURL`'s host)
 sits on its own line for anyone who opens the file without the app; reading
 skips everything before the first heading. Strings are written in JSON's
 string syntax, which YAML reads as double-quoted strings, so a title with a
@@ -1922,7 +1939,8 @@ set, no tracks, transcribed and published. Speakers are numbered `s1…` in the
 order the file lists them, none `isYou`; a paragraph ends where the next
 starts. A meeting whose id is already in the store is shown, not added
 again. The settings window opens on it unless onboarding or the gate is up.
-A file that is not a meeting, or has a `format` above 1, gets an alert.
+A file that is not a meeting, or has a `format` above 2, gets an alert.
+Claude's part reads back as asked questions and hook runs that did not fail.
 
 A shared meeting's row says `from <name>`. It has no player or add
 speakers, since it has no audio. The insights and the MCP's
@@ -1936,7 +1954,10 @@ paragraph ends, `sharedBy`); a name the user gave themselves is kept; quotes
 and line breaks in a title and a speaker's name; a paragraph past an hour; a
 line that only looks like a heading stays words; CRLF line endings; a
 forwarded meeting names who forwarded it; plain Markdown, and front matter
-without an id, are not meetings; `format: 2` is refused. `MeetingInsightsTests`
+without an id, are not meetings; a format above the newest is refused.
+`MeetingShareClaudeTests`: Claude's part stays out unless asked; only
+answered questions and hook results count; the whole file with them; they
+read back; a `-->` in a question stays inside its line. `MeetingInsightsTests`
 and `MCPTests`: a shared meeting is not counted.
 
 ## 8. Phase 2: the room, and speakers

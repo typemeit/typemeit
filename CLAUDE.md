@@ -111,6 +111,14 @@ A string that shows a count next to a noun goes through `counted(n, "word")`
 (TypeMeIt/Plural.swift), so it reads "1 word" and "2 words". Never write
 "\(n) words" or "word(s)" in anything the user sees.
 
+## UI changes check the website shots
+
+When a change alters anything the app draws, check whether `web/shots/`
+shows it: read `Scripts/store/app/meeting.py` for what each shot seeds and
+captures, and compare with the change. If a shot would come out different,
+retake it with `make site-shots` in the same change; if none would, say so
+in the PR description, naming what you checked.
+
 ## New models join the model scout
 
 When a change adds a model, or swaps one, for any feature, add it to the
