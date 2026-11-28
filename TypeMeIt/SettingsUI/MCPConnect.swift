@@ -60,49 +60,75 @@ extension MCPSetup {
 /// "add to claude code", which runs `claude mcp add`, or "added to claude
 /// code" once Claude Code names this copy; "install" without Claude Code.
 struct MCPAddToClaudeCode: View {
-    @State private var status: ClaudeCodeMCPStatus?
-    @State private var checking = true
-    @State private var adding = false
-    @State private var failed = false
+    enum Row: Equatable {
+        case checking
+        /// Claude Code could not be asked: not installed, or it did not start.
+        case unreachable
+        /// Claude Code has no server for this copy; `replacing` when it names another copy.
+        case absent(replacing: Bool, adding: Adding)
+        case added
+
+        enum Adding: Equatable { case notYet, running, failed }
+
+        /// What Claude Code answered, or nil when it could not be asked.
+        init(_ status: ClaudeCodeMCPStatus?) {
+            switch status {
+            case nil: self = .unreachable
+            case .missing: self = .absent(replacing: false, adding: .notYet)
+            case .otherCopy: self = .absent(replacing: true, adding: .notYet)
+            case .thisCopy: self = .added
+            }
+        }
+    }
+
+    /// What the row's task asks again for: Claude Code coming or going, or a retry.
+    private struct Ask: Hashable {
+        let claudeAvailable: Bool
+        let retries: Int
+    }
+
+    @State private var row = Row.checking
+    @State private var retries = 0
 
     var body: some View {
         // A stack, not a Group: a Group with nothing in it yet would never
         // appear, and its task would never ask.
         HStack(spacing: 10) {
-            switch status {
-            case .thisCopy:
+            switch row {
+            case .added:
                 Text("added to claude code").font(Square.mono(12)).foregroundStyle(DesignTokens.Colors.ink2)
-            case .missing, .otherCopy:
-                if failed {
-                    Text("couldn’t add").font(Square.sans(11.5)).foregroundStyle(DesignTokens.Colors.ink2)
-                    Button("retry", action: add).buttonStyle(SquareButtonStyle(small: true))
+            case .absent(let replacing, .failed):
+                Text("couldn’t add").font(Square.sans(11.5)).foregroundStyle(DesignTokens.Colors.ink2)
+                Button("retry") { add(replacing: replacing) }.buttonStyle(SquareButtonStyle(small: true))
+            case .absent(let replacing, let adding):
+                Button(adding == .running ? "adding…" : "add to claude code") { add(replacing: replacing) }
+                    .buttonStyle(SquareButtonStyle(small: true))
+                    .disabled(adding == .running)
+            case .checking:
+                if ClaudeRun.isAvailable { SquareSpinner() } else { installButton }
+            case .unreachable:
+                if ClaudeRun.isAvailable {
+                    Button("retry") { retries += 1 }.buttonStyle(SquareButtonStyle(small: true))
                 } else {
-                    Button(adding ? "adding…" : "add to claude code", action: add)
-                        .buttonStyle(SquareButtonStyle(small: true))
-                        .disabled(adding)
-                }
-            case nil:
-                if !ClaudeRun.isAvailable {
-                    Button("install") { NSWorkspace.shared.open(ClaudeRun.installPage) }.buttonStyle(SquareButtonStyle(small: true))
-                } else if checking {
-                    SquareSpinner()
+                    installButton
                 }
             }
         }
-        .task(id: ClaudeRun.isAvailable) {
-            checking = true
-            status = await MCPSetup.claudeCodeStatus()
-            checking = false
+        .task(id: Ask(claudeAvailable: ClaudeRun.isAvailable, retries: retries)) {
+            row = .checking
+            row = Row(await MCPSetup.claudeCodeStatus())
         }
     }
 
-    private func add() {
-        adding = true
-        failed = false
+    private var installButton: some View {
+        Button("install") { NSWorkspace.shared.open(ClaudeRun.installPage) }.buttonStyle(SquareButtonStyle(small: true))
+    }
+
+    private func add(replacing: Bool) {
+        row = .absent(replacing: replacing, adding: .running)
         Task {
-            let added = await MCPSetup.addToClaudeCode(replacing: status == .otherCopy)
-            adding = false
-            if added { status = .thisCopy } else { failed = true }
+            let added = await MCPSetup.addToClaudeCode(replacing: replacing)
+            row = added ? .added : .absent(replacing: replacing, adding: .failed)
         }
     }
 }

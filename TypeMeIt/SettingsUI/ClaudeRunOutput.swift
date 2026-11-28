@@ -27,7 +27,7 @@ struct ClaudeRunOutput: View {
             let running = live.running.contains(id)
             let failed = run.failed || (!running && kept?.failed == true)
             // While it runs the thread counts the seconds itself, so only its footer redraws each second.
-            let seconds = running ? nil : run.seconds ?? Int(Date().timeIntervalSince(run.started))
+            let seconds = running ? nil : run.seconds
             SquareClaudeThread(lines: [.prompt(run.prompt)] + run.lines + (failed && !run.lines.contains(where: Self.isText) ? kept.map { [.error($0.answer)] } ?? [] : []),
                                status: running ? .running : failed ? .failed : .done,
                                footer: ([running ? nil : ranLabel, running || !failed ? nil : "failed", seconds.map { "\($0) s" }, run.model].compactMap { $0 }).joined(separator: " · "),

@@ -46,7 +46,7 @@ struct WordSuggestions: View {
             let newestFirst = Array(history.reversed())
             let left = check.unchecked(newestFirst).count
             SquareClaudeButton(title: "check words") { check.check(newestFirst) }
-                .disabled(left == 0)
+                .disabled(left == 0 || check.status == .stopping)
                 .help(left == 0 ? "all checked" : "claude reads the newest unchecked dictations · \(left.formatted()) left")
         }
     }

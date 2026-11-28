@@ -65,7 +65,9 @@ final class ClaudeLive {
         return calls.isEmpty ? nil : calls
     }
 
+    /// A run that exited without its result line keeps how long it ran.
     func finish(_ id: UUID) {
+        if let run = runs[id], run.seconds == nil { run.seconds = Int(Date().timeIntervalSince(run.started)) }
         running.remove(id)
         cancels[id] = nil
     }

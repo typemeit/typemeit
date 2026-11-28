@@ -24,6 +24,10 @@ final class MeetingCoordinator {
     struct Transcribing: Equatable {
         let id: UUID
         var progress: MeetingTranscriber.Progress
+        /// A rejoin being joined onto `id`, whose folder the pass reads.
+        var joining: UUID? = nil
+        /// The user paused it; it stops after the chunk in hand.
+        var stopRequested = false
         /// The share of the audio transcribed, all of it once the words are in.
         var fraction: Double {
             if case .transcribing(let f) = progress { f } else { 1 }
@@ -97,6 +101,9 @@ final class MeetingCoordinator {
     /// Meetings a recording paused the transcription of, oldest first, to
     /// carry on when it ends. One the user carries on during the call runs.
     @ObservationIgnored private var pausedForRecording: [UUID] = []
+    /// A paused pass that was still letting go when its recording ended:
+    /// queued again once it stops.
+    @ObservationIgnored private var resumeWhenStopped: UUID?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// Settings.askClaude: the live transcript that spots questions, and the
     /// Claude Code run answering one.
@@ -139,13 +146,21 @@ final class MeetingCoordinator {
 
     /// A pre-roll capture is running.
     var holdsPreRoll: Bool { preRoll != nil }
-    var isIdle: Bool { recording == nil && transcribing == nil && machine.state == .idle }
+    /// Nothing a relaunch would cut short: no recording, transcription,
+    /// snapshot, summary, hook or question for Claude in progress.
+    var isIdle: Bool {
+        recording == nil && transcribing == nil && machine.state == .idle && !snapshotting && !transcribingSoFar
+            && summarising.isEmpty && runningHooks.isEmpty && asking == nil && askRun == nil
+    }
 
     /// Meetings whose files are being written: recording, transcribing or waiting to be.
     var liveIDs: Set<UUID> {
         var ids = Set(queued)
         if let recording { ids.insert(recording.id) }
-        if let transcribing { ids.insert(transcribing.id) }
+        if let transcribing {
+            ids.insert(transcribing.id)
+            if let joining = transcribing.joining { ids.insert(joining) }
+        }
         return ids
     }
 
@@ -183,8 +198,14 @@ final class MeetingCoordinator {
         } onChange: {
             Task { @MainActor in
                 if ModelStore.shared.state == .installed {
-                    for meeting in self.store.pendingForModel where !self.transcribeQueue.contains(where: { $0.id == meeting.id }) && self.transcribing?.id != meeting.id {
-                        self.enqueue(meeting)
+                    let live = self.liveIDs
+                    for meeting in self.store.pendingForModel where !live.contains(meeting.id) {
+                        // A recording holds transcription until it ends.
+                        if self.recording != nil {
+                            if !self.pausedForRecording.contains(meeting.id) { self.pausedForRecording.append(meeting.id) }
+                        } else {
+                            self.enqueue(meeting)
+                        }
                     }
                 }
                 self.observeModel()
@@ -644,6 +665,13 @@ final class MeetingCoordinator {
         discardPreRoll()
         let names = roster?.finish()
         roster = nil
+        // Which meeting is only a copy of the live one is known only here, so
+        // the copy goes now; the recording is transcribed in full on relaunch.
+        if let id = snapshotID, let folder = store.folder(for: id) {
+            snapshotID = nil
+            // To the Trash like `discardSnapshot`, but synchronously: the app is quitting.
+            try? FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+        }
         guard let recorder, let meeting = inProgress?.meeting else { return }
         self.recorder = nil
         let done = DispatchSemaphore(value: 0)
@@ -655,6 +683,11 @@ final class MeetingCoordinator {
         _ = done.wait(timeout: .now() + .seconds(Fixed.meetingQuitWaitSeconds))
         var finished = meeting
         if let result = box.result {
+            guard MeetingMachine.Rules.fixed.keeps(meeting.kind, recordedMs: result.recordedMs) else {
+                DebugLog.write("Meeting dropped for quit: \(result.recordedMs) ms recorded")
+                try? FileManager.default.removeItem(at: MeetingFolder.staged(meeting.id))
+                return
+            }
             finished.ended = Date()
             finished.durationMs = result.durationMs
             finished.recordedMs = result.recordedMs
@@ -719,6 +752,7 @@ final class MeetingCoordinator {
         queued = []
         transcribeTask?.cancel()
         pausedForRecording = paused
+        resumeWhenStopped = nil
         DebugLog.write("Meeting transcription paused for the recording: \(counted(paused.count, "meeting"))")
     }
 
@@ -726,7 +760,12 @@ final class MeetingCoordinator {
         let paused = pausedForRecording
         pausedForRecording = []
         for id in paused {
-            if let meeting = store.meeting(id), meeting.transcription.state == .pending { enqueue(meeting) }
+            if let running = transcribing, running.id == id {
+                // One the user paused during the call stays paused.
+                if !running.stopRequested { resumeWhenStopped = id }
+            } else if let meeting = store.meeting(id), meeting.transcription.state == .pending {
+                enqueue(meeting)
+            }
         }
     }
 
@@ -738,6 +777,8 @@ final class MeetingCoordinator {
             transcribeQueue.remove(at: i)
             queued = transcribeQueue.map(\.id)
         } else if transcribing?.id == id {
+            transcribing?.stopRequested = true
+            if resumeWhenStopped == id { resumeWhenStopped = nil }
             transcribeTask?.cancel()
         }
     }
@@ -791,7 +832,7 @@ final class MeetingCoordinator {
         // finished its own pass by now.
         if let id = meeting.continues {
             if let earlier = store.meeting(id), let earlierFolder = store.folder(for: id), !liveIDs.contains(id) {
-                transcribing = Transcribing(id: id, progress: .transcribing(0))
+                transcribing = Transcribing(id: id, progress: .transcribing(0), joining: meeting.id)
                 transcribeTask = Task.detached { [meeting, folder] in
                     let joined = await MeetingCoordinator.join(earlier, in: earlierFolder, meeting, in: folder)
                     var alone = meeting
@@ -874,6 +915,13 @@ final class MeetingCoordinator {
             toast(.meetingFailed(id: meeting.id))
         case .pending, .running:
             break
+        }
+        if resumeWhenStopped == meeting.id {
+            resumeWhenStopped = nil
+            if let stored = store.meeting(meeting.id), stored.transcription.state == .pending {
+                transcribeQueue.append(stored)
+                queued = transcribeQueue.map(\.id)
+            }
         }
         // Nothing left to transcribe, or paused: the speaker models need not stay loaded.
         if transcribeQueue.isEmpty { Task { await Diarizer.shared.unload() } }
@@ -1021,6 +1069,8 @@ final class MeetingCoordinator {
     /// A meeting toast: shown now or parked behind the cloud, and taken
     /// down after `ToastTiming.timeout` unless it stands until answered.
     private func toast(_ state: OverlayModel.State, onTimeout: (@MainActor () -> Void)? = nil) {
+        // A passing note does not sweep away a question the user asked; a warning still shows.
+        if askInPill, Self.isPassingNote(state) { return }
         toastTask?.cancel()
         overlay.showMeeting(state)
         guard !state.isStanding else { return }
@@ -1165,9 +1215,9 @@ final class MeetingCoordinator {
         let permissionMode = settings.askClaudePermissionMode
         Task { [weak self] in
             let transcript = await self?.transcribeSoFar().map(TranscriptRender.markdown)
-            // Cancelled while the transcript was gathered.
-            guard let self, self.currentAskID == runID,
-                  self.askOpened || self.overlay.model.state == asking || self.overlay.model.pendingMeeting == asking else { return }
+            // Cancelled while the transcript was gathered. A toast that took
+            // the pill's place is no cancel: the answer still comes.
+            guard let self, self.currentAskID == runID else { return }
             // The page shows the new text, and the pill too while it is up.
             let show = { (text: String) in
                 self.asking?.question.text = text
@@ -1195,6 +1245,7 @@ final class MeetingCoordinator {
             }
             guard let run = ClaudeRun.answering(prompt: prompt ?? "The question: \(question)", transcript: transcript, folder: folder, model: model, allowedTools: tools, permissionMode: permissionMode,
                                                     userSystemPrompt: userSystemPrompt) else {
+                self.askRun = nil
                 self.showAnswer(question, ClaudeRun.Answer(text: "Claude Code isn't installed. Get it at claude.com/claude-code.",
                                                            seconds: 0, costUSD: nil, failed: true), replacing: asking)
                 return
@@ -1288,6 +1339,7 @@ final class MeetingCoordinator {
         if var kept = self.asking {
             self.asking = nil
             kept.question.answer = answer.text
+            kept.question.failed = answer.failed ? true : nil
             kept.question.sessionID = answer.sessionID
             kept.question.calls = calls
             keep(kept.question, meeting: kept.meeting, dictation: kept.dictation)
@@ -1309,7 +1361,34 @@ final class MeetingCoordinator {
             kept.question.outcome = .cancelled
             keep(kept.question, meeting: kept.meeting, dictation: kept.dictation)
         }
-        dismissToast()
+        // The asking pill goes, shown or parked behind the cloud; any other pill stays.
+        for shown in [overlay.model.state, overlay.model.pendingMeeting].compactMap({ $0 }) where Self.isAsking(shown) {
+            overlay.hideMeeting(shown)
+        }
+    }
+
+    /// A toast that only reports what went well, and is lost harmlessly.
+    private static func isPassingNote(_ state: OverlayModel.State) -> Bool {
+        switch state {
+        case .meetingResumed: true
+        case .meetingSaved(_, let hooks): !hooks
+        default: false
+        }
+    }
+
+    private static func isAsking(_ state: OverlayModel.State) -> Bool {
+        if case .meetingAsking = state { true } else { false }
+    }
+
+    /// A question the user put to Claude, still being answered or answered,
+    /// on screen or parked behind the cloud.
+    private var askInPill: Bool {
+        [overlay.model.state, overlay.model.pendingMeeting].compactMap { $0 }.contains { shown in
+            switch shown {
+            case .meetingAsking, .meetingAnswer: true
+            default: false
+            }
+        }
     }
 
     private func dismissToast() {

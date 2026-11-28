@@ -60,6 +60,8 @@ final class WordCheck {
     enum Status: Equatable {
         case idle
         case checking(dictations: Int)
+        /// Stopped by the user; the run is letting go, and its answer is dropped.
+        case stopping
         case failed(String)
     }
 
@@ -112,7 +114,7 @@ final class WordCheck {
 
     /// Sends the unchecked of `entries`, newest first, up to `wordsPerRun`.
     func check(_ entries: [HistoryEntry]) {
-        guard run == nil else { return }
+        guard run == nil, status != .stopping else { return }
         let batch = Self.batch(unchecked(entries), words: Self.wordsPerRun)
         guard !batch.isEmpty else { return }
         let settings = Settings.shared
@@ -126,9 +128,8 @@ final class WordCheck {
         Task {
             let answer = await run.answer()
             self.run = nil
-            if answer.failed {
-                // Stopped by the user: back to idle, nothing marked checked.
-                status = status == .idle ? .idle : .failed(answer.text)
+            if let ended = Self.status(endingRunIn: status, failure: answer.failed ? answer.text : nil) {
+                status = ended
                 return
             }
             guard let found = Self.suggestions(from: answer.text, batch: batch) else {
@@ -147,8 +148,16 @@ final class WordCheck {
     }
 
     func stop() {
-        status = .idle
+        status = run == nil ? .idle : .stopping
         run?.cancel()
+    }
+
+    /// Where a finished run leaves `status`, or nil when its answer is to be
+    /// read: a stopped run goes back to idle whatever it answered, with
+    /// nothing marked checked, and a failed one shows its error.
+    nonisolated static func status(endingRunIn status: Status, failure: String?) -> Status? {
+        if status == .stopping { return .idle }
+        return failure.map { .failed($0) }
     }
 
     /// Fixes each dictation in `group` that still holds the heard word, and

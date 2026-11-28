@@ -170,6 +170,8 @@ struct Meeting: Codable, Equatable, Sendable, Identifiable {
         var text: String
         /// Claude Code's answer, or why there was none. Nil when it was not asked.
         var answer: String?
+        /// True when `answer` says why Claude Code gave none; nil for a real answer.
+        var failed: Bool?
         /// Nil on a question kept when only asked ones were.
         var outcome: Outcome?
         /// The run in `ClaudeLive`, and Claude Code's session for `claude --resume`.

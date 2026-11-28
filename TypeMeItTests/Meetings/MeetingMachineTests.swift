@@ -366,6 +366,12 @@ struct MeetingMachineTests {
         #expect(long.at(111, .recorderEnded(recordedMs: 91_000)) == [.finished(keep: true)])
     }
 
+    @Test func theKeepRuleKeepsARoomAndALongEnoughCall() {
+        #expect(!MeetingMachine.Rules.fixed.keeps(.call, recordedMs: 89_000))
+        #expect(MeetingMachine.Rules.fixed.keeps(.call, recordedMs: 91_000))
+        #expect(MeetingMachine.Rules.fixed.keeps(.room, recordedMs: 1_000))
+    }
+
     @Test func willSleepFinishesARecording() {
         var s = S()
         s.recordCall()

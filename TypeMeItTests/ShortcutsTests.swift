@@ -48,6 +48,17 @@ struct ShortcutsTests {
         #expect(log == ["phase pinned", "event recordingStarted", "event pinned"])
     }
 
+    @Test func aMenuStartThatFailsPinsNothing() {
+        var seen: [ShortcutEvent] = []
+        shortcuts.onEvent = { [shortcuts] event in
+            seen.append(event)
+            if event == .recordingStarted { shortcuts.setPhase(.idle) }
+        }
+        shortcuts.startFromMenu()
+        #expect(seen == [.recordingStarted])
+        #expect(shortcuts.phase == .idle)
+    }
+
     @Test func aPinnedStopEndsThroughTheTail() {
         shortcuts.startFromMenu()
         let seen = events { shortcuts.stopFromOverlay() }

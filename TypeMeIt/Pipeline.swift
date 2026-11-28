@@ -426,11 +426,8 @@ final class Pipeline {
 
     // MARK: Learned-words toast
 
-    private var toastBatch: UUID?
-
     func showLearnedToast(batchId: UUID, words: [String]) {
         guard !words.isEmpty else { return }
-        toastBatch = batchId
         showToast(.learned(batchId: batchId, words: words))
     }
 
@@ -461,9 +458,10 @@ final class Pipeline {
     }
 
     private func undoLearned() {
-        guard let batch = toastBatch else { overlay.hide(); return }
+        // The batch named by the toast on screen: a later batch's toast may have been refused.
+        guard case .learned(let shownBatch, _) = overlay.model.state else { overlay.hide(); return }
         toastTask?.cancel()
-        LearningCoordinator.shared.undo(batchId: batch)
+        LearningCoordinator.shared.undo(batchId: shownBatch)
         overlay.show(.undone)
         toastTask = Task { [weak self] in
             try? await Task.sleep(for: ToastTiming.undoneLinger)

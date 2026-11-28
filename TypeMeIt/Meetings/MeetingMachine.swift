@@ -70,6 +70,11 @@ struct MeetingMachine: Equatable {
                   resume: .seconds(Fixed.meetingResumeSeconds), rejoin: .seconds(Fixed.meetingRejoinSeconds),
                   minimum: .seconds(Fixed.meetingMinimumSeconds), sessionCap: .seconds(Fixed.meetingSessionCapSeconds))
         }
+
+        /// A room is always kept; a call only once it has run `minimum`.
+        func keeps(_ kind: Meeting.Kind, recordedMs: Int) -> Bool {
+            kind == .room || Duration.milliseconds(recordedMs) >= minimum
+        }
     }
 
     private(set) var state: State = .idle
@@ -308,7 +313,7 @@ struct MeetingMachine: Equatable {
         guard case .finishing(let owner) = state else { return [] }
         state = .idle
         recordingSince = nil
-        let keep = owner == nil || Duration.milliseconds(recordedMs) >= rules.minimum
+        let keep = rules.keeps(owner == nil ? .room : .call, recordedMs: recordedMs)
         defer { movedOn = nil }
         // The next call asks for itself.
         if let next = movedOn, inputHolders.contains(next) {
