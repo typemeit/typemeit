@@ -28,7 +28,7 @@ model to update it.
 | Diarization | Nemotron 3 Diarization, CoreML offline, weights `ga-2026-09-23` | `TypeMeIt/Meetings/Diarizer.swift`, `DiarizerModelStore.swift` | `make asr-eval ARGS=score`: wrong-speaker word rate vs AssemblyAI labels. The Nemotron baseline adapter is still a stub |
 | Ask Claude: finding the question | Claude Haiku via Claude Code (`--model haiku`, no tools or MCP) | `TypeMeIt/Meetings/ClaudeRun.swift` `latestQuestion` | None |
 | Word check: misheard words in past dictations | The Claude Code model picked in settings (`askClaudeModel`, Claude Code's default unless set), no tools or MCP, `--json-schema` output | `TypeMeIt/Meetings/ClaudeRun.swift` `wordCheck`, `TypeMeIt/Learning/WordCheck.swift` | None |
-| Speaker segmentation and embeddings | pyannote community-1 + WeSpeaker 256-d + VBx, via FluidAudio 0.18.2 | `project.yml`, `Diarizer.swift` | None. `docs/voice-names-research/` scripts are ad hoc |
+| Speaker segmentation and embeddings | pyannote community-1 + WeSpeaker 256-d + VBx, via FluidAudio 0.18.2 | `project.yml`, `Diarizer.swift` | None yet. The planned one: re-embed the user's named learned-voice clips with the candidate and score each person's own-neighbour share (of each clip's 10 nearest clips, the share with the same name), the figure the voices map in Insights shows. Outside FluidAudio's VBx clustering a candidate can replace WeSpeaker only where the app embeds spans itself (`Diarizer.voice(of:)`, `SpeakerMerge`, `RoomVoices`, `VoiceLibrary`) |
 
 The evals use one paid model, tracked the same way:
 
@@ -59,6 +59,14 @@ llama.cpp, transcribe.cpp, sherpa-onnx, mlx-audio, Apple Foundation Models.
      in FluidAudio 0.17.3, older than our pin, and went untried for three weeks.
    - A model in `seen.json` comes back if it has gained a benchmark or an
      Apple Silicon build since it was seen.
+   - Speaker embeddings: every family below stays a standing candidate until
+     it has a row in `docs/model-trials.md`, whatever its age or `seen.json`
+     entry. Report each one's newest Core ML or ONNX port and its VoxCeleb1-O
+     EER next to WeSpeaker ResNet34's (about 0.72%), and say it waits on the
+     eval in the table above until that eval exists: ReDimNet (IDRnD),
+     WeSpeaker ResNet293 and SimAM-ResNet100, ERes2NetV2 and CAM++
+     (3D-Speaker), TitaNet-Large and any Nemotron speaker encoder (NVIDIA),
+     ECAPA-TDNN (SpeechBrain).
    - Hugging Face API (`https://huggingface.co/api/models?author=<org>&sort=createdAt&limit=30`):
      FluidInference, mlx-community (≤4B params), nvidia (search parakeet,
      sortformer, titanet, canary), pyannote, argmaxinc, onnx-community,
@@ -69,7 +77,8 @@ llama.cpp, transcribe.cpp, sherpa-onnx, mlx-audio, Apple Foundation Models.
      argmaxinc/OpenBench, ml-explore/mlx-swift-lm, ml-explore/mlx-lm,
      ggml-org/llama.cpp (only titles adding a model architecture), k2-fsa/sherpa-onnx,
      Blaizzy/mlx-audio, pyannote/pyannote-audio, NVIDIA-NeMo/NeMo,
-     handy-computer/transcribe.cpp.
+     handy-computer/transcribe.cpp, wenet-e2e/wespeaker, modelscope/3D-Speaker,
+     IDRnD/redimnet.
    - Open ASR Leaderboard rows: `python3 .claude/skills/model-scout/leaderboard.py`
      prints the short-form table as CSV, proprietary rows and `License`
      included, from the leaderboard Space's API; the results datasets behind
